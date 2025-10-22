@@ -152,7 +152,7 @@ docker compose up --build
 
 | Участник | Роль | Ответственность |
 |-----------|------|-----------------|
-| Артем Горшков | Team Lead / Backend(C#) | Transactions, Budget, Logs |
+| Артем Горшков | Backend(C#) | Transactions, Budget, Logs |
 | Дмитрий Костерин | Backend (Python) | Classification, Goals, Notification, Authentification |
 | Антон Седлецкий | Frontend | UI, интеграция API |
 | Софья Евланова | Analityc | Анализ эффиктивности и работоспособности приложения |
