@@ -4,6 +4,7 @@
 Это позволяет избежать дублирования кода и унифицировать бизнес-логику, DTO и схемы данных.
 
 ## 📁 Структура папки
+```
 shared/
 ├── python/
 │ ├── models/ # Общие Pydantic / SQLAlchemy модели
@@ -17,3 +18,4 @@ shared/
 │ ├── Clients/ # Общие HTTP/gRPC клиенты
 │ └── Shared.csproj
 └── README.md
+```
