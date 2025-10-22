@@ -18,7 +18,7 @@
 | **Goals** | Python (FastAPI) | Финансовые цели и прогресс |
 | **Logs** | C# (ASP.NET Core) | Централизованный сбор логов |
 | **Notification** | Python (FastAPI, Celery) | Отправка email, push и SMS уведомлений |
-| **Frontend** | TypeScript (React / Next.js) | Веб-интерфейс пользователя |
+| **Frontend** | TypeScript (React) | Веб-интерфейс пользователя |
 | **Shared** | Python + .NET | Общие библиотеки, модели и утилиты |
 | **Infra** | Docker + K8s | Инфраструктура, CI/CD, мониторинг |
 
