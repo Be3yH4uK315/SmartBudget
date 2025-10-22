@@ -1,0 +1,13 @@
+# --- FRONTEND IGNORE RULES ---
+/frontend/.DS_Store
+/frontend/*.local
+/frontend/*.log*
+
+/frontend/node_modules
+/frontend/dist/
+
+/frontend/.rspack-profile-*/
+
+/frontend/.vscode/*
+!/frontend/.vscode/extensions.json
+/frontend/.idea
