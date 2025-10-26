@@ -1,25 +1,24 @@
 {
+  "extends": "./tsconfig.paths.json",
   "compilerOptions": {
-    "lib": ["DOM", "ES2020"],
-    "jsx": "react-jsx",
-    "target": "ES2020",
-    "noEmit": true,
-    "skipLibCheck": true,
-    "useDefineForClassFields": true,
-
-    /* modules */
+    "target": "es5",
     "module": "ESNext",
-    "moduleDetection": "force",
-    "moduleResolution": "bundler",
-    "verbatimModuleSyntax": true,
+    "lib": ["dom", "dom.iterable", "ESNext"],
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "noEmit": true,
+    "isolatedModules": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
-    "noUncheckedSideEffectImports": true,
-
-    /* type checking */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules"]
 }
