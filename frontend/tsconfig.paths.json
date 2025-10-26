@@ -1,7 +1,14 @@
 {
   "compilerOptions": {
     "paths": {
-      "@app": ["src/app"]
+      "@app": ["src/app"],
+
+      "@shared/api/*": ["src/shared/api/*"],
+      "@shared/api": ["src/shared/api"],
+      "@shared/store/*": ["src/shared/store/*"],
+      "@shared/store": ["src/shared/store"],
+      "@shared/types/*": ["src/shared/types/*"],
+      "@shared/types": ["src/shared/types"]
     }
   }
 }
