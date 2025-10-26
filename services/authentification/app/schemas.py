@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional
 from uuid import UUID
 
 class VerifyEmailRequest(BaseModel):
@@ -9,6 +8,7 @@ class VerifyLinkRequest(BaseModel):
     token: str = Field(..., description="Токен из email")
 
 class CompleteRegistrationRequest(BaseModel):
+    email: EmailStr = Field(..., description="Email для завершения")
     name: str = Field(..., max_length=255, description="Имя пользователя")
     country: str = Field(..., description="Страна")
     token: str = Field(..., description="Верификационный токен")
@@ -28,6 +28,7 @@ class ResetPasswordRequest(BaseModel):
     email: EmailStr = Field(..., description="Email для восстановления")
 
 class CompleteResetRequest(BaseModel):
+    email: EmailStr = Field(..., description="Email для сброса")
     token: str = Field(..., description="Токен восстановления")
     new_password: str = Field(..., min_length=8, description="Новый пароль")
 
