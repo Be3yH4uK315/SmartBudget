@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    env: str = 'dev'  # dev/prod для отличий
     db_url: str
     kafka_bootstrap_servers: str
     kafka_group_id: str = "auth-group"
