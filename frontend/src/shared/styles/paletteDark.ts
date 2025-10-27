@@ -34,19 +34,19 @@ export const paletteDark: PaletteOptions = {
   success: {
     light: '#B9F8CF',
     main: '#00A63E',
-    dark: '#016630'
+    dark: '#016630',
   },
 
   info: {
     light: '#BEDBFF',
     main: '#155DFC',
-    dark: '#193CB8'
+    dark: '#193CB8',
   },
 
   alert: {
-      light: '#FFF085',
-      main: '#FFAB00',
-      dark: '#894B00',
+    light: '#FFF085',
+    main: '#FFAB00',
+    dark: '#894B00',
   },
 
   grayButton: {
@@ -57,7 +57,7 @@ export const paletteDark: PaletteOptions = {
   error: {
     light: '#FFC9C9',
     main: '#E7000B',
-    dark: '#9F0712'
+    dark: '#9F0712',
   },
 
   text: {
@@ -66,17 +66,17 @@ export const paletteDark: PaletteOptions = {
 
   additionalRed: {
     main: '#FE788B',
-    light: '#FE788BBF', 
+    light: '#FE788BBF',
   },
 
   additionalLavender: {
     main: '#BAA2ED',
-    light: '#BAA2EDBF', 
+    light: '#BAA2EDBF',
   },
 
   additionalOrange: {
     main: '#F8B975',
-    light: '#F8B975BF', 
+    light: '#F8B975BF',
   },
 
   additionalPurple: {
@@ -86,7 +86,7 @@ export const paletteDark: PaletteOptions = {
 
   additionalBlue: {
     main: '#4FC5DF',
-    light: '#4FC5DFBF', 
+    light: '#4FC5DFBF',
   },
 
   additionalGray: {

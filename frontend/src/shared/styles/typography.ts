@@ -1,6 +1,7 @@
 import { TypographyVariantsOptions } from '@mui/material/styles'
 
-const brandFont = '"Tinkoff Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+const brandFont =
+  '"Tinkoff Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 
 export const typography: TypographyVariantsOptions = {
   fontFamily: brandFont,
