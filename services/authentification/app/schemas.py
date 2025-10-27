@@ -20,9 +20,9 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="Пароль")
     user_agent: str = Field(..., description="User-Agent")
 
-class LogoutRequest(BaseModel):
-    user_id: UUID = Field(..., description="ID пользователя")
-    user_agent: str = Field(..., description="User-Agent для revoke")
+# class LogoutRequest(BaseModel):
+#     user_id: UUID = Field(..., description="ID пользователя")
+#     user_agent: str = Field(..., description="User-Agent для revoke")
 
 class ResetPasswordRequest(BaseModel):
     email: EmailStr = Field(..., description="Email для восстановления")

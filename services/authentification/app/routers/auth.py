@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Body, HTTPException, Request
+from fastapi import APIRouter, Depends, Query, Body, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,7 @@ from jwt import encode, decode, PyJWTError
 from app.dependencies import get_db, get_redis
 from app.schemas import (
     VerifyEmailRequest, VerifyLinkRequest, CompleteRegistrationRequest,
-    LoginRequest, LogoutRequest, ResetPasswordRequest, CompleteResetRequest,
+    LoginRequest, ResetPasswordRequest, CompleteResetRequest,
     ChangePasswordRequest, TokenValidateRequest, RefreshRequest
 )
 from app.models import User, Session
@@ -215,24 +215,34 @@ async def login(
 
 @router.post("/logout", status_code=200)
 async def logout(
-    body: LogoutRequest = Body(...),
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
-    session_query = await db.execute(select(Session).where(Session.user_id == body.user_id, Session.user_agent == body.user_agent, Session.revoked == sa.false())) # type: ignore
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        response.delete_cookie("access_token")
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    fingerprint = sha256(refresh_token.encode()).hexdigest()
+    session_query = await db.execute(select(Session).where(
+        Session.refresh_fingerprint == fingerprint, 
+        Session.revoked == sa.false()
+    ))
     session = session_query.scalar_one_or_none()
     if not session:
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
         raise HTTPException(status_code=404, detail="Session not found")
-
     session.revoked = True
+    user_id_for_event = session.user_id
     await db.commit()
-
-    event = {"event": "user.logout", "user_id": str(body.user_id)}
+    event = {"event": "user.logout", "user_id": str(user_id_for_event)}
     await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
-
-    response = JSONResponse({"ok": True})
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
-    return response
+    secure = (settings.env == 'prod')
+    response.delete_cookie("access_token", httponly=True, secure=secure, samesite='strict')
+    response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='strict')
+    
+    return {"ok": True}
 
 @router.post("/reset-password", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def reset_password(
