@@ -25,11 +25,12 @@ app = Celery('auth', broker=settings.celery_broker_url, backend=settings.celery_
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def send_email_wrapper(self, to: str, subject: str, body: str):
+    loop = asyncio.get_event_loop()
     try:
-        asyncio.run(send_email_async(to, subject, body))
-    except Exception as e:
-        logger.error(f"Failed to run send_email_async: {e}")
-        raise self.retry(exc=e)
+        loop.run_until_complete(send_email_async(to, subject, body))
+    except Exception as exc:
+        logger.error(f"Email task failed: {exc}")
+        raise self.retry(exc=exc)
 
 async def send_email_async(to: str, subject: str, body: str):
     message = EmailMessage()
@@ -54,11 +55,12 @@ async def send_email_async(to: str, subject: str, body: str):
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def send_kafka_event_wrapper(self, topic: str, event_data: dict, schema_name: str):
+    loop = asyncio.get_event_loop()
     try:
-        asyncio.run(send_kafka_event_async(topic, event_data, schema_name))
-    except Exception as e:
-        logger.error(f"Failed to run send_kafka_event_async: {e}")
-        raise self.retry(exc=e)
+        loop.run_until_complete(send_kafka_event_async(topic, event_data, schema_name))
+    except Exception as exc:
+        logger.error(f"Kafka task failed: {exc}")
+        raise self.retry(exc=exc)
 
 async def send_kafka_event_async(topic: str, event_data: dict, schema_name: str):
     schema = SCHEMAS.get(schema_name)
@@ -87,20 +89,32 @@ async def send_kafka_event_async(topic: str, event_data: dict, schema_name: str)
         await producer.stop()
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def cleanup_sessions_wrapper():
+def cleanup_sessions_wrapper(self):
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(cleanup_sessions_async())
+    try:
+        loop.run_until_complete(cleanup_sessions_async())
+    except Exception as exc:
+        logger.error(f"Cleanup task failed: {exc}")
+        raise self.retry(exc=exc)
+
 
 async def cleanup_sessions_async():
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as db:
-        await db.execute(delete(DBSession).where(or_(DBSession.expires_at < datetime.now(timezone.utc), DBSession.revoked == sa.true())))
+        await db.execute(
+            delete(DBSession).where(
+                or_(
+                    DBSession.expires_at < datetime.now(timezone.utc),
+                    DBSession.revoked == sa.true()
+                )
+            )
+        )
         await db.commit()
-    logger.info("Expired sessions cleaned up")
+    logger.info("Expired/revoked sessions cleaned up")
 
 app.conf.beat_schedule = {
-    'cleanup-daily': {
-        'task': 'app.tasks.cleanup_sessions_wrapper',
-        'schedule': crontab(hour=3, minute=0),
+    "cleanup-daily": {
+        "task": "app.tasks.cleanup_sessions_wrapper",
+        "schedule": crontab(hour=3, minute=0),
     },
 }
