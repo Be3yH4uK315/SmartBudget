@@ -21,6 +21,7 @@ from app.tasks import send_email_wrapper, send_kafka_event_wrapper
 from app.settings import settings
 from hashlib import sha256
 import sqlalchemy as sa
+import base64
 import json
 
 router = APIRouter(prefix="", tags=["auth"])
@@ -338,7 +339,7 @@ async def refresh(
         raise HTTPException(status_code=401, detail="Missing access token")
 
     try:
-        payload = decode(access_token, settings.jwt_secret, algorithms=["HS256"], options={"verify_exp": False})
+        payload = decode(access_token, settings.jwt_public_key, algorithms=[settings.jwt_algorithm], options={"verify_exp": False})
         user_id = payload.get("sub")
         if not user_id:
             raise PyJWTError("Missing sub")
@@ -372,9 +373,13 @@ async def refresh(
     response.set_cookie("access_token", access_token, httponly=True, secure=secure, samesite='strict', max_age=900)
     return response
 
+def _int_to_base64url(value: int) -> str:
+    byte_len = (value.bit_length() + 7) // 8
+    bytes_val = value.to_bytes(byte_len, "big")
+    return base64.urlsafe_b64encode(bytes_val).decode("utf-8").rstrip("=")
+
 @router.get("/.well-known/jwks.json")
 async def get_jwks():
-    from jwt.utils import b64url_decode
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.backends import default_backend
 
@@ -383,17 +388,17 @@ async def get_jwks():
         backend=default_backend()
     )
     public_numbers = public_key_obj.public_numbers()
-    
-    jwks_data = {
+
+    jwks = {
         "keys": [
             {
-                "kty": "RSA", # <-- ИЗМЕНЕНИЕ
+                "kty": "RSA",
                 "use": "sig",
                 "kid": "sig-1",
-                "alg": "RS256", # <-- ИЗМЕНЕНИЕ
-                "n": b64url_decode(public_numbers.n).decode('utf-8'),
-                "e": b64url_decode(public_numbers.e).decode('utf-8'),
+                "alg": "RS256",
+                "n": _int_to_base64url(public_numbers.n),
+                "e": _int_to_base64url(public_numbers.e),
             }
         ]
     }
-    return jwks_data
+    return jwks
