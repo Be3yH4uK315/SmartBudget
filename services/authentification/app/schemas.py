@@ -46,3 +46,6 @@ class RefreshRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
+
+class StatusResponse(BaseModel):
+    ok: bool = Field(True, description="Статус операции")

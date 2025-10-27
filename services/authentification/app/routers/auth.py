@@ -12,7 +12,8 @@ from app.dependencies import get_db, get_redis
 from app.schemas import (
     VerifyEmailRequest, VerifyLinkRequest, CompleteRegistrationRequest,
     LoginRequest, ResetPasswordRequest, CompleteResetRequest,
-    ChangePasswordRequest, TokenValidateRequest, RefreshRequest
+    ChangePasswordRequest, TokenValidateRequest, RefreshRequest,
+    StatusResponse
 )
 from app.models import User, Session
 from app.utils import parse_device, get_location, hash_token, hash_password, check_password
@@ -45,7 +46,7 @@ async def verify_email(
         subject="Verify your email for Budget App",
         body=f"Your verification token: {token}. Use it to complete registration."
     )
-    return {"ok": True}
+    return StatusResponse()
 
 @router.get("/verify-link", status_code=200)
 async def verify_link(
@@ -57,7 +58,7 @@ async def verify_link(
     stored_hash = await redis.get(f"verify:{email}")
     if not stored_hash or stored_hash.decode() != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
-    return {"ok": True}
+    return StatusResponse()
 
 @router.post("/complete-registration", status_code=200)
 async def complete_registration(
@@ -242,7 +243,7 @@ async def logout(
     response.delete_cookie("access_token", httponly=True, secure=secure, samesite='strict')
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='strict')
     
-    return {"ok": True}
+    return StatusResponse()
 
 @router.post("/reset-password", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def reset_password(
@@ -264,7 +265,7 @@ async def reset_password(
         subject="Reset your password",
         body=f"Your reset token: {token}"
     )
-    return {"ok": True}
+    return StatusResponse()
 
 @router.post("/complete-reset", status_code=200)
 async def complete_reset(
@@ -289,7 +290,7 @@ async def complete_reset(
 
     event = {"event": "user.password_reset", "user_id": str(user.id)}
     await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
-    return {"ok": True}
+    return StatusResponse()
 
 @router.post("/change-password", status_code=200)
 async def change_password(
@@ -307,7 +308,7 @@ async def change_password(
 
     event = {"event": "user.password_changed", "user_id": str(body.user_id)}
     await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
-    return {"ok": True}
+    return StatusResponse()
 
 @router.post("/validate-token", status_code=200)
 async def validate_token(
@@ -321,7 +322,7 @@ async def validate_token(
         )
         if "sub" not in payload:
             raise PyJWTError("Missing sub")
-        return {"ok": True}
+        return StatusResponse()
     except PyJWTError:
         event = {"event": "user.token_invalid", "token": "anonymized"}
         await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
