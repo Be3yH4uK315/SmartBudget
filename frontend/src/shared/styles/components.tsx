@@ -1,5 +1,5 @@
 import TinkoffSansMedium from '@shared/assets/fonts/TinkoffSans-Medium.ttf'
-import TinkoffSansRegular from '@shared/assets/fonts/TinkoffSans-Regular.ttf'
+import NeueRegular from '@shared/assets/fonts/Neue Haas Unica W1G Light.ttf'
 import TinkoffSansBold from '@shared/assets/fonts/TinkoffSans-Bold.ttf'
 import { ThemeOptions } from '@mui/material'
 
@@ -20,9 +20,9 @@ export const components: ThemeOptions['components'] = {
 
       '@font-face': [
         {
-          fontFamily: 'Tinkoff Sans',
+          fontFamily: 'Neue Haas Unica W1G',
           fontWeight: '400',
-          src: `url(${TinkoffSansRegular}) format('truetype')`,
+          src: `url(${NeueRegular}) format('truetype')`,
         },
         {
           fontFamily: 'Tinkoff Sans',
@@ -51,13 +51,11 @@ export const components: ThemeOptions['components'] = {
         padding: '8px 16px',
 
         ...theme.typography.body1,
-        fontWeight: 500,
-        lineHeight: 1.3,
 
         borderWidth: 0,
         borderStyle: 'solid',
 
-        borderRadius: '15%',
+        borderRadius: '12px',
       }),
     },
 
@@ -87,7 +85,7 @@ export const components: ThemeOptions['components'] = {
         props: { variant: 'yellow' },
         style: ({ theme }) => ({
           backgroundColor: theme.palette.primary.main,
-          color: theme.palette.text.primary,
+          color: '#333333',
 
           '&:hover': {
             backgroundColor: theme.palette.primary.light,
@@ -106,7 +104,7 @@ export const components: ThemeOptions['components'] = {
         props: { variant: 'blue' },
         style: ({ theme }) => ({
           backgroundColor: theme.palette.secondary.main,
-          color: theme.palette.text.secondary,
+          color: '#FFFFFF',
 
           '&:hover': {
             backgroundColor: theme.palette.secondary.light,

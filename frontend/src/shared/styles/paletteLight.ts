@@ -50,8 +50,8 @@ export const paletteLight: PaletteOptions = {
   },
 
   grayButton: {
-    main: '#F3F4F7',
-    dark: '#EBEFF3', //hover
+    main: '#dedede',
+    dark: '#d6d6d6', //hover
   },
 
   error: {

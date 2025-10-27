@@ -1,39 +1,42 @@
 import { TypographyVariantsOptions } from '@mui/material/styles'
 
-const brandFont =
+const brandTinkoffFont =
   '"Tinkoff Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+  
+const brandFont =
+  '"Neue Haas Unica W1G", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 
 export const typography: TypographyVariantsOptions = {
-  fontFamily: brandFont,
+  fontFamily: brandTinkoffFont,
   fontWeightRegular: '400',
 
   h1: {
-    fontFamily: brandFont,
+    fontFamily: brandTinkoffFont,
     fontWeight: '600',
     fontSize: '3.125rem',
   },
 
   h2: {
-    fontFamily: brandFont,
+    fontFamily: brandTinkoffFont,
     fontWeight: '600',
     fontSize: '2.75rem',
   },
 
   h3: {
-    fontFamily: brandFont,
+    fontFamily: brandTinkoffFont,
     fontWeight: '500',
     fontSize: '2rem',
   },
 
   h4: {
-    fontFamily: brandFont,
+    fontFamily: brandTinkoffFont,
     fontWeight: '500',
     fontSize: '1.75rem',
   },
 
   h5: {
-    fontFamily: brandFont,
-    fontWeight: '400',
+    fontFamily: brandTinkoffFont,
+    fontWeight: '500',
     fontSize: '1.5rem',
   },
 
@@ -46,6 +49,6 @@ export const typography: TypographyVariantsOptions = {
   body1: {
     fontFamily: brandFont,
     fontWeight: '400',
-    fontSize: '1.25rem',
+    fontSize: '1rem',
   },
 }
