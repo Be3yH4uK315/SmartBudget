@@ -8,8 +8,7 @@ from redis.asyncio import Redis
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from jwt import encode, decode, PyJWTError
-from app.db import get_db
-from app.dependencies import get_redis
+from app.dependencies import get_db, get_redis
 from app.schemas import (
     VerifyEmailRequest, VerifyLinkRequest, CompleteRegistrationRequest,
     LoginRequest, LogoutRequest, ResetPasswordRequest, CompleteResetRequest,
@@ -22,7 +21,7 @@ from app.tasks import send_email_wrapper
 from app.settings import settings
 from hashlib import sha256
 import sqlalchemy as sa
-import base64
+import json
 
 router = APIRouter(prefix="", tags=["auth"])
 
@@ -120,7 +119,11 @@ async def complete_registration(
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         "role": user.role  # int role
     }
-    access_token = encode(access_payload, settings.jwt_secret, algorithm="HS256")
+    access_token = encode(
+        access_payload, 
+        settings.jwt_private_key,
+        algorithm=settings.jwt_algorithm
+    )
 
     event = {
         "event": "user.registered",
@@ -195,7 +198,11 @@ async def login(
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         "role": user.role  # int role
     }
-    access_token = encode(access_payload, settings.jwt_secret, algorithm="HS256")
+    access_token = encode(
+        access_payload, 
+        settings.jwt_private_key,
+        algorithm=settings.jwt_algorithm
+    )
 
     event = {"event": "user.login", "user_id": str(user.id), "ip": ip, "location": location}
     await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
@@ -297,7 +304,11 @@ async def validate_token(
     body: TokenValidateRequest = Body(...),
 ):
     try:
-        payload = decode(body.token, settings.jwt_secret, algorithms=["HS256"])
+        payload = decode(
+            body.token, 
+            settings.jwt_public_key,
+            algorithms=[settings.jwt_algorithm]
+        )
         if "sub" not in payload:
             raise PyJWTError("Missing sub")
         return {"ok": True}
@@ -340,7 +351,11 @@ async def refresh(
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         "role": (await db.execute(select(User.role).where(User.id == user_id))).scalar() # type: ignore
     }
-    access_token = encode(access_payload, settings.jwt_secret, algorithm="HS256")
+    access_token = encode(
+        access_payload, 
+        settings.jwt_private_key,
+        algorithm=settings.jwt_algorithm
+    )
 
     response = JSONResponse({"ok": True})
     secure = (settings.env == 'prod')
@@ -349,14 +364,25 @@ async def refresh(
 
 @router.get("/.well-known/jwks.json")
 async def get_jwks():
+    from jwt.utils import b64url_decode
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+
+    public_key_obj = serialization.load_pem_public_key(
+        settings.jwt_public_key.encode(),
+        backend=default_backend()
+    )
+    public_numbers = public_key_obj.public_numbers()
+    
     jwks_data = {
         "keys": [
             {
-                "kty": "oct",
+                "kty": "RSA", # <-- ИЗМЕНЕНИЕ
                 "use": "sig",
                 "kid": "sig-1",
-                "k": base64.urlsafe_b64encode(settings.jwt_secret.encode()).decode(),
-                "alg": "HS256"
+                "alg": "RS256", # <-- ИЗМЕНЕНИЕ
+                "n": b64url_decode(public_numbers.n).decode('utf-8'),
+                "e": b64url_decode(public_numbers.e).decode('utf-8'),
             }
         ]
     }
