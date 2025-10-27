@@ -17,8 +17,7 @@ from app.schemas import (
 )
 from app.models import User, Session
 from app.utils import parse_device, get_location, hash_token, hash_password, check_password
-from app.kafka import send_event, AUTH_EVENTS_SCHEMA, USERS_ACTIVE_SCHEMA
-from app.tasks import send_email_wrapper
+from app.tasks import send_email_wrapper, send_kafka_event_wrapper
 from app.settings import settings
 from hashlib import sha256
 import sqlalchemy as sa
@@ -133,7 +132,7 @@ async def complete_registration(
         "ip": ip,
         "location": location
     }
-    await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
+    send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
 
     user_event = {
         "user_id": str(user.id),
@@ -143,7 +142,7 @@ async def complete_registration(
         "role": user.role,
         "is_active": True
     }
-    await send_event("users.active", user_event, USERS_ACTIVE_SCHEMA)
+    send_kafka_event_wrapper.delay("users.active", user_event, "USERS_ACTIVE_SCHEMA")
 
     response = JSONResponse({"ok": True})
     secure = (settings.env == 'prod')
@@ -206,7 +205,7 @@ async def login(
     )
 
     event = {"event": "user.login", "user_id": str(user.id), "ip": ip, "location": location}
-    await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
+    send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
 
     response = JSONResponse({"ok": True})
     secure = (settings.env == 'prod')
@@ -238,7 +237,7 @@ async def logout(
     user_id_for_event = session.user_id
     await db.commit()
     event = {"event": "user.logout", "user_id": str(user_id_for_event)}
-    await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
+    send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
     secure = (settings.env == 'prod')
     response.delete_cookie("access_token", httponly=True, secure=secure, samesite='strict')
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='strict')
@@ -289,7 +288,7 @@ async def complete_reset(
     await db.commit()
 
     event = {"event": "user.password_reset", "user_id": str(user.id)}
-    await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
+    send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
     return StatusResponse()
 
 @router.post("/change-password", status_code=200)
@@ -307,7 +306,7 @@ async def change_password(
     await db.commit()
 
     event = {"event": "user.password_changed", "user_id": str(body.user_id)}
-    await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
+    send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
     return StatusResponse()
 
 @router.post("/validate-token", status_code=200)
@@ -325,7 +324,7 @@ async def validate_token(
         return StatusResponse()
     except PyJWTError:
         event = {"event": "user.token_invalid", "token": "anonymized"}
-        await send_event("budget.auth.events", event, AUTH_EVENTS_SCHEMA)
+        send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.post("/refresh", status_code=200)
