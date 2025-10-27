@@ -1,12 +1,7 @@
-from contextlib import asynccontextmanager
+from fastapi import Depends
 from redis.asyncio import Redis
 from .settings import settings
+from .db import get_db
 
-
-@asynccontextmanager
-async def get_redis():
-    redis = Redis.from_url(settings.redis_url, decode_responses=True)
-    try:
-        yield redis
-    finally:
-        await redis.close()
+def get_redis() -> Redis:
+    return Redis.from_url(settings.redis_url, decode_responses=True)
