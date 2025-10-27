@@ -1,6 +1,9 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent
+
 class Settings(BaseSettings):
     env: str = 'dev'
     db_url: str
@@ -11,12 +14,12 @@ class Settings(BaseSettings):
     celery_result_backend: str
     smtp_host: str
     smtp_port: int = 587
-    smtp_user: str
-    smtp_pass: str
+    smtp_user: str = ""
+    smtp_pass: str = ""
     geoip_db_path: str
 
-    jwt_private_key_path: Path = Path(__file__).parent.parent / "certs" / "jwt-private.pem"
-    jwt_public_key_path: Path = Path(__file__).parent.parent / "certs" / "jwt-public.pem"
+    jwt_private_key_path: Path = BASE_DIR / "certs" / "jwt-private.pem"
+    jwt_public_key_path: Path = BASE_DIR / "certs" / "jwt-public.pem"
     jwt_algorithm: str = "RS256"
     
     @property
@@ -32,7 +35,7 @@ class Settings(BaseSettings):
     tz: str = "UTC"
 
     model_config = SettingsConfigDict(
-        env_file=str(Path(__file__).parent.parent / ".env"),
+        env_file=str(ROOT_DIR / ".env"),
         env_file_encoding="utf-8",
     )
 
