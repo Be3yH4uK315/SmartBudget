@@ -1,5 +1,6 @@
 import asyncio
 from celery import Celery
+from celery.schedules import crontab
 from aiosmtplib import send, SMTPException
 from email.message import EmailMessage
 import sqlalchemy as sa
@@ -9,16 +10,19 @@ from datetime import datetime, timezone
 from logging import getLogger
 from .settings import settings
 from .models import Session as DBSession
-from .db import engine
+from .dependencies import engine
 
 logger = getLogger(__name__)
 
 app = Celery('auth', broker=settings.celery_broker_url, backend=settings.celery_result_backend)
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def send_email_wrapper(to: str, subject: str, body: str):
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(send_email_async(to, subject, body))
+def send_email_wrapper(self, to: str, subject: str, body: str):
+    try:
+        asyncio.run(send_email_async(to, subject, body))
+    except Exception as e:
+        logger.error(f"Failed to run send_email_async: {e}")
+        raise self.retry(exc=e)
 
 async def send_email_async(to: str, subject: str, body: str):
     message = EmailMessage()
@@ -56,6 +60,6 @@ async def cleanup_sessions_async():
 app.conf.beat_schedule = {
     'cleanup-daily': {
         'task': 'app.tasks.cleanup_sessions_wrapper',
-        'schedule': {'hour': 3, 'minute': 0},
+        'schedule': crontab(hour=3, minute=0),
     },
 }
