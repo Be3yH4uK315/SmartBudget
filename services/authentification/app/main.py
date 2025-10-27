@@ -7,6 +7,10 @@ from app.kafka import startup_kafka, shutdown_kafka
 from app.dependencies import get_redis
 from fastapi_limiter import FastAPILimiter
 
+app = FastAPI(title="Auth Service", version="1.0")
+Instrumentator().instrument(app).expose(app)
+app.middleware("http")(error_middleware)
+app.include_router(auth_router)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -14,16 +18,11 @@ async def lifespan(app: FastAPI):
     await startup_kafka()
     async with get_redis() as redis:
         await FastAPILimiter.init(redis)
-        Instrumentator().instrument(app).expose(app)
         yield
     await shutdown_kafka()
     await FastAPILimiter.close()
 
-
-app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
-app.middleware("http")(error_middleware)
-app.include_router(auth_router)
-
+app.router.lifespan_context = lifespan
 
 if __name__ == "__main__":
     import uvicorn
