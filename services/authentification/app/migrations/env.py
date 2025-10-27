@@ -1,7 +1,8 @@
 import sys
 import os
+from pathlib import Path
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # добавляем app в sys.path
 
 import asyncio
 from logging.config import fileConfig
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from alembic import context
 
-from app.db import Base
+from app.dependencies import Base
 from app import models
 from app.settings import settings
 
