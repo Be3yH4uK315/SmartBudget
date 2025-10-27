@@ -1,5 +1,5 @@
 import '@shared/styles/index.css'
-import { createContext, PropsWithChildren, useCallback, useMemo, useState } from 'react'
+import { createContext, PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react'
 import { CssBaseline, ThemeProvider as MuiThemeProvider } from '@mui/material'
 import { darkTheme } from '@shared/styles/darkTheme'
 import { lightTheme } from '@shared/styles/lightTheme'
@@ -29,9 +29,6 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
   const handleColorModeChange = useCallback((newColorMode: ColorMode) => {
     setColorMode(newColorMode)
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('colorMode', newColorMode)
-    }
   }, [])
 
   const theme = colorMode === 'light' ? lightTheme : darkTheme
@@ -43,6 +40,28 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     }),
     [colorMode, handleColorModeChange],
   )
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('colorMode', colorMode)
+    }
+  }, [colorMode])
+
+  /** Обновление темы при смене системной темы */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setColorMode(e.matches ? 'dark' : 'light')
+    }
+
+    if (media.addEventListener) {
+      media.addEventListener('change', handleChange)
+      return () => media.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   return (
     <ThemeContext.Provider value={contextValue}>
