@@ -1,36 +1,22 @@
-FROM python:3.12-slim AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    libmaxminddb-dev \
-    && rm -rf /var/lib/apt/lists/*
+# services/authentification/Dockerfile
+FROM python:3.12-slim as builder
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-FROM python:3.12-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    libmaxminddb0 \
-    && rm -rf /var/lib/apt/lists/*
+FROM python:3.12-slim as final
 
 WORKDIR /app
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY app/ /app/app/
+COPY ./app /app/app
+COPY alembic.ini /app/alembic.ini
 
-COPY migrations/ /app/migrations/
-COPY alembic.ini /app/
-
-VOLUME /geoip
-
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+RUN mkdir /geoip
+ENV GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
