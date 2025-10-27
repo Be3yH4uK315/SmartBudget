@@ -1,7 +1,8 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    env: str = 'dev'  # dev/prod для отличий
+    env: str = 'dev'
     db_url: str
     kafka_bootstrap_servers: str
     kafka_group_id: str = "auth-group"
@@ -18,6 +19,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     tz: str = "UTC"
 
-    model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).parent / ".env"),
+        env_file_encoding="utf-8",
+    )
 
 settings = Settings()
