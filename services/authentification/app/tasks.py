@@ -12,6 +12,13 @@ from .settings import settings
 from .models import Session as DBSession
 from .dependencies import engine
 
+from aiokafka import AIOKafkaProducer
+from aiokafka.errors import KafkaConnectionError
+from jsonschema import validate
+import jsonschema
+import json
+from .kafka import SCHEMAS
+
 logger = getLogger(__name__)
 
 app = Celery('auth', broker=settings.celery_broker_url, backend=settings.celery_result_backend)
@@ -44,6 +51,40 @@ async def send_email_async(to: str, subject: str, body: str):
     except SMTPException as e:
         logger.error(f"SMTP error sending email to {to}: {e}")
         raise
+
+@app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
+def send_kafka_event_wrapper(self, topic: str, event_data: dict, schema_name: str):
+    try:
+        asyncio.run(send_kafka_event_async(topic, event_data, schema_name))
+    except Exception as e:
+        logger.error(f"Failed to run send_kafka_event_async: {e}")
+        raise self.retry(exc=e)
+
+async def send_kafka_event_async(topic: str, event_data: dict, schema_name: str):
+    schema = SCHEMAS.get(schema_name)
+    if not schema:
+        logger.error(f"Invalid schema name provided to Celery task: {schema_name}")
+        raise ValueError(f"Invalid schema name: {schema_name}")
+
+    try:
+        validate(instance=event_data, schema=schema)
+    except jsonschema.exceptions.ValidationError as e:
+        logger.error(f"Invalid event data from Celery task: {e}")
+        raise
+    
+    producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
+    try:
+        await producer.start()
+        await producer.send_and_wait(topic, value=json.dumps(event_data).encode('utf-8'))
+        logger.info(f"Event sent via Celery to {topic}: {event_data.get('event')}")
+    except KafkaConnectionError as e:
+        logger.warning(f"Kafka connection failed in Celery task: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Kafka send failed in Celery task: {e}")
+        raise
+    finally:
+        await producer.stop()
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def cleanup_sessions_wrapper():
