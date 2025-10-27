@@ -1,7 +1,7 @@
-import Redis
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from contextlib import asynccontextmanager
+from redis import Redis
 from app.middleware import error_middleware, setup_logging
 from app.routers.auth import router as auth_router
 from app.kafka import startup_kafka, shutdown_kafka
