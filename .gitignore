@@ -11,3 +11,6 @@
 /frontend/.vscode/*
 !/frontend/.vscode/extensions.json
 /frontend/.idea
+
+# JWT Keys
+services/authentification/certs/
