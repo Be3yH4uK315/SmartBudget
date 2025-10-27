@@ -12,6 +12,7 @@ user-agents==2.2.0
 aiosmtplib==3.0.2
 pydantic==2.9.2
 pydantic-settings==2.5.2
+pydantic[email]
 alembic==1.13.3
 prometheus-fastapi-instrumentator==7.0.0
 jsonschema==4.23.0
