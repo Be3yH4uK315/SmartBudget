@@ -1,5 +1,6 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from functools import cached_property
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,11 +22,11 @@ class Settings(BaseSettings):
     jwt_public_key_path: Path = ROOT_DIR / "certs" / "jwt-public.pem"
     jwt_algorithm: str = "RS256"
     
-    @property
+    @cached_property
     def jwt_private_key(self) -> str:
         return self.jwt_private_key_path.read_text()
 
-    @property
+    @cached_property
     def jwt_public_key(self) -> str:
         return self.jwt_public_key_path.read_text()
     
