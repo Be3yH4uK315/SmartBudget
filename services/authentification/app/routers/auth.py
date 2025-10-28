@@ -15,7 +15,8 @@ from app.schemas import (
     ChangePasswordRequest, TokenValidateRequest, RefreshRequest,
     StatusResponse
 )
-from app.models import User, Session
+from app import constants
+from app.models import User, Session, UserRole
 from app.utils import parse_device, get_location, hash_token, hash_password, check_password
 from app.tasks import send_email_wrapper, send_kafka_event_wrapper
 from app.settings import settings
@@ -39,7 +40,8 @@ async def verify_email(
 
     token = str(uuid4())
     hashed_token = hash_token(token)
-    await redis.set(f"verify:{body.email}", hashed_token, ex=900)  # 15 мин TTL
+    redis_key = constants.get_verify_email_key(body.email)
+    await redis.set(redis_key, hashed_token, ex=900)
 
     send_email_wrapper.delay(
         to=body.email,
@@ -55,7 +57,8 @@ async def verify_link(
     redis: Redis = Depends(get_redis)
 ):
     hashed_token = hash_token(token)
-    stored_hash = await redis.get(f"verify:{email}")
+    redis_key = constants.get_verify_email_key(email)
+    stored_hash = await redis.get(redis_key)
     if not stored_hash or stored_hash != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
     return StatusResponse()
@@ -68,7 +71,8 @@ async def complete_registration(
     redis: Redis = Depends(get_redis)
 ):
     hashed_token = hash_token(body.token)
-    stored = await redis.get(f"verify:{body.email}")
+    redis_key = constants.get_verify_email_key(body.email)
+    stored = await redis.get(redis_key)
     if not stored or stored != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
     await redis.delete(f"verify:{body.email}")
@@ -81,7 +85,7 @@ async def complete_registration(
 
     user = User(
         id=uuid4(),
-        role=0,  # Default user role
+        role=UserRole.USER,  # Default user role
         email=body.email,
         password_hash=pw_hash,
         name=body.name,
@@ -158,7 +162,7 @@ async def login(
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
-    fail_key = f"fail:{request.client.host}"
+    fail_key = constants.get_login_fail_key(request.client.host)
     fails = int(await redis.get(fail_key) or 0)
     if fails >= 5:
         raise HTTPException(status_code=429, detail="Too many attempts, try later")
@@ -258,7 +262,8 @@ async def reset_password(
 
     token = str(uuid4())
     hashed_token = hash_token(token)
-    await redis.set(f"reset:{body.email}", hashed_token, ex=900)
+    redis_key = constants.get_reset_password_key(body.email)
+    await redis.set(redis_key, hashed_token, ex=900)
 
     send_email_wrapper.delay(
         to=body.email,
@@ -274,7 +279,8 @@ async def complete_reset(
     redis: Redis = Depends(get_redis)
 ):
     hashed_token = hash_token(body.token)
-    stored = await redis.get(f"reset:{body.email}")
+    redis_key = constants.get_reset_password_key(body.email)
+    stored = await redis.get(redis_key)
     if not stored or stored != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid token")
     await redis.delete(f"reset:{body.email}")
