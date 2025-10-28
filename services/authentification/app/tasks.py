@@ -5,12 +5,11 @@ from aiosmtplib import send, SMTPException
 from email.message import EmailMessage
 import sqlalchemy as sa
 from sqlalchemy import delete, or_
-from sqlalchemy.ext.asyncio import async_sessionmaker
 from datetime import datetime, timezone
 from logging import getLogger
 from .settings import settings
 from .models import Session as DBSession
-from .dependencies import engine
+from .dependencies import async_session
 
 from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError
@@ -100,7 +99,6 @@ def cleanup_sessions_wrapper(self):
 
 
 async def cleanup_sessions_async():
-    async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as db:
         await db.execute(
             delete(DBSession).where(
