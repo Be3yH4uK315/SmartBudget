@@ -9,14 +9,14 @@ from jwt import encode, decode, PyJWTError
 from hashlib import sha256
 import sqlalchemy as sa
 
-from app.dependencies import get_db, get_redis
+from app.dependencies import get_db, get_redis, get_arq_pool
+from arq.connections import ArqRedis
 from app.schemas import (
     CompleteRegistrationRequest, LoginRequest, 
     CompleteResetRequest, ChangePasswordRequest
 )
 from app.models import User, Session, UserRole
 from app.utils import parse_device, get_location, hash_token, hash_password, check_password
-from app.tasks import send_email_wrapper, send_kafka_event_wrapper
 from app.settings import settings
 from app import constants
 
@@ -27,10 +27,12 @@ class AuthService:
     def __init__(
         self,
         db: AsyncSession = Depends(get_db),
-        redis: Redis = Depends(get_redis)
+        redis: Redis = Depends(get_redis),
+        arq_pool: ArqRedis = Depends(get_arq_pool)
     ):
         self.db = db
         self.redis = redis
+        self.arq_pool = arq_pool
 
     async def start_email_verification(self, email: str):
         """
@@ -46,7 +48,8 @@ class AuthService:
         redis_key = constants.get_verify_email_key(email)
         await self.redis.set(redis_key, hashed_token, ex=900)  # 15 мин TTL
 
-        send_email_wrapper.delay(
+        await self.arq_pool.enqueue_job(
+            'send_email_async',
             to=email,
             subject="Verify your email for Budget App",
             body=f"Your verification token: {token}. Use it to complete registration."
@@ -116,7 +119,13 @@ class AuthService:
             "ip": ip,
             "location": location
         }
-        send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
+        # Ставим задачу в очередь Arq
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async', 
+            "budget.auth.events", 
+            event, 
+            "AUTH_EVENTS_SCHEMA"
+        )
 
         user_event = {
             "user_id": str(user.id),
@@ -126,7 +135,13 @@ class AuthService:
             "role": user.role,
             "is_active": True
         }
-        send_kafka_event_wrapper.delay("users.active", user_event, "USERS_ACTIVE_SCHEMA")
+        # Ставим задачу в очередь Arq
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async', 
+            "users.active", 
+            user_event, 
+            "USERS_ACTIVE_SCHEMA"
+        )
         
         return user, session, access_token, refresh_token
 
@@ -168,7 +183,13 @@ class AuthService:
         await self.db.commit()
 
         event = {"event": "user.login", "user_id": str(user.id), "ip": ip, "location": location}
-        send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
+        # Ставим задачу в очередь Arq
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async', 
+            "budget.auth.events", 
+            event, 
+            "AUTH_EVENTS_SCHEMA"
+        )
 
         return user, session, access_token, refresh_token
 
@@ -194,7 +215,12 @@ class AuthService:
         await self.db.commit()
         
         event = {"event": "user.logout", "user_id": str(user_id_for_event)}
-        send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async', 
+            "budget.auth.events", 
+            event, 
+            "AUTH_EVENTS_SCHEMA"
+        )
 
     async def start_password_reset(self, email: str):
         """
@@ -203,7 +229,6 @@ class AuthService:
         user_query = await self.db.execute(select(User).where(User.email == email)) # type: ignore
         user = user_query.scalar_one_or_none()
         if not user:
-            # Не сообщаем, что юзер не найден, из соображений безопасности
             return
 
         token = str(uuid4())
@@ -211,7 +236,8 @@ class AuthService:
         redis_key = constants.get_reset_password_key(email)
         await self.redis.set(redis_key, hashed_token, ex=900)
 
-        send_email_wrapper.delay(
+        await self.arq_pool.enqueue_job(
+            'send_email_async',
             to=email,
             subject="Reset your password",
             body=f"Your reset token: {token}"
@@ -239,7 +265,12 @@ class AuthService:
         await self.db.commit()
 
         event = {"event": "user.password_reset", "user_id": str(user.id)}
-        send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async', 
+            "budget.auth.events", 
+            event, 
+            "AUTH_EVENTS_SCHEMA"
+        )
 
     async def change_password(self, body: ChangePasswordRequest):
         """
@@ -255,9 +286,14 @@ class AuthService:
         await self.db.commit()
 
         event = {"event": "user.password_changed", "user_id": str(body.user_id)}
-        send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async', 
+            "budget.auth.events", 
+            event, 
+            "AUTH_EVENTS_SCHEMA"
+        )
 
-    def validate_access_token(self, token: str):
+    async def validate_access_token_async(self, token: str):
         """
         Валидирует access_token. Вызывается из /validate-token.
         """
@@ -271,7 +307,12 @@ class AuthService:
                 raise PyJWTError("Missing sub")
         except PyJWTError:
             event = {"event": "user.token_invalid", "token": "anonymized"}
-            send_kafka_event_wrapper.delay("budget.auth.events", event, "AUTH_EVENTS_SCHEMA")
+            await self.arq_pool.enqueue_job(
+                'send_kafka_event_async', 
+                "budget.auth.events", 
+                event, 
+                "AUTH_EVENTS_SCHEMA"
+            )
             raise HTTPException(status_code=401, detail="Invalid token")
 
     async def refresh_session(
@@ -304,10 +345,11 @@ class AuthService:
             raise HTTPException(status_code=403, detail="Invalid refresh token")
 
         # Получаем роль пользователя для нового токена
-        role = (await self.db.execute(select(User.role).where(User.id == user_id))).scalar() # type: ignore
+        role_result = await self.db.execute(select(User.role).where(User.id == user_id)) # type: ignore
+        role = role_result.scalar()
         
         # Создаем только новый access_token
-        new_access_token = self._create_access_token(user_id=str(user_id), role=role)
+        new_access_token = self._create_access_token(user_id=str(user_id), role=role or UserRole.USER)
         return new_access_token
 
     # --- Приватные методы ---
