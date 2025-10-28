@@ -19,4 +19,4 @@ COPY alembic.ini /app/alembic.ini
 RUN mkdir /geoip
 ENV GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]
