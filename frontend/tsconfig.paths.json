@@ -9,11 +9,13 @@
       "@shared/assets/fonts/*": ["src/shared/assets/fonts/*"],
       "@shared/assets/*": ["src/shared/assets/*"],
       "@shared/hooks": ["src/shared/hooks"],
+      "@shared/locale/*": ["src/shared/locale/*"],
       "@shared/store/*": ["src/shared/store/*"],
       "@shared/store": ["src/shared/store"],
       "@shared/styles/*": ["src/shared/styles/*"],
       "@shared/types/*": ["src/shared/types/*"],
-      "@shared/types": ["src/shared/types"]
+      "@shared/types": ["src/shared/types"],
+      "@shared/utils/*": ["src/shared/utils/*"]
     }
   }
 }
