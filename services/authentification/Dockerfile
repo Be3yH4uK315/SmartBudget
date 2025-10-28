@@ -14,9 +14,7 @@ COPY --from=builder /install /usr/local
 ENV PATH=/usr/local/bin:$PATH
 
 COPY ./app /app/app
-COPY ./certs /app/certs
 COPY alembic.ini /app/alembic.ini
-COPY .env /app/.env
 
 RUN mkdir /geoip
 ENV GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
