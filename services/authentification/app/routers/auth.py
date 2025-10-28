@@ -138,7 +138,7 @@ async def validate_token(
     body: TokenValidateRequest = Body(...),
     service: AuthService = Depends(AuthService)
 ):
-    service.validate_access_token(body.token)
+    await service.validate_access_token_async(body.token)
     return StatusResponse()
 
 @router.post("/refresh", status_code=200)
