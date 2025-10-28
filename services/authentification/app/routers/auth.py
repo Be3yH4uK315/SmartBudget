@@ -56,7 +56,7 @@ async def verify_link(
 ):
     hashed_token = hash_token(token)
     stored_hash = await redis.get(f"verify:{email}")
-    if not stored_hash or stored_hash.decode() != hashed_token:
+    if not stored_hash or stored_hash != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
     return StatusResponse()
 
@@ -69,7 +69,7 @@ async def complete_registration(
 ):
     hashed_token = hash_token(body.token)
     stored = await redis.get(f"verify:{body.email}")
-    if not stored or stored.decode() != hashed_token:
+    if not stored or stored != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
     await redis.delete(f"verify:{body.email}")
 
@@ -275,7 +275,7 @@ async def complete_reset(
 ):
     hashed_token = hash_token(body.token)
     stored = await redis.get(f"reset:{body.email}")
-    if not stored or stored.decode() != hashed_token:
+    if not stored or stored != hashed_token:
         raise HTTPException(status_code=403, detail="Invalid token")
     await redis.delete(f"reset:{body.email}")
 
