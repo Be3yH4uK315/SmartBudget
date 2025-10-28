@@ -3,12 +3,18 @@ from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, I
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
 from .dependencies import Base
+import enum
+
+class UserRole(enum.IntEnum):
+    USER = 0
+    ADMIN = 1
+    MODERATOR = 2
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)  # Уникальный ID пользователя
-    role = Column(Integer, default=0, nullable=False)  # Роль как целое число: 0 - user, 1 - admin и т.д.
+    role = Column(Integer, default=UserRole.USER, nullable=False)  # Роль как целое число
     email = Column(String(255), nullable=False)  # Email пользователя
     password_hash = Column(String, nullable=False)  # Хэш пароля
     name = Column(String(255), nullable=False)  # Имя пользователя
