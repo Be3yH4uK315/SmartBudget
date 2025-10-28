@@ -1,0 +1,141 @@
+services:
+  # -------------------------
+  # Auth Service
+  # -------------------------
+  auth_service:
+    build: .
+    container_name: auth_service_dev
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth_postgres_dev
+      - auth_redis_dev
+      - auth_kafka_dev
+    volumes:
+      - .:/app
+      - ./geoip:/geoip
+    restart: unless-stopped
+
+  # -------------------------
+  # PostgreSQL
+  # -------------------------
+  auth_postgres_dev:
+    image: postgres:16
+    container_name: auth_postgres_dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data_auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Redis (async)
+  # -------------------------
+  auth_redis_dev:
+    image: redis:7
+    container_name: auth_redis_dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_auth:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Zookeeper (для Kafka)
+  # -------------------------
+  auth_zookeeper_dev:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: auth_zookeeper_dev
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "zkServer.sh", "status"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Kafka
+  # -------------------------
+  auth_kafka_dev:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: auth_kafka_dev
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: auth_zookeeper_dev:2181
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://auth_kafka_dev:9092
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9092:9092"
+    depends_on:
+      - auth_zookeeper_dev
+    healthcheck:
+      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "auth_kafka_dev:9092", "--list"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Mailhog для тестирования почты
+  # -------------------------
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "8025:8025" # веб интерфейс
+      - "1025:1025" # SMTP порт
+
+  # -------------------------
+  # Celery worker
+  # -------------------------
+  auth_celery_worker:
+    build: .
+    container_name: auth_celery_worker
+    env_file:
+      - .env
+    command: celery -A app.tasks worker --loglevel=info
+    depends_on:
+      - auth_service_dev
+      - auth_postgres_dev
+      - auth_redis_dev
+      - auth_kafka_dev
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+  # -------------------------
+  # Celery beat
+  # -------------------------
+  auth_celery_beat:
+    build: .
+    container_name: auth_celery_beat
+    env_file:
+      - .env
+    command: celery -A app.tasks beat --loglevel=info
+    depends_on:
+      - auth_service_dev
+      - auth_postgres_dev
+      - auth_redis_dev
+      - auth_kafka_dev
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+volumes:
+  pg_data_auth:
+  redis_data_auth:
