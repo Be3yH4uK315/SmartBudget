@@ -14,9 +14,9 @@ class User(Base):
     name = Column(String(255), nullable=False)  # Имя пользователя
     country = Column(String, nullable=False)  # Страна
     is_active = Column(Boolean, default=False)  # Активен ли аккаунт
-    last_login = Column(DateTime, nullable=True)  # Последний логин
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))  # Дата создания
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))  # Дата обновления
+    last_login = Column(DateTime(timezone=True), nullable=True)  # Последний логин
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))  # Дата создания
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))  # Дата обновления
 
     __table_args__ = (
         Index('ix_users_email', 'email', unique=True),  # Индекс для уникального email
@@ -33,8 +33,8 @@ class Session(Base):
     location = Column(String, nullable=False)  # Локация
     revoked = Column(Boolean, default=False)  # Отозвана ли сессия
     refresh_fingerprint = Column(String, nullable=False)  # Fingerprint refresh токена
-    expires_at = Column(DateTime, nullable=False)  # Дата истечения
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))  # Дата создания
+    expires_at = Column(DateTime(timezone=True), nullable=False)  # Дата истечения
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))  # Дата создания
 
     __table_args__ = (
         Index('ix_sessions_user_id', 'user_id'),  # Индекс для поиска по user_id
