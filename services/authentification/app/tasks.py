@@ -25,28 +25,29 @@ app = Celery('auth', broker=settings.celery_broker_url, backend=settings.celery_
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def send_email_wrapper(self, to: str, subject: str, body: str):
-    loop = asyncio.get_event_loop()
+    import asyncio
     try:
-        loop.run_until_complete(send_email_async(to, subject, body))
+        asyncio.run(send_email_async(to, subject, body))
     except Exception as exc:
-        logger.error(f"Email task failed: {exc}")
-        raise self.retry(exc=exc)
+        self.retry(exc=exc)
 
 async def send_email_async(to: str, subject: str, body: str):
     message = EmailMessage()
-    message["From"] = settings.smtp_user
+    message["From"] = settings.smtp_user or "no-reply@example.com"
     message["To"] = to
     message["Subject"] = subject
     message.set_content(body)
 
+    logger.info(f"Пробуем отправить письмо на {to} через {settings.smtp_host}:{settings.smtp_port}")
+    
     try:
         await send(
             message,
             hostname=settings.smtp_host,
             port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_pass,
-            use_tls=True,
+            username=settings.smtp_user or None,
+            password=settings.smtp_pass or None,
+            start_tls=False
         )
         logger.info(f"Email sent to {to}")
     except SMTPException as e:

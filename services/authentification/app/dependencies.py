@@ -22,7 +22,7 @@ async def get_redis(request: Request) -> Redis:
     return Redis(connection_pool=pool, decode_responses=True)
 
 async def create_redis_pool() -> ConnectionPool:
-    return ConnectionPool.from_url(settings.redis_url)
+    return ConnectionPool.from_url(settings.redis_url, decode_responses=True)
 
 async def close_redis_pool(pool: ConnectionPool):
     await pool.disconnect()
