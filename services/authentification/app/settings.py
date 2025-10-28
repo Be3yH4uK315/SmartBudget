@@ -1,8 +1,7 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parent
-ROOT_DIR = BASE_DIR.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     env: str = 'dev'
@@ -18,8 +17,8 @@ class Settings(BaseSettings):
     smtp_pass: str = ""
     geoip_db_path: str
 
-    jwt_private_key_path: Path = BASE_DIR / "certs" / "jwt-private.pem"
-    jwt_public_key_path: Path = BASE_DIR / "certs" / "jwt-public.pem"
+    jwt_private_key_path: Path = ROOT_DIR / "certs" / "jwt-private.pem"
+    jwt_public_key_path: Path = ROOT_DIR / "certs" / "jwt-public.pem"
     jwt_algorithm: str = "RS256"
     
     @property
