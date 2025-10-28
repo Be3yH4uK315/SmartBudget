@@ -10,8 +10,7 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str
     kafka_group_id: str = "auth-group"
     redis_url: str
-    celery_broker_url: str
-    celery_result_backend: str
+    arq_queue_name: str = "auth_tasks"
     smtp_host: str
     smtp_port: int = 587
     smtp_user: str = ""
