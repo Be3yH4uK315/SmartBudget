@@ -101,32 +101,14 @@ services:
       - "1025:1025" # SMTP порт
 
   # -------------------------
-  # Celery worker
+  # Arq worker
   # -------------------------
-  auth_celery_worker:
+  auth_worker:
     build: .
-    container_name: auth_celery_worker
+    container_name: auth_worker
     env_file:
       - .env
-    command: celery -A app.tasks worker --loglevel=info
-    depends_on:
-      - auth_service_dev
-      - auth_postgres_dev
-      - auth_redis_dev
-      - auth_kafka_dev
-    volumes:
-      - .:/app
-    restart: unless-stopped
-
-  # -------------------------
-  # Celery beat
-  # -------------------------
-  auth_celery_beat:
-    build: .
-    container_name: auth_celery_beat
-    env_file:
-      - .env
-    command: celery -A app.tasks beat --loglevel=info
+    command: arq app.worker.WorkerSettings
     depends_on:
       - auth_service_dev
       - auth_postgres_dev
