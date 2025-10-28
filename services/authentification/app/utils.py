@@ -1,4 +1,5 @@
 from user_agents import parse as ua_parse
+import ipaddress
 import geoip2.database
 from geoip2.errors import AddressNotFoundError
 from hashlib import sha256
@@ -14,6 +15,12 @@ def parse_device(user_agent: str) -> str:
     return f"{ua.device.family}, {ua.os.family} {ua.os.version_string}"
 
 def get_location(ip: str) -> str:
+    try:
+        if ipaddress.ip_address(ip).is_private:
+            return "Local Network"
+    except ValueError:
+        pass
+
     if not os.path.exists(settings.geoip_db_path):
         logger.error(f"GeoIP DB not found at {settings.geoip_db_path}")
         return "Unknown"
