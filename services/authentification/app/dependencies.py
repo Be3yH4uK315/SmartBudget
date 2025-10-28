@@ -4,6 +4,7 @@ from app.settings import settings
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from typing import AsyncGenerator
+from arq.connections import ArqRedis
 
 # --- DB ---
 engine = create_async_engine(settings.db_url)
@@ -26,3 +27,7 @@ async def create_redis_pool() -> ConnectionPool:
 
 async def close_redis_pool(pool: ConnectionPool):
     await pool.disconnect()
+
+# --- Arq ---
+async def get_arq_pool(request: Request) -> ArqRedis:
+    return request.app.state.arq_pool
