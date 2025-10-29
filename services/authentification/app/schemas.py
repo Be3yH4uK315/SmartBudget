@@ -20,10 +20,6 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="Пароль")
     user_agent: str = Field(..., description="User-Agent")
 
-# class LogoutRequest(BaseModel):
-#     user_id: UUID = Field(..., description="ID пользователя")
-#     user_agent: str = Field(..., description="User-Agent для revoke")
-
 class ResetPasswordRequest(BaseModel):
     email: EmailStr = Field(..., description="Email для восстановления")
 
@@ -33,7 +29,6 @@ class CompleteResetRequest(BaseModel):
     new_password: str = Field(..., min_length=8, description="Новый пароль")
 
 class ChangePasswordRequest(BaseModel):
-    user_id: UUID = Field(..., description="ID пользователя")
     password: str = Field(..., description="Текущий пароль")
     new_password: str = Field(..., min_length=8, description="Новый пароль")
 

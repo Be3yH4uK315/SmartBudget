@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from redis.asyncio import Redis
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime, timedelta, timezone
 from jwt import encode, decode, PyJWTError
 from hashlib import sha256
@@ -39,7 +39,7 @@ class AuthService:
         Проверяет, свободен ли email, и инициирует отправку
         письма с токеном верификации.
         """
-        existing_user = await self.db.execute(select(User).where(User.email == email)) # type: ignore
+        existing_user = await self.db.execute(select(User).where(User.email == email)) 
         if existing_user.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -157,7 +157,7 @@ class AuthService:
         if fails >= 5:
             raise HTTPException(status_code=429, detail="Too many attempts, try later")
 
-        user_query = await self.db.execute(select(User).where(User.email == body.email, User.is_active == sa.true())) # type: ignore
+        user_query = await self.db.execute(select(User).where(User.email == body.email, User.is_active == sa.true())) 
         user = user_query.scalar_one_or_none()
         
         if not user or not check_password(body.password, user.password_hash):
@@ -226,7 +226,7 @@ class AuthService:
         """
         Инициирует сброс пароля, если пользователь существует.
         """
-        user_query = await self.db.execute(select(User).where(User.email == email)) # type: ignore
+        user_query = await self.db.execute(select(User).where(User.email == email)) 
         user = user_query.scalar_one_or_none()
         if not user:
             return
@@ -256,7 +256,7 @@ class AuthService:
 
         pw_hash = hash_password(body.new_password)
 
-        user_query = await self.db.execute(select(User).where(User.email == body.email)) # type: ignore
+        user_query = await self.db.execute(select(User).where(User.email == body.email))
         user = user_query.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -272,11 +272,11 @@ class AuthService:
             "AUTH_EVENTS_SCHEMA"
         )
 
-    async def change_password(self, body: ChangePasswordRequest):
+    async def change_password(self, user_id: str, body: ChangePasswordRequest):
         """
-        Изменяет пароль пользователя после проверки текущего пароля.
+        Изменяет пароль пользователя, используя user_id из токена.
         """
-        user_query = await self.db.execute(select(User).where(User.id == body.user_id)) # type: ignore
+        user_query = await self.db.execute(select(User).where(User.id == UUID(user_id)))
         user = user_query.scalar_one_or_none()
         if not user or not check_password(body.password, user.password_hash):
             raise HTTPException(status_code=403, detail="Invalid current password")
@@ -285,7 +285,7 @@ class AuthService:
         user.password_hash = pw_hash
         await self.db.commit()
 
-        event = {"event": "user.password_changed", "user_id": str(body.user_id)}
+        event = {"event": "user.password_changed", "user_id": user_id}
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async', 
             "budget.auth.events", 
@@ -335,9 +335,9 @@ class AuthService:
 
         fingerprint = sha256(refresh_token.encode()).hexdigest()
         session_query = await self.db.execute(select(Session).where(
-            Session.user_id == user_id, # type: ignore
-            Session.refresh_fingerprint == fingerprint, # type: ignore
-            Session.revoked == sa.false(),# type: ignore
+            Session.user_id == user_id, 
+            Session.refresh_fingerprint == fingerprint, 
+            Session.revoked == sa.false(),
             Session.expires_at > datetime.now(timezone.utc)
         ))
         session = session_query.scalar_one_or_none()
@@ -345,7 +345,7 @@ class AuthService:
             raise HTTPException(status_code=403, detail="Invalid refresh token")
 
         # Получаем роль пользователя для нового токена
-        role_result = await self.db.execute(select(User.role).where(User.id == user_id)) # type: ignore
+        role_result = await self.db.execute(select(User.role).where(User.id == user_id)) 
         role = role_result.scalar()
         
         # Создаем только новый access_token
