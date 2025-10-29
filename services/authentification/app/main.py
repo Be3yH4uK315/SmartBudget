@@ -9,6 +9,7 @@ from fastapi_limiter import FastAPILimiter
 from arq import create_pool
 from arq.connections import RedisSettings
 from app.settings import settings
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +34,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
+app.add_middleware(
+    TrustedHostMiddleware, allowed_hosts=["*"]
+)
 Instrumentator().instrument(app).expose(app)
 app.middleware("http")(error_middleware)
 app.include_router(auth_router)
