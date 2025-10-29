@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 import base64
 
+from app.dependencies import get_current_user_id, get_real_ip
 from app.schemas import (
     VerifyEmailRequest, VerifyLinkRequest, CompleteRegistrationRequest,
     LoginRequest, ResetPasswordRequest, CompleteResetRequest,
@@ -64,12 +65,11 @@ async def verify_link(
 
 @router.post("/complete-registration", status_code=200)
 async def complete_registration(
-    request: Request,
     body: CompleteRegistrationRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    service: AuthService = Depends(AuthService),
+    ip: str = Depends(get_real_ip)
 ):
-    _user, _session, access_token, refresh_token = \
-        await service.complete_registration(body, request.client.host if request.client else "127.0.0.1")
+    _user, _session, access_token, refresh_token = await service.complete_registration(body, ip)
 
     response = JSONResponse({"ok": True})
     _set_auth_cookies(response, access_token, refresh_token)
@@ -77,12 +77,11 @@ async def complete_registration(
 
 @router.post("/login", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def login(
-    request: Request,
     body: LoginRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    service: AuthService = Depends(AuthService),
+    ip: str = Depends(get_real_ip)
 ):
-    _user, _session, access_token, refresh_token = \
-        await service.authenticate_user(body, request.client.host if request.client else "127.0.0.1")
+    _user, _session, access_token, refresh_token = await service.authenticate_user(body, ip)
 
     response = JSONResponse({"ok": True})
     _set_auth_cookies(response, access_token, refresh_token)
@@ -128,9 +127,10 @@ async def complete_reset(
 @router.post("/change-password", status_code=200)
 async def change_password(
     body: ChangePasswordRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    service: AuthService = Depends(AuthService),
+    user_id: str = Depends(get_current_user_id)
 ):
-    await service.change_password(body)
+    await service.change_password(user_id, body)
     return StatusResponse()
 
 @router.post("/validate-token", status_code=200)
