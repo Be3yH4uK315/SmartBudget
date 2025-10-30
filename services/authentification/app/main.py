@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     await FastAPILimiter.init(redis_limiter)
     
     arq_pool = await create_pool(
-        RedisSettings.from_url(settings.redis_url)
+        RedisSettings.from_dsn(settings.redis_url)
     )
     app.state.arq_pool = arq_pool
 
@@ -31,7 +31,10 @@ async def lifespan(app: FastAPI):
     await close_redis_pool(redis_pool)
     if arq_pool:
         await arq_pool.close()
-
+    if hasattr(app.state, "redis_pool"):
+        del app.state.redis_pool
+    if hasattr(app.state, "arq_pool"):
+        del app.state.arq_pool
 
 app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
 app.add_middleware(
