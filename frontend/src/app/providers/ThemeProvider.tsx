@@ -1,5 +1,5 @@
-import '@shared/styles/index.css'
 import { createContext, PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react'
+import '@shared/styles/index.css'
 import { CssBaseline, ThemeProvider as MuiThemeProvider } from '@mui/material'
 import { darkTheme } from '@shared/styles/darkTheme'
 import { lightTheme } from '@shared/styles/lightTheme'
