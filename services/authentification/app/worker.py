@@ -1,17 +1,14 @@
-import asyncio
 from aiosmtplib import send, SMTPException
 from email.message import EmailMessage
 import sqlalchemy as sa
 from sqlalchemy import delete, or_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 from datetime import datetime, timezone
 from logging import getLogger
-from arq.connections import RedisSettings, create_pool
 from arq.cron import cron
 
 from .settings import settings
 from .models import Session as DBSession
-from .dependencies import async_session, engine
 
 from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError
@@ -63,7 +60,7 @@ async def send_kafka_event_async(ctx, topic: str, event_data: dict, schema_name:
         validate(instance=event_data, schema=schema)
     except jsonschema.exceptions.ValidationError as e:
         logger.error(f"Arq: Invalid event data: {e}")
-        return
+        raise
 
     producer: AIOKafkaProducer = ctx["kafka_producer"]
     try:
@@ -80,8 +77,8 @@ async def cleanup_sessions_async(ctx):
     """
     Задача Arq (Cron) для очистки старых сессий.
     """
-    db: AsyncSession = ctx["db_session"]
-    async with db() as session:
+    db_maker: async_sessionmaker[AsyncSession] = ctx["db_session_maker"]
+    async with db_maker() as session:
         try:
             await session.execute(
                 delete(DBSession).where(
@@ -94,52 +91,48 @@ async def cleanup_sessions_async(ctx):
             await session.commit()
             logger.info("Arq: Expired/revoked sessions cleaned up")
         except Exception as e:
-            logger.error(f"Arq: Cleanup task failed: {e}")
             await session.rollback()
+            logger.error(f"Arq: Cleanup task failed: {e}")
             raise
 
 # --- Жизненный цикл Воркера ---
-async def startup(ctx):
+async def on_startup(ctx):
     """
     Выполняется при старте воркера Arq.
     Инициализируем пулы соединений.
     """
-    logger.info("Arq Worker starting up...")
-    ctx["kafka_producer"] = AIOKafkaProducer(
-        bootstrap_servers=settings.kafka_bootstrap_servers
-    )
-    await ctx["kafka_producer"].start()
-    ctx["db_session"] = async_session 
-    logger.info("Arq Worker startup complete.")
+    logger.info("Starting Arq worker...")
+    producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
+    await producer.start()
+    ctx["kafka_producer"] = producer
+    logger.info("Arq: Kafka producer started.")
+    ctx["db_session_maker"] = db_session_maker
+    logger.info("Arq: DB session maker injected.")
 
-async def shutdown(ctx):
+
+async def on_shutdown(ctx):
     """
     Выполняется при остановке воркера Arq.
     """
-    logger.info("Arq Worker shutting down...")
-    if "kafka_producer" in ctx:
-        await ctx["kafka_producer"].stop()
-    await engine.dispose() 
-    logger.info("Arq Worker shutdown complete.")
+    logger.info("Shutting down Arq worker...")
+    producer: AIOKafkaProducer = ctx.get("kafka_producer")
+    if producer:
+        await producer.stop()
+        logger.info("Arq: Kafka producer stopped.")
+    await engine.dispose()
+    logger.info("Arq: DB engine disposed.")
 
 # --- Настройки Воркера ---
-functions = [send_email_async, send_kafka_event_async, cleanup_sessions_async]
-cron_jobs = [
-    cron(
-        'app.worker.cleanup_sessions_async', 
-        hour=3, 
-        minute=0, 
-        run_at_startup=False
-    )
-]
+engine = create_async_engine(settings.db_url)
+db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 class WorkerSettings:
-    """
-    Главный класс настроек, который Arq использует для запуска.
-    """
-    functions = functions
-    cron_jobs = cron_jobs
-    on_startup = startup
-    on_shutdown = shutdown
-    redis_settings = RedisSettings.from_url(settings.redis_url) 
+    functions = [
+        send_email_async,
+        send_kafka_event_async,
+        cleanup_sessions_async
+    ]
+    on_startup = on_startup
+    on_shutdown = on_shutdown
+    cron_jobs = [cron(cleanup_sessions_async, hour=3, minute=0)]
     queue_name = settings.arq_queue_name
