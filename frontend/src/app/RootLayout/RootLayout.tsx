@@ -1,5 +1,6 @@
 import { PropsWithChildren } from 'react'
 import { Box } from '@mui/material'
+import Header from './Header'
 
 export function RootLayout({ children }: PropsWithChildren) {
   return (
@@ -11,7 +12,7 @@ export function RootLayout({ children }: PropsWithChildren) {
         backgroundColor: 'surface.main',
       }}
     >
-      {/* header будет тута*/}
+      <Header />
 
       <Box
         sx={{
