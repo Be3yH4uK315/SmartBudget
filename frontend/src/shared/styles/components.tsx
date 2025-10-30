@@ -179,4 +179,20 @@ export const components: ThemeOptions['components'] = {
       }),
     },
   },
+
+  MuiTab: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        textTransform: 'none',
+        minHeight: 48,
+        paddingInline: theme.spacing(2),
+        ...theme.typography.caption,
+        color: theme.palette.text.primary,
+
+        '&.Mui-selected': {
+          color: theme.palette.text.primary,
+        },
+      }),
+    },
+  },
 }
