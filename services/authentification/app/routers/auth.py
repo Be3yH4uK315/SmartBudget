@@ -25,7 +25,7 @@ def _set_auth_cookies(
     response.set_cookie(
         key="access_token", 
         value=access_token, 
-        htt_only=True, 
+        httponly=True, 
         secure=secure, 
         samesite='strict', 
         max_age=900 # 15 min
@@ -33,7 +33,7 @@ def _set_auth_cookies(
     response.set_cookie(
         key="refresh_token", 
         value=refresh_token, 
-        htt_only=True, 
+        httponly=True, 
         secure=secure, 
         samesite='strict', 
         max_age=2592000 # 30 days
@@ -42,8 +42,8 @@ def _set_auth_cookies(
 def _delete_auth_cookies(response: Response):
     """Хелпер для удаления auth cookie."""
     secure = (settings.env == 'prod')
-    response.delete_cookie("access_token", htt_only=True, secure=secure, samesite='strict')
-    response.delete_cookie("refresh_token", htt_only=True, secure=secure, samesite='strict')
+    response.delete_cookie("access_token", httponly=True, secure=secure, samesite='strict')
+    response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='strict')
 
 
 @router.post("/verify-email", status_code=200)
@@ -160,7 +160,7 @@ async def refresh(
     response.set_cookie(
         "access_token", 
         new_access_token, 
-        htt_only=True, 
+        httponly=True, 
         secure=secure, 
         samesite='strict', 
         max_age=900
