@@ -1,6 +1,6 @@
 fastapi==0.115.2
 uvicorn==0.31.1
-guvicorn>=0.31.1
+gunicorn>=22.0.0
 sqlalchemy[asyncio]==2.0.35
 asyncpg==0.29.0
 aiokafka==0.11.0
@@ -21,3 +21,11 @@ python-dotenv==1.0.1
 python-multipart==0.0.12
 fastapi-limiter==0.1.6
 cryptography>=42.0.0
+pytest
+pytest-asyncio
+httpx
+asgi-lifespan
+faker
+freezegun
+respx
+fakeredis
