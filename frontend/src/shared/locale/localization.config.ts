@@ -1,5 +1,5 @@
-import i18next, { i18n } from 'i18next'
 import { getInitialLanguage } from '@shared/utils/locale.helpers'
+import i18next, { i18n } from 'i18next'
 import { rootDictionary } from './rootDictionary'
 
 let _instance: i18n | null = null

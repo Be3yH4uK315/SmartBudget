@@ -1,2 +1,2 @@
-export * from './Providers'
 export * from './LocalizationProvider'
+export * from './Providers'
