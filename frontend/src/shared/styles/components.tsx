@@ -1,7 +1,7 @@
-import TinkoffSansMedium from '@shared/assets/fonts/TinkoffSans-Medium.ttf'
+import { ThemeOptions } from '@mui/material'
 import NeueRegular from '@shared/assets/fonts/Neue Haas Unica W1G Light.ttf'
 import TinkoffSansBold from '@shared/assets/fonts/TinkoffSans-Bold.ttf'
-import { ThemeOptions } from '@mui/material'
+import TinkoffSansMedium from '@shared/assets/fonts/TinkoffSans-Medium.ttf'
 
 export const components: ThemeOptions['components'] = {
   MuiCssBaseline: {
