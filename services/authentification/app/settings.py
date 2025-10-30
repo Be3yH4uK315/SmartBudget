@@ -1,8 +1,12 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import cached_property
+import os
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+
+env_file_name = os.getenv("ENV_FILE", ".env")
+env_file_path = ROOT_DIR / env_file_name
 
 class Settings(BaseSettings):
     env: str = 'dev'
@@ -34,7 +38,7 @@ class Settings(BaseSettings):
     tz: str = "UTC"
 
     model_config = SettingsConfigDict(
-        env_file=str(ROOT_DIR / ".env"),
+        env_file=str(env_file_path),
         env_file_encoding="utf-8",
     )
 
