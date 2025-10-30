@@ -43,7 +43,7 @@ export const typography: TypographyVariantsOptions = {
   caption: {
     fontFamily: brandFont,
     fontWeight: '400',
-    fontSize: '1.25rem',
+    fontSize: '0.875rem',
   },
 
   body1: {
