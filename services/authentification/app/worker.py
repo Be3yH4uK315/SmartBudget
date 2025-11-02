@@ -1,9 +1,10 @@
-from aiosmtplib import send, SMTPException
+from aiosmtplib import send
 from email.message import EmailMessage
 import sqlalchemy as sa
 from sqlalchemy import delete, or_
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 from datetime import datetime, timezone
+from arq.connections import RedisSettings
 from logging import getLogger
 from arq.cron import cron
 
@@ -16,6 +17,9 @@ from jsonschema import validate
 import jsonschema
 import json
 from .kafka import SCHEMAS
+from .middleware import setup_logging
+
+setup_logging()
 
 logger = getLogger(__name__)
 
@@ -25,6 +29,7 @@ async def send_email_async(ctx, to: str, subject: str, body: str):
     Задача Arq для отправки email.
     'ctx' - это словарь контекста воркера.
     """
+    logger.info(f"send_email_async START for {to}")
     message = EmailMessage()
     message["From"] = settings.smtp_user or "no-reply@example.com"
     message["To"] = to
@@ -43,8 +48,8 @@ async def send_email_async(ctx, to: str, subject: str, body: str):
             start_tls=False # В prod => True
         )
         logger.info(f"Arq: Email sent to {to}")
-    except SMTPException as e:
-        logger.error(f"Arq: SMTP error sending email to {to}: {e}")
+    except Exception as e:
+        logger.error(f"Arq: Unexpected error sending email to {to}: {e}")
         raise
 
 async def send_kafka_event_async(ctx, topic: str, event_data: dict, schema_name: str):
@@ -101,14 +106,13 @@ async def on_startup(ctx):
     Выполняется при старте воркера Arq.
     Инициализируем пулы соединений.
     """
-    logger.info("Starting Arq worker...")
+    logger.info(f"Arq worker starting. Redis: {settings.redis_url}, Queue: {settings.arq_queue_name}")
     producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
     await producer.start()
     ctx["kafka_producer"] = producer
     logger.info("Arq: Kafka producer started.")
     ctx["db_session_maker"] = db_session_maker
     logger.info("Arq: DB session maker injected.")
-
 
 async def on_shutdown(ctx):
     """
@@ -135,4 +139,5 @@ class WorkerSettings:
     on_startup = on_startup
     on_shutdown = on_shutdown
     cron_jobs = [cron(cleanup_sessions_async, hour=3, minute=0)]
-    queue_name = settings.arq_queue_name
+    redis_settings = RedisSettings.from_dsn(settings.redis_url)
+    redis_settings.queue_name = settings.arq_queue_name

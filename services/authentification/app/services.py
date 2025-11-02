@@ -9,6 +9,7 @@ from jwt import encode, decode, PyJWTError
 from hashlib import sha256
 import sqlalchemy as sa
 
+from app.middleware import logger
 from app.dependencies import get_db, get_redis, get_arq_pool
 from arq.connections import ArqRedis
 from app.schemas import (
@@ -47,13 +48,15 @@ class AuthService:
         hashed_token = hash_token(token)
         redis_key = constants.get_verify_email_key(email)
         await self.redis.set(redis_key, hashed_token, ex=900)  # 15 мин TTL
-
-        await self.arq_pool.enqueue_job(
+        logger.info(f"Arq pool in AuthService: {self.arq_pool}")
+        logger.info(f"Enqueueing send_email_async to {email} in queue {settings.arq_queue_name}")
+        job = await self.arq_pool.enqueue_job(
             'send_email_async',
             to=email,
             subject="Verify your email for Budget App",
-            body=f"Your verification token: {token}. Use it to complete registration."
+            body=f"Your verification token: {token}. Use it to complete registration.",
         )
+        logger.info(f"Job enqueued: {job.job_id}")
 
     async def validate_verification_token(self, token: str, email: str):
         """
