@@ -62,7 +62,11 @@ class JsonFormatter(Formatter):
         return json.dumps(log_data)
 
 def setup_logging():
+    root_logger = logging.getLogger()
+    if root_logger.hasHandlers():
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
     handler = StreamHandler()
     handler.setFormatter(JsonFormatter(datefmt="%Y-%m-%dT%H:%M:%S%z"))
-    logging.root.addHandler(handler)
-    logging.root.setLevel(settings.log_level)
+    root_logger.addHandler(handler)
+    root_logger.setLevel(settings.log_level)
