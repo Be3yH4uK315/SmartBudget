@@ -366,7 +366,7 @@ class AuthService:
         session.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
         await self.db.commit()
 
-        new_access_token, new_refresh_token
+        return new_access_token, new_refresh_token
 
     # --- Приватные методы ---
 
