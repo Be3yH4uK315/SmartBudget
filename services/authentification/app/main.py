@@ -19,10 +19,9 @@ async def lifespan(app: FastAPI):
     app.state.redis_pool = redis_pool
     redis_limiter = Redis(connection_pool=redis_pool)
     await FastAPILimiter.init(redis_limiter)
-    
-    arq_pool = await create_pool(
-        RedisSettings.from_dsn(settings.redis_url)
-    )
+    arq_redis_settings = RedisSettings.from_dsn(settings.redis_url)
+    arq_redis_settings.queue_name = settings.arq_queue_name
+    arq_pool = await create_pool(arq_redis_settings)
     app.state.arq_pool = arq_pool
 
     yield
