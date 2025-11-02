@@ -35,9 +35,6 @@ class ChangePasswordRequest(BaseModel):
 class TokenValidateRequest(BaseModel):
     token: str = Field(..., description="JWT токен для валидации")
 
-class RefreshRequest(BaseModel):
-    refresh_token: str = Field(..., description="Refresh токен из cookie")
-
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

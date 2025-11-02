@@ -5,8 +5,6 @@ from geoip2.errors import AddressNotFoundError
 from hashlib import sha256
 from bcrypt import hashpw, gensalt, checkpw
 from logging import getLogger
-from .settings import settings
-import os
 
 logger = getLogger(__name__)
 
@@ -14,18 +12,14 @@ def parse_device(user_agent: str) -> str:
     ua = ua_parse(user_agent)
     return f"{ua.device.family}, {ua.os.family} {ua.os.version_string}"
 
-def get_location(ip: str) -> str:
+def get_location(ip: str, reader: geoip2.database.Reader) -> str:
     try:
         if ipaddress.ip_address(ip).is_private:
             return "Local Network"
     except ValueError:
         pass
 
-    if not os.path.exists(settings.geoip_db_path):
-        logger.error(f"GeoIP DB not found at {settings.geoip_db_path}")
-        return "Unknown"
     try:
-        reader = geoip2.database.Reader(settings.geoip_db_path)
         geo = reader.city(ip)
         return f"{geo.country.name}, {geo.city.name or 'Unknown'}"
     except (AddressNotFoundError, Exception) as e:

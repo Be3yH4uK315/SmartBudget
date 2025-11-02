@@ -6,6 +6,8 @@ from sqlalchemy.orm import DeclarativeBase
 from typing import AsyncGenerator
 from arq.connections import ArqRedis
 from jwt import decode, PyJWTError
+import geoip2.database
+from app.middleware import logger
 
 # --- DB ---
 engine = create_async_engine(settings.db_url)
@@ -32,6 +34,16 @@ async def close_redis_pool(pool: ConnectionPool):
 # --- Arq ---
 async def get_arq_pool(request: Request) -> ArqRedis:
     return request.app.state.arq_pool
+
+def get_geoip_reader(request: Request) -> geoip2.database.Reader:
+    """
+    Возвращает GeoIP reader, инициализированный при старте.
+    """
+    try:
+        return request.app.state.geoip_reader
+    except AttributeError:
+        logger.error("GeoIP reader not found in app.state. Make sure it is initialized in lifespan.")
+        raise HTTPException(status_code=500, detail="GeoIP service not available")
 
 def get_real_ip(request: Request) -> str:
     if "x-forwarded-for" in request.headers:

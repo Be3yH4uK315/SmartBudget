@@ -10,11 +10,24 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from app.settings import settings
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+import geoip2.database
+from app.middleware import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
     
+    try:
+        geoip_reader = geoip2.database.Reader(settings.geoip_db_path)
+        app.state.geoip_reader = geoip_reader
+        logger.info(f"GeoIP DB uploaded from {settings.geoip_db_path}")
+    except FileNotFoundError:
+        logger.error(f"GeoIP DB not found on the way: {settings.geoip_db_path}. Geolocation service will not work.")
+        app.state.geoip_reader = None
+    except Exception as e:
+        logger.error(f"Error when uploading GeoIP DB: {e}")
+        app.state.geoip_reader = None
+
     redis_pool = await create_redis_pool()
     app.state.redis_pool = redis_pool
     redis_limiter = Redis(connection_pool=redis_pool)
@@ -26,6 +39,11 @@ async def lifespan(app: FastAPI):
 
     yield
     
+    if hasattr(app.state, "geoip_reader") and app.state.geoip_reader:
+        app.state.geoip_reader.close()
+        logger.info("GeoIP DB Reader is closed.")
+        del app.state.geoip_reader
+
     await FastAPILimiter.close()
     await close_redis_pool(redis_pool)
     if arq_pool:
@@ -37,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
 app.add_middleware(
-    TrustedHostMiddleware, allowed_hosts=["*"]
+    TrustedHostMiddleware, allowed_hosts=["*"] # Заменить на домен
 )
 Instrumentator().instrument(app).expose(app)
 app.middleware("http")(error_middleware)
