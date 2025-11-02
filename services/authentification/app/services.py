@@ -8,9 +8,10 @@ from datetime import datetime, timedelta, timezone
 from jwt import encode, decode, PyJWTError
 from hashlib import sha256
 import sqlalchemy as sa
+import geoip2.database
 
 from app.middleware import logger
-from app.dependencies import get_db, get_redis, get_arq_pool
+from app.dependencies import get_db, get_redis, get_arq_pool, get_geoip_reader
 from arq.connections import ArqRedis
 from app.schemas import (
     CompleteRegistrationRequest, LoginRequest, 
@@ -29,11 +30,13 @@ class AuthService:
         self,
         db: AsyncSession = Depends(get_db),
         redis: Redis = Depends(get_redis),
-        arq_pool: ArqRedis = Depends(get_arq_pool)
+        arq_pool: ArqRedis = Depends(get_arq_pool),
+        geoip_reader: geoip2.database.Reader = Depends(get_geoip_reader)
     ):
         self.db = db
         self.redis = redis
         self.arq_pool = arq_pool
+        self.geoip_reader = geoip_reader
 
     async def start_email_verification(self, email: str):
         """
@@ -83,7 +86,7 @@ class AuthService:
         await self.redis.delete(redis_key)
 
         device_name = parse_device(body.user_agent)
-        location = get_location(ip)
+        location = get_location(ip, self.geoip_reader)
         pw_hash = hash_password(body.password)
 
         user = User(
@@ -98,12 +101,6 @@ class AuthService:
             updated_at=datetime.now(timezone.utc)
         )
         self.db.add(user)
-        try:
-            await self.db.commit()
-            await self.db.refresh(user)
-        except IntegrityError:
-            await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Email already registered")
 
         # Создаем сессию и токены
         access_token, refresh_token, session = await self._create_session_and_tokens(
@@ -111,9 +108,16 @@ class AuthService:
             user_agent=body.user_agent,
             device_name=device_name,
             ip=ip,
-            location=location
+            location=location,
+            commit=False
         )
-
+        try:
+            await self.db.commit()
+            await self.db.refresh(user)
+        except IntegrityError:
+            await self.db.rollback()
+            raise HTTPException(status_code=409, detail="Email already registered")
+        
         # Отправка событий Kafka
         event = {
             "event": "user.registered",
@@ -171,7 +175,10 @@ class AuthService:
         await self.redis.delete(fail_key)
 
         device_name = parse_device(body.user_agent)
-        location = get_location(ip)
+        location = get_location(ip, self.geoip_reader)
+
+        user.last_login = datetime.now(timezone.utc)
+        self.db.add(user)
 
         # Создаем сессию и токены
         access_token, refresh_token, session = await self._create_session_and_tokens(
@@ -179,10 +186,10 @@ class AuthService:
             user_agent=body.user_agent,
             device_name=device_name,
             ip=ip,
-            location=location
+            location=location,
+            commit=False
         )
-        
-        user.last_login = datetime.now(timezone.utc)
+
         await self.db.commit()
 
         event = {"event": "user.login", "user_id": str(user.id), "ip": ip, "location": location}
@@ -351,9 +358,15 @@ class AuthService:
         role_result = await self.db.execute(select(User.role).where(User.id == user_id)) 
         role = role_result.scalar()
         
-        # Создаем только новый access_token
+        # Создаем только access_token и refresh_token
         new_access_token = self._create_access_token(user_id=str(user_id), role=role or UserRole.USER)
-        return new_access_token
+        new_refresh_token = str(uuid4())
+        new_fingerprint = hash_token(new_refresh_token)
+        session.refresh_fingerprint = new_fingerprint
+        session.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        await self.db.commit()
+
+        new_access_token, new_refresh_token
 
     # --- Приватные методы ---
 
@@ -371,7 +384,8 @@ class AuthService:
         )
     
     async def _create_session_and_tokens(
-        self, user: User, user_agent: str, device_name: str, ip: str, location: str
+        self, user: User, user_agent: str, device_name: str, ip: str, location: str,
+        commit: bool = True
     ):
         """
         Создает новую сессию в БД, генерирует access и refresh токены.
@@ -396,6 +410,7 @@ class AuthService:
         access_token = self._create_access_token(str(user.id), user.role)
         
         # Коммит сессии
-        await self.db.commit() 
+        if commit:
+            await self.db.commit()
         
         return access_token, refresh_token, session

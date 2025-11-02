@@ -5,10 +5,9 @@ import base64
 
 from app.dependencies import get_current_user_id, get_real_ip
 from app.schemas import (
-    VerifyEmailRequest, VerifyLinkRequest, CompleteRegistrationRequest,
+    VerifyEmailRequest, CompleteRegistrationRequest,
     LoginRequest, ResetPasswordRequest, CompleteResetRequest,
-    ChangePasswordRequest, TokenValidateRequest, RefreshRequest,
-    StatusResponse
+    ChangePasswordRequest, TokenValidateRequest, StatusResponse
 )
 from app.settings import settings
 from app.services import AuthService
@@ -103,9 +102,6 @@ async def logout(
             raise e
     
     _delete_auth_cookies(response)
-    if not refresh_token:
-        _delete_auth_cookies(response)
-
     return StatusResponse()
 
 @router.post("/reset-password", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
@@ -144,27 +140,22 @@ async def validate_token(
 @router.post("/refresh", status_code=200)
 async def refresh(
     request: Request,
-    body: RefreshRequest = Body(...),
     service: AuthService = Depends(AuthService)
 ):
     access_token = request.cookies.get("access_token") or \
                    request.headers.get("Authorization", "").replace("Bearer ", "")
     
-    new_access_token = await service.refresh_session(
-        body.refresh_token, 
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+    
+    new_access_token, new_refresh_token = await service.refresh_session(
+        refresh_token, 
         access_token or ""
     )
 
     response = JSONResponse({"ok": True})
-    secure = (settings.env == 'prod')
-    response.set_cookie(
-        "access_token", 
-        new_access_token, 
-        httponly=True, 
-        secure=secure, 
-        samesite='strict', 
-        max_age=900
-    )
+    _set_auth_cookies(response, new_access_token, new_refresh_token)
     return response
 
 def _int_to_base64url(value: int) -> str:
