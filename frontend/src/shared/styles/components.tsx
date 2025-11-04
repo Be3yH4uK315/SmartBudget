@@ -185,9 +185,13 @@ export const components: ThemeOptions['components'] = {
       root: ({ theme }) => ({
         textTransform: 'none',
         minHeight: 48,
-        paddingInline: theme.spacing(2),
         ...theme.typography.caption,
         color: theme.palette.text.primary,
+
+        paddingInline: theme.spacing(0),
+        [theme.breakpoints.up('sm')]: {
+          paddingInline: theme.spacing(2),
+        },
 
         '&.Mui-selected': {
           color: theme.palette.text.primary,
