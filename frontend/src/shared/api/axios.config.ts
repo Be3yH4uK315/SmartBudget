@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const baseURL = 'http://127.0.0.1:9000/api/v1.1'
+const baseURL = 'http://127.0.0.1:9000/api/'
 
 export const api = axios.create({
   baseURL,
@@ -32,12 +32,10 @@ api.interceptors.response.use(
     const original: any = config || {}
     const status = response?.status
 
-    /** если не 401, пробрасываем как есть */
     if (status !== 401 || original.__isRetryRequest) {
       return Promise.reject(error)
     }
 
-    /** очередь ожидания единого refresh-запроса */
     if (!isRefreshing) {
       isRefreshing = true
       try {
