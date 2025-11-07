@@ -10,11 +10,13 @@ from functools import lru_cache
 logger = getLogger(__name__)
 
 def parse_device(user_agent: str) -> str:
+    """Анализирует информацию об устройстве из User-Agent."""
     ua = ua_parse(user_agent)
     return f"{ua.device.family}, {ua.os.family} {ua.os.version_string}"
 
 @lru_cache(maxsize=1024)
 def get_location(ip: str, reader: geoip2.database.Reader) -> str:
+    """Получает местоположение по IP-адресу с помощью GeoIP."""
     try:
         if ipaddress.ip_address(ip).is_private:
             return "Local Network"
@@ -29,10 +31,13 @@ def get_location(ip: str, reader: geoip2.database.Reader) -> str:
         return "Unknown"
 
 def hash_token(token: str) -> str:
+    """Хэширует токен."""
     return sha256(token.encode()).hexdigest()
 
 def hash_password(password: str) -> str:
+    """Хэширует пароль."""
     return hashpw(password.encode(), gensalt()).decode()
 
 def check_password(password: str, hashed: str) -> bool:
+    """Проверяет пароль."""
     return checkpw(password.encode(), hashed.encode())
