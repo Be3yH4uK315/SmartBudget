@@ -11,6 +11,7 @@ from .settings import settings
 logger = getLogger(__name__)
 
 async def error_middleware(request: Request, call_next):
+    """Промежуточное программное обеспечение для обработки ошибок в запросах."""
     try:
         return await call_next(request)
     except IntegrityError as e:
@@ -51,6 +52,7 @@ async def error_middleware(request: Request, call_next):
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 class JsonFormatter(Formatter):
+    """Средство форматирования JSON для журналов."""
     def format(self, record):
         log_data = {
             "timestamp": self.formatTime(record, self.datefmt),
@@ -62,6 +64,7 @@ class JsonFormatter(Formatter):
         return json.dumps(log_data)
 
 def setup_logging():
+    """Настраивает ведение журнала с помощью JSON formatter."""
     root_logger = logging.getLogger()
     if root_logger.hasHandlers():
         for handler in root_logger.handlers[:]:
