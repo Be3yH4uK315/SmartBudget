@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, Body, HTTPException, Request, Res
 from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 import base64
+from functools import lru_cache
 
 from app.dependencies import get_current_user_id, get_real_ip
 from app.schemas import (
@@ -45,7 +46,7 @@ def _delete_auth_cookies(response: Response):
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='strict')
 
 
-@router.post("/verify-email", status_code=200)
+@router.post("/verify-email", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def verify_email(
     body: VerifyEmailRequest = Body(...),
     service: AuthService = Depends(AuthService)
@@ -62,7 +63,7 @@ async def verify_link(
     await service.validate_verification_token(token, email)
     return StatusResponse()
 
-@router.post("/complete-registration", status_code=200)
+@router.post("/complete-registration", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def complete_registration(
     body: CompleteRegistrationRequest = Body(...),
     service: AuthService = Depends(AuthService),
@@ -137,7 +138,7 @@ async def validate_token(
     await service.validate_access_token_async(body.token)
     return StatusResponse()
 
-@router.post("/refresh", status_code=200)
+@router.post("/refresh", status_code=200, dependencies=[Depends(RateLimiter(times=10, seconds=60))])
 async def refresh(
     request: Request,
     service: AuthService = Depends(AuthService)
@@ -165,6 +166,7 @@ def _int_to_base64url(value: int) -> str:
     bytes_val = value.to_bytes(byte_len, "big", signed=False)
     return base64.urlsafe_b64encode(bytes_val).decode("utf-8").rstrip("=")
 
+@lru_cache(maxsize=1)
 @router.get("/.well-known/jwks.json")
 async def get_jwks():
     from cryptography.hazmat.primitives import serialization
