@@ -15,7 +15,8 @@ services:
       - auth_kafka_dev
     volumes:
       - .:/app
-      - ./geoip:/geoip
+      - geoip_data:/geoip
+      - ./certs:/app/certs
     restart: unless-stopped
 
   # -------------------------
@@ -122,6 +123,8 @@ services:
       - auth_kafka_dev
     volumes:
       - .:/app
+      - geoip_data:/geoip
+      - ./certs:/app/certs
     restart: unless-stopped
 
   auth_postgres_test:
@@ -182,3 +185,6 @@ volumes:
   pg_data_auth:
   redis_data_auth:
   pg_data_auth_test:
+  geoip_data: {}
+
+# docker cp ./geoip/GeoLite2-City.mmdb auth_service_dev:/geoip/GeoLite2-City.mmdb
