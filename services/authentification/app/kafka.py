@@ -8,7 +8,8 @@ AUTH_EVENTS_SCHEMA = {
             "enum": [
                 "user.registered", "user.login", "user.logout", "user.session_mismatch_detected",
                 "user.password_reset", "user.token_invalid", "user.verification_started",
-                "user.verification_validated", "user.token_refreshed", "user.password_changed"
+                "user.verification_validated", "user.token_refreshed", "user.password_changed",
+                "user.login_failed", "user.password_reset_started"
             ],
             "description": "Type of authentication event"
         },
@@ -19,10 +20,16 @@ AUTH_EVENTS_SCHEMA = {
     },
     "required": ["event"],
     "if": {
-        "properties": { "event": { "not": { "const": "user.token_invalid" } } }
+        "properties": { "event": { "in": [
+            "user.registered", "user.login", "user.logout", "user.session_mismatch_detected",
+            "user.password_reset", "user.token_refreshed", "user.password_changed"
+        ] } }
     },
     "then": {
         "required": ["user_id"]
+    },
+    "else": {
+        "not": { "required": ["user_id"] }
     }
 }
 

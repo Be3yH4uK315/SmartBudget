@@ -102,7 +102,7 @@ class AuthService:
             await self.db.refresh(user)
 
             device_name = parse_device(body.user_agent)
-            location = get_location(ip, self.geoip_reader)
+            location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
 
             access_token, refresh_token, session = await self._create_session_and_tokens(
                 user, body.user_agent, device_name, ip, location
@@ -135,6 +135,8 @@ class AuthService:
         if fails >= 5:
             raise HTTPException(status_code=429, detail="Too many attempts, try later")
 
+        location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
+
         user_query = await self.db.execute(
             select(User).where(
                 User.email == body.email,
@@ -145,12 +147,22 @@ class AuthService:
         if not user or not check_password(body.password, user.password_hash):
             await self.redis.incr(fail_key)
             await self.redis.expire(fail_key, 300)  # 5 min lock
+            await self.arq_pool.enqueue_job(
+                'send_kafka_event_async',
+                topic="auth_events",
+                event_data = {
+                    "event": "user.login_failed",
+                    "email": body.email,
+                    "ip": ip,
+                    "location": location,
+                },
+                schema_name="AUTH_EVENTS_SCHEMA"
+            )
             raise HTTPException(status_code=403, detail="Invalid credentials")
 
         await self.redis.delete(fail_key)
 
         device_name = parse_device(body.user_agent)
-        location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
 
         user.last_login = datetime.now(timezone.utc)
         self.db.add(user)
