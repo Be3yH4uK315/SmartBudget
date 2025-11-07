@@ -3,11 +3,19 @@ AUTH_EVENTS_SCHEMA = {
     "title": "Auth Events Schema",
     "type": "object",
     "properties": {
-        "event": {"type": "string", "enum": ["user.registered", "user.login", "user.logout", "user.password_changed", "user.password_reset", "user.token_invalid"]},
-        "user_id": {"type": "string", "format": "uuid"},
-        "email": {"type": "string"},
-        "ip": {"type": "string"},
-        "location": {"type": "string"}
+        "event": {
+            "type": "string",
+            "enum": [
+                "user.registered", "user.login", "user.logout", "user.session_mismatch_detected",
+                "user.password_reset", "user.token_invalid", "user.verification_started",
+                "user.verification_validated", "user.token_refreshed", "user.password_changed"
+            ],
+            "description": "Type of authentication event"
+        },
+        "user_id": {"type": "string", "format": "uuid", "description": "User UUID"},
+        "email": {"type": "string", "description": "User email"},
+        "ip": {"type": "string", "description": "IP address"},
+        "location": {"type": "string", "description": "Geolocation"}
     },
     "required": ["event"],
     "if": {
@@ -22,12 +30,12 @@ USERS_ACTIVE_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
-        "user_id": {"type": "string", "format": "uuid"},
-        "email": {"type": "string"},
-        "name": {"type": "string"},
-        "country": {"type": "string"},
-        "role": {"type": "integer"},
-        "is_active": {"type": "boolean"}
+        "user_id": {"type": "string", "format": "uuid", "description": "User UUID"},
+        "email": {"type": "string", "description": "User email"},
+        "name": {"type": "string", "description": "User name"},
+        "country": {"type": "string", "description": "User country"},
+        "role": {"type": "integer", "description": "User role"},
+        "is_active": {"type": "boolean", "description": "Active status"}
     },
     "required": ["user_id", "email"]
 }
