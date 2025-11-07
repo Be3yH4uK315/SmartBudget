@@ -91,5 +91,4 @@ async def get_current_user_id(
     except InvalidSignatureError:
         raise HTTPException(status_code=401, detail="Invalid token signature (Key mismatch)")
     except PyJWTError as e:
-        print(f">>> PyJWTError caught: {e}") 
         raise HTTPException(status_code=401, detail="Invalid token")
