@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 import { ThemeContext } from '@app/providers/ThemeProvider'
 
-export function useTheme() {
+export const useTheme = () => {
   const context = useContext(ThemeContext)
 
   if (!context)
