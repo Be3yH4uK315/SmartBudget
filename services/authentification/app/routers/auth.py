@@ -211,7 +211,7 @@ async def validate_token(
 @router.post(
     "/refresh", 
     status_code=200, 
-    dependencies=[Depends(RateLimiter(times=10, seconds=60))]
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))]
 )
 async def refresh(
     request: Request,
