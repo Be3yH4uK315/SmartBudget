@@ -60,7 +60,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
 app.add_middleware(
-    TrustedHostMiddleware, allowed_hosts=["*"] # Заменить на домен
+    TrustedHostMiddleware, 
+    allowed_hosts=["api.your-domain.com", "www.your-domain.com", "localhost"]
 )
 app.add_middleware(
     CORSMiddleware,
