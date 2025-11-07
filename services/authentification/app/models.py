@@ -2,8 +2,8 @@ from uuid import uuid4
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Index
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
-from .dependencies import Base
 import enum
+from app.base import Base
 
 class UserRole(enum.IntEnum):
     USER = 0
