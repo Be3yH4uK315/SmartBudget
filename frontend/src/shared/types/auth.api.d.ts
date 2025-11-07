@@ -2,8 +2,12 @@ type Ok = {
   ok: true
 }
 
+type SignInAction = 'sign_in' | 'sign_up' | 'reset_password'
+type VerifyMode = 'signup' | 'reset' | null
+type AuthStep = 'email' | 'password' | 'verifyEmail'
+
 type VerifyEmailResponse = {
-  name: string
+  action: SignInAction
 }
 
 type VerifyEmail = {
