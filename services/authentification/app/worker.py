@@ -7,15 +7,14 @@ from datetime import datetime, timezone
 from arq.connections import RedisSettings
 from logging import getLogger
 from arq.cron import cron
-
-from .settings import settings
-from .models import Session as DBSession
-
 from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError
 from jsonschema import validate
 import jsonschema
 import json
+
+from .settings import settings
+from .models import Session as DBSession
 from .kafka import SCHEMAS
 from .middleware import setup_logging
 
@@ -141,3 +140,5 @@ class WorkerSettings:
     cron_jobs = [cron(cleanup_sessions_async, hour=3, minute=0)]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     redis_settings.queue_name = settings.arq_queue_name
+    max_tries = 5
+    max_jobs = 10
