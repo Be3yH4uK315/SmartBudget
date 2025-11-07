@@ -1,11 +1,44 @@
 export const rootDictionary: LocaleDictionary = {
   ru: {
     AuthScreen: {
-      screenTitle: 'Вход',
-      email: 'Электронная почта',
-      password: 'Пароль',
+      email: {
+        title: 'Вход',
+        subtitle: 'Введите почту, чтобы войти или зарегистрироваться',
+        placeholder: 'Электронная почта',
+      },
+      password: {
+        title: 'Введите пароль',
+        placeholder: 'Пароль',
+        forgotPassword: 'Не помню пароль',
+      },
+      verifyEmail: {
+        title: 'Проверьте почту',
+        subtitleEmail: 'Письмо с подтверждением регистрации отправлено на почту {{email}}',
+        subtitlePassword: 'Письмо для смены пароля отправлено на почту {{email}}',
+        buttonText: 'Письмо не пришло',
+      },
       signIn: 'Войти',
     },
+    RegistrationScreen: {
+      title: 'Регистрация',
+      caption: 'Нажимая кнопку «Зарегистрироваться» вы соглашаетесь с условиями использования.',
+      name: 'Имя',
+      country: 'Страна',
+      password: 'Пароль',
+      repeatPassword: 'Подтвердите пароль',
+      passwordsNotMatch: 'Пароли не совпадают',
+      continue: 'Зарегистрироваться',
+      incorrectLink: 'К сожалению, эта страница недоступна',
+      incorrectLinkCaption: 'Проверьте корректность ссылки или попробуйте еще раз',
+    },
+    ResetPasswordScreen: {
+      title: 'Восстановление пароля',
+      password: 'Пароль',
+      repeatPassword: 'Подтвердите пароль',
+      passwordsNotMatch: 'Пароли не совпадают',
+      continue: 'Сбросить пароль',
+    },
+
     HeaderTabs: {
       main: 'Главная',
       budget: 'Бюджет',
@@ -19,11 +52,24 @@ export const rootDictionary: LocaleDictionary = {
 
   en: {
     AuthScreen: {
-      screenTitle: 'Login',
-      email: 'Email address',
-      password: 'Password',
+      email: {
+        title: 'Login',
+        subtitle: 'Enter your email to sign in or sign up',
+        placeholder: 'Email address',
+      },
+      password: {
+        title: 'Hello, {{name}}',
+        placeholder: 'Password',
+        forgotPassword: 'Forgot password',
+      },
+      verifyEmail: {
+        title: 'Check your Inbox',
+        subtitle: 'A confirmation email has been sent to {{email}}',
+        buttonText: 'Resend confirmation mail',
+      },
       signIn: 'Sign In',
     },
+
     HeaderTabs: {
       main: 'Main',
       budget: 'Budget',

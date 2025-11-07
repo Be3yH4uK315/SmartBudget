@@ -15,7 +15,6 @@ class LocaleManager {
   async updateLocale(lang?: Languages, extraDict?: OneLocaleDictionary) {
     const nextLang = lang ?? (this.i18n.language as Languages)
 
-    // если пришёл словарь фичи — вливаем его поверх текущего
     if (extraDict) {
       const current = this.i18n.getResourceBundle(nextLang, 'translation') || {}
       this.i18n.addResources(nextLang, 'translation', {
@@ -24,10 +23,8 @@ class LocaleManager {
       })
     }
 
-    // переключаем язык
     await this.i18n.changeLanguage(nextLang)
 
-    // синхронизация побочек
     dayjs.locale(nextLang)
     localStorage.setItem('language', nextLang)
   }
