@@ -1,6 +1,7 @@
+import asyncio
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from redis.asyncio import Redis
 from uuid import uuid4, UUID
@@ -9,17 +10,18 @@ from jwt import encode, decode, PyJWTError
 from hashlib import sha256
 import sqlalchemy as sa
 import geoip2.database
-
-from app.middleware import logger
-from app.dependencies import get_db, get_redis, get_arq_pool, get_geoip_reader
 from arq.connections import ArqRedis
-from app.schemas import (
+
+from .email_templates import get_password_reset_body, get_verification_email_body
+from .middleware import logger
+from .dependencies import get_db, get_redis, get_arq_pool, get_geoip_reader
+from .schemas import (
     CompleteRegistrationRequest, LoginRequest, 
     CompleteResetRequest, ChangePasswordRequest
 )
-from app.models import User, Session, UserRole
-from app.utils import parse_device, get_location, hash_token, hash_password, check_password
-from app.settings import settings
+from .models import User, Session, UserRole
+from .utils import parse_device, get_location, hash_token, hash_password, check_password
+from .settings import settings
 from app import constants
 
 class AuthService:
@@ -45,19 +47,23 @@ class AuthService:
         """
         existing_user = await self.db.execute(select(User).where(User.email == email)) 
         if existing_user.scalar_one_or_none():
-            raise HTTPException(status_code=409, detail="Email already registered")
+            logger.warning(f"Попытка верификации для уже существующего email: {email}")
+            return
 
         token = str(uuid4())
         hashed_token = hash_token(token)
         redis_key = constants.get_verify_email_key(email)
         await self.redis.set(redis_key, hashed_token, ex=900)  # 15 мин TTL
+
+        email_body = get_verification_email_body(email, token)
+        
         logger.info(f"Arq pool in AuthService: {self.arq_pool}")
         logger.info(f"Enqueueing send_email_async to {email} in queue {settings.arq_queue_name}")
         job = await self.arq_pool.enqueue_job(
             'send_email_async',
             to=email,
-            subject="Verify your email for Budget App",
-            body=f"Your verification token: {token}. Use it to complete registration.",
+            subject="Verify your email for SmartBudget",
+            body=email_body,
         )
         logger.info(f"Job enqueued: {job.job_id}")
 
@@ -86,7 +92,7 @@ class AuthService:
         await self.redis.delete(redis_key)
 
         device_name = parse_device(body.user_agent)
-        location = get_location(ip, self.geoip_reader)
+        location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
         pw_hash = hash_password(body.password)
 
         user = User(
@@ -102,21 +108,32 @@ class AuthService:
         )
         self.db.add(user)
 
-        # Создаем сессию и токены
-        access_token, refresh_token, session = await self._create_session_and_tokens(
-            user=user,
-            user_agent=body.user_agent,
-            device_name=device_name,
-            ip=ip,
-            location=location,
-            commit=False
-        )
         try:
             await self.db.commit()
             await self.db.refresh(user)
         except IntegrityError:
             await self.db.rollback()
             raise HTTPException(status_code=409, detail="Email already registered")
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Ошибка при создании User: {e}")
+            raise HTTPException(status_code=500, detail="Could not create user")
+        
+        try:
+            device_name = parse_device(body.user_agent)
+            location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
+            
+            access_token, refresh_token, session = await self._create_session_and_tokens(
+                user=user,
+                user_agent=body.user_agent,
+                device_name=device_name,
+                ip=ip,
+                location=location,
+                commit=True
+            )
+        except Exception as e:
+            logger.error(f"Пользователь {user.id} создан, но сессия не удалась: {e}")
+            raise HTTPException(status_code=500, detail="User created, but session creation failed. Please log in.")
         
         # Отправка событий Kafka
         event = {
@@ -175,7 +192,7 @@ class AuthService:
         await self.redis.delete(fail_key)
 
         device_name = parse_device(body.user_agent)
-        location = get_location(ip, self.geoip_reader)
+        location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
 
         user.last_login = datetime.now(timezone.utc)
         self.db.add(user)
@@ -245,12 +262,14 @@ class AuthService:
         hashed_token = hash_token(token)
         redis_key = constants.get_reset_password_key(email)
         await self.redis.set(redis_key, hashed_token, ex=900)
+        
+        email_body = get_password_reset_body(email, token)
 
         await self.arq_pool.enqueue_job(
             'send_email_async',
             to=email,
             subject="Reset your password",
-            body=f"Your reset token: {token}"
+            body=email_body
         )
 
     async def complete_password_reset(self, body: CompleteResetRequest):
@@ -272,6 +291,11 @@ class AuthService:
             raise HTTPException(status_code=404, detail="User not found")
         
         user.password_hash = pw_hash
+        await self.db.execute(
+            update(Session)
+            .where(Session.user_id == user.id, Session.revoked == sa.false())
+            .values(revoked=True)
+        )
         await self.db.commit()
 
         event = {"event": "user.password_reset", "user_id": str(user.id)}
@@ -293,6 +317,11 @@ class AuthService:
 
         pw_hash = hash_password(body.new_password)
         user.password_hash = pw_hash
+        await self.db.execute(
+            update(Session)
+            .where(Session.user_id == user.id, Session.revoked == sa.false())
+            .values(revoked=True)
+        )
         await self.db.commit()
 
         event = {"event": "user.password_changed", "user_id": user_id}
@@ -311,7 +340,9 @@ class AuthService:
             payload = decode(
                 token, 
                 settings.jwt_public_key,
-                algorithms=[settings.jwt_algorithm]
+                algorithms=[settings.jwt_algorithm],
+                issuer="auth-service",
+                audience="smart-budget",
             )
             if "sub" not in payload:
                 raise PyJWTError("Missing sub")
@@ -375,13 +406,15 @@ class AuthService:
         access_payload = {
             "sub": user_id,
             "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
-            "role": role
+            "role": role,
+            "iss": "auth-service",
+            "aud": "smart-budget"
         }
         return encode(
-            access_payload, 
-            settings.jwt_private_key,
-            algorithm=settings.jwt_algorithm
-        )
+        access_payload, 
+        settings.jwt_private_key,
+        algorithm=settings.jwt_algorithm
+    )   
     
     async def _create_session_and_tokens(
         self, user: User, user_agent: str, device_name: str, ip: str, location: str,
