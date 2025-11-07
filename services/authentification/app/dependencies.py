@@ -62,7 +62,11 @@ def get_real_ip(request: Request) -> str:
 
 async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_db)) -> str:
     """Извлекает и проверяет текущий идентификатор пользователя из токена."""
-    access_token = request.cookies.get("access_token")
+    access_token = request.headers.get("Authorization")
+    if access_token and access_token.startswith("Bearer "):
+        access_token = access_token.replace("Bearer ", "")
+    else:
+        access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(
             status_code=401, 
