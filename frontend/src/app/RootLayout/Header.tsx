@@ -4,7 +4,7 @@ import { AppBar, Box, Button, Container, IconButton, Tab, Tabs, useMediaQuery } 
 import { useTranslate } from '@shared/hooks'
 import { Link as RouterLink, useLocation } from 'react-router'
 
-export default function Header() {
+export const Header = () => {
   const { pathname } = useLocation()
   const translate = useTranslate('HeaderTabs')
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down('sm'))
@@ -31,6 +31,7 @@ export default function Header() {
     <AppBar position="static" color="transparent" sx={{ bgcolor: 'surface.light' }}>
       <Container maxWidth="lg" sx={{ display: 'flex', alignItems: 'center' }}>
         <Tabs
+          id="back-to-top-anchor"
           value={value}
           TabIndicatorProps={{ sx: { bgcolor: 'primary.main' } }}
           aria-label="main navigation"

@@ -4,7 +4,7 @@ import { ReduxProvider } from './ReduxProvider'
 import { RouterProvider } from './RouterProvider'
 import { ThemeProvider } from './ThemeProvider'
 
-export function Providers({ children }: PropsWithChildren) {
+export const Providers = ({ children }: PropsWithChildren) => {
   return (
     <ReduxProvider>
       <RouterProvider>

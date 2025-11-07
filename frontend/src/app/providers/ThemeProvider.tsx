@@ -11,7 +11,7 @@ export const ThemeContext = createContext<{
   changeColorMode(newColorMode: ColorMode): void
 } | null>(null)
 
-export function ThemeProvider({ children }: PropsWithChildren) {
+export const ThemeProvider = ({ children }: PropsWithChildren) => {
   const [colorMode, setColorMode] = useState<ColorMode>(() => {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem('colorMode')
@@ -47,7 +47,6 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     }
   }, [colorMode])
 
-  /** Обновление темы при смене системной темы */
   useEffect(() => {
     if (typeof window === 'undefined') return
 

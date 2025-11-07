@@ -5,6 +5,6 @@ interface Props {
   children: ReactNode
 }
 
-export function RouterProvider({ children }: Props) {
+export const RouterProvider = ({ children }: Props) => {
   return <BrowserRouter>{children}</BrowserRouter>
 }
