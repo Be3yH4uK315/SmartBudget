@@ -49,6 +49,7 @@ export const components: ThemeOptions['components'] = {
         textTransform: 'none',
         minWidth: 'auto',
         padding: '8px 16px',
+        height: '56px',
 
         ...theme.typography.body1,
 
@@ -118,6 +119,27 @@ export const components: ThemeOptions['components'] = {
           },
         }),
       },
+
+      {
+        props: { variant: 'link' },
+        style: ({ theme }) => ({
+          backgroundColor: 'transparent',
+          color: theme.palette.link.main,
+          padding: 0,
+          margin: 0,
+          typography: 'caption',
+          width: 'max-content',
+
+          '&:hover': {
+            backgroundColor: 'transparent',
+            color: theme.palette.link.dark,
+          },
+          '&:active': {
+            backgroundColor: 'transparent',
+            color: theme.palette.link.light,
+          },
+        }),
+      },
     ],
   },
 
@@ -150,7 +172,7 @@ export const components: ThemeOptions['components'] = {
     styleOverrides: {
       root: ({ theme: { palette } }) => ({
         animation: `pulse 2s ease-in-out infinite`,
-        backgroundColor: palette.surface.dark,
+        backgroundColor: palette.gray.light,
 
         '@keyframes pulse': {
           '0%': {
@@ -165,9 +187,9 @@ export const components: ThemeOptions['components'] = {
         },
       }),
 
-      rounded: ({ theme: { shape } }) => ({
-        borderRadius: shape.borderRadius,
-      }),
+      rounded: {
+        borderRadius: '24px',
+      },
     },
   },
 
@@ -195,6 +217,32 @@ export const components: ThemeOptions['components'] = {
 
         '&.Mui-selected': {
           color: theme.palette.text.primary,
+        },
+      }),
+    },
+  },
+
+  MuiTextField: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        '& .MuiOutlinedInput-root': {
+          height: '56px',
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: theme.palette.primary.main,
+            borderWidth: '2px',
+            borderRadius: '12px',
+          },
+          '&:hover:not(.Mui-focused)': {
+            '& .MuiOutlinedInput-notchedOutline': {
+              borderColor: theme.palette.primary.light,
+            },
+          },
+        },
+        '& .MuiInputLabel-outlined': {
+          color: theme.palette.text.primary,
+          '&.Mui-focused': {
+            color: theme.palette.text.primary,
+          },
         },
       }),
     },
