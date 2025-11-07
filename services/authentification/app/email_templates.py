@@ -2,11 +2,9 @@ from urllib.parse import quote
 from .settings import settings
 
 def get_verification_email_body(email: str, token: str) -> str:
-    """
-    Генерирует тело письма для верификации аккаунта.
-    """
+    """Генерирует тело письма для верификации аккаунта."""
     encoded_email = quote(email)
-    verify_url = f"{settings.frontend_url}/complete-registration?token={token}&email={encoded_email}"
+    verify_url = f"{settings.frontend_url}/auth/registration?token={token}&email={encoded_email}"
 
     return f"""
     Здравствуйте!
@@ -20,11 +18,9 @@ def get_verification_email_body(email: str, token: str) -> str:
     """
 
 def get_password_reset_body(email: str, token: str) -> str:
-    """
-    Генерирует тело письма для сброса пароля.
-    """
+    """Генерирует тело письма для сброса пароля."""
     encoded_email = quote(email)
-    reset_url = f"{settings.frontend_url}/complete-reset?token={token}&email={encoded_email}"
+    reset_url = f"{settings.frontend_url}/auth/reset-password?token={token}&email={encoded_email}"
     
     return f"""
     Здравствуйте!
