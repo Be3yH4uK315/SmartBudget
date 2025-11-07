@@ -5,6 +5,7 @@ from geoip2.errors import AddressNotFoundError
 from hashlib import sha256
 from bcrypt import hashpw, gensalt, checkpw
 from logging import getLogger
+from functools import lru_cache
 
 logger = getLogger(__name__)
 
@@ -12,6 +13,7 @@ def parse_device(user_agent: str) -> str:
     ua = ua_parse(user_agent)
     return f"{ua.device.family}, {ua.os.family} {ua.os.version_string}"
 
+@lru_cache(maxsize=1024)
 def get_location(ip: str, reader: geoip2.database.Reader) -> str:
     try:
         if ipaddress.ip_address(ip).is_private:
