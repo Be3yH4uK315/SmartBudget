@@ -2,16 +2,18 @@ from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from contextlib import asynccontextmanager
 from redis.asyncio import Redis
-from app.middleware import error_middleware, setup_logging
-from app.routers.auth import router as auth_router
-from app.dependencies import create_redis_pool, close_redis_pool
-from fastapi_limiter import FastAPILimiter
-from arq import create_pool
-from arq.connections import RedisSettings
-from app.settings import settings
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import geoip2.database
-from app.middleware import logger
+from fastapi_limiter import FastAPILimiter
+from fastapi.middleware.cors import CORSMiddleware
+from arq import create_pool
+from arq.connections import RedisSettings
+
+from .middleware import error_middleware, setup_logging
+from .routers.auth import router as auth_router
+from .dependencies import create_redis_pool, close_redis_pool
+from .settings import settings
+from .middleware import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,6 +58,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
 app.add_middleware(
     TrustedHostMiddleware, allowed_hosts=["*"] # Заменить на домен
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.frontend_url,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 Instrumentator().instrument(app).expose(app)
 app.middleware("http")(error_middleware)
