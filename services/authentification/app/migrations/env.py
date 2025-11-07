@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from alembic import context
 
-from app.dependencies import Base
+from app.base import Base
 from app import models
 from app.settings import settings
 
