@@ -11,16 +11,16 @@ from .settings import settings
 from .middleware import logger
 from .models import User
 
-# --- DB ---
 engine = create_async_engine(settings.db_url)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Обеспечивает асинхронный сеанс работы с базой данных."""
     async with async_session() as session:
         yield session
 
-# --- Redis ---
 async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
+    """Обеспечивает подключение Redis из пула."""
     pool: ConnectionPool = request.app.state.redis_pool
     redis = Redis(connection_pool=pool, decode_responses=True)
     try:
@@ -29,13 +29,15 @@ async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
         await redis.aclose()
 
 async def create_redis_pool() -> ConnectionPool:
+    """Создает пул подключений Redis."""
     return ConnectionPool.from_url(settings.redis_url, decode_responses=True)
 
 async def close_redis_pool(pool: ConnectionPool):
+    """Закрывает пул подключений Redis."""
     await pool.disconnect()
 
-# --- Arq ---
 async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
+    """Предоставляет пул Arq."""
     arq_pool: ArqRedis = request.app.state.arq_pool
     try:
         yield arq_pool
@@ -43,24 +45,23 @@ async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
         pass
 
 def get_geoip_reader(request: Request) -> geoip2.database.Reader:
-    """
-    Возвращает GeoIP reader, инициализированный при старте.
-    """
+    """Возвращает GeoIP reader, инициализированный при старте."""
     try:
         return request.app.state.geoip_reader
     except AttributeError:
-        logger.error("GeoIP reader not found in app.state. Make sure it is initialized in lifespan.")
+        logger.error(
+            "GeoIP reader not found in app.state. Make sure it is initialized in lifespan."
+        )
         raise HTTPException(status_code=500, detail="GeoIP service not available")
 
 def get_real_ip(request: Request) -> str:
+    """Извлекает реальный IP-адрес из запроса."""
     if "x-forwarded-for" in request.headers:
         return request.headers["x-forwarded-for"].split(",")[0].strip()
     return request.client.host if request.client else "127.0.0.1"
 
-async def get_current_user_id(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-) -> str:
+async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_db)) -> str:
+    """Извлекает и проверяет текущий идентификатор пользователя из токена."""
     access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(
@@ -91,4 +92,6 @@ async def get_current_user_id(
     except InvalidSignatureError:
         raise HTTPException(status_code=401, detail="Invalid token signature (Key mismatch)")
     except PyJWTError as e:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token payload: {str(e)}")
