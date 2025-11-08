@@ -1,0 +1,45 @@
+services:
+  budgets:
+    build: ./services/budgets
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
+
+  classification:
+    build: ./services/classification
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
+
+  notifications:
+    build: ./services/notifications
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
+  transactions:
+    build: ./services/transactions
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
+  logs:
+    build: ./services/logs
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
+  authentification:
+    build: ./services/authentification
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
+  goals:
+    build: ./services/goals
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    networks:
+      - smartbudget-net
