@@ -146,7 +146,7 @@ class AuthService:
         user = user_query.scalar_one_or_none()
         if not user or not check_password(body.password, user.password_hash):
             await self.redis.incr(fail_key)
-            await self.redis.expire(fail_key, 300)  # 5 min lock
+            await self.redis.expire(fail_key, 60)  # 5 min lock
             await self.arq_pool.enqueue_job(
                 'send_kafka_event_async',
                 topic="auth_events",
