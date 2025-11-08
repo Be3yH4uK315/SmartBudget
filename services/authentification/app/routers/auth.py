@@ -27,7 +27,7 @@ def _set_auth_cookies(
         value=access_token,
         httponly=True,
         secure=secure,
-        samesite='strict',
+        samesite='None',
         max_age=900,  # 15 min
     )
     response.set_cookie(
@@ -35,15 +35,15 @@ def _set_auth_cookies(
         value=refresh_token,
         httponly=True,
         secure=secure,
-        samesite='strict',
+        samesite='None',
         max_age=2592000,  # 30 days
     )
 
 def _delete_auth_cookies(response: Response):
     """Хелпер для удаления auth cookie."""
     secure = (settings.env == 'prod')
-    response.delete_cookie("access_token", httponly=True, secure=secure, samesite='strict')
-    response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='strict')
+    response.delete_cookie("access_token", httponly=True, secure=secure, samesite='None')
+    response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='None')
 
 
 @router.post(
