@@ -72,10 +72,11 @@ async def verify_email(
 async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
+    token_type: str = Query(...),
     service: AuthService = Depends(AuthService)
 ):
     """Проверяет токен подтверждения по ссылке электронной почты."""
-    await service.validate_verification_token(token, email)
+    await service.validate_verification_token(token, email, token_type)
     return JSONResponse(
         UnifiedResponse(
             status="success",
