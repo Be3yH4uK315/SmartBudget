@@ -50,9 +50,11 @@ export const ResetPasswordScreen = () => {
         }}
       >
         <Stack width="100%" spacing={4} alignItems="center">
-          <Typography variant="h3" textAlign="center">
-            {translate('title')}
-          </Typography>
+          {verified && (
+            <Typography variant="h3" textAlign="center">
+              {translate('title')}
+            </Typography>
+          )}
 
           {isVerifying ? (
             <Stack alignItems="center" justifyContent="center" width="100%" py={6}>
