@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_pass: str = ""
     geoip_db_path: str
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = "http://127.0.0.1:3000"
     jwt_private_key_path: Path = ROOT_DIR / "certs" / "jwt-private.pem"
     jwt_public_key_path: Path = ROOT_DIR / "certs" / "jwt-public.pem"
     jwt_algorithm: str = "RS256"
