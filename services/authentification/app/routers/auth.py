@@ -13,7 +13,7 @@ from app.schemas import (
 from app.settings import settings
 from app.services import AuthService
 
-router = APIRouter(prefix="", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 def _set_auth_cookies(
     response: Response,
