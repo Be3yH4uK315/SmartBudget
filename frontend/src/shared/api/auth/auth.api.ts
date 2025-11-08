@@ -1,73 +1,73 @@
-import { api, req } from '@shared/api'
+import { api } from '@shared/api'
 
 const getUserAgent = () => (typeof navigator !== 'undefined' ? navigator.userAgent : undefined)
 
 class Auth_api {
   baseUrl = '/auth'
 
-  async verifyEmail(payload: VerifyEmail): Promise<string> {
+  async verifyEmail(payload: VerifyEmail): Promise<AuthResponse> {
     const url = `${this.baseUrl}/verify-email`
 
-    const response = await req<VerifyEmailResponse>(api.post(url, payload))
-    return response.action
+    const response = await api.post<AuthResponse>(url, payload)
+    return response.data
   }
 
-  async verifyLink(params: VerifyLink): Promise<boolean> {
+  async verifyLink(params: VerifyLink): Promise<AuthResponse> {
     const url = `${this.baseUrl}/verify-link`
 
-    const response = await req<Ok>(api.get(url, { params }))
-    return !!response?.ok
+    const response = await api.get<AuthResponse>(url, { params })
+    return response.data
   }
 
-  async completeRegistration(payload: CompleteRegistration): Promise<boolean> {
+  async completeRegistration(payload: CompleteRegistration): Promise<AuthResponse> {
     const url = `${this.baseUrl}/complete-registration`
     const body = { user_agent: getUserAgent(), ...payload }
 
-    const response = await req<Ok>(api.post(url, body))
-    return !!response?.ok
+    const response = await api.post<AuthResponse>(url, body)
+    return response.data
   }
 
-  async login(payload: Login): Promise<boolean> {
+  async login(payload: Login): Promise<AuthResponse> {
     const url = `${this.baseUrl}/login`
     const body = { user_agent: getUserAgent(), ...payload }
 
-    const response = await req<Ok>(api.post(url, body))
-    return !!response?.ok
+    const response = await api.post<AuthResponse>(url, body)
+    return response.data
   }
 
-  async logout(): Promise<boolean> {
+  async logout(): Promise<AuthResponse> {
     const url = `${this.baseUrl}/logout`
 
-    const response = await req<Ok>(api.post(url))
-    return !!response?.ok
+    const response = await api.post<AuthResponse>(url)
+    return response.data
   }
 
-  async resetPassword(payload: ResetPassword): Promise<boolean> {
+  async resetPassword(payload: ResetPassword): Promise<AuthResponse> {
     const url = `${this.baseUrl}/reset-password`
 
-    const response = await req<Ok>(api.post(url, payload))
-    return !!response?.ok
+    const response = await api.post<AuthResponse>(url, payload)
+    return response.data
   }
 
-  async completeReset(payload: CompleteReset): Promise<boolean> {
+  async completeReset(payload: CompleteReset): Promise<AuthResponse> {
     const url = `${this.baseUrl}/complete-reset`
 
-    const response = await req<Ok>(api.post(url, payload))
-    return !!response?.ok
+    const response = await api.post<AuthResponse>(url, payload)
+    return response.data
   }
 
   async refresh(): Promise<boolean> {
     const url = `${this.baseUrl}/refresh`
 
-    const response = await req<Ok>(api.post(url, {}))
-    return !!response?.ok
+    const response = await api.post<any>(url, {})
+    return response.data
   }
 
   async validateToken(token: string): Promise<boolean> {
     const url = `${this.baseUrl}/validate-token`
 
-    const response = await req<Ok>(api.post(url, { token }))
-    return !!response?.ok
+    const response = await api.post<any>(url, { token })
+    return response.data
   }
 }
 

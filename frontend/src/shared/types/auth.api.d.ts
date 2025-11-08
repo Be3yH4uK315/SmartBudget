@@ -1,13 +1,11 @@
-type Ok = {
-  ok: true
-}
-
 type SignInAction = 'sign_in' | 'sign_up' | 'reset_password'
 type VerifyMode = 'signup' | 'reset' | null
 type AuthStep = 'email' | 'password' | 'verifyEmail'
 
-type VerifyEmailResponse = {
+type AuthResponse = {
   action: SignInAction
+  details: string
+  status: string
 }
 
 type VerifyEmail = {

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const baseURL = 'http://127.0.0.1:9000/api/'
+const baseURL = 'http://127.0.0.1:8000/api/'
 
 export const api = axios.create({
   baseURL,
@@ -64,15 +64,3 @@ api.interceptors.response.use(
     })
   },
 )
-
-export const getDataMsg = (data: any) =>
-  typeof data === 'string' ? data : data?.msg || data?.detail
-
-export const req = async <T>(p: Promise<{ data: T }>): Promise<T> => {
-  try {
-    const { data } = await p
-    return data
-  } catch (e: any) {
-    throw new Error(getDataMsg(e?.response?.data) || e?.message)
-  }
-}
