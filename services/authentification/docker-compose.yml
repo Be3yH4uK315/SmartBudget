@@ -10,14 +10,23 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - auth_postgres_dev
-      - auth_redis_dev
-      - auth_kafka_dev
+      auth_postgres_dev:
+        condition: service_healthy
+      auth_redis_dev:
+        condition: service_started
+      auth_kafka_dev:
+        condition: service_started
     volumes:
       - .:/app
       - geoip_data:/geoip
       - ./certs:/app/certs
     restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Waiting for PostgreSQL...' && /app/wait-for-it.sh auth_postgres_dev 5432 120 &&
+        echo 'Applying Alembic migrations...' && alembic upgrade head &&
+        echo 'Starting server...' && gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --forwarded-allow-ips '*' --access-logfile '-'
+      "
 
   # -------------------------
   # PostgreSQL
