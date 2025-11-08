@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { auth_api } from '@shared/api/auth'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 
 export const useVerifyLinkFlow = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
 
   const email = (searchParams.get('email') || '').trim().toLowerCase()
   const token = (searchParams.get('token') || '').trim()
+
+  const token_type: TokenType = location.pathname.includes('reset-password')
+    ? 'reset'
+    : 'verification'
 
   const [isVerifying, setIsVerifying] = useState(true)
   const [verified, setVerified] = useState<boolean | null>(null)
@@ -25,7 +30,7 @@ export const useVerifyLinkFlow = () => {
     ;(async () => {
       setIsVerifying(true)
       try {
-        const res = await auth_api.verifyLink({ email, token })
+        const res = await auth_api.verifyLink({ email, token, token_type })
         if (!cancelled) setVerified(res.status === 'success')
       } catch {
         if (!cancelled) setVerified(false)
@@ -44,7 +49,14 @@ export const useVerifyLinkFlow = () => {
       setIsSubmitting(true)
       try {
         const res = await fn()
-        if (res.status === 'success') navigate('/main')
+        if (res.status === 'success' && res.action === 'complete_registration') {
+          navigate('/main')
+          return
+        }
+        if (res.status === 'success' && res.action === 'complete_reset') {
+          navigate('/auth/sign-in')
+          return
+        }
       } finally {
         setIsSubmitting(false)
       }

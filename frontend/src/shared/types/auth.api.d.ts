@@ -1,6 +1,12 @@
-type SignInAction = 'sign_in' | 'sign_up' | 'reset_password'
+type SignInAction =
+  | 'sign_in'
+  | 'sign_up'
+  | 'reset_password'
+  | 'complete_registration'
+  | 'complete_reset'
 type VerifyMode = 'signup' | 'reset' | null
 type AuthStep = 'email' | 'password' | 'verifyEmail'
+type TokenType = 'verification' | 'reset'
 
 type AuthResponse = {
   action: SignInAction
@@ -15,6 +21,7 @@ type VerifyEmail = {
 type VerifyLink = {
   token: string
   email: string
+  token_type: string
 }
 
 type CompleteRegistration = {
