@@ -57,7 +57,7 @@ async def verify_email(
 ):
     """Инициирует процесс проверки электронной почты."""
     action = await service.start_email_verification(body.email)
-    detail = "Complete sign in." if action == "sign-in" else "Verification email sent."
+    detail = "Complete sign in." if action == "sign_in" else "Verification email sent."
     return JSONResponse(
         UnifiedResponse(
             status="success", 
