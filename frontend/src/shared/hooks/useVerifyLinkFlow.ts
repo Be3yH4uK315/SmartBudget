@@ -1,5 +1,5 @@
-import { useCallback,useEffect, useState } from 'react'
-import { auth_mock } from '@shared/api/auth'
+import { useCallback, useEffect, useState } from 'react'
+import { auth_api } from '@shared/api/auth'
 import { useNavigate, useSearchParams } from 'react-router'
 
 export const useVerifyLinkFlow = () => {
@@ -25,8 +25,8 @@ export const useVerifyLinkFlow = () => {
     ;(async () => {
       setIsVerifying(true)
       try {
-        const ok = await auth_mock.verifyLink({ email, token })
-        if (!cancelled) setVerified(!!ok)
+        const res = await auth_api.verifyLink({ email, token })
+        if (!cancelled) setVerified(res.status === 'success')
       } catch {
         if (!cancelled) setVerified(false)
       } finally {
@@ -40,11 +40,11 @@ export const useVerifyLinkFlow = () => {
   }, [email, token])
 
   const wrapSubmit = useCallback(
-    async (fn: () => Promise<boolean>) => {
+    async (fn: () => Promise<AuthResponse>) => {
       setIsSubmitting(true)
       try {
-        const ok = await fn()
-        if (ok) navigate('/main')
+        const res = await fn()
+        if (res.status === 'success') navigate('/main')
       } finally {
         setIsSubmitting(false)
       }

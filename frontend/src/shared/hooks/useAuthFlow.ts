@@ -46,13 +46,13 @@ export function useAuthFlow() {
       setIsLoading(true)
       setErrorCode(null)
       try {
-        const action = await auth_mock.verifyEmail({ email: normalizedEmail })
-        if (action === 'sign_in') {
+        const res = await auth_api.verifyEmail({ email: normalizedEmail })
+        if (res.action === 'sign_in') {
           pushStep('password')
-        } else if (action === 'sign_up') {
+        } else if (res.action === 'sign_up') {
           setVerifyMode('signup')
           pushStep('verifyEmail')
-        } else if (action === 'reset_password') {
+        } else if (res.action === 'reset_password') {
           setVerifyMode('reset')
           pushStep('verifyEmail')
         }
@@ -66,8 +66,8 @@ export function useAuthFlow() {
       setIsLoading(true)
       setErrorCode(null)
       try {
-        const ok = await auth_mock.login({ email: normalizedEmail, password })
-        if (ok) {
+        const res = await auth_api.login({ email: normalizedEmail, password })
+        if (res) {
           navigate('/main')
           return
         }
@@ -93,7 +93,7 @@ export function useAuthFlow() {
         submit()
       }
     },
-    [canSubmit, submit]
+    [canSubmit, submit],
   )
 
   const resetPasswordFlow = useCallback(() => {
@@ -101,8 +101,8 @@ export function useAuthFlow() {
     setErrorCode(null)
     auth_mock
       .resetPassword({ email: normalizedEmail })
-      .then((ok) => {
-        if (ok) {
+      .then((res) => {
+        if (res.status === 'success') {
           setVerifyMode('reset')
           pushStep('verifyEmail')
         }
@@ -113,9 +113,9 @@ export function useAuthFlow() {
   const resendVerifyEmail = useCallback(async () => {
     setIsResending(true)
     try {
-      const action = await auth_mock.verifyEmail({ email: normalizedEmail })
-      if (action === 'sign_up') setVerifyMode('signup')
-      if (action === 'reset_password') setVerifyMode('reset')
+      const res = await auth_api.verifyEmail({ email: normalizedEmail })
+      if (res.action === 'sign_up') setVerifyMode('signup')
+      if (res.action === 'reset_password') setVerifyMode('reset')
     } finally {
       setIsResending(false)
     }
