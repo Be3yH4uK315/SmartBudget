@@ -23,7 +23,6 @@ services:
     restart: unless-stopped
     command: >
       sh -c "
-        echo 'Waiting for PostgreSQL...' && /app/wait-for-it.sh auth_postgres_dev 5432 120 &&
         echo 'Applying Alembic migrations...' && alembic upgrade head &&
         echo 'Starting server...' && gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --forwarded-allow-ips '*' --access-logfile '-'
       "
@@ -135,60 +134,6 @@ services:
       - geoip_data:/geoip
       - ./certs:/app/certs
     restart: unless-stopped
-
-  auth_postgres_test:
-    image: postgres:16
-    container_name: auth_postgres_test
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: auth_db_test
-    ports:
-      - "5434:5432"
-    volumes:
-      - pg_data_auth_test:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      retries: 5
-      timeout: 5s
-
-  # --- Тестовый Redis ---
-  auth_redis_test:
-    image: redis:7
-    container_name: auth_redis_test
-    ports:
-      - "6380:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      retries: 5
-      timeout: 5s
-
-  # --- Сервис для запуска тестов ---
-  tests:
-    build: .
-    container_name: auth_tests
-    environment:
-      - PYTHONPATH=/app
-      - ENV_FILE=.env.test
-    env_file: .env.test
-    command: >
-      sh -c "
-        echo 'Waiting for Test DB...' && /app/wait-for-it.sh auth_postgres_test 5432 120 &&
-        echo 'Waiting for Test Redis...' && /app/wait-for-it.sh auth_redis_test 6379 120 &&
-        echo 'Running Alembic Migrations on Test DB...' && alembic upgrade head &&
-        echo 'Running Pytest...' && pytest
-      "
-    depends_on:
-      auth_postgres_test:
-        condition: service_healthy
-      auth_redis_test:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - ./geoip:/geoip
-    restart: "no"
 
 volumes:
   pg_data_auth:
