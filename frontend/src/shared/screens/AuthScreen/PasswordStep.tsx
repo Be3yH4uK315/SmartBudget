@@ -47,14 +47,14 @@ export const PasswordStep = ({
           error={showWrong || showBan}
           helperText={
             showWrong
-              ? 'Неверный пароль'
+              ? translate('password.wrongPassword')
               : showBan
-                ? 'Слишком много попыток. Попробуйте позже.'
+                ? translate('password.tooManyAttempts')
                 : undefined
           }
           FormHelperTextProps={{ sx: { color: 'error.main' } }}
         />
-        
+
         <IconButton
           onClick={submit}
           disabled={!canSubmit || showBan}

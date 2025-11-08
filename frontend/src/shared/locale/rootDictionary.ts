@@ -10,6 +10,8 @@ export const rootDictionary: LocaleDictionary = {
         title: 'Введите пароль',
         placeholder: 'Пароль',
         forgotPassword: 'Не помню пароль',
+        wrongPassword: 'Неверный пароль',
+        tooManyAttempts: 'Слишком много попыток, попробуйте позже',
       },
       verifyEmail: {
         title: 'Проверьте почту',
@@ -28,8 +30,6 @@ export const rootDictionary: LocaleDictionary = {
       repeatPassword: 'Подтвердите пароль',
       passwordsNotMatch: 'Пароли не совпадают',
       continue: 'Зарегистрироваться',
-      incorrectLink: 'К сожалению, эта страница недоступна',
-      incorrectLinkCaption: 'Проверьте корректность ссылки или попробуйте еще раз',
     },
     ResetPasswordScreen: {
       title: 'Восстановление пароля',
@@ -37,6 +37,10 @@ export const rootDictionary: LocaleDictionary = {
       repeatPassword: 'Подтвердите пароль',
       passwordsNotMatch: 'Пароли не совпадают',
       continue: 'Сбросить пароль',
+    },
+    WrongLink: {
+      incorrectLink: 'К сожалению, эта страница недоступна',
+      incorrectLinkCaption: 'Проверьте корректность ссылки или попробуйте еще раз',
     },
 
     HeaderTabs: {
