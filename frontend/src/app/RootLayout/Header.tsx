@@ -1,13 +1,17 @@
-import { useMemo } from 'react'
+import { useCallback,useMemo, useState } from 'react'
 import { LogoutRounded } from '@mui/icons-material'
 import { AppBar, Box, Button, Container, IconButton, Tab, Tabs, useMediaQuery } from '@mui/material'
+import { auth_api } from '@shared/api/auth'
 import { useTranslate } from '@shared/hooks'
-import { Link as RouterLink, useLocation } from 'react-router'
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
 export const Header = () => {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const translate = useTranslate('HeaderTabs')
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down('sm'))
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const routes = useMemo(
     () => [
@@ -26,6 +30,17 @@ export const Header = () => {
     )
     return idx === -1 ? false : idx
   }, [pathname, routes])
+
+  const handleLogout = useCallback(async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try {
+      await auth_api.logout()
+      navigate('/auth/sign-in')
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }, [isLoggingOut, navigate])
 
   return (
     <AppBar position="static" color="transparent" sx={{ bgcolor: 'surface.light' }}>
@@ -50,10 +65,14 @@ export const Header = () => {
             />
           ))}
         </Tabs>
+
         <Box sx={{ flexGrow: 1 }} />
-        {isMobile && (
+
+        {isMobile ? (
           <IconButton
             aria-label={translate('logout')}
+            onClick={handleLogout}
+            disabled={isLoggingOut}
             sx={{
               bgcolor: 'transparent',
               '&:hover': { bgcolor: 'transparent' },
@@ -63,10 +82,10 @@ export const Header = () => {
           >
             <LogoutRounded />
           </IconButton>
-        )}
-
-        {!isMobile && (
+        ) : (
           <Button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
             sx={{
               bgcolor: 'transparent',
               '&:hover': { bgcolor: 'transparent' },
