@@ -42,7 +42,7 @@ class AuthService:
         existing_user = await self.db.execute(select(User).where(User.email == email)) 
         if existing_user.scalar_one_or_none():
             logger.warning(f"Verification attempt for existing email: {email}")
-            return "sign-in"
+            return "sign_in"
 
         token = str(uuid4())
         hashed_token = hash_token(token)
@@ -67,7 +67,7 @@ class AuthService:
             event_data={"event": "user.verification_started", "email": email},
             schema_name="AUTH_EVENTS_SCHEMA"
         )
-        return "verify_email"
+        return "sign_up"
 
     async def validate_verification_token(self, token: str, email: str):
         """Проверяет валидность токена верификации из email."""
