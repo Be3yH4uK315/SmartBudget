@@ -9,7 +9,7 @@ AUTH_EVENTS_SCHEMA = {
                 "user.registered", "user.login", "user.logout", "user.session_mismatch_detected",
                 "user.password_reset", "user.token_invalid", "user.verification_started",
                 "user.verification_validated", "user.token_refreshed", "user.password_changed",
-                "user.login_failed", "user.password_reset_started"
+                "user.login_failed", "user.password_reset_started", "user.password_reset_validated"
             ],
             "description": "Type of authentication event"
         },
