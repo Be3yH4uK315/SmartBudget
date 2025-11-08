@@ -69,23 +69,32 @@ class AuthService:
         )
         return "sign_up"
 
-    async def validate_verification_token(self, token: str, email: str):
+    async def validate_verification_token(self, token: str, email: str, token_type: str):
         """Проверяет валидность токена верификации из email."""
-        redis_key = constants.get_verify_email_key(email)
+        if token_type == 'verification':
+            redis_key = constants.get_verify_email_key(email)
+            event_name = "user.verification_validated"
+        elif token_type == 'reset':
+            redis_key = constants.get_reset_password_key(email)
+            event_name = "user.password_reset_validated"
+
         stored_hash = await self.redis.get(redis_key)
         if not stored_hash or stored_hash != hash_token(token):
+            logger.warning(f"Invalid or expired token for {token_type} on email: {email}")
             raise HTTPException(status_code=403, detail="Invalid or expired token")
 
-        await self.arq_pool.enqueue_job(
-            'send_kafka_event_async',
-            topic="auth_events",
-            event_data={"event": "user.verification_validated", "email": email},
-            schema_name="AUTH_EVENTS_SCHEMA"
-        )
+        if event_name:
+            await self.arq_pool.enqueue_job(
+                'send_kafka_event_async',
+                topic="auth_events",
+                event_data={"event": event_name, "email": email},
+                schema_name="AUTH_EVENTS_SCHEMA"
+            )
+            logger.info(f"Token validated for {token_type} on email: {email}, event sent")
 
     async def complete_registration(self, body: CompleteRegistrationRequest, ip: str):
         """Завершает регистрацию: создает пользователя и сеанс."""
-        await self.validate_verification_token(body.token, body.email)
+        await self.validate_verification_token(body.token, body.email, token_type='verification')
         redis_key = constants.get_verify_email_key(body.email)
         try:
             user = User(
@@ -245,10 +254,8 @@ class AuthService:
 
     async def complete_password_reset(self, body: CompleteResetRequest):
         """Завершает сброс пароля: проверяет токен и обновляет хэш пароля."""
+        await self.validate_verification_token(body.token, body.email, token_type='reset')
         redis_key = constants.get_reset_password_key(body.email)
-        stored_hash = await self.redis.get(redis_key)
-        if not stored_hash or hash_token(body.token) != stored_hash:
-            raise HTTPException(status_code=400, detail="Invalid or expired token")
 
         user_query = await self.db.execute(select(User).where(User.email == body.email))
         user = user_query.scalar_one_or_none()
