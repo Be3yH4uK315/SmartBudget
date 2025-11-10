@@ -92,7 +92,12 @@ class AuthService:
             )
             logger.info(f"Token validated for {token_type} on email: {email}, event sent")
 
-    async def complete_registration(self, body: CompleteRegistrationRequest, ip: str):
+    async def complete_registration(
+        self, 
+        body: CompleteRegistrationRequest,
+        ip: str,
+        user_agent: str | None
+    ):
         """Завершает регистрацию: создает пользователя и сеанс."""
         await self.validate_verification_token(body.token, body.email, token_type='verification')
         redis_key = constants.get_verify_email_key(body.email)
@@ -110,11 +115,15 @@ class AuthService:
             await self.db.commit()
             await self.db.refresh(user)
 
-            device_name = parse_device(body.user_agent)
+            device_name = parse_device(user_agent or "Unknown")
             location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
 
             access_token, refresh_token, session = await self._create_session_and_tokens(
-                user, body.user_agent, device_name, ip, location
+                user, 
+                user_agent or "Unknown",
+                device_name, 
+                ip, 
+                location
             )
 
             await self.arq_pool.enqueue_job(
@@ -136,7 +145,10 @@ class AuthService:
             raise HTTPException(status_code=409, detail="Email already registered")
 
     async def authenticate_user(
-        self, body: LoginRequest, ip: str
+        self, 
+        body: LoginRequest, 
+        ip: str,
+        user_agent: str | None
     ):
         """Выполняет вход в систему: проверяет учетные данные и создает сеанс."""
         fail_key = constants.get_login_fail_key(ip)
@@ -171,13 +183,17 @@ class AuthService:
 
         await self.redis.delete(fail_key)
 
-        device_name = parse_device(body.user_agent)
+        device_name = parse_device(user_agent or "Unknown")
 
         user.last_login = datetime.now(timezone.utc)
         self.db.add(user)
 
         access_token, refresh_token, session = await self._create_session_and_tokens(
-            user, body.user_agent, device_name, ip, location
+            user, 
+            user_agent or "Unknown",
+            device_name, 
+            ip, 
+            location
         )
 
         await self.db.execute(
@@ -389,7 +405,12 @@ class AuthService:
         )   
     
     async def _create_session_and_tokens(
-        self, user: User, user_agent: str, device_name: str, ip: str, location: str,
+        self, 
+        user: User, 
+        user_agent: str | None,
+        device_name: str, 
+        ip: str, 
+        location: str,
         commit: bool = True
     ):
         """Создает новый сеанс и генерирует токены."""
@@ -399,7 +420,7 @@ class AuthService:
         session = Session(
             id=uuid4(),
             user_id=user.id,
-            user_agent=user_agent,
+            user_agent=user_agent or "Unknown",
             device_name=device_name,
             ip=ip,
             location=location,
