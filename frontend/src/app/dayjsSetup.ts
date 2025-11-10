@@ -1,6 +1,4 @@
 import 'dayjs/locale/ru'
-import 'dayjs/locale/uz'
-import 'dayjs/locale/zh'
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import isBetween from 'dayjs/plugin/isBetween'
