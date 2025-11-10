@@ -27,3 +27,4 @@ services/authentification//geoip/GeoLite2-City.mmdb
 services/authentification/celerybeat-schedule
 services/authentification/certs
 */*/.idea
+**/.DS_Store
