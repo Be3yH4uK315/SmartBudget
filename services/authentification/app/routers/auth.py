@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Body, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 import base64
@@ -93,10 +93,15 @@ async def verify_link(
 async def complete_registration(
     body: CompleteRegistrationRequest = Body(...),
     service: AuthService = Depends(AuthService),
-    ip: str = Depends(get_real_ip)
+    ip: str = Depends(get_real_ip),
+    user_agent: str | None = Header(None, alias="User-Agent")
 ):
     """Завершает регистрацию пользователя после верификации."""
-    _user, _session, access_token, refresh_token = await service.complete_registration(body, ip)
+    _user, _session, access_token, refresh_token = await service.complete_registration(
+        body, 
+        ip, 
+        user_agent or "Unknown"
+    )
 
     response = JSONResponse(
         UnifiedResponse(
@@ -112,10 +117,15 @@ async def complete_registration(
 async def login(
     body: LoginRequest = Body(...),
     service: AuthService = Depends(AuthService),
-    ip: str = Depends(get_real_ip)
+    ip: str = Depends(get_real_ip),
+    user_agent: str | None = Header(None, alias="User-Agent")
 ):
     """Обрабатывает вход пользователя в систему и создает сеанс."""
-    _user, _session, access_token, refresh_token = await service.authenticate_user(body, ip)
+    _user, _session, access_token, refresh_token = await service.authenticate_user(
+        body, 
+        ip, 
+        user_agent or "Unknown"
+    )
 
     response = JSONResponse(
         UnifiedResponse(

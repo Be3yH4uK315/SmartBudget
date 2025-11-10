@@ -16,13 +16,11 @@ class CompleteRegistrationRequest(BaseModel):
     country: str = Field(..., description="Страна")
     token: str = Field(..., description="Верификационный токен")
     password: str = Field(..., min_length=8, description="Пароль")
-    user_agent: str = Field(..., description="User-Agent")
 
 class LoginRequest(BaseModel):
     """Модель запроса для входа в систему."""
     email: EmailStr = Field(..., description="Email")
     password: str = Field(..., description="Пароль")
-    user_agent: str = Field(..., description="User-Agent")
 
 class ResetPasswordRequest(BaseModel):
     """Модель запроса для инициирования сброса пароля."""
