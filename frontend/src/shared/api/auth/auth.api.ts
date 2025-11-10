@@ -2,7 +2,7 @@ import { api } from '@shared/api'
 
 const getUserAgent = () => (typeof navigator !== 'undefined' ? navigator.userAgent : undefined)
 
-class Auth_api {
+class AuthApi {
   baseUrl = '/auth'
 
   async verifyEmail(payload: VerifyEmail): Promise<AuthResponse> {
@@ -71,4 +71,4 @@ class Auth_api {
   }
 }
 
-export const auth_api = new Auth_api()
+export const authApi = new AuthApi()

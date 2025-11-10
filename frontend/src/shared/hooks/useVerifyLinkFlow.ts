@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { auth_api } from '@shared/api/auth'
+import { authApi } from '@shared/api/auth'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 
 export const useVerifyLinkFlow = () => {
@@ -30,7 +30,7 @@ export const useVerifyLinkFlow = () => {
     ;(async () => {
       setIsVerifying(true)
       try {
-        const res = await auth_api.verifyLink({ email, token, token_type })
+        const res = await authApi.verifyLink({ email, token, token_type })
         if (!cancelled) setVerified(res.status === 'success')
       } catch {
         if (!cancelled) setVerified(false)

@@ -3,7 +3,7 @@ const delay = (ms = 900) => new Promise((res) => setTimeout(res, ms))
 class AuthMock {
   async verifyEmail(payload: VerifyEmail): Promise<string> {
     await delay()
-    return ('sign_up')
+    return 'sign_up'
   }
 
   async verifyLink(params: VerifyLink): Promise<boolean> {
@@ -17,12 +17,12 @@ class AuthMock {
   }
 
   async login(payload: Login): Promise<any> {
-  await delay()
+    await delay()
 
-  const err: any = new Error('Wrong password')
-  err.status = 403
-  throw err
-}
+    const err: any = new Error('Wrong password')
+    err.status = 403
+    throw err
+  }
 
   async logout(): Promise<boolean> {
     await delay()
@@ -50,4 +50,4 @@ class AuthMock {
   }
 }
 
-export const auth_mock = new AuthMock()
+export const authMock = new AuthMock()

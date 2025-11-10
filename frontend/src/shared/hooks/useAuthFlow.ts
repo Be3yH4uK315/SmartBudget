@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { auth_mock } from '@shared/api/auth'
+import { authApi } from '@shared/api/auth'
 import { useNavigate } from 'react-router'
 
 type ErrorCode = 403 | 429 | null
@@ -46,7 +46,7 @@ export function useAuthFlow() {
       setIsLoading(true)
       setErrorCode(null)
       try {
-        const res = await auth_api.verifyEmail({ email: normalizedEmail })
+        const res = await authApi.verifyEmail({ email: normalizedEmail })
         if (res.action === 'sign_in') {
           pushStep('password')
         } else if (res.action === 'sign_up') {
@@ -66,7 +66,7 @@ export function useAuthFlow() {
       setIsLoading(true)
       setErrorCode(null)
       try {
-        const res = await auth_api.login({ email: normalizedEmail, password })
+        const res = await authApi.login({ email: normalizedEmail, password })
         if (res) {
           navigate('/main')
           return
@@ -99,7 +99,7 @@ export function useAuthFlow() {
   const resetPasswordFlow = useCallback(() => {
     setIsLoading(true)
     setErrorCode(null)
-    auth_mock
+    authApi
       .resetPassword({ email: normalizedEmail })
       .then((res) => {
         if (res.status === 'success') {
@@ -113,7 +113,7 @@ export function useAuthFlow() {
   const resendVerifyEmail = useCallback(async () => {
     setIsResending(true)
     try {
-      const res = await auth_api.verifyEmail({ email: normalizedEmail })
+      const res = await authApi.verifyEmail({ email: normalizedEmail })
       if (res.action === 'sign_up') setVerifyMode('signup')
       if (res.action === 'reset_password') setVerifyMode('reset')
     } finally {
