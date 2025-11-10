@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react'
 import { Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material'
-import { auth_mock } from '@shared/api/auth'
+import { authApi } from '@shared/api/auth'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate, useVerifyLinkFlow } from '@shared/hooks'
 import { WrongLink } from './WrongLink'
 
-export const RegistrationScreen = () => {
+const RegistrationScreen = () => {
   const translate = useTranslate('RegistrationScreen')
   const { email, token, isVerifying, verified, isSubmitting, wrapSubmit } = useVerifyLinkFlow()
 
@@ -24,7 +24,7 @@ export const RegistrationScreen = () => {
       if (!canSubmit) return
 
       wrapSubmit(() =>
-        auth_mock.completeRegistration({
+        authApi.completeRegistration({
           email,
           token,
           password,
@@ -131,3 +131,5 @@ export const RegistrationScreen = () => {
     </ScreenContent>
   )
 }
+
+export default RegistrationScreen

@@ -6,7 +6,7 @@ import { EmailStep } from './EmailStep'
 import { PasswordStep } from './PasswordStep'
 import { VerifyEmailStep } from './VerifyEmailStep'
 
-export const AuthScreen = () => {
+const AuthScreen = () => {
   const translate = useTranslate('AuthScreen')
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
@@ -32,7 +32,7 @@ export const AuthScreen = () => {
   } = useAuthFlow()
 
   const title = translate(`${step}.title`)
-  const subtitle = step === 'email' ? translate('email.subtitle') : step === 'verifyEmail' && null
+  const subtitle = step === 'email' ? translate('email.subtitle') : null
 
   return (
     <ScreenContent containerSx={{ justifyContent: 'center', alignItems: 'center' }}>
@@ -69,7 +69,7 @@ export const AuthScreen = () => {
         <Stack spacing={4} width="100%">
           <Stack alignItems="center">
             <Typography variant="h3">{title}</Typography>
-            
+
             {subtitle && <Typography textAlign="center">{subtitle}</Typography>}
           </Stack>
 
@@ -113,3 +113,5 @@ export const AuthScreen = () => {
     </ScreenContent>
   )
 }
+
+export default AuthScreen

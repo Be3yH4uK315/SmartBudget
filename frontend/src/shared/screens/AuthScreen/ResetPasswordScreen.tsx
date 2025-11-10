@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material'
-import { auth_mock } from '@shared/api/auth'
+import { authApi } from '@shared/api/auth'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate, useVerifyLinkFlow } from '@shared/hooks'
 import { WrongLink } from './WrongLink'
 
-export const ResetPasswordScreen = () => {
+const ResetPasswordScreen = () => {
   const translate = useTranslate('ResetPasswordScreen')
   const { email, token, isVerifying, verified, isSubmitting, wrapSubmit } = useVerifyLinkFlow()
 
@@ -24,7 +24,7 @@ export const ResetPasswordScreen = () => {
     if (!canSubmit) return
 
     wrapSubmit(() =>
-      auth_mock.completeReset({
+      authApi.completeReset({
         email,
         token,
         new_password: password,
@@ -105,3 +105,5 @@ export const ResetPasswordScreen = () => {
     </ScreenContent>
   )
 }
+
+export default ResetPasswordScreen

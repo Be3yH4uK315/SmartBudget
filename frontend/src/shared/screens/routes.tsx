@@ -1,6 +1,9 @@
-import { Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { Route } from 'react-router'
-import { AuthScreen, RegistrationScreen, ResetPasswordScreen } from './AuthScreen'
+
+const AuthScreen = lazy(() => import('./AuthScreen/AuthScreen'))
+const RegistrationScreen = lazy(() => import('./AuthScreen/RegistrationScreen'))
+const ResetPasswordScreen = lazy(() => import('./AuthScreen/ResetPasswordScreen'))
 
 export const authRoutes = {
   pages: (
