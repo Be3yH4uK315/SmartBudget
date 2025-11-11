@@ -21,17 +21,15 @@ class AuthApi {
 
   async completeRegistration(payload: CompleteRegistration): Promise<AuthResponse> {
     const url = `${this.baseUrl}/complete-registration`
-    const body = { user_agent: getUserAgent(), ...payload }
 
-    const response = await api.post<AuthResponse>(url, body)
+    const response = await api.post<AuthResponse>(url, payload)
     return response.data
   }
 
   async login(payload: Login): Promise<AuthResponse> {
     const url = `${this.baseUrl}/login`
-    const body = { user_agent: getUserAgent(), ...payload }
 
-    const response = await api.post<AuthResponse>(url, body)
+    const response = await api.post<AuthResponse>(url, payload)
     return response.data
   }
 

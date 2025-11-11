@@ -30,7 +30,6 @@ type CompleteRegistration = {
   password: string
   name: string
   country: string
-  user_agent?: string
 }
 
 type Login = {
