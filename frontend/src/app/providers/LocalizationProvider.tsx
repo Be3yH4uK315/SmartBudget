@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useCallback, useLayoutEffect, useState } from 'react'
+import { createContext, PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react'
 import { _localeManager } from '@shared/locale/localeManager'
 
 export const LocalizationContext = createContext<{
@@ -11,7 +11,7 @@ type Props = PropsWithChildren<{
 }>
 
 export const LocalizationProvider = ({ dictionaryLoader, children }: Props) => {
-  const [language, setLanguage] = useState<Languages>(_localeManager.getLocale())
+  const [language, setLanguage] = useState<Languages>(() => _localeManager.getLocale())
 
   const loadAndStoreDict = useCallback(
     async (lang: Languages = _localeManager.getLocale()) => {
@@ -29,16 +29,13 @@ export const LocalizationProvider = ({ dictionaryLoader, children }: Props) => {
     [loadAndStoreDict],
   )
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     loadAndStoreDict()
   }, [loadAndStoreDict])
 
   return (
     <LocalizationContext.Provider
-      value={{
-        language,
-        changeLanguage,
-      }}
+      value={useMemo(() => ({ language, changeLanguage }), [language, changeLanguage])}
     >
       {children}
     </LocalizationContext.Provider>
