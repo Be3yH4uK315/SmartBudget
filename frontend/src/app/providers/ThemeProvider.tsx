@@ -13,15 +13,13 @@ export const ThemeContext = createContext<{
 
 export const ThemeProvider = ({ children }: PropsWithChildren) => {
   const [colorMode, setColorMode] = useState<ColorMode>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = window.localStorage.getItem('colorMode')
-      if (stored === 'light' || stored === 'dark') {
-        return stored
-      }
+    const stored = window.localStorage.getItem('colorMode')
+    if (stored === 'light' || stored === 'dark') {
+      return stored
+    }
 
-      if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-        return 'dark'
-      }
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+      return 'dark'
     }
 
     return 'light'
@@ -42,21 +40,17 @@ export const ThemeProvider = ({ children }: PropsWithChildren) => {
   )
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('colorMode', colorMode)
-    }
+    window.localStorage.setItem('colorMode', colorMode)
   }, [colorMode])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-
     const media = window.matchMedia('(prefers-color-scheme: dark)')
 
-    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      setColorMode(e.matches ? 'dark' : 'light')
-    }
-
     if (media.addEventListener) {
+      const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+        setColorMode(e.matches ? 'dark' : 'light')
+      }
+
       media.addEventListener('change', handleChange)
       return () => media.removeEventListener('change', handleChange)
     }
