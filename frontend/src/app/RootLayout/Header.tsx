@@ -1,7 +1,7 @@
-import { useCallback,useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LogoutRounded } from '@mui/icons-material'
 import { AppBar, Box, Button, Container, IconButton, Tab, Tabs, useMediaQuery } from '@mui/material'
-import { auth_api } from '@shared/api/auth'
+import { authApi } from '@shared/api/auth'
 import { useTranslate } from '@shared/hooks'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
 
@@ -31,16 +31,16 @@ export const Header = () => {
     return idx === -1 ? false : idx
   }, [pathname, routes])
 
-  const handleLogout = useCallback(async () => {
+  const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
     try {
-      await auth_api.logout()
+      await authApi.logout()
       navigate('/auth/sign-in')
     } finally {
       setIsLoggingOut(false)
     }
-  }, [isLoggingOut, navigate])
+  }
 
   return (
     <AppBar position="static" color="transparent" sx={{ bgcolor: 'surface.light' }}>
