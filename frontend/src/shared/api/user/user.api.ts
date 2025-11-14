@@ -1,7 +1,7 @@
-import { api } from '../axios.config'
+import { api } from '@shared/api'
 
 class User_api {
-  baseURL = ''
+  baseURL = '/user'
 
   async getUserInfo() {
     const url = `${this.baseURL}/get_user_info`
