@@ -1,7 +1,5 @@
 import { api } from '@shared/api'
 
-const getUserAgent = () => (typeof navigator !== 'undefined' ? navigator.userAgent : undefined)
-
 class AuthApi {
   baseUrl = '/auth'
 
