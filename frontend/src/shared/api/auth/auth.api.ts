@@ -57,14 +57,7 @@ class AuthApi {
   async refresh(): Promise<boolean> {
     const url = `${this.baseUrl}/refresh`
 
-    const response = await api.post<any>(url, {})
-    return response.data
-  }
-
-  async validateToken(token: string): Promise<boolean> {
-    const url = `${this.baseUrl}/validate-token`
-
-    const response = await api.post<any>(url, { token })
+    const response = await api.post<any>(url)
     return response.data
   }
 }
