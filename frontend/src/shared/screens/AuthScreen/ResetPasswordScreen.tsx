@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material'
 import { authApi } from '@shared/api/auth'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate, useVerifyLinkFlow } from '@shared/hooks'
@@ -63,7 +63,7 @@ const ResetPasswordScreen = () => {
           ) : verified === false ? (
             <WrongLink />
           ) : (
-            <form style={{ width: '100%' }} onSubmit={onSubmit}>
+            <Box component="form" onSubmit={onSubmit} sx={{ width: '100%' }}>
               <Stack spacing={2} width="100%">
                 <TextField
                   label={translate('password')}
@@ -98,7 +98,7 @@ const ResetPasswordScreen = () => {
                   {translate('continue')}
                 </Button>
               </Stack>
-            </form>
+            </Box>
           )}
         </Stack>
       </Paper>
