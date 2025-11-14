@@ -11,7 +11,6 @@ type Props = {
   onEnterDown: (e: React.KeyboardEvent) => void
   isMobile: boolean
   errorCode: 403 | 429 | null
-  isBanned: boolean
   onForgot: () => void
 }
 
@@ -24,13 +23,12 @@ export const PasswordStep = ({
   onEnterDown,
   isMobile,
   errorCode,
-  isBanned,
   onForgot,
 }: Props) => {
   const translate = useTranslate('AuthScreen')
 
   const showWrong = errorCode === 403
-  const showBan = errorCode === 429 || isBanned
+  const isBanned = errorCode === 429
 
   return (
     <Stack spacing={{ xs: 2, sm: 0 }} alignItems={{ xs: 'center', sm: 'normal' }}>
@@ -43,12 +41,12 @@ export const PasswordStep = ({
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={onEnterDown}
           sx={{ width: '100%' }}
-          disabled={isLoading || showBan}
-          error={showWrong || showBan}
+          disabled={isLoading || isBanned}
+          error={showWrong || isBanned}
           helperText={
             showWrong
               ? translate('password.wrongPassword')
-              : showBan
+              : isBanned
                 ? translate('password.tooManyAttempts')
                 : undefined
           }
@@ -57,7 +55,7 @@ export const PasswordStep = ({
 
         <IconButton
           onClick={submit}
-          disabled={!canSubmit || showBan}
+          disabled={!canSubmit || isBanned}
           sx={{
             bgcolor: 'primary.main',
             width: { xs: 'auto', sm: 56 },

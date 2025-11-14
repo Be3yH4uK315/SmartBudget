@@ -19,7 +19,6 @@ const AuthScreen = () => {
     canSubmit,
     normalizedEmail,
     errorCode,
-    isBanned,
     verifyMode,
     isResending,
     setEmail,
@@ -95,7 +94,6 @@ const AuthScreen = () => {
               onEnterDown={onKeyDown}
               isMobile={isMobile}
               errorCode={errorCode}
-              isBanned={isBanned}
               onForgot={resetPasswordFlow}
             />
           )}

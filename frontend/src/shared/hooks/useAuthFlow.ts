@@ -28,7 +28,6 @@ export function useAuthFlow() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errorCode, setErrorCode] = useState<ErrorCode>(null)
-  const [isBanned, setIsBanned] = useState(false)
   const [verifyMode, setVerifyMode] = useState<VerifyMode>(null)
   const [isResending, setIsResending] = useState(false)
 
@@ -37,9 +36,9 @@ export function useAuthFlow() {
   const canSubmit = useMemo(() => {
     if (isLoading) return false
     if (step === 'email') return /\S+@\S+\.\S+/.test(normalizedEmail)
-    if (step === 'password') return password.trim().length > 0 && !isBanned
+    if (step === 'password') return password.trim().length > 0
     return false
-  }, [isLoading, step, normalizedEmail, password, isBanned])
+  }, [isLoading, step, normalizedEmail, password])
 
   const submit = useCallback(async () => {
     if (step === 'email') {
@@ -77,7 +76,6 @@ export function useAuthFlow() {
           setErrorCode(403)
         } else if (code === 429) {
           setErrorCode(429)
-          setIsBanned(true)
         }
       } finally {
         setIsLoading(false)
@@ -121,11 +119,6 @@ export function useAuthFlow() {
     }
   }, [normalizedEmail])
 
-  const clearBan = useCallback(() => {
-    setIsBanned(false)
-    setErrorCode(null)
-  }, [])
-
   return {
     step,
     email,
@@ -134,7 +127,6 @@ export function useAuthFlow() {
     canSubmit,
     normalizedEmail,
     errorCode,
-    isBanned,
     verifyMode,
     isResending,
 
@@ -144,7 +136,6 @@ export function useAuthFlow() {
     onKeyDown,
     resetPasswordFlow,
     resendVerifyEmail,
-    clearBan,
     goBack,
   }
 }
