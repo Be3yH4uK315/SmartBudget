@@ -1,5 +1,4 @@
-import { createSlice, WithSlice } from '@reduxjs/toolkit'
-import { rootReducer } from '@shared/store'
+import { createSlice } from '@reduxjs/toolkit'
 import { getUserInitialState } from './user.state'
 import { getUserInfo } from './user.thunks'
 
