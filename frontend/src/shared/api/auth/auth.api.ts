@@ -52,11 +52,11 @@ class AuthApi {
     return response.data
   }
 
-  async refresh(): Promise<boolean> {
+  async refresh() {
     const url = `${this.baseUrl}/refresh`
 
-    const response = await api.post<any>(url)
-    return response.data
+    const response = await api.post(url)
+    return response.status
   }
 }
 
