@@ -1,10 +1,11 @@
 import { api } from '@shared/api'
 
 class User_api {
-  baseURL = '/user'
+  /** времменый роут на auth для тестов */
+  baseURL = '/auth'
 
-  async getUserInfo() {
-    const url = `${this.baseURL}/get_user_info`
+  async getUserInfo(): Promise<User> {
+    const url = `${this.baseURL}/me`
     const response = await api.get<User>(url)
 
     return response.data
