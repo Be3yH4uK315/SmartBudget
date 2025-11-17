@@ -1,3 +1,5 @@
+from datetime import datetime
+from uuid import UUID
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
@@ -51,3 +53,38 @@ class UnifiedResponse(BaseModel):
     status: str = Field(..., description="Статус: успешно или ошибка")
     action: str = Field(..., description="Выполненное действие")
     detail: Optional[str] = Field(None, description="Дополнительное подробное сообщение")
+
+class UserInfo(BaseModel):
+    """
+    Безопасная информация о пользователе.
+    """
+    id: UUID
+    email: EmailStr
+    name: str
+    country: str
+    role: str
+    last_login: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class SessionInfo(BaseModel):
+    """
+    Безопасная информация о сессии, передаваемая на фронтенд.
+    """
+    id: UUID
+    device_name: str
+    location: str
+    ip: str
+    created_at: datetime
+    is_current_session: bool = Field(False, description="Является ли эта сессия текущей")
+
+    class Config:
+        from_attributes = True
+
+class AllSessionsResponse(BaseModel):
+    """
+    Модель ответа для списка всех сессий пользователя.
+    """
+    sessions: list[SessionInfo]
