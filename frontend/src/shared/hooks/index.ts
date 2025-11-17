@@ -1,4 +1,5 @@
 export * from './useAuthFlow'
+export * from './useAuthorization'
 export * from './useScreenSizeValue'
 export * from './useTheme'
 export * from './useTranslate'

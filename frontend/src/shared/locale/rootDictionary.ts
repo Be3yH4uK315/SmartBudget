@@ -42,7 +42,6 @@ export const rootDictionary: LocaleDictionary = {
       incorrectLink: 'К сожалению, эта страница недоступна',
       incorrectLinkCaption: 'Проверьте корректность ссылки или попробуйте еще раз',
     },
-
     HeaderTabs: {
       main: 'Главная',
       budget: 'Бюджет',
@@ -51,6 +50,9 @@ export const rootDictionary: LocaleDictionary = {
       settings: 'Настройки',
       signIn: 'Войти',
       logout: 'Выход',
+    },
+    LoadingScreen: {
+      loading: 'Загрузка...',
     },
   },
 
@@ -73,7 +75,6 @@ export const rootDictionary: LocaleDictionary = {
       },
       signIn: 'Sign In',
     },
-
     HeaderTabs: {
       main: 'Main',
       budget: 'Budget',
@@ -82,6 +83,9 @@ export const rootDictionary: LocaleDictionary = {
       settings: 'Settings',
       signIn: 'Sign In',
       logout: 'Logout',
+    },
+    LoadingScreen: {
+      loading: 'Loading...',
     },
   },
 }

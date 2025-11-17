@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react'
 import { authApi } from '@shared/api/auth'
 import { getUserInfo } from '@shared/store/user'
-import { useEffect, useState } from 'react'
 import { useDispatch } from 'react-redux'
 
 export function useAuthorization() {
