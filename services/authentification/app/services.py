@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.exc import IntegrityError
 from redis.asyncio import Redis
 from uuid import uuid4, UUID
@@ -16,7 +16,8 @@ from .middleware import logger
 from .dependencies import get_db, get_redis, get_arq_pool, get_geoip_reader
 from .schemas import (
     CompleteRegistrationRequest, LoginRequest, 
-    CompleteResetRequest, ChangePasswordRequest
+    CompleteResetRequest, ChangePasswordRequest,
+    SessionInfo
 )
 from .models import User, Session, UserRole
 from .utils import parse_device, get_location, hash_token, hash_password, check_password
@@ -329,6 +330,78 @@ class AuthService:
         if not user or not user.is_active:
             raise HTTPException(status_code=401, detail="User not found or inactive")
         return user
+
+    async def get_all_sessions(
+        self, 
+        user_id: str, 
+        current_refresh_token: str | None
+    ) -> list[SessionInfo]:
+        """Получает все активные сессии для пользователя и помечает, какая является текущей."""
+        current_fingerprint = None
+        if current_refresh_token:
+            current_fingerprint = hash_token(current_refresh_token)
+
+        query = (
+            select(Session)
+            .where(
+                Session.user_id == UUID(user_id),
+                Session.revoked == sa.false()
+            )
+            .order_by(Session.created_at.desc())
+        )
+        
+        result = await self.db.execute(query)
+        sessions = result.scalars().all()
+
+        session_info_list = []
+        for session in sessions:
+            is_current = (session.refresh_fingerprint == current_fingerprint)
+            session_info_list.append(
+                SessionInfo(
+                    id=session.id,
+                    device_name=session.device_name,
+                    location=session.location,
+                    ip=session.ip,
+                    created_at=session.created_at,
+                    is_current_session=is_current
+                )
+            )
+        return session_info_list
+
+    async def revoke_session_by_id(self, user_id: str, session_id: str):
+        """Отзывает одну конкретную сессию по ID. Проверка user_id для безопасности."""
+        query = (
+            update(Session)
+            .where(
+                Session.id == UUID(session_id),
+                Session.user_id == UUID(user_id)
+            )
+            .values(revoked=True)
+        )
+        
+        await self.db.execute(query)
+        await self.db.commit()
+        logger.info(f"Session {session_id} has been revoked by user {user_id}")
+
+    async def revoke_other_sessions(self, user_id: str, current_refresh_token: str):
+        """Отзывает все сессии пользователя, кроме текущей."""
+        current_fingerprint = hash_token(current_refresh_token)
+
+        query = (
+            update(Session)
+            .where(
+                Session.user_id == UUID(user_id),
+                Session.refresh_fingerprint != current_fingerprint,
+                Session.revoked == sa.false()
+            )
+            .values(revoked=True)
+        )
+        
+        result = await self.db.execute(query)
+        await self.db.commit()
+        
+        revoked_count = result.rowcount
+        logger.info(f"Revoked {revoked_count} other sessions for user {user_id}")
 
     async def validate_access_token_async(self, token: str):
         """Валидирует access_token."""

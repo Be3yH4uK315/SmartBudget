@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
@@ -6,7 +7,7 @@ from functools import lru_cache
 
 from app.dependencies import get_current_user_id, get_real_ip
 from app.schemas import (
-    UnifiedResponse, VerifyEmailRequest, CompleteRegistrationRequest,
+    AllSessionsResponse, UnifiedResponse, UserInfo, VerifyEmailRequest, CompleteRegistrationRequest,
     LoginRequest, ResetPasswordRequest, CompleteResetRequest,
     ChangePasswordRequest, TokenValidateRequest
 )
@@ -206,21 +207,71 @@ async def change_password(
         ).model_dump()
     )
 
-@router.get("/me", status_code=200)
+@router.get("/me", status_code=200, response_model=UserInfo)
 async def get_current_user_info(
     service: AuthService = Depends(AuthService),
     user_id: str = Depends(get_current_user_id)
 ):
     """Возвращает информацию о текущем аутентифицированном пользователе."""
-    user_info = await service.get_user_info_by_id(user_id)
-    return {
-        "id": user_info.id,
-        "email": user_info.email,
-        "name": user_info.name,
-        "role": user_info.role.name,
-        "country": user_info.country,
-        "last_login": user_info.last_login
-    }
+    user = await service.get_user_info_by_id(user_id)
+    return user
+
+@router.get(
+    "/sessions",
+    status_code=200,
+    response_model=AllSessionsResponse
+)
+async def get_all_user_sessions(
+    request: Request,
+    service: AuthService = Depends(AuthService),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Получает список всех активных сессий для текущего пользователя."""
+    current_refresh_token = request.cookies.get("refresh_token")
+    sessions_list = await service.get_all_sessions(user_id, current_refresh_token)
+    return AllSessionsResponse(sessions=sessions_list)
+
+
+@router.delete("/sessions/{session_id}", status_code=200)
+async def revoke_session(
+    session_id: UUID,
+    service: AuthService = Depends(AuthService),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Отзывает одну конкретную сессию по ее ID."""
+    await service.revoke_session_by_id(user_id, str(session_id))
+    return JSONResponse(
+        UnifiedResponse(
+            status="success",
+            action="revoke_session",
+            detail="Session has been revoked."
+        ).model_dump()
+    )
+
+
+@router.post(
+    "/sessions/logout-others", 
+    status_code=200,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))]
+)
+async def revoke_other_sessions(
+    request: Request,
+    service: AuthService = Depends(AuthService),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Отзывает все сессии, кроме текущей."""
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    await service.revoke_other_sessions(user_id, refresh_token)
+    return JSONResponse(
+        UnifiedResponse(
+            status="success",
+            action="revoke_other_sessions",
+            detail="All other sessions have been revoked."
+        ).model_dump()
+    )
 
 @router.post("/validate-token", status_code=200)
 async def validate_token(
