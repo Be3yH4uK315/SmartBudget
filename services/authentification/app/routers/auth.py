@@ -206,6 +206,22 @@ async def change_password(
         ).model_dump()
     )
 
+@router.get("/me", status_code=200)
+async def get_current_user_info(
+    service: AuthService = Depends(AuthService),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Возвращает информацию о текущем аутентифицированном пользователе."""
+    user_info = await service.get_user_info_by_id(user_id)
+    return {
+        "id": user_info.id,
+        "email": user_info.email,
+        "name": user_info.name,
+        "role": user_info.role.name,
+        "country": user_info.country,
+        "last_login": user_info.last_login
+    }
+
 @router.post("/validate-token", status_code=200)
 async def validate_token(
     body: TokenValidateRequest = Body(...),

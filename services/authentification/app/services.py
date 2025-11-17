@@ -323,6 +323,13 @@ class AuthService:
             schema_name="AUTH_EVENTS_SCHEMA"
         )
 
+    async def get_user_info_by_id(self, user_id: str):
+        """Получает пользователя по ID (для эндпоинта /me)."""
+        user = await self.db.get(User, UUID(user_id))
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="User not found or inactive")
+        return user
+
     async def validate_access_token_async(self, token: str):
         """Валидирует access_token."""
         try:
