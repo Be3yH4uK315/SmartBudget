@@ -9,10 +9,13 @@ export const userSlice = createSlice<userSliceState, userSliceReducers, 'user', 
 
   extraReducers: (builder) => {
     builder.addCase(getUserInfo.fulfilled, (state, { payload }) => {
-      state.name = payload.NAME
-      state.role = payload.ROLE
-      state.userId = payload.ID
-      state.email = payload.EMAIL
+      state.name = payload.name
+      state.role = payload.role
+      state.userId = payload.id
+      state.email = payload.email
+      state.isAuth = true
     })
   },
 })
+
+export const userReducer = userSlice.reducer

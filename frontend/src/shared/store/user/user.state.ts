@@ -4,5 +4,6 @@ export function getUserInitialState(): userSliceState {
     role: 0,
     name: '',
     email: '',
+    isAuth: false,
   }
 }

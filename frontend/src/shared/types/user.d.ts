@@ -1,13 +1,13 @@
 /** Тип описывающий пользователя */
 type User = {
   /** ID пользователя */
-  ID: string
+  id: string
 
   /** Роль пользователя */
-  ROLE: 0 | 1
+  role: 0 | 1
 
   /** Имя пользователя */
-  NAME: string
+  name: string
 
-  EMAIL: string
+  email: string
 }
