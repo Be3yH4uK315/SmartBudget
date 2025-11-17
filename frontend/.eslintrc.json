@@ -1,0 +1,56 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "ignorePatterns": ["node_modules", "build", "**/assets", "*.css", "src/languages/**/*.json"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "plugins": ["react", "@typescript-eslint", "react-hooks", "simple-import-sort", "import"],
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-empty-interface": "off",
+    "@typescript-eslint/no-namespace": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "caughtErrors": "none" }],
+    "@typescript-eslint/no-empty-object-type": [
+      "warn",
+      { "allowInterfaces": "with-single-extends" }
+    ],
+    "react/display-name": "off",
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "react/prop-types": "off",
+    "import/no-duplicates": ["error", { "prefer-inline": true }],
+    "simple-import-sort/imports": [
+      "error",
+      {
+        /** Дефолтная сортировка групп. Дефолтная сортировка групп.
+         * https://github.com/lydell/eslint-plugin-simple-import-sort/tree/main?tab=readme-ov-file#custom-grouping
+         * (на странице ниже есть описание элементов массива)
+         */
+
+        "groups": [["^react$", "^\\u0000", "^@?\\w", "^", "^\\."]]
+      }
+    ],
+    "simple-import-sort/exports": "error"
+  }
+}
+

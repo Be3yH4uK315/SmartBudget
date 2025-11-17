@@ -1,0 +1,1 @@
+type AppThemeColorMode = 'light' | 'dark'
