@@ -4,7 +4,7 @@
 /frontend/*.log*
 
 /frontend/node_modules
-/frontend/dist/
+/frontend/build/
 
 /frontend/.rspack-profile-*/
 
@@ -13,7 +13,7 @@
 /frontend/.idea
 
 
-# services/authentification/.gitignore
+# --- AUTHENTIFICATION IGNORE RULES ---
 services/authentification/*/__pycache__/
 services/authentification/*/*/__pycache__/
 services/authentification/*/*/*/__pycache__/
