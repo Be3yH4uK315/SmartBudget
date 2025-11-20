@@ -1,25 +1,10 @@
 version: '3.8'
 
-# ----------------------------------------------------
-# X-Template for Application Services
-# ----------------------------------------------------
-x-base-app: &base-app
-  restart: unless-stopped
-  depends_on:
-    redis_cache:
-      condition: service_started
-    kafka:
-      condition: service_started
-
 services:
-
-  # ====================================================
+  # ----------------------------------------------------
   # 1. CORE INFRASTRUCTURE
-  # ====================================================
+  # ----------------------------------------------------
 
-  # -------------------------
-  # Shared Redis Cache
-  # -------------------------
   redis_cache:
     image: redis:7
     container_name: redis_cache
@@ -34,50 +19,29 @@ services:
       timeout: 5s
 
   # -------------------------
-  # Shared Zookeeper for Kafka
-  # -------------------------
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.7.1
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo srvr | nc localhost 2181 | grep Mode"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # -------------------------
-  # Shared Kafka
+  # Apache Kafka KRaft
   # -------------------------
   kafka:
-    image: confluentinc/cp-kafka:7.7.1
+    image: apache/kafka:3.7.0
     container_name: kafka
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      ALLOW_PLAINTEXT_LISTENER: "yes"
     ports:
       - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
-      interval: 10s
-      retries: 10
-      timeout: 10s
+      test: ["CMD-SHELL", "nc -z localhost 9092"]
+      interval: 5s
+      retries: 15
+      timeout: 5s
 
-  # -------------------------
-  # Mailhog для тестирования почты
-  # -------------------------
   mailhog:
     image: mailhog/mailhog
     container_name: mailhog
@@ -85,14 +49,10 @@ services:
       - "8025:8025"
       - "1025:1025"
 
+  # ----------------------------------------------------
+  # 2. AUTHENTIFICATION SERVICE
+  # ----------------------------------------------------
 
-  # ====================================================
-  # 2. AUTHENTIFICATION SERVICE INFRA & APPS
-  # ====================================================
-
-  # -------------------------
-  # Auth PostgreSQL
-  # -------------------------
   auth_postgres:
     image: postgres:16
     container_name: auth_postgres
@@ -100,21 +60,18 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: auth_db
+      POSTGRES_SHARED_BUFFERS: 64MB
     ports:
       - "5433:5432"
     volumes:
       - pg_data_auth:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      retries: 5
+      interval: 5s
+      retries: 10
       timeout: 5s
 
-  # -------------------------
-  # Auth Service Main App
-  # -------------------------
   auth_service:
-    <<: *base-app
     build:
       context: ../../services/authentification/
     env_file:
@@ -123,23 +80,20 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      auth_postgres:
-        condition: service_healthy
+      - auth_postgres
+      - redis_cache
+      - kafka
     volumes:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
     command: >
       sh -c "
-        echo 'Applying Alembic migrations...' && alembic upgrade head &&
-        echo 'Starting server...' && gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --forwarded-allow-ips '*' --access-logfile '-'
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
       "
 
-  # -------------------------
-  # Auth Arq worker
-  # -------------------------
   auth_worker:
-    <<: *base-app
     build:
       context: ../../services/authentification/
     env_file:
@@ -148,20 +102,18 @@ services:
     depends_on:
       - auth_service
       - auth_postgres
+      - kafka
+      - redis_cache
     volumes:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
     command: bash /app/wait-for-kafka.sh kafka 9092 arq app.worker.WorkerSettings
 
+  # ----------------------------------------------------
+  # 3. CLASSIFICATION SERVICE
+  # ----------------------------------------------------
 
-  # ====================================================
-  # 3. CLASSIFICATION SERVICE INFRA & APPS
-  # ====================================================
-
-  # -------------------------
-  # Classification PostgreSQL
-  # -------------------------
   class_postgres:
     image: postgres:16
     container_name: class_postgres
@@ -169,21 +121,18 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: class_db
+      POSTGRES_SHARED_BUFFERS: 64MB
     ports:
       - "5434:5432"
     volumes:
       - pg_data_class:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      retries: 5
+      interval: 5s
+      retries: 10
       timeout: 5s
 
-  # -------------------------
-  # Categorization Service Main App
-  # -------------------------
   categorization_service:
-    <<: *base-app
     build:
       context: ../../services/classification/
     env_file:
@@ -192,26 +141,21 @@ services:
     ports:
       - "8001:8001"
     depends_on:
-      class_postgres:
-        condition: service_healthy
+      - class_postgres
+      - redis_cache
+      - kafka
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
     command: >
       sh -c "
-        echo 'Waiting for Kafka...' &&
         bash /app/wait-for-kafka.sh kafka 9092 &&
-        echo 'Applying Alembic migrations...' && alembic upgrade head &&
-        echo 'Starting server...' &&
-        gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
       "
 
-  # -------------------------
-  # Arq worker
-  # -------------------------
   categorization_worker:
-    <<: *base-app
     build:
       context: ../../services/classification/
     env_file:
@@ -220,17 +164,15 @@ services:
     depends_on:
       - categorization_service
       - class_postgres
+      - kafka
+      - redis_cache
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
     command: bash /app/wait-for-kafka.sh kafka 9092 arq app.worker.WorkerSettings
 
-  # -------------------------
-  # Kafka Consumers
-  # -------------------------
   categorization_consumers:
-    <<: *base-app
     build:
       context: ../../services/classification/
     env_file:
@@ -239,24 +181,22 @@ services:
     depends_on:
       - categorization_service
       - class_postgres
+      - kafka
+      - redis_cache
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
     command: bash /app/wait-for-kafka.sh kafka 9092 python run_consumers.py
 
-# ====================================================
+# ----------------------------------------------------
 # 4. VOLUMES
-# ====================================================
+# ----------------------------------------------------
 volumes:
-  # Auth Service
   pg_data_auth:
-  pg_data_auth_test:
-  geoip_data: {}
-  
-  # Classification Service
   pg_data_class:
+  geoip_data:
   models_data:
   datasets_data:
-
   redis_data_cache:
+  kafka_data:
