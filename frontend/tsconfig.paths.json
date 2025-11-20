@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@app": ["src/app"],
+      "@app/*": ["src/app/*"],
+
+      "@shared/api/*": ["src/shared/api/*"],
+      "@shared/api": ["src/shared/api"],
+      "@shared/assets/fonts/*": ["src/shared/assets/fonts/*"],
+      "@shared/assets/*": ["src/shared/assets/*"],
+      "@shared/components/*": ["src/shared/components/*"],
+      "@shared/components": ["src/shared/components"],
+      "@shared/hooks": ["src/shared/hooks"],
+      "@shared/locale/*": ["src/shared/locale/*"],
+      "@shared/screens/*": ["src/shared/screens/*"],
+      "@shared/screens": ["src/shared/screens"],
+      "@shared/store/*": ["src/shared/store/*"],
+      "@shared/store": ["src/shared/store"],
+      "@shared/styles/*": ["src/shared/styles/*"],
+      "@shared/types/*": ["src/shared/types/*"],
+      "@shared/types": ["src/shared/types"],
+      "@shared/utils/*": ["src/shared/utils/*"]
+    }
+  }
+}
