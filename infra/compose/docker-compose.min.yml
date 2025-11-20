@@ -24,30 +24,48 @@ services:
   # -------------------------
   # Bitnami Kafka KRaft
   # -------------------------
+  auth_zookeeper_dev:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: auth_zookeeper_dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 2181 || exit 1"]
+      interval: 5s
+      retries: 5
+      timeout: 2s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  # -------------------------
+  # Kafka
+  # -------------------------
   kafka:
-    image: bitnamilegacy/kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
+    depends_on:
+      auth_zookeeper_dev:
+        condition: service_healthy
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: auth_zookeeper_dev:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
     ports:
       - "9092:9092"
-    volumes:
-      - kafka_data:/bitnami/kafka
-    environment:
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
-      - KAFKA_BROKER_ID=0
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-      - ALLOW_PLAINTEXT_LISTENER=yes
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
       interval: 10s
       retries: 10
-      timeout: 5s
+      timeout: 3s
     restart: unless-stopped
     networks:
       - smartbudget-net
