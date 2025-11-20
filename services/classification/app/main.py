@@ -24,8 +24,10 @@ async def lifespan(app: FastAPI):
     logger.info(f"Redis pool created for {settings.redis_url}")
     
     arq_redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    arq_redis_settings.queue_name = settings.arq_queue_name
-    arq_pool = await create_pool(arq_redis_settings)
+    arq_pool = await create_pool(
+        arq_redis_settings, 
+        default_queue_name=settings.arq_queue_name
+    )
     app.state.arq_pool = arq_pool
     logger.info(f"Arq pool created for queue '{settings.arq_queue_name}'")
 

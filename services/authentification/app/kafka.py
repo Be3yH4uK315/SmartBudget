@@ -20,16 +20,17 @@ AUTH_EVENTS_SCHEMA = {
     },
     "required": ["event"],
     "if": {
-        "properties": { "event": { "in": [
-            "user.registered", "user.login", "user.logout", "user.session_mismatch_detected",
-            "user.password_reset", "user.token_refreshed", "user.password_changed"
-        ] } }
+        "properties": { 
+            "event": { 
+                "enum": [
+                    "user.registered", "user.login", "user.logout", "user.session_mismatch_detected",
+                    "user.password_reset", "user.token_refreshed", "user.password_changed"
+                ] 
+            } 
+        }
     },
     "then": {
         "required": ["user_id"]
-    },
-    "else": {
-        "not": { "required": ["user_id"] }
     }
 }
 

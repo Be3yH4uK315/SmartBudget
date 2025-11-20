@@ -45,7 +45,7 @@ async def send_email_async(ctx, to: str, subject: str, body: str):
                 port=settings.smtp_port,
                 username=settings.smtp_user or None,
                 password=settings.smtp_pass or None,
-                start_tls=start_tls
+                start_tls=False
             )
             logger.info(f"Arq: Email sent to {to}")
             return
@@ -140,7 +140,7 @@ class WorkerSettings:
     on_startup = on_startup
     on_shutdown = on_shutdown
     cron_jobs = [cron(cleanup_sessions_async, hour=3, minute=0)]
+    queue_name = settings.arq_queue_name
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    redis_settings.queue_name = settings.arq_queue_name
     max_tries = 5
     max_jobs = 10

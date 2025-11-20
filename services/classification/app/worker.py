@@ -55,8 +55,7 @@ class WorkerSettings:
             run_at_startup=False
         )
     ]
-    
+    queue_name = settings.arq_queue_name
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    redis_settings.queue_name = settings.arq_queue_name
     max_tries = 3
     max_jobs = 10
