@@ -28,13 +28,3 @@ services/authentification/celerybeat-schedule
 services/authentification/certs
 */*/.idea
 **/.DS_Store
-
-services/classification/*/__pycache__/
-services/classification/*/*/__pycache__/
-services/classification/*/*/*/__pycache__/
-services/classification/.pytest_cache/
-services/classification/.env
-services/classification/.env.test
-services/classification/*.sh
-services/classification/*.db
-services/classification/*.log

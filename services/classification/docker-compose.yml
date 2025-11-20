@@ -1,0 +1,152 @@
+services:
+  # -------------------------
+  # Categorization Service
+  # -------------------------
+  categorization_service:
+    build: .
+    container_name: class_service_dev
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    depends_on:
+      class_postgres_dev:
+        condition: service_healthy
+      class_redis_dev:
+        condition: service_started
+      class_kafka_dev:
+        condition: service_started
+    volumes:
+      - .:/app
+      - models_data:/models
+      - datasets_data:/app/datasets
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Waiting for Kafka...' &&
+        bash /app/wait-for-kafka.sh class_kafka_dev 9092 &&
+        echo 'Applying Alembic migrations...' && alembic upgrade head &&
+        echo 'Starting server...' &&
+        gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
+      "
+
+  # -------------------------
+  # Arq worker
+  # -------------------------
+  categorization_worker:
+    build: .
+    container_name: class_worker_dev
+    env_file:
+      - .env
+    depends_on:
+      - categorization_service
+      - class_postgres_dev
+      - class_redis_dev
+      - class_kafka_dev
+    volumes:
+      - .:/app
+      - models_data:/models
+      - datasets_data:/app/datasets
+    restart: unless-stopped
+    command: bash /app/wait-for-kafka.sh class_kafka_dev 9092 arq app.worker.WorkerSettings
+
+  # -------------------------
+  # Kafka Consumers
+  # -------------------------
+  categorization_consumers:
+    build: .
+    container_name: class_consumers_dev
+    env_file:
+      - .env
+    depends_on:
+      - categorization_service
+      - class_postgres_dev
+      - class_redis_dev
+      - class_kafka_dev
+    volumes:
+      - .:/app
+      - models_data:/models
+      - datasets_data:/app/datasets
+    restart: unless-stopped
+    command: bash /app/wait-for-kafka.sh class_kafka_dev 9092 python run_consumers.py
+
+  # -------------------------
+  # PostgreSQL
+  # -------------------------
+  class_postgres_dev:
+    image: postgres:16
+    container_name: class_postgres_dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: class_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_data_class:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Redis
+  # -------------------------
+  class_redis_dev:
+    image: redis:7
+    container_name: class_redis_dev
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data_class:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+
+  # -------------------------
+  # Zookeeper (для Kafka)
+  # -------------------------
+  class_zookeeper_dev:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: class_zookeeper_dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2182:2181"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo srvr | nc localhost 2181 | grep Mode"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  class_kafka_dev:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: class_kafka_dev
+    depends_on:
+      - class_zookeeper_dev
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: class_zookeeper_dev:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://class_kafka_dev:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://class_kafka_dev:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9093:9092"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
+      interval: 10s
+      retries: 10
+      timeout: 10s
+
+volumes:
+  pg_data_class:
+  redis_data_class:
+  models_data:
+  datasets_data:
