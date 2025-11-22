@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_pass: str = ""
+    smtp_from_email: str = "no-reply@example.com"
+    smtp_from_name: str = "SmartBudget"
     geoip_db_path: str
     frontend_url: str = "http://127.0.0.1:3000"
     jwt_private_key_path: Path = ROOT_DIR / "certs" / "jwt-private.pem"
