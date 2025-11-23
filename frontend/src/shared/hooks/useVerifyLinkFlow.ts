@@ -42,7 +42,7 @@ export const useVerifyLinkFlow = () => {
     return () => {
       cancelled = true
     }
-  }, [email, token])
+  }, [email, token, token_type])
 
   const wrapSubmit = useCallback(
     async (fn: () => Promise<AuthResponse>) => {
