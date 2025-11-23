@@ -9,12 +9,8 @@ export function useAuthorization() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const auth = async () => {
+    ;;(async () => {
       try {
-        const refreshResponse = await authApi.refresh()
-
-        if (refreshResponse !== 200) return
-
         const action = await dispatch(getUserInfo())
 
         if (getUserInfo.rejected.match(action) && action.payload === 'noInfo') {
@@ -24,9 +20,7 @@ export function useAuthorization() {
       } finally {
         setIsLoading(false)
       }
-    }
-
-    auth()
+    })()
   }, [dispatch])
 
   return { isLoading }
