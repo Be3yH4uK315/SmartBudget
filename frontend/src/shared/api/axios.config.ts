@@ -34,7 +34,9 @@ function refreshSession(): Promise<RefreshResult> {
       .catch((err: AxiosError): RefreshResult => {
         const status = err.response?.status
 
-        if (status === 403) return 'logout'
+        if (status === 401 || status === 403) {
+          return 'logout'
+        }
 
         return 'error'
       })
