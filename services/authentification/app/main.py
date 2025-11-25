@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
         app.state.geoip_reader = geoip_reader
         middleware.logger.info(f"GeoIP DB uploaded from {settings.settings.app.geoip_db_path}")
     except FileNotFoundError:
-        middleware.logger.error(
+        middleware.logger.warning(
             f"GeoIP DB not found on the way: {settings.settings.app.geoip_db_path}. "
             "Geolocation service will not work."
         )
