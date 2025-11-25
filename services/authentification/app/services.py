@@ -4,7 +4,6 @@ from redis.asyncio import Redis
 from uuid import uuid4, UUID
 from datetime import datetime, timedelta, timezone
 from jwt import encode, decode, PyJWTError
-import sqlalchemy as sa
 import geoip2.database
 from arq.connections import ArqRedis
 
