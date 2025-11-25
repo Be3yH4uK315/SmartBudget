@@ -1,16 +1,17 @@
 from uuid import uuid4
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Index
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
 import enum
-from app.base import Base
+
+from app import base
 
 class UserRole(enum.IntEnum):
     USER = 0
     ADMIN = 1
     MODERATOR = 2
 
-class User(Base):
+class User(base.Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)  # Уникальный ID пользователя
@@ -29,10 +30,11 @@ class User(Base):
     )  # Дата обновления
 
     __table_args__ = (
-        Index('ix_users_email', 'email', unique=True),  # Индекс для уникального email
+        UniqueConstraint('email', name='uq_users_email'), # Unique для email
+        Index('ix_users_email', 'email'),  # Индекс для email
     )
 
-class Session(Base):
+class Session(base.Base):
     __tablename__ = "sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)  # ID сессии
