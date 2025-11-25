@@ -1,4 +1,4 @@
-from app.constants import get_verify_email_key, get_reset_password_key, get_login_fail_key
+from app.redis_keys import get_verify_email_key, get_reset_password_key, get_login_fail_key
 
 def test_get_verify_email_key_standard():
     assert get_verify_email_key("test@example.com") == "verify:test@example.com", "Стандартный email"
