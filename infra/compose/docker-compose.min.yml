@@ -17,30 +17,58 @@ services:
       interval: 5s
       retries: 10
       timeout: 5s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
   # -------------------------
-  # Apache Kafka KRaft
+  # Bitnami Kafka KRaft
+  # -------------------------
+  auth_zookeeper_dev:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: auth_zookeeper_dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 2181 || exit 1"]
+      interval: 5s
+      retries: 5
+      timeout: 2s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  # -------------------------
+  # Kafka
   # -------------------------
   kafka:
-    image: apache/kafka:3.7.0
+    image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
+    depends_on:
+      auth_zookeeper_dev:
+        condition: service_healthy
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: auth_zookeeper_dev:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
     ports:
       - "9092:9092"
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
-    volumes:
-      - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 9092"]
-      interval: 5s
-      retries: 15
-      timeout: 5s
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      retries: 10
+      timeout: 3s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
   mailhog:
     image: mailhog/mailhog
@@ -48,6 +76,9 @@ services:
     ports:
       - "8025:8025"
       - "1025:1025"
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
   # ----------------------------------------------------
   # 2. AUTHENTIFICATION SERVICE
@@ -60,7 +91,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: auth_db
-      POSTGRES_SHARED_BUFFERS: 64MB
     ports:
       - "5433:5432"
     volumes:
@@ -70,6 +100,8 @@ services:
       interval: 5s
       retries: 10
       timeout: 5s
+    networks:
+      - smartbudget-net
 
   auth_service:
     build:
@@ -80,18 +112,24 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - auth_postgres
-      - redis_cache
-      - kafka
+      auth_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     volumes:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
+    restart: unless-stopped
     command: >
       sh -c "
         alembic upgrade head &&
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
       "
+    networks:
+      - smartbudget-net
 
   auth_worker:
     build:
@@ -101,14 +139,16 @@ services:
     container_name: auth_worker_dev
     depends_on:
       - auth_service
-      - auth_postgres
       - kafka
       - redis_cache
     volumes:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
-    command: bash /app/wait-for-kafka.sh kafka 9092 arq app.worker.WorkerSettings
+    command: arq app.worker.WorkerSettings
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
   # ----------------------------------------------------
   # 3. CLASSIFICATION SERVICE
@@ -121,7 +161,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: class_db
-      POSTGRES_SHARED_BUFFERS: 64MB
     ports:
       - "5434:5432"
     volumes:
@@ -131,6 +170,8 @@ services:
       interval: 5s
       retries: 10
       timeout: 5s
+    networks:
+      - smartbudget-net
 
   categorization_service:
     build:
@@ -141,19 +182,24 @@ services:
     ports:
       - "8001:8001"
     depends_on:
-      - class_postgres
-      - redis_cache
-      - kafka
+      class_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
     command: >
       sh -c "
-        bash /app/wait-for-kafka.sh kafka 9092 &&
         alembic upgrade head &&
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
       "
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
   categorization_worker:
     build:
@@ -163,14 +209,16 @@ services:
     container_name: class_worker_dev
     depends_on:
       - categorization_service
-      - class_postgres
       - kafka
       - redis_cache
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
-    command: bash /app/wait-for-kafka.sh kafka 9092 arq app.worker.WorkerSettings
+    command: arq app.worker.WorkerSettings
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
   categorization_consumers:
     build:
@@ -180,14 +228,63 @@ services:
     container_name: class_consumers_dev
     depends_on:
       - categorization_service
-      - class_postgres
       - kafka
       - redis_cache
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
-    command: bash /app/wait-for-kafka.sh kafka 9092 python run_consumers.py
+    command: python run_consumers.py
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  # ============================
+  # 4. TRANSACTIONS SERVICE
+  # ============================
+
+  transactions_postgres:
+    image: postgres:16
+    container_name: transactions_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: transactions_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg_data_transactions:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  transactions:
+    build:
+      context: ../../services/transactions/SmartBudget.transactions/
+      dockerfile: Dockerfile
+    container_name: transactions
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      DATABASE_DSN: "Host=transactions_postgres;Database=transactions_db;Username=postgres;Password=password"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_GROUP_ID: "transactions-service"
+      USERS_ACTIVE_TOPIC: "users.active"
+      TRANSACTION_CLASSIFIED_TOPIC: "transaction.classified"
+      BANK_POLL_INTERVAL: "300"
+    ports:
+      - "8082:8080"
+    depends_on:
+      transactions_postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - smartbudget-net
 
 # ----------------------------------------------------
 # 4. VOLUMES
@@ -195,8 +292,13 @@ services:
 volumes:
   pg_data_auth:
   pg_data_class:
+  pg_data_transactions:
   geoip_data:
   models_data:
   datasets_data:
   redis_data_cache:
   kafka_data:
+
+networks:
+  smartbudget-net:
+    name: smartbudget-net
