@@ -15,20 +15,25 @@ def parse_device(user_agent: str) -> str:
     return f"{ua.device.family}, {ua.os.family} {ua.os.version_string}"
 
 @lru_cache(maxsize=1024)
-def get_location(ip: str, reader: geoip2.database.Reader) -> str:
+def get_location(ip: str, reader: geoip2.database.Reader) -> dict:
     """Получает местоположение по IP-адресу с помощью GeoIP."""
     try:
         if ipaddress.ip_address(ip).is_private:
-            return "Local Network"
+            return {"type": "local", "country": None, "city": None, "full": "Local Network"}
     except ValueError:
         pass
 
     try:
         geo = reader.city(ip)
-        return f"{geo.country.name}, {geo.city.name or 'Unknown'}"
+        return {
+            "type": "geo",
+            "country": geo.country.name,
+            "city": geo.city.name or "Unknown",
+            "full": f"{geo.country.name}, {geo.city.name or 'Unknown'}"
+        }
     except (AddressNotFoundError, Exception) as e:
         logger.warning(f"GeoIP failed for IP {ip}: {e}")
-        return "Unknown"
+        return {"type": "unknown", "country": None, "city": None, "full": "Unknown"}
 
 def hash_token(token: str) -> str:
     """Хэширует токен."""
