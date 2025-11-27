@@ -1,0 +1,6 @@
+@SmartBudget.Transactions_HostAddress = http://localhost:5197
+
+GET {{SmartBudget.Transactions_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

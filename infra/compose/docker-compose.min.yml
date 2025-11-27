@@ -154,148 +154,148 @@ services:
   # 3. CLASSIFICATION SERVICE
   # ----------------------------------------------------
 
-  # class_postgres:
-  #   image: postgres:16
-  #   container_name: class_postgres
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: password
-  #     POSTGRES_DB: class_db
-  #   ports:
-  #     - "5434:5432"
-  #   volumes:
-  #     - pg_data_class:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
-  #     interval: 5s
-  #     retries: 10
-  #     timeout: 5s
-  #   networks:
-  #     - smartbudget-net
+  class_postgres:
+    image: postgres:16
+    container_name: class_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: class_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_data_class:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
 
-  # categorization_service:
-  #   build:
-  #     context: ../../services/classification/
-  #   env_file:
-  #     - ../../services/classification/.env
-  #   container_name: class_service_dev
-  #   ports:
-  #     - "8001:8001"
-  #   depends_on:
-  #     class_postgres:
-  #       condition: service_healthy
-  #     redis_cache:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ../../services/classification:/app
-  #     - models_data:/models
-  #     - datasets_data:/app/datasets
-  #   command: >
-  #     sh -c "
-  #       alembic upgrade head &&
-  #       gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
-  #     "
-  #   restart: unless-stopped
-  #   networks:
-  #     - smartbudget-net
+  categorization_service:
+    build:
+      context: ../../services/classification/
+    env_file:
+      - ../../services/classification/.env
+    container_name: class_service_dev
+    ports:
+      - "8001:8001"
+    depends_on:
+      class_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/classification:/app
+      - models_data:/models
+      - datasets_data:/app/datasets
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
+      "
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
-  # categorization_worker:
-  #   build:
-  #     context: ../../services/classification/
-  #   env_file:
-  #     - ../../services/classification/.env
-  #   container_name: class_worker_dev
-  #   depends_on:
-  #     - categorization_service
-  #     - kafka
-  #     - redis_cache
-  #   volumes:
-  #     - ../../services/classification:/app
-  #     - models_data:/models
-  #     - datasets_data:/app/datasets
-  #   command: arq app.worker.WorkerSettings
-  #   restart: unless-stopped
-  #   networks:
-  #     - smartbudget-net
+  categorization_worker:
+    build:
+      context: ../../services/classification/
+    env_file:
+      - ../../services/classification/.env
+    container_name: class_worker_dev
+    depends_on:
+      - categorization_service
+      - kafka
+      - redis_cache
+    volumes:
+      - ../../services/classification:/app
+      - models_data:/models
+      - datasets_data:/app/datasets
+    command: arq app.worker.WorkerSettings
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
-  # categorization_consumers:
-  #   build:
-  #     context: ../../services/classification/
-  #   env_file:
-  #     - ../../services/classification/.env
-  #   container_name: class_consumers_dev
-  #   depends_on:
-  #     - categorization_service
-  #     - kafka
-  #     - redis_cache
-  #   volumes:
-  #     - ../../services/classification:/app
-  #     - models_data:/models
-  #     - datasets_data:/app/datasets
-  #   command: python run_consumers.py
-  #   restart: unless-stopped
-  #   networks:
-  #     - smartbudget-net
+  categorization_consumers:
+    build:
+      context: ../../services/classification/
+    env_file:
+      - ../../services/classification/.env
+    container_name: class_consumers_dev
+    depends_on:
+      - categorization_service
+      - kafka
+      - redis_cache
+    volumes:
+      - ../../services/classification:/app
+      - models_data:/models
+      - datasets_data:/app/datasets
+    command: python run_consumers.py
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
 
-  # # ============================
-  # # 4. TRANSACTIONS SERVICE
-  # # ============================
+  # ============================
+  # 4. TRANSACTIONS SERVICE
+  # ============================
 
-  # transactions_postgres:
-  #   image: postgres:16
-  #   container_name: transactions_postgres
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: password
-  #     POSTGRES_DB: transactions_db
-  #   ports:
-  #     - "5435:5432"
-  #   volumes:
-  #     - pg_data_transactions:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
-  #     interval: 5s
-  #     retries: 10
-  #     timeout: 5s
-  #   networks:
-  #     - smartbudget-net
+  transactions_postgres:
+    image: postgres:16
+    container_name: transactions_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: transactions_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg_data_transactions:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
 
-  # transactions:
-  #   build:
-  #     context: ../../services/transactions/SmartBudget.transactions/
-  #     dockerfile: Dockerfile
-  #   container_name: transactions
-  #   environment:
-  #     ASPNETCORE_ENVIRONMENT: Development
-  #     ASPNETCORE_URLS: "http://+:8080"
-  #     DATABASE_DSN: "Host=transactions_postgres;Database=transactions_db;Username=postgres;Password=password"
-  #     KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-  #     KAFKA_GROUP_ID: "transactions-service"
-  #     USERS_ACTIVE_TOPIC: "users.active"
-  #     TRANSACTION_CLASSIFIED_TOPIC: "transaction.classified"
-  #     BANK_POLL_INTERVAL: "300"
-  #   ports:
-  #     - "8082:8080"
-  #   depends_on:
-  #     transactions_postgres:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_healthy
-  #   networks:
-  #     - smartbudget-net
+  transactions:
+    build:
+      context: ../../services/transactions/SmartBudget.transactions/
+      dockerfile: Dockerfile
+    container_name: transactions
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      DATABASE_DSN: "Host=transactions_postgres;Database=transactions_db;Username=postgres;Password=password"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_GROUP_ID: "transactions-service"
+      USERS_ACTIVE_TOPIC: "users.active"
+      TRANSACTION_CLASSIFIED_TOPIC: "transaction.classified"
+      BANK_POLL_INTERVAL: "300"
+    ports:
+      - "8082:8080"
+    depends_on:
+      transactions_postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - smartbudget-net
 
 # ----------------------------------------------------
 # 4. VOLUMES
 # ----------------------------------------------------
 volumes:
   pg_data_auth:
-  # pg_data_class:
-  # pg_data_transactions:
+  pg_data_class:
+  pg_data_transactions:
   geoip_data:
   models_data:
-  # datasets_data:
+  datasets_data:
   redis_data_cache:
   kafka_data:
 

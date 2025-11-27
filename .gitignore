@@ -14,27 +14,17 @@
 
 
 # --- AUTHENTIFICATION IGNORE RULES ---
-services/authentification/*/__pycache__/
-services/authentification/*/*/__pycache__/
-services/authentification/*/*/*/__pycache__/
-services/authentification/.pytest_cache/
-services/authentification/.env
-services/authentification/.env.test
-services/authentification/*.sh
-services/authentification/*.db
-services/authentification/*.log
-services/authentification//geoip/GeoLite2-City.mmdb
-services/authentification/celerybeat-schedule
-services/authentification/certs
+*/*/*/__pycache__/
+*/*/*/*/__pycache__/
+*/*/*/*/*/__pycache__/
+*/*/.pytest_cache/
+*/*/.env
+*/*/.env.test
+*/*/*.sh
+*/*/*.db
+*/*/*.log
+*/*//geoip/GeoLite2-City.mmdb
+*/*/celerybeat-schedule
+*/*/certs
 */*/.idea
 **/.DS_Store
-
-services/classification/*/__pycache__/
-services/classification/*/*/__pycache__/
-services/classification/*/*/*/__pycache__/
-services/classification/.pytest_cache/
-services/classification/.env
-services/classification/.env.test
-services/classification/*.sh
-services/classification/*.db
-services/classification/*.log
