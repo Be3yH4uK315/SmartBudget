@@ -151,7 +151,7 @@ class UserInfo(BaseModel):
         title="Country",
         description="Страна пользователя"
     )
-    role: str = Field(
+    role: int = Field(
         ...,
         title="Role",
         description="Роль пользователя в системе"
