@@ -120,7 +120,7 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/authentification:/app
-      - geoip_data:/geoip
+      - ../../services/authentification/geoip:/app/geoip:ro
       - ../../services/authentification/certs:/app/certs
     restart: unless-stopped
     command: >
@@ -143,7 +143,7 @@ services:
       - redis_cache
     volumes:
       - ../../services/authentification:/app
-      - geoip_data:/geoip
+      - ../../services/authentification/geoip:/app/geoip:ro
       - ../../services/authentification/certs:/app/certs
     command: arq app.worker.WorkerSettings
     restart: unless-stopped
@@ -293,7 +293,6 @@ volumes:
   pg_data_auth:
   # pg_data_class:
   # pg_data_transactions:
-  geoip_data:
   models_data:
   # datasets_data:
   redis_data_cache:
