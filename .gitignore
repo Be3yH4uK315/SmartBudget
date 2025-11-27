@@ -1,39 +1,19 @@
 # --- FRONTEND IGNORE RULES ---
-/frontend/.DS_Store
 /frontend/*.local
 /frontend/*.log*
-
 /frontend/node_modules
-/frontend/dist/
-
+/frontend/build/
 /frontend/.rspack-profile-*/
-
-/frontend/.vscode/*
 !/frontend/.vscode/extensions.json
-/frontend/.idea
 
-# services/authentification/.gitignore
-services/authentification/*/__pycache__/
-services/authentification/*/*/__pycache__/
-services/authentification/*/*/*/__pycache__/
-services/authentification/.pytest_cache/
-services/authentification/.env
-services/authentification/.env.test
-services/authentification/*.sh
-services/authentification/*.db
-services/authentification/*.log
-services/authentification//geoip/GeoLite2-City.mmdb
-services/authentification/celerybeat-schedule
-services/authentification/certs
-*/*/.idea
+# --- UNIVERSAL IGNORE RULES ---
+**/__pycache__/
+**/.pytest_cache/
+**/.env
+**/*.sh
+**/*.db
+**/*.log
+**/certs
+**/.idea
 **/.DS_Store
-
-services/classification/*/__pycache__/
-services/classification/*/*/__pycache__/
-services/classification/*/*/*/__pycache__/
-services/classification/.pytest_cache/
-services/classification/.env
-services/classification/.env.test
-services/classification/*.sh
-services/classification/*.db
-services/classification/*.log
+**/.vscode/*
