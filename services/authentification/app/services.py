@@ -24,8 +24,8 @@ class AuthService:
     """Сервис, инкапсулирующий всю бизнес-логику аутентификации."""
     def __init__(
         self,
-        user_repo: repositories.UserRepository = Depends(repositories.UserRepository),
-        session_repo: repositories.SessionRepository = Depends(repositories.SessionRepository),
+        user_repo: repositories.UserRepository = Depends(dependencies.get_user_repository),
+        session_repo: repositories.SessionRepository = Depends(dependencies.get_session_repository),
         redis: Redis = Depends(dependencies.get_redis),
         arq_pool: ArqRedis = Depends(dependencies.get_arq_pool),
         geoip_reader: geoip2.database.Reader = Depends(dependencies.get_geoip_reader)
