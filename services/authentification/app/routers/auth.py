@@ -9,6 +9,8 @@ from cryptography.hazmat.backends import default_backend
 
 from app import (
     dependencies,
+    exceptions,
+    middleware,
     schemas,
     settings,
     services
@@ -53,6 +55,7 @@ def _delete_auth_cookies(response: Response):
     "/verify-email",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    response_model=schemas.UnifiedResponse
 )
 async def verify_email(
     body: schemas.VerifyEmailRequest = Body(...),
@@ -61,35 +64,38 @@ async def verify_email(
     """Инициирует процесс проверки электронной почты."""
     action = await service.start_email_verification(body.email)
     detail = "Complete sign in." if action == "sign_in" else "Verification email sent."
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action=action, 
-            detail=detail
-        ).model_dump()
+    return schemas.UnifiedResponse(
+        status="success", 
+        action=action, 
+        detail=detail
     )
 
-@router.get("/verify-link", status_code=200)
+@router.get("/verify-link", status_code=200, response_model=schemas.UnifiedResponse)
 async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
     token_type: str = Query(...),
-    service: services.AuthService = Depends(services.AuthService)
+    service: services.AuthService = Depends(services.AuthService),
 ):
     """Проверяет токен подтверждения по ссылке электронной почты."""
-    await service.validate_verification_token(token, email, token_type)
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success",
-            action="verify_link",
-            detail="Token validated.",
-        ).model_dump()
+    if token_type == 'verification':
+        await service.validate_email_verification_token(token, email)
+    elif token_type == 'reset':
+        await service.validate_password_reset_token(token, email)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid token type")
+
+    return schemas.UnifiedResponse(
+        status="success",
+        action="verify_link",
+        detail="Token validated.",
     )
 
 @router.post(
     "/complete-registration", 
     status_code=200, 
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))]
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    response_model=None
 )
 async def complete_registration(
     body: schemas.CompleteRegistrationRequest = Body(...),
@@ -114,7 +120,12 @@ async def complete_registration(
     _set_auth_cookies(response, access_token, refresh_token)
     return response
 
-@router.post("/login", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+@router.post(
+    "/login", 
+    status_code=200, 
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    response_model=None
+)
 async def login(
     body: schemas.LoginRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService),
@@ -138,15 +149,24 @@ async def login(
     _set_auth_cookies(response, access_token, refresh_token)
     return response
 
-@router.post("/logout", status_code=200)
+@router.post(
+    "/logout", 
+    status_code=200,
+    response_model=None
+)
 async def logout(
     request: Request,
     service: services.AuthService = Depends(services.AuthService),
-    user_id: str = Depends(dependencies.get_current_user_id)
+    user_id: str | None = Depends(dependencies.get_user_id_from_expired_token)
 ):
     """Обрабатывает выход пользователя из системы и отменяет сеанс."""
     refresh_token = request.cookies.get("refresh_token")
-    await service.logout(user_id, refresh_token)
+    if user_id and refresh_token:
+        try:
+            await service.logout(user_id, refresh_token)
+        except exceptions.AuthServiceError as e:
+            middleware.logger.warning(f"Failed to revoke session during logout: {e}")
+
     response = JSONResponse(
         schemas.UnifiedResponse(
             status="success", 
@@ -160,7 +180,8 @@ async def logout(
 @router.post(
     "/reset-password", 
     status_code=200, 
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))]
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    response_model=schemas.UnifiedResponse
 )
 async def reset_password(
     body: schemas.ResetPasswordRequest = Body(...),
@@ -168,30 +189,36 @@ async def reset_password(
 ):
     """Инициирует процесс сброса пароля."""
     await service.start_password_reset(body.email)
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="reset_password", 
-            detail="Reset email sent."
-        ).model_dump()
+
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="reset_password", 
+        detail="Reset email sent."
     )
 
-@router.post("/complete-reset", status_code=200)
+@router.post(
+    "/complete-reset", 
+    status_code=200,
+    response_model=schemas.UnifiedResponse
+)
 async def complete_reset(
     body: schemas.CompleteResetRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService)
 ):
     """Завершает сброс пароля с помощью нового пароля."""
     await service.complete_password_reset(body)
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="complete_reset", 
-            detail="Password reset completed."
-        ).model_dump()
+
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="complete_reset", 
+        detail="Password reset completed."
     )
 
-@router.post("/change-password", status_code=200)
+@router.post(
+    "/change-password", 
+    status_code=200,
+    response_model=schemas.UnifiedResponse
+)
 async def change_password(
     body: schemas.ChangePasswordRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService),
@@ -199,12 +226,11 @@ async def change_password(
 ):
     """Изменяет пароль пользователя после проверки подлинности."""
     await service.change_password(user_id, body)
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="change_password", 
-            detail="Password changed."
-        ).model_dump()
+
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="change_password", 
+        detail="Password changed."
     )
 
 @router.get("/me", status_code=200, response_model=schemas.UserInfo)
@@ -232,7 +258,11 @@ async def get_all_user_sessions(
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
-@router.delete("/sessions/{session_id}", status_code=200)
+@router.delete(
+    "/sessions/{session_id}", 
+    status_code=200,
+    response_model=schemas.UnifiedResponse
+)
 async def revoke_session(
     session_id: UUID,
     service: services.AuthService = Depends(services.AuthService),
@@ -240,19 +270,19 @@ async def revoke_session(
 ):
     """Отзывает одну конкретную сессию по ее ID."""
     await service.revoke_session_by_id(user_id, str(session_id))
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success",
-            action="revoke_session",
-            detail="Session has been revoked."
-        ).model_dump()
+
+    return schemas.UnifiedResponse(
+        status="success",
+        action="revoke_session",
+        detail="Session has been revoked."
     )
 
 
 @router.post(
     "/sessions/logout-others", 
     status_code=200,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))]
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    response_model=schemas.UnifiedResponse
 )
 async def revoke_other_sessions(
     request: Request,
@@ -265,33 +295,36 @@ async def revoke_other_sessions(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     await service.revoke_other_sessions(user_id, refresh_token)
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success",
-            action="revoke_other_sessions",
-            detail="All other sessions have been revoked."
-        ).model_dump()
+
+    return schemas.UnifiedResponse(
+        status="success",
+        action="revoke_other_sessions",
+        detail="All other sessions have been revoked."
     )
 
-@router.post("/validate-token", status_code=200)
+@router.post(
+    "/validate-token", 
+    status_code=200,
+    response_model=schemas.UnifiedResponse
+)
 async def validate_token(
     body: schemas.TokenValidateRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService)
 ):
     """Проверяет access_token."""
     await service.validate_access_token_async(body.token)
-    return JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="validate_token", 
-            detail="Token valid."
-        ).model_dump()
+
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="validate_token", 
+        detail="Token valid."
     )
 
 @router.post(
     "/refresh", 
     status_code=200, 
-    dependencies=[Depends(RateLimiter(times=30, seconds=60))]
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+    response_model=None
 )
 async def refresh(
     request: Request,
