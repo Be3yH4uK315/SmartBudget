@@ -1,66 +1,64 @@
 import asyncio
-from fastapi import Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from sqlalchemy.exc import IntegrityError
+from fastapi import Depends
 from redis.asyncio import Redis
 from uuid import uuid4, UUID
 from datetime import datetime, timedelta, timezone
 from jwt import encode, decode, PyJWTError
-import sqlalchemy as sa
 import geoip2.database
 from arq.connections import ArqRedis
 
-from .email_templates import get_password_reset_body, get_verification_email_body
-from .middleware import logger
-from .dependencies import get_db, get_redis, get_arq_pool, get_geoip_reader
-from .schemas import (
-    CompleteRegistrationRequest, LoginRequest, 
-    CompleteResetRequest, ChangePasswordRequest,
-    SessionInfo
+from app import (
+    email_templates, 
+    middleware, 
+    dependencies,
+    redis_keys, 
+    schemas, 
+    models, 
+    utils, 
+    settings,
+    exceptions,
+    repositories
 )
-from .models import User, Session, UserRole
-from .utils import parse_device, get_location, hash_token, hash_password, check_password
-from .settings import settings
-from app import constants
 
 class AuthService:
     """Сервис, инкапсулирующий всю бизнес-логику аутентификации."""
     def __init__(
         self,
-        db: AsyncSession = Depends(get_db),
-        redis: Redis = Depends(get_redis),
-        arq_pool: ArqRedis = Depends(get_arq_pool),
-        geoip_reader: geoip2.database.Reader = Depends(get_geoip_reader)
+        user_repo: repositories.UserRepository = Depends(repositories.UserRepository),
+        session_repo: repositories.SessionRepository = Depends(repositories.SessionRepository),
+        redis: Redis = Depends(dependencies.get_redis),
+        arq_pool: ArqRedis = Depends(dependencies.get_arq_pool),
+        geoip_reader: geoip2.database.Reader = Depends(dependencies.get_geoip_reader)
     ):
-        self.db = db
+        self.user_repo = user_repo
+        self.session_repo = session_repo
         self.redis = redis
         self.arq_pool = arq_pool
         self.geoip_reader = geoip_reader
 
     async def start_email_verification(self, email: str):
         """Проверяет, свободен ли email, и инициирует отправку письма с токеном верификации."""
-        existing_user = await self.db.execute(select(User).where(User.email == email)) 
-        if existing_user.scalar_one_or_none():
-            logger.warning(f"Verification attempt for existing email: {email}")
+        existing_user = await self.user_repo.get_by_email(email)
+        if existing_user:
+            middleware.logger.warning(f"Verification attempt for existing email: {email}")
             return "sign_in"
 
         token = str(uuid4())
-        hashed_token = hash_token(token)
-        redis_key = constants.get_verify_email_key(email)
+        hashed_token = utils.hash_token(token)
+        redis_key = redis_keys.get_verify_email_key(email)
         await self.redis.set(redis_key, hashed_token, ex=900)  # 15 мин TTL
 
-        email_body = get_verification_email_body(email, token)
+        email_body = email_templates.get_verification_email_body(email, token)
         
-        logger.info(f"Arq pool in AuthService: {self.arq_pool}")
-        logger.info(f"Enqueueing send_email_async to {email} in queue {settings.arq_queue_name}")
+        middleware.logger.info(f"Arq pool in AuthService: {self.arq_pool}")
+        middleware.logger.info(f"Enqueueing send_email_async to {email} in queue {settings.settings.app.arq_queue_name}")
         job = await self.arq_pool.enqueue_job(
             'send_email_async',
             to=email,
             subject="Verify your email for SmartBudget",
             body=email_body,
         )
-        logger.info(f"Job enqueued: {job.job_id}")
+        middleware.logger.info(f"Job enqueued: {job.job_id}")
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -70,105 +68,109 @@ class AuthService:
         )
         return "sign_up"
 
-    async def validate_verification_token(self, token: str, email: str, token_type: str):
+    async def validate_email_verification_token(self, token: str, email: str):
         """Проверяет валидность токена верификации из email."""
-        if token_type == 'verification':
-            redis_key = constants.get_verify_email_key(email)
-            event_name = "user.verification_validated"
-        elif token_type == 'reset':
-            redis_key = constants.get_reset_password_key(email)
-            event_name = "user.password_reset_validated"
+        redis_key = redis_keys.get_verify_email_key(email)
+        event_name = "user.verification_validated"
 
         stored_hash = await self.redis.get(redis_key)
-        if not stored_hash or stored_hash != hash_token(token):
-            logger.warning(f"Invalid or expired token for {token_type} on email: {email}")
-            raise HTTPException(status_code=403, detail="Invalid or expired token")
+        if not stored_hash or stored_hash != utils.hash_token(token):
+            middleware.logger.warning(f"Invalid or expired token for verification on email: {email}")
+            raise exceptions.InvalidTokenError("Invalid or expired token")
 
-        if event_name:
-            await self.arq_pool.enqueue_job(
-                'send_kafka_event_async',
-                topic="auth_events",
-                event_data={"event": event_name, "email": email},
-                schema_name="AUTH_EVENTS_SCHEMA"
-            )
-            logger.info(f"Token validated for {token_type} on email: {email}, event sent")
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async',
+            topic="auth_events",
+            event_data={"event": event_name, "email": email},
+            schema_name="AUTH_EVENTS_SCHEMA"
+        )
+        middleware.logger.info(f"Token validated for verification on email: {email}, event sent")
+
+    async def validate_password_reset_token(self, token: str, email: str):
+        """Проверяет валидность токена сброса пароля из email."""
+        redis_key = redis_keys.get_reset_password_key(email)
+        event_name = "user.password_reset_validated"
+
+        stored_hash = await self.redis.get(redis_key)
+        if not stored_hash or stored_hash != utils.hash_token(token):
+            middleware.logger.warning(f"Invalid or expired token for reset on email: {email}")
+            raise exceptions.InvalidTokenError("Invalid or expired token")
+
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async',
+            topic="auth_events",
+            event_data={"event": event_name, "email": email},
+            schema_name="AUTH_EVENTS_SCHEMA"
+        )
+        middleware.logger.info(f"Token validated for reset on email: {email}, event sent")
 
     async def complete_registration(
         self, 
-        body: CompleteRegistrationRequest,
+        body: schemas.CompleteRegistrationRequest,
         ip: str,
         user_agent: str | None
     ):
         """Завершает регистрацию: создает пользователя и сеанс."""
-        await self.validate_verification_token(body.token, body.email, token_type='verification')
-        redis_key = constants.get_verify_email_key(body.email)
-        try:
-            user = User(
-                id=uuid4(),
-                email=body.email,
-                name=body.name,
-                country=body.country,
-                password_hash=hash_password(body.password),
-                is_active=True,
-                role=UserRole.USER.value
-            )
-            self.db.add(user)
-            await self.db.commit()
-            await self.db.refresh(user)
+        await self.validate_email_verification_token(body.token, body.email)
+        redis_key = redis_keys.get_verify_email_key(body.email)
+        user_model = models.User(
+            id=uuid4(),
+            email=body.email,
+            name=body.name,
+            country=body.country,
+            password_hash=utils.hash_password(body.password),
+            is_active=True,
+            role=models.UserRole.USER.value
+        )
+        user = await self.user_repo.create(user_model)
 
-            device_name = parse_device(user_agent or "Unknown")
-            location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
+        device_name = utils.parse_device(user_agent or "Unknown")
+        location_data = await asyncio.to_thread(utils.get_location, ip, self.geoip_reader)
+        location = location_data.get("full", "Unknown")
 
-            access_token, refresh_token, session = await self._create_session_and_tokens(
-                user, 
-                user_agent or "Unknown",
-                device_name, 
-                ip, 
-                location
-            )
+        access_token, refresh_token, session = await self._create_session_and_tokens(
+            user, 
+            user_agent or "Unknown",
+            device_name, 
+            ip, 
+            location
+        )
 
-            await self.arq_pool.enqueue_job(
-                'send_kafka_event_async',
-                topic="auth_events",
-                event_data={
-                    "event": "user.registered",
-                    "user_id": str(user.id),
-                    "email": user.email,
-                    "ip": ip,
-                    "location": location
-                },
-                schema_name="AUTH_EVENTS_SCHEMA"
-            )
-            await self.redis.delete(redis_key)
-            return user, session, access_token, refresh_token
-        except IntegrityError:
-            await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Email already registered")
+        await self.arq_pool.enqueue_job(
+            'send_kafka_event_async',
+            topic="auth_events",
+            event_data={
+                "event": "user.registered",
+                "user_id": str(user.id),
+                "email": user.email,
+                "ip": ip,
+                "location": location
+            },
+            schema_name="AUTH_EVENTS_SCHEMA"
+        )
+        await self.redis.delete(redis_key)
+        return user, session, access_token, refresh_token
 
     async def authenticate_user(
         self, 
-        body: LoginRequest, 
+        body: schemas.LoginRequest, 
         ip: str,
         user_agent: str | None
     ):
         """Выполняет вход в систему: проверяет учетные данные и создает сеанс."""
-        fail_key = constants.get_login_fail_key(ip)
+        fail_key = redis_keys.get_login_fail_key(ip)
         fails = int(await self.redis.get(fail_key) or 0)
         if fails >= 5:
-            raise HTTPException(status_code=429, detail="Too many attempts, try later")
+            raise exceptions.TooManyAttemptsError("Too many attempts, try later")
 
-        location = await asyncio.to_thread(get_location, ip, self.geoip_reader)
+        location_data = await asyncio.to_thread(utils.get_location, ip, self.geoip_reader)
+        location = location_data.get("full", "Unknown")
 
-        user_query = await self.db.execute(
-            select(User).where(
-                User.email == body.email,
-                User.is_active == sa.true(),
-            )
-        )
-        user = user_query.scalar_one_or_none()
-        if not user or not check_password(body.password, user.password_hash):
+        user = await self.user_repo.get_by_email(body.email)
+
+        if not user or not user.is_active or not utils.check_password(body.password, user.password_hash):
             await self.redis.incr(fail_key)
-            await self.redis.expire(fail_key, 60)  # 5 min lock
+            await self.redis.expire(fail_key, 60)
             await self.arq_pool.enqueue_job(
                 'send_kafka_event_async',
                 topic="auth_events",
@@ -180,14 +182,10 @@ class AuthService:
                 },
                 schema_name="AUTH_EVENTS_SCHEMA"
             )
-            raise HTTPException(status_code=403, detail="Invalid credentials")
+            raise exceptions.InvalidCredentialsError("Invalid credentials")
 
         await self.redis.delete(fail_key)
-
-        device_name = parse_device(user_agent or "Unknown")
-
-        user.last_login = datetime.now(timezone.utc)
-        self.db.add(user)
+        device_name = utils.parse_device(user_agent or "Unknown")
 
         access_token, refresh_token, session = await self._create_session_and_tokens(
             user, 
@@ -197,14 +195,7 @@ class AuthService:
             location
         )
 
-        await self.db.execute(
-            update(User)
-            .where(User.id == user.id)
-            .values(
-                last_login=datetime.now(timezone.utc),
-            )
-        )
-        await self.db.commit()
+        await self.user_repo.update_last_login(user.id)
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -218,20 +209,15 @@ class AuthService:
             },
             schema_name="AUTH_EVENTS_SCHEMA"
         )
-
         return user, session, access_token, refresh_token
 
     async def logout(self, user_id: str, refresh_token: str):
         """Производит выход из системы, отзывая сессию по refresh_token."""
         if not refresh_token:
-            raise HTTPException(status_code=401, detail="Not authenticated")
+            raise exceptions.InvalidTokenError("Not authenticated (missing refresh token)")
 
-        fingerprint = hash_token(refresh_token)
-        await self.db.execute(update(Session).where(
-            Session.user_id == UUID(user_id),
-            Session.refresh_fingerprint == fingerprint
-        ).values(revoked=True))
-        await self.db.commit()
+        fingerprint = utils.hash_token(refresh_token)
+        await self.session_repo.revoke_by_fingerprint(UUID(user_id), fingerprint)
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -242,18 +228,17 @@ class AuthService:
 
     async def start_password_reset(self, email: str):
         """Инициирует сброс пароля, если пользователь существует."""
-        user_query = await self.db.execute(select(User).where(User.email == email)) 
-        user = user_query.scalar_one_or_none()
+        user = await self.user_repo.get_by_email(email)
         if not user:
-            logger.warning(f"Password reset attempt for non-existing email: {email}")
+            middleware.logger.warning(f"Password reset attempt for non-existing email: {email}")
             return
 
         token = str(uuid4())
-        hashed_token = hash_token(token)
-        redis_key = constants.get_reset_password_key(email)
-        await self.redis.set(redis_key, hashed_token, ex=900) # 15 min TTL
+        hashed_token = utils.hash_token(token)
+        redis_key = redis_keys.get_reset_password_key(email)
+        await self.redis.set(redis_key, hashed_token, ex=900)
         
-        email_body = get_password_reset_body(email, token)
+        email_body = email_templates.get_password_reset_body(email, token)
 
         await self.arq_pool.enqueue_job(
             'send_email_async',
@@ -269,26 +254,19 @@ class AuthService:
             schema_name="AUTH_EVENTS_SCHEMA"
         )
 
-    async def complete_password_reset(self, body: CompleteResetRequest):
+    async def complete_password_reset(self, body: schemas.CompleteResetRequest):
         """Завершает сброс пароля: проверяет токен и обновляет хэш пароля."""
-        await self.validate_verification_token(body.token, body.email, token_type='reset')
-        redis_key = constants.get_reset_password_key(body.email)
+        await self.validate_password_reset_token(body.token, body.email)
+        redis_key = redis_keys.get_reset_password_key(body.email)
 
-        user_query = await self.db.execute(select(User).where(User.email == body.email))
-        user = user_query.scalar_one_or_none()
+        user = await self.user_repo.get_by_email(body.email)
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise exceptions.UserNotFoundError("User not found")
 
-        user.password_hash = hash_password(body.new_password)
-        await self.db.commit()
+        await self.user_repo.update_password(user, utils.hash_password(body.new_password))
         await self.redis.delete(redis_key)
 
-        await self.db.execute(
-            update(Session)
-            .where(Session.user_id == user.id)
-            .values(revoked=True)
-        )
-        await self.db.commit()
+        await self.session_repo.revoke_all_for_user(user.id)
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -301,21 +279,15 @@ class AuthService:
             schema_name="AUTH_EVENTS_SCHEMA"
         )
 
-    async def change_password(self, user_id: str, body: ChangePasswordRequest):
+    async def change_password(self, user_id: str, body: schemas.ChangePasswordRequest):
         """Изменяет пароль пользователя, используя user_id из токена."""
-        user_query = await self.db.execute(select(User).where(User.id == UUID(user_id)))
-        user = user_query.scalar_one_or_none()
-        if not user or not check_password(body.password, user.password_hash):
-            raise HTTPException(status_code=401, detail="Invalid current password")
+        user = await self.user_repo.get_by_id(UUID(user_id))
+        if not user or not utils.check_password(body.password, user.password_hash):
+            raise exceptions.InvalidCredentialsError("Invalid current password")
 
-        pw_hash = hash_password(body.new_password)
-        user.password_hash = pw_hash
-        await self.db.execute(
-            update(Session)
-            .where(Session.user_id == user.id, Session.revoked == sa.false())
-            .values(revoked=True)
-        )
-        await self.db.commit()
+        pw_hash = utils.hash_password(body.new_password)
+        await self.user_repo.update_password(user, pw_hash)
+        await self.session_repo.revoke_all_for_user(user.id)
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -326,38 +298,28 @@ class AuthService:
 
     async def get_user_info_by_id(self, user_id: str):
         """Получает пользователя по ID (для эндпоинта /me)."""
-        user = await self.db.get(User, UUID(user_id))
+        user = await self.user_repo.get_by_id(UUID(user_id))
         if not user or not user.is_active:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
+            raise exceptions.UserInactiveError("User not found or inactive")
         return user
 
     async def get_all_sessions(
         self, 
         user_id: str, 
         current_refresh_token: str | None
-    ) -> list[SessionInfo]:
+    ) -> list[schemas.SessionInfo]:
         """Получает все активные сессии для пользователя и помечает, какая является текущей."""
         current_fingerprint = None
         if current_refresh_token:
-            current_fingerprint = hash_token(current_refresh_token)
+            current_fingerprint = utils.hash_token(current_refresh_token)
 
-        query = (
-            select(Session)
-            .where(
-                Session.user_id == UUID(user_id),
-                Session.revoked == sa.false()
-            )
-            .order_by(Session.created_at.desc())
-        )
-        
-        result = await self.db.execute(query)
-        sessions = result.scalars().all()
+        sessions = await self.session_repo.get_all_active(UUID(user_id))
 
         session_info_list = []
         for session in sessions:
             is_current = (session.refresh_fingerprint == current_fingerprint)
             session_info_list.append(
-                SessionInfo(
+                schemas.SessionInfo(
                     id=session.id,
                     device_name=session.device_name,
                     location=session.location,
@@ -370,95 +332,72 @@ class AuthService:
 
     async def revoke_session_by_id(self, user_id: str, session_id: str):
         """Отзывает одну конкретную сессию по ID. Проверка user_id для безопасности."""
-        query = (
-            update(Session)
-            .where(
-                Session.id == UUID(session_id),
-                Session.user_id == UUID(user_id)
-            )
-            .values(revoked=True)
-        )
-        
-        await self.db.execute(query)
-        await self.db.commit()
-        logger.info(f"Session {session_id} has been revoked by user {user_id}")
+        await self.session_repo.revoke_by_id(UUID(user_id), UUID(session_id))
+        middleware.logger.info(f"Session {session_id} has been revoked by user {user_id}")
 
     async def revoke_other_sessions(self, user_id: str, current_refresh_token: str):
         """Отзывает все сессии пользователя, кроме текущей."""
-        current_fingerprint = hash_token(current_refresh_token)
-
-        query = (
-            update(Session)
-            .where(
-                Session.user_id == UUID(user_id),
-                Session.refresh_fingerprint != current_fingerprint,
-                Session.revoked == sa.false()
-            )
-            .values(revoked=True)
-        )
-        
-        result = await self.db.execute(query)
-        await self.db.commit()
-        
-        revoked_count = result.rowcount
-        logger.info(f"Revoked {revoked_count} other sessions for user {user_id}")
+        current_fingerprint = utils.hash_token(current_refresh_token)
+        revoked_count = await self.session_repo.revoke_all_except(UUID(user_id), current_fingerprint)
+        middleware.logger.info(f"Revoked {revoked_count} other sessions for user {user_id}")
 
     async def validate_access_token_async(self, token: str):
         """Валидирует access_token."""
         try:
             payload = decode(
                 token, 
-                settings.jwt_public_key,
-                algorithms=[settings.jwt_algorithm],
+                settings.settings.jwt.jwt_public_key,
+                algorithms=[settings.settings.jwt.jwt_algorithm],
                 issuer="auth-service",
                 audience="smart-budget",
             )
             user_id = payload.get("sub")
             if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token")
+                raise exceptions.InvalidTokenError("Invalid token (missing sub)")
 
-            user = await self.db.get(User, UUID(user_id))
+            user = await self.user_repo.get_by_id(UUID(user_id))
             if not user or not user.is_active:
-                raise HTTPException(status_code=401, detail="User inactive")
+                raise exceptions.UserInactiveError("User inactive or not found")
         except PyJWTError as e:
-            raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+            raise exceptions.InvalidTokenError(f"Invalid token: {str(e)}")
+        except ValueError:
+            raise exceptions.InvalidTokenError("Invalid token payload (bad UUID)")
+
 
     async def refresh_session(self, refresh_token: str, access_token: str):
         """Обновляет сеанс с помощью проверки."""
         if not access_token:
-            raise HTTPException(status_code=401, detail="Missing access token")
+            raise exceptions.InvalidTokenError("Missing access token")
         try:
             payload = decode(
                 access_token,
-                settings.jwt_public_key,
-                algorithms=[settings.jwt_algorithm],
+                settings.settings.jwt.jwt_public_key,
+                algorithms=[settings.settings.jwt.jwt_algorithm],
                 audience="smart-budget",
                 options={"verify_exp": False},
             )
             user_id = UUID(payload.get("sub"))
         except PyJWTError as e:
-            raise HTTPException(status_code=401, detail=f"Invalid access token: {str(e)}")
+            raise exceptions.InvalidTokenError(f"Invalid access token: {str(e)}")
+        except ValueError:
+            raise exceptions.InvalidTokenError("Invalid access token payload (bad UUID)")
 
-        fingerprint = hash_token(refresh_token)
-        session_query = await self.db.execute(select(Session).where(
-            Session.user_id == user_id,
-            Session.refresh_fingerprint == fingerprint,
-            Session.revoked == sa.false(),
-            Session.expires_at > datetime.now(timezone.utc)
-        ))
-        session = session_query.scalar_one_or_none()
+
+        fingerprint = utils.hash_token(refresh_token)
+        session = await self.session_repo.get_by_fingerprint(user_id, fingerprint)
         if not session:
-            raise HTTPException(status_code=403, detail="Invalid refresh token")
+            raise exceptions.InvalidTokenError("Invalid or expired refresh token")
         
-        role_result = await self.db.execute(select(User.role).where(User.id == user_id))
-        role = role_result.scalar() or UserRole.USER.value
+        role = await self.user_repo.get_role_by_id(user_id)
         
         new_access_token = self._create_access_token(str(user_id), role)
         new_refresh_token = str(uuid4())
-        new_fingerprint = hash_token(new_refresh_token)
-        session.refresh_fingerprint = new_fingerprint
-        session.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
-        await self.db.commit()
+        new_fingerprint = utils.hash_token(new_refresh_token)
+        await self.session_repo.update_fingerprint(
+            session, 
+            new_fingerprint, 
+            datetime.now(timezone.utc) + timedelta(days=30)
+        )
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -474,19 +413,19 @@ class AuthService:
         access_payload = {
             "sub": user_id,
             "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
-            "role": UserRole(role).name,
+            "role": models.UserRole(role).name,
             "iss": "auth-service",
             "aud": "smart-budget"
         }
         return encode(
-        access_payload, 
-        settings.jwt_private_key,
-        algorithm=settings.jwt_algorithm
+            access_payload, 
+            settings.settings.jwt.jwt_private_key,
+            algorithm=settings.settings.jwt.jwt_algorithm
         )   
     
     async def _create_session_and_tokens(
         self, 
-        user: User, 
+        user: models.User, 
         user_agent: str | None,
         device_name: str, 
         ip: str, 
@@ -495,9 +434,9 @@ class AuthService:
     ):
         """Создает новый сеанс и генерирует токены."""
         refresh_token = str(uuid4())
-        fingerprint = hash_token(refresh_token)
+        fingerprint = utils.hash_token(refresh_token)
 
-        session = Session(
+        session_model = models.Session(
             id=uuid4(),
             user_id=user.id,
             user_agent=user_agent or "Unknown",
@@ -509,11 +448,8 @@ class AuthService:
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
             created_at=datetime.now(timezone.utc)
         )
-        self.db.add(session)
+        session = await self.session_repo.create(session_model)
         
         access_token = self._create_access_token(str(user.id), user.role)
         
-        if commit:
-            await self.db.commit()
-
         return access_token, refresh_token, session

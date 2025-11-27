@@ -4,15 +4,15 @@ from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 import base64
 from functools import lru_cache
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
-from app.dependencies import get_current_user_id, get_real_ip
-from app.schemas import (
-    AllSessionsResponse, UnifiedResponse, UserInfo, VerifyEmailRequest, CompleteRegistrationRequest,
-    LoginRequest, ResetPasswordRequest, CompleteResetRequest,
-    ChangePasswordRequest, TokenValidateRequest
+from app import (
+    dependencies,
+    schemas,
+    settings,
+    services
 )
-from app.settings import settings
-from app.services import AuthService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -22,7 +22,7 @@ def _set_auth_cookies(
     refresh_token: str
 ):
     """Хелпер для установки httpOnly cookie."""
-    secure = (settings.env == 'prod')
+    secure = (settings.settings.app.env == 'prod')
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -44,7 +44,7 @@ def _set_auth_cookies(
 
 def _delete_auth_cookies(response: Response):
     """Хелпер для удаления auth cookie."""
-    secure = (settings.env == 'prod')
+    secure = (settings.settings.app.env == 'prod')
     response.delete_cookie("access_token", httponly=True, secure=secure, samesite='None', path='/')
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='None', path='/')
 
@@ -55,14 +55,14 @@ def _delete_auth_cookies(response: Response):
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
 )
 async def verify_email(
-    body: VerifyEmailRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    body: schemas.VerifyEmailRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService)
 ):
     """Инициирует процесс проверки электронной почты."""
     action = await service.start_email_verification(body.email)
     detail = "Complete sign in." if action == "sign_in" else "Verification email sent."
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action=action, 
             detail=detail
@@ -74,12 +74,12 @@ async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
     token_type: str = Query(...),
-    service: AuthService = Depends(AuthService)
+    service: services.AuthService = Depends(services.AuthService)
 ):
     """Проверяет токен подтверждения по ссылке электронной почты."""
     await service.validate_verification_token(token, email, token_type)
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success",
             action="verify_link",
             detail="Token validated.",
@@ -92,9 +92,9 @@ async def verify_link(
     dependencies=[Depends(RateLimiter(times=5, seconds=60))]
 )
 async def complete_registration(
-    body: CompleteRegistrationRequest = Body(...),
-    service: AuthService = Depends(AuthService),
-    ip: str = Depends(get_real_ip),
+    body: schemas.CompleteRegistrationRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService),
+    ip: str = Depends(dependencies.get_real_ip),
     user_agent: str | None = Header(None, alias="User-Agent")
 ):
     """Завершает регистрацию пользователя после верификации."""
@@ -105,7 +105,7 @@ async def complete_registration(
     )
 
     response = JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="complete_registration", 
             detail="Registration completed."
@@ -116,9 +116,9 @@ async def complete_registration(
 
 @router.post("/login", status_code=200, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def login(
-    body: LoginRequest = Body(...),
-    service: AuthService = Depends(AuthService),
-    ip: str = Depends(get_real_ip),
+    body: schemas.LoginRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService),
+    ip: str = Depends(dependencies.get_real_ip),
     user_agent: str | None = Header(None, alias="User-Agent")
 ):
     """Обрабатывает вход пользователя в систему и создает сеанс."""
@@ -129,7 +129,7 @@ async def login(
     )
 
     response = JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="login", 
             detail="Login successful."
@@ -141,14 +141,14 @@ async def login(
 @router.post("/logout", status_code=200)
 async def logout(
     request: Request,
-    service: AuthService = Depends(AuthService),
-    user_id: str = Depends(get_current_user_id)
+    service: services.AuthService = Depends(services.AuthService),
+    user_id: str = Depends(dependencies.get_current_user_id)
 ):
     """Обрабатывает выход пользователя из системы и отменяет сеанс."""
     refresh_token = request.cookies.get("refresh_token")
     await service.logout(user_id, refresh_token)
     response = JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="logout", 
             detail="Logout successful."
@@ -163,13 +163,13 @@ async def logout(
     dependencies=[Depends(RateLimiter(times=5, seconds=60))]
 )
 async def reset_password(
-    body: ResetPasswordRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    body: schemas.ResetPasswordRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService)
 ):
     """Инициирует процесс сброса пароля."""
     await service.start_password_reset(body.email)
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="reset_password", 
             detail="Reset email sent."
@@ -178,13 +178,13 @@ async def reset_password(
 
 @router.post("/complete-reset", status_code=200)
 async def complete_reset(
-    body: CompleteResetRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    body: schemas.CompleteResetRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService)
 ):
     """Завершает сброс пароля с помощью нового пароля."""
     await service.complete_password_reset(body)
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="complete_reset", 
             detail="Password reset completed."
@@ -193,24 +193,24 @@ async def complete_reset(
 
 @router.post("/change-password", status_code=200)
 async def change_password(
-    body: ChangePasswordRequest = Body(...),
-    service: AuthService = Depends(AuthService),
-    user_id: str = Depends(get_current_user_id)
+    body: schemas.ChangePasswordRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService),
+    user_id: str = Depends(dependencies.get_current_user_id)
 ):
     """Изменяет пароль пользователя после проверки подлинности."""
     await service.change_password(user_id, body)
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="change_password", 
             detail="Password changed."
         ).model_dump()
     )
 
-@router.get("/me", status_code=200, response_model=UserInfo)
+@router.get("/me", status_code=200, response_model=schemas.UserInfo)
 async def get_current_user_info(
-    service: AuthService = Depends(AuthService),
-    user_id: str = Depends(get_current_user_id)
+    service: services.AuthService = Depends(services.AuthService),
+    user_id: str = Depends(dependencies.get_current_user_id)
 ):
     """Возвращает информацию о текущем аутентифицированном пользователе."""
     user = await service.get_user_info_by_id(user_id)
@@ -219,29 +219,29 @@ async def get_current_user_info(
 @router.get(
     "/sessions",
     status_code=200,
-    response_model=AllSessionsResponse
+    response_model=schemas.AllSessionsResponse
 )
 async def get_all_user_sessions(
     request: Request,
-    service: AuthService = Depends(AuthService),
-    user_id: str = Depends(get_current_user_id)
+    service: services.AuthService = Depends(services.AuthService),
+    user_id: str = Depends(dependencies.get_current_user_id)
 ):
     """Получает список всех активных сессий для текущего пользователя."""
     current_refresh_token = request.cookies.get("refresh_token")
     sessions_list = await service.get_all_sessions(user_id, current_refresh_token)
-    return AllSessionsResponse(sessions=sessions_list)
+    return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
 @router.delete("/sessions/{session_id}", status_code=200)
 async def revoke_session(
     session_id: UUID,
-    service: AuthService = Depends(AuthService),
-    user_id: str = Depends(get_current_user_id)
+    service: services.AuthService = Depends(services.AuthService),
+    user_id: str = Depends(dependencies.get_current_user_id)
 ):
     """Отзывает одну конкретную сессию по ее ID."""
     await service.revoke_session_by_id(user_id, str(session_id))
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success",
             action="revoke_session",
             detail="Session has been revoked."
@@ -256,8 +256,8 @@ async def revoke_session(
 )
 async def revoke_other_sessions(
     request: Request,
-    service: AuthService = Depends(AuthService),
-    user_id: str = Depends(get_current_user_id)
+    service: services.AuthService = Depends(services.AuthService),
+    user_id: str = Depends(dependencies.get_current_user_id)
 ):
     """Отзывает все сессии, кроме текущей."""
     refresh_token = request.cookies.get("refresh_token")
@@ -266,7 +266,7 @@ async def revoke_other_sessions(
 
     await service.revoke_other_sessions(user_id, refresh_token)
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success",
             action="revoke_other_sessions",
             detail="All other sessions have been revoked."
@@ -275,13 +275,13 @@ async def revoke_other_sessions(
 
 @router.post("/validate-token", status_code=200)
 async def validate_token(
-    body: TokenValidateRequest = Body(...),
-    service: AuthService = Depends(AuthService)
+    body: schemas.TokenValidateRequest = Body(...),
+    service: services.AuthService = Depends(services.AuthService)
 ):
     """Проверяет access_token."""
     await service.validate_access_token_async(body.token)
     return JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success", 
             action="validate_token", 
             detail="Token valid."
@@ -295,7 +295,7 @@ async def validate_token(
 )
 async def refresh(
     request: Request,
-    service: AuthService = Depends(AuthService)
+    service: services.AuthService = Depends(services.AuthService)
 ):
     """Обновляет access_token с помощью refresh_token"""
     access_token = (
@@ -311,7 +311,7 @@ async def refresh(
     )
 
     response = JSONResponse(
-        UnifiedResponse(
+        schemas.UnifiedResponse(
             status="success",
             action="refresh",
             detail="Tokens refreshed.",
@@ -332,11 +332,8 @@ def _int_to_base64url(value: int) -> str:
 @router.get("/.well-known/jwks.json")
 async def get_jwks():
     """Предоставляет JWKS для проверки токенов."""
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.backends import default_backend
-
     public_key_obj = serialization.load_pem_public_key(
-        settings.jwt_public_key.encode(),
+        settings.settings.jwt.jwt_public_key.encode(),
         backend=default_backend()
     )
     public_numbers = public_key_obj.public_numbers()

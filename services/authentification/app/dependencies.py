@@ -1,3 +1,4 @@
+import ipaddress
 from fastapi import Depends, Request, HTTPException
 from redis.asyncio import Redis, ConnectionPool
 from uuid import UUID
@@ -7,16 +8,25 @@ from arq.connections import ArqRedis
 from jwt import ExpiredSignatureError, InvalidSignatureError, decode, PyJWTError
 import geoip2.database
 
-from .settings import settings
-from .middleware import logger
-from .models import User
+from app import (
+    settings,
+    middleware,
+    repositories
+)
 
-engine = create_async_engine(settings.db_url)
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+def get_async_engine():
+    """Создает async engine для БД."""
+    return create_async_engine(settings.settings.db.db_url)
+
+def get_async_session_maker():
+    """Создает maker сессий."""
+    engine = get_async_engine()
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Обеспечивает асинхронный сеанс работы с базой данных."""
-    async with async_session() as session:
+    session_maker = get_async_session_maker()
+    async with session_maker() as session:
         yield session
 
 async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
@@ -30,7 +40,7 @@ async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
 
 async def create_redis_pool() -> ConnectionPool:
     """Создает пул подключений Redis."""
-    return ConnectionPool.from_url(settings.redis_url, decode_responses=True)
+    return ConnectionPool.from_url(settings.settings.app.redis_url, decode_responses=True)
 
 async def close_redis_pool(pool: ConnectionPool):
     """Закрывает пул подключений Redis."""
@@ -49,24 +59,31 @@ def get_geoip_reader(request: Request) -> geoip2.database.Reader:
     try:
         return request.app.state.geoip_reader
     except AttributeError:
-        logger.error(
+        middleware.logger.error(
             "GeoIP reader not found in app.state. Make sure it is initialized in lifespan."
         )
         raise HTTPException(status_code=500, detail="GeoIP service not available")
 
 def get_real_ip(request: Request) -> str:
-    """Извлекает реальный IP-адрес из запроса."""
-    if "x-forwarded-for" in request.headers:
-        return request.headers["x-forwarded-for"].split(",")[0].strip()
-    return request.client.host if request.client else "127.0.0.1"
+    """Извлекает реальный IP-адрес из запроса, учитывая цепочку прокси."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        ips = [ip.strip() for ip in forwarded.split(",")]
+        for ip in ips:
+            try:
+                addr = ipaddress.ip_address(ip)
+                if not addr.is_private:
+                    return ip
+            except ValueError:
+                middleware.logger.warning(f"Invalid IP in x-forwarded-for: {ip}")
+        middleware.logger.warning(f"No valid public IP in x-forwarded-for: {forwarded}")
+    client_host = request.client.host if request.client else "127.0.0.1"
+    middleware.logger.debug(f"Falling back to client.host: {client_host}")
+    return client_host
 
 async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_db)) -> str:
     """Извлекает и проверяет текущий идентификатор пользователя из токена."""
-    access_token = request.headers.get("Authorization")
-    if access_token and access_token.startswith("Bearer "):
-        access_token = access_token.replace("Bearer ", "")
-    else:
-        access_token = request.cookies.get("access_token")
+    access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(
             status_code=401, 
@@ -75,20 +92,18 @@ async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_d
     try:
         payload = decode(
             access_token,
-            settings.jwt_public_key,
-            algorithms=[settings.jwt_algorithm],
+            settings.settings.jwt.jwt_public_key,
+            algorithms=[settings.settings.jwt.jwt_algorithm],
             audience='smart-budget'
         )
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token (missing sub)")
         
-        try:
-            user = await db.get(User, UUID(user_id))
-            if not user or not user.is_active:
-                raise HTTPException(status_code=401, detail="User inactive or not found")
-        except Exception:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
+        user_repo = repositories.UserRepository(db)
+        user = await user_repo.get_by_id(UUID(user_id))
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="User inactive or not found")
 
         return user_id
     except ExpiredSignatureError:
@@ -96,6 +111,6 @@ async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_d
     except InvalidSignatureError:
         raise HTTPException(status_code=401, detail="Invalid token signature (Key mismatch)")
     except PyJWTError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Invalid token")
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token payload: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Invalid token payload")
