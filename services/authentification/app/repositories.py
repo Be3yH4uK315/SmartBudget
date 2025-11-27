@@ -1,4 +1,3 @@
-from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -8,14 +7,13 @@ from datetime import datetime, timezone
 
 from app import (
     models, 
-    dependencies, 
     exceptions, 
     middleware
 )
 
 class BaseRepository:
     """Базовый репозиторий для внедрения сессии БД."""
-    def __init__(self, db: AsyncSession = Depends(dependencies.get_db)):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
 class UserRepository(BaseRepository):
