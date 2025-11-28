@@ -1,6 +1,6 @@
+import { dispatch } from '@shared/store/store'
 import axios, { AxiosError, AxiosRequestConfig } from 'axios'
 import { logoutHelper } from '../utils'
-import { dispatch } from '@shared/store/store'
 
 const baseURL = 'http://127.0.0.1:8000/api/'
 

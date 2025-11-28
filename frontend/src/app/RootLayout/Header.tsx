@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { LogoutRounded } from '@mui/icons-material'
 import { AppBar, Box, Button, Container, IconButton, Tab, Tabs, useMediaQuery } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
-import { Link as RouterLink, useLocation } from 'react-router'
 import { logoutHelper } from '@shared/utils'
 import { useDispatch } from 'react-redux'
+import { Link as RouterLink, useLocation } from 'react-router'
 
 export const Header = () => {
   const { pathname } = useLocation()
