@@ -29,6 +29,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with session_maker() as session:
         yield session
 
+def get_user_repository(db: AsyncSession = Depends(get_db)) -> repositories.UserRepository:
+    """Провайдер для UserRepository."""
+    return repositories.UserRepository(db)
+
+def get_session_repository(db: AsyncSession = Depends(get_db)) -> repositories.SessionRepository:
+    """Провайдер для SessionRepository."""
+    return repositories.SessionRepository(db)
+
 async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
     """Обеспечивает подключение Redis из пула."""
     pool: ConnectionPool = request.app.state.redis_pool
@@ -114,3 +122,25 @@ async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=401, detail=f"Invalid token")
     except ValueError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token payload")
+
+async def get_user_id_from_expired_token(request: Request) -> str | None:
+    """
+    Извлекает user_id из access_token, игнорируя срок его действия.
+    Нужно для эндпоинта /logout.
+    """
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return None
+    try:
+        payload = decode(
+            access_token,
+            settings.settings.jwt.jwt_public_key,
+            algorithms=[settings.settings.jwt.jwt_algorithm],
+            audience='smart-budget',
+            options={"verify_exp": False}
+        )
+        user_id: str | None = payload.get("sub")
+        return user_id
+    except (PyJWTError, ValueError):
+        middleware.logger.warning("Invalid token structure encountered during logout")
+        return None
