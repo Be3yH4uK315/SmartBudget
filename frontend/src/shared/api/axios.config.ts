@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios'
-import { authApi } from './auth'
+import { logoutHelper } from '../utils'
+import { dispatch } from '@shared/store/store'
 
 const baseURL = 'http://127.0.0.1:8000/api/'
 
@@ -79,7 +80,7 @@ api.interceptors.response.use(
     }
 
     if (result === 'logout') {
-      await authApi.logout()
+      await logoutHelper(dispatch)
       return Promise.reject(error)
     }
 

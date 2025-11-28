@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { LogoutRounded } from '@mui/icons-material'
 import { AppBar, Box, Button, Container, IconButton, Tab, Tabs, useMediaQuery } from '@mui/material'
-import { authApi } from '@shared/api/auth'
 import { useTranslate } from '@shared/hooks'
-import { Link as RouterLink, useLocation, useNavigate } from 'react-router'
+import { Link as RouterLink, useLocation } from 'react-router'
+import { logoutHelper } from '@shared/utils'
+import { useDispatch } from 'react-redux'
 
 export const Header = () => {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
+  const dispatch = useDispatch<AppDispatch>()
   const translate = useTranslate('HeaderTabs')
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down('sm'))
 
@@ -35,8 +36,7 @@ export const Header = () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
     try {
-      await authApi.logout()
-      navigate('/auth/sign-in')
+      await logoutHelper(dispatch)
     } finally {
       setIsLoggingOut(false)
     }
