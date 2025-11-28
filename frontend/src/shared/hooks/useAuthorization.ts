@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { authApi } from '@shared/api/auth'
 import { getUserInfo } from '@shared/store/user'
 import { useDispatch } from 'react-redux'
+import { logoutHelper } from '../utils'
 
 export function useAuthorization() {
   const dispatch = useDispatch<AppDispatch>()
@@ -9,12 +9,12 @@ export function useAuthorization() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    ;;(async () => {
+    ;(async () => {
       try {
         const action = await dispatch(getUserInfo())
 
         if (getUserInfo.rejected.match(action) && action.payload === 'noInfo') {
-          await authApi.logout()
+          await logoutHelper(dispatch)
         }
       } catch (_) {
       } finally {
