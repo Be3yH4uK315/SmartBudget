@@ -1,29 +1,19 @@
 # --- FRONTEND IGNORE RULES ---
-/frontend/.DS_Store
 /frontend/*.local
 /frontend/*.log*
-
 /frontend/node_modules
 /frontend/build/
-
 /frontend/.rspack-profile-*/
-
-/frontend/.vscode/*
 !/frontend/.vscode/extensions.json
-/frontend/.idea
 
-
-# --- AUTHENTIFICATION IGNORE RULES ---
-*/*/*/__pycache__/
-*/*/*/*/__pycache__/
-*/*/*/*/*/__pycache__/
-*/*/.pytest_cache/
-*/*/.env
-*/*/.env.test
-*/*/*.sh
-*/*/*.db
-*/*/*.log
-*/*//geoip/GeoLite2-City.mmdb
-*/*/celerybeat-schedule
-*/*/certs
-*/*/.idea
+# --- UNIVERSAL IGNORE RULES ---
+**/__pycache__/
+**/.pytest_cache/
+**/.env
+**/*.sh
+**/*.db
+**/*.log
+**/certs
+**/.idea
+**/.DS_Store
+**/.vscode/*
