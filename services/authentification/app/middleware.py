@@ -4,12 +4,20 @@ from jwt.exceptions import PyJWTError
 from aiokafka.errors import KafkaError
 from logging import getLogger
 
+from app import exceptions
+
 logger = getLogger(__name__)
 
 async def error_middleware(request: Request, call_next):
     """Промежуточное программное обеспечение для обработки ошибок в запросах."""
     try:
         return await call_next(request)
+    except exceptions.AuthServiceError as e:
+        logger.warning(
+            f"Handled business logic error: {e}",
+            extra={"path": request.url.path, "method": request.method}
+        )
+        raise e
     except PyJWTError as e:
         logger.warning(
             f"JWT error: {e}",

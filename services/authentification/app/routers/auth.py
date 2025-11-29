@@ -1,6 +1,5 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response
-from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 import base64
 from functools import lru_cache
@@ -11,6 +10,7 @@ from app import (
     dependencies,
     exceptions,
     middleware,
+    models,
     schemas,
     settings,
     services
@@ -95,9 +95,10 @@ async def verify_link(
     "/complete-registration", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=None
+    response_model=schemas.UnifiedResponse
 )
 async def complete_registration(
+    response: Response,
     body: schemas.CompleteRegistrationRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService),
     ip: str = Depends(dependencies.get_real_ip),
@@ -110,23 +111,22 @@ async def complete_registration(
         user_agent or "Unknown"
     )
 
-    response = JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="complete_registration", 
-            detail="Registration completed."
-        ).model_dump()
-    )
     _set_auth_cookies(response, access_token, refresh_token)
-    return response
+    
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="complete_registration", 
+        detail="Registration completed."
+    )
 
 @router.post(
     "/login", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=None
+    response_model=schemas.UnifiedResponse
 )
 async def login(
+    response: Response,
     body: schemas.LoginRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService),
     ip: str = Depends(dependencies.get_real_ip),
@@ -139,22 +139,21 @@ async def login(
         user_agent or "Unknown"
     )
 
-    response = JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="login", 
-            detail="Login successful."
-        ).model_dump()
-    )
     _set_auth_cookies(response, access_token, refresh_token)
-    return response
+
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="login", 
+        detail="Login successful."
+    )
 
 @router.post(
     "/logout", 
     status_code=200,
-    response_model=None
+    response_model=schemas.UnifiedResponse
 )
 async def logout(
+    response: Response,
     request: Request,
     service: services.AuthService = Depends(services.AuthService),
     user_id: str | None = Depends(dependencies.get_user_id_from_expired_token)
@@ -167,15 +166,13 @@ async def logout(
         except exceptions.AuthServiceError as e:
             middleware.logger.warning(f"Failed to revoke session during logout: {e}")
 
-    response = JSONResponse(
-        schemas.UnifiedResponse(
-            status="success", 
-            action="logout", 
-            detail="Logout successful."
-        ).model_dump()
-    )
     _delete_auth_cookies(response)
-    return response
+
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="logout", 
+        detail="Logout successful."
+    )
 
 @router.post(
     "/reset-password", 
@@ -222,10 +219,10 @@ async def complete_reset(
 async def change_password(
     body: schemas.ChangePasswordRequest = Body(...),
     service: services.AuthService = Depends(services.AuthService),
-    user_id: str = Depends(dependencies.get_current_user_id)
+    user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Изменяет пароль пользователя после проверки подлинности."""
-    await service.change_password(user_id, body)
+    await service.change_password(user.id, body)
 
     return schemas.UnifiedResponse(
         status="success", 
@@ -235,11 +232,9 @@ async def change_password(
 
 @router.get("/me", status_code=200, response_model=schemas.UserInfo)
 async def get_current_user_info(
-    service: services.AuthService = Depends(services.AuthService),
-    user_id: str = Depends(dependencies.get_current_user_id)
+    user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Возвращает информацию о текущем аутентифицированном пользователе."""
-    user = await service.get_user_info_by_id(user_id)
     return user
 
 @router.get(
@@ -250,11 +245,11 @@ async def get_current_user_info(
 async def get_all_user_sessions(
     request: Request,
     service: services.AuthService = Depends(services.AuthService),
-    user_id: str = Depends(dependencies.get_current_user_id)
+    user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Получает список всех активных сессий для текущего пользователя."""
     current_refresh_token = request.cookies.get("refresh_token")
-    sessions_list = await service.get_all_sessions(user_id, current_refresh_token)
+    sessions_list = await service.get_all_sessions(user.id, current_refresh_token)
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
@@ -266,10 +261,10 @@ async def get_all_user_sessions(
 async def revoke_session(
     session_id: UUID,
     service: services.AuthService = Depends(services.AuthService),
-    user_id: str = Depends(dependencies.get_current_user_id)
+    user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Отзывает одну конкретную сессию по ее ID."""
-    await service.revoke_session_by_id(user_id, str(session_id))
+    await service.revoke_session_by_id(user.id, session_id)
 
     return schemas.UnifiedResponse(
         status="success",
@@ -287,14 +282,14 @@ async def revoke_session(
 async def revoke_other_sessions(
     request: Request,
     service: services.AuthService = Depends(services.AuthService),
-    user_id: str = Depends(dependencies.get_current_user_id)
+    user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Отзывает все сессии, кроме текущей."""
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    await service.revoke_other_sessions(user_id, refresh_token)
+    await service.revoke_other_sessions(user.id, refresh_token)
 
     return schemas.UnifiedResponse(
         status="success",
@@ -324,9 +319,10 @@ async def validate_token(
     "/refresh", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=30, seconds=60))],
-    response_model=None
+    response_model=schemas.UnifiedResponse
 )
 async def refresh(
+    response: Response,
     request: Request,
     service: services.AuthService = Depends(services.AuthService)
 ):
@@ -336,15 +332,13 @@ async def refresh(
         raise HTTPException(status_code=401, detail="Missing refresh token")
     new_access_token, new_refresh_token = await service.refresh_session(refresh_token)
 
-    response = JSONResponse(
-        schemas.UnifiedResponse(
-            status="success",
-            action="refresh",
-            detail="Tokens refreshed.",
-        ).model_dump()
-    )
     _set_auth_cookies(response, new_access_token, new_refresh_token)
-    return response
+
+    return schemas.UnifiedResponse(
+        status="success",
+        action="refresh",
+        detail="Tokens refreshed.",
+    )
 
 def _int_to_base64url(value: int) -> str:
     """Преобразует целое число в строку base64url."""

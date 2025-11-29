@@ -27,15 +27,13 @@ logger = getLogger(__name__)
 
 async def send_email_async(ctx, to: str, subject: str, body: str):
     """Задача Arq для отправки email. 'ctx' - это словарь контекста воркера."""
-    logger.info(f"send_email_async START for {to}")
+    logger.info(f"send_email_async START", extra={"email_to": to})
     
     message = EmailMessage()
     message["From"] = settings.settings.smtp.smtp_user or "no-reply@example.com"
     message["To"] = to
     message["Subject"] = subject
     message.set_content(body)
-
-    logger.info(f"[STEP 1/5] Using hostname: {settings.settings.smtp.smtp_host}")
 
     tls_context = ssl.create_default_context()
 
@@ -50,32 +48,24 @@ async def send_email_async(ctx, to: str, subject: str, body: str):
     )
 
     try:
-        logger.info(f"[STEP 2/5] Connecting to {settings.settings.smtp.smtp_host}:{settings.settings.smtp.smtp_port} (TLS={use_implicit_tls})...")
         await client.connect()
-        logger.info("[STEP 2/5] Connected successfully!")
-
         if not use_implicit_tls:
-            logger.info("[STEP 3/5] Sending STARTTLS command...")
             await client.starttls() 
-            logger.info("[STEP 3/5] STARTTLS upgrade success!")
-        else:
-            logger.info("[STEP 3/5] Skipping STARTTLS (already connected via SSL).")
 
-        logger.info(f"[STEP 4/5] Logging in as {settings.settings.smtp.smtp_user}...")
         await client.login(settings.settings.smtp.smtp_user, settings.settings.smtp.smtp_pass)
-        logger.info("[STEP 4/5] Login success!")
-
-        logger.info("[STEP 5/5] Sending message data...")
         await client.send_message(message)
-        logger.info(f"[STEP 5/5] Message sent to {to}!")
+        logger.info(f"Message sent successfully", extra={"email_to": to})
 
     except Exception as e:
-        logger.error(f"!!! EMAIL FAILED !!! Error: {e}")
+        logger.error(
+            f"EMAIL FAILED", 
+            extra={"email_to": to, "error": str(e), "error_type": type(e).__name__}
+        )
         raise e
     finally:
         try:
             await client.quit()
-            logger.info("Connection closed.")
+            logger.debug("Connection closed.", extra={"email_to": to})
         except:
             pass
 
