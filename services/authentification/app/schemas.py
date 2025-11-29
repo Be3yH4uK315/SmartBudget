@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from typing import Optional
 
 class VerifyEmailRequest(BaseModel):
@@ -167,8 +167,7 @@ class UserInfo(BaseModel):
         description="Дата создания учетной записи"
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SessionInfo(BaseModel):
     """Безопасная информация о сессии, передаваемая на фронтенд."""
@@ -203,8 +202,7 @@ class SessionInfo(BaseModel):
         description="Является ли сессия текущей"
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AllSessionsResponse(BaseModel):
     """Модель ответа для списка всех сессий пользователя."""
