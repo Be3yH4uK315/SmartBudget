@@ -13,16 +13,16 @@ class DBSettings(BaseSettings):
 
 class SMTPSettings(BaseSettings):
     smtp_host: str
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_pass: str = ""
-    smtp_from_email: str = "no-reply@example.com"
-    smtp_from_name: str = "SmartBudget"
+    smtp_port: int
+    smtp_user: str
+    smtp_pass: str
+    smtp_from_email: str
+    smtp_from_name: str
 
 class JWTSettings(BaseSettings):
-    jwt_private_key_path: Path = ROOT_DIR / "certs" / "jwt-private.pem"
-    jwt_public_key_path: Path = ROOT_DIR / "certs" / "jwt-public.pem"
-    jwt_algorithm: str = "RS256"
+    jwt_private_key_path: Path
+    jwt_public_key_path: Path
+    jwt_algorithm: str
     
     @cached_property
     def jwt_private_key(self) -> str:
@@ -33,16 +33,16 @@ class JWTSettings(BaseSettings):
         return self.jwt_public_key_path.read_text()
 
 class AppSettings(BaseSettings):
-    env: str = 'dev'
+    env: str
     kafka_bootstrap_servers: str
-    kafka_group_id: str = "auth-group"
+    kafka_group_id: str
     redis_url: str
-    arq_queue_name: str = "auth_tasks"
+    arq_queue_name: str
     geoip_db_path: str
-    frontend_url: str = "http://127.0.0.1:3000"
-    prometheus_port: int = 8001
-    log_level: str = "INFO"
-    tz: str = "UTC"
+    frontend_url: str
+    prometheus_port: int
+    log_level: str
+    tz: str
 
 class Settings(BaseSettings):
     db: DBSettings
