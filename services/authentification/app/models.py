@@ -56,4 +56,5 @@ class Session(base.Base):
     __table_args__ = (
         Index('ix_sessions_user_id', 'user_id'),  # Индекс для поиска по user_id
         Index('ix_sessions_expires_at', 'expires_at'),  # Индекс для cleanup
+        Index('ix_sessions_fingerprint', 'refresh_fingerprint'), # Индекс для refresh
     )
