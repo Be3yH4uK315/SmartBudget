@@ -331,17 +331,10 @@ async def refresh(
     service: services.AuthService = Depends(services.AuthService)
 ):
     """Обновляет access_token с помощью refresh_token"""
-    access_token = (
-        request.cookies.get("access_token")
-        or request.headers.get("Authorization", "").replace("Bearer ", "")
-    )
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Missing refresh token")
-    new_access_token, new_refresh_token = await service.refresh_session(
-        refresh_token,
-        access_token or "",
-    )
+    new_access_token, new_refresh_token = await service.refresh_session(refresh_token)
 
     response = JSONResponse(
         schemas.UnifiedResponse(

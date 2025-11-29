@@ -73,14 +73,9 @@ class SessionRepository(BaseRepository):
         await self.db.commit()
         return session
 
-    async def get_by_fingerprint(
-        self, 
-        user_id: UUID, 
-        fingerprint: str
-    ) -> models.Session | None:
+    async def get_by_fingerprint(self, fingerprint: str) -> models.Session | None:
         """Находит активную сессию по fingerprint."""
         query = select(models.Session).where(
-            models.Session.user_id == user_id,
             models.Session.refresh_fingerprint == fingerprint,
             models.Session.revoked == sa.false(),
             models.Session.expires_at > datetime.now(timezone.utc)
