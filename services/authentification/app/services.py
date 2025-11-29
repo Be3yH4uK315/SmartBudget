@@ -49,16 +49,14 @@ class AuthService:
         await self.redis.set(redis_key, hashed_token, ex=900)  # 15 мин TTL
 
         email_body = email_templates.get_verification_email_body(email, token)
-        
-        middleware.logger.info(f"Arq pool in AuthService: {self.arq_pool}")
-        middleware.logger.info(f"Enqueueing send_email_async to {email} in queue {settings.settings.app.arq_queue_name}")
+
         job = await self.arq_pool.enqueue_job(
             'send_email_async',
             to=email,
             subject="Verify your email for SmartBudget",
             body=email_body,
         )
-        middleware.logger.info(f"Job enqueued: {job.job_id}")
+        middleware.logger.debug(f"Job enqueued: {job.job_id}")
 
         await self.arq_pool.enqueue_job(
             'send_kafka_event_async',
@@ -158,19 +156,12 @@ class AuthService:
         user_agent: str | None
     ):
         """Выполняет вход в систему: проверяет учетные данные и создает сеанс."""
-        fail_key = redis_keys.get_login_fail_key(ip)
-        fails = int(await self.redis.get(fail_key) or 0)
-        if fails >= 5:
-            raise exceptions.TooManyAttemptsError("Too many attempts, try later")
-
         location_data = await asyncio.to_thread(utils.get_location, ip, self.geoip_reader)
         location = location_data.get("full", "Unknown")
 
         user = await self.user_repo.get_by_email(body.email)
 
         if not user or not user.is_active or not utils.check_password(body.password, user.password_hash):
-            await self.redis.incr(fail_key)
-            await self.redis.expire(fail_key, 60)
             await self.arq_pool.enqueue_job(
                 'send_kafka_event_async',
                 topic="auth_events",
@@ -184,7 +175,6 @@ class AuthService:
             )
             raise exceptions.InvalidCredentialsError("Invalid credentials")
 
-        await self.redis.delete(fail_key)
         device_name = utils.parse_device(user_agent or "Unknown")
 
         access_token, refresh_token, session = await self._create_session_and_tokens(
@@ -279,9 +269,9 @@ class AuthService:
             schema_name="AUTH_EVENTS_SCHEMA"
         )
 
-    async def change_password(self, user_id: str, body: schemas.ChangePasswordRequest):
+    async def change_password(self, user_id: UUID, body: schemas.ChangePasswordRequest):
         """Изменяет пароль пользователя, используя user_id из токена."""
-        user = await self.user_repo.get_by_id(UUID(user_id))
+        user = await self.user_repo.get_by_id(user_id)
         if not user or not utils.check_password(body.password, user.password_hash):
             raise exceptions.InvalidCredentialsError("Invalid current password")
 
@@ -296,16 +286,9 @@ class AuthService:
             schema_name="AUTH_EVENTS_SCHEMA"
         )
 
-    async def get_user_info_by_id(self, user_id: str):
-        """Получает пользователя по ID (для эндпоинта /me)."""
-        user = await self.user_repo.get_by_id(UUID(user_id))
-        if not user or not user.is_active:
-            raise exceptions.UserInactiveError("User not found or inactive")
-        return user
-
     async def get_all_sessions(
         self, 
-        user_id: str, 
+        user_id: UUID, 
         current_refresh_token: str | None
     ) -> list[schemas.SessionInfo]:
         """Получает все активные сессии для пользователя и помечает, какая является текущей."""
@@ -313,7 +296,7 @@ class AuthService:
         if current_refresh_token:
             current_fingerprint = utils.hash_token(current_refresh_token)
 
-        sessions = await self.session_repo.get_all_active(UUID(user_id))
+        sessions = await self.session_repo.get_all_active(user_id)
 
         session_info_list = []
         for session in sessions:
@@ -330,15 +313,15 @@ class AuthService:
             )
         return session_info_list
 
-    async def revoke_session_by_id(self, user_id: str, session_id: str):
+    async def revoke_session_by_id(self, user_id: UUID, session_id: UUID):
         """Отзывает одну конкретную сессию по ID. Проверка user_id для безопасности."""
-        await self.session_repo.revoke_by_id(UUID(user_id), UUID(session_id))
+        await self.session_repo.revoke_by_id(user_id, session_id)
         middleware.logger.info(f"Session {session_id} has been revoked by user {user_id}")
 
-    async def revoke_other_sessions(self, user_id: str, current_refresh_token: str):
+    async def revoke_other_sessions(self, user_id: UUID, current_refresh_token: str):
         """Отзывает все сессии пользователя, кроме текущей."""
         current_fingerprint = utils.hash_token(current_refresh_token)
-        revoked_count = await self.session_repo.revoke_all_except(UUID(user_id), current_fingerprint)
+        revoked_count = await self.session_repo.revoke_all_except(user_id, current_fingerprint)
         middleware.logger.info(f"Revoked {revoked_count} other sessions for user {user_id}")
 
     async def validate_access_token_async(self, token: str):
@@ -417,7 +400,6 @@ class AuthService:
         device_name: str, 
         ip: str, 
         location: str,
-        commit: bool = True
     ):
         """Создает новый сеанс и генерирует токены."""
         refresh_token = str(uuid4())
