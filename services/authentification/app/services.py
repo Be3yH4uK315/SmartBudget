@@ -364,30 +364,17 @@ class AuthService:
             raise exceptions.InvalidTokenError("Invalid token payload (bad UUID)")
 
 
-    async def refresh_session(self, refresh_token: str, access_token: str):
+    async def refresh_session(self, refresh_token: str):
         """Обновляет сеанс с помощью проверки."""
-        if not access_token:
-            raise exceptions.InvalidTokenError("Missing access token")
-        try:
-            payload = decode(
-                access_token,
-                settings.settings.jwt.jwt_public_key,
-                algorithms=[settings.settings.jwt.jwt_algorithm],
-                audience="smart-budget",
-                options={"verify_exp": False},
-            )
-            user_id = UUID(payload.get("sub"))
-        except PyJWTError as e:
-            raise exceptions.InvalidTokenError(f"Invalid access token: {str(e)}")
-        except ValueError:
-            raise exceptions.InvalidTokenError("Invalid access token payload (bad UUID)")
-
-
         fingerprint = utils.hash_token(refresh_token)
-        session = await self.session_repo.get_by_fingerprint(user_id, fingerprint)
+        session = await self.session_repo.get_by_fingerprint(fingerprint)
         if not session:
-            raise exceptions.InvalidTokenError("Invalid or expired refresh token")
+            raise exceptions.InvalidTokenError("Invalid refresh token")
+
+        if session.expires_at < datetime.now(timezone.utc):
+            raise exceptions.InvalidTokenError("Refresh token expired")
         
+        user_id = session.user_id
         role = await self.user_repo.get_role_by_id(user_id)
         
         new_access_token = self._create_access_token(str(user_id), role)
