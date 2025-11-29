@@ -2,32 +2,34 @@ import ipaddress
 from fastapi import Depends, Request, HTTPException
 from redis.asyncio import Redis, ConnectionPool
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typing import AsyncGenerator
 from arq.connections import ArqRedis
 from jwt import ExpiredSignatureError, InvalidSignatureError, decode, PyJWTError
 import geoip2.database
 
 from app import (
+    models,
     settings,
     middleware,
     repositories
 )
 
-def get_async_engine():
-    """Создает async engine для БД."""
-    return create_async_engine(settings.settings.db.db_url)
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
+    async_session_maker: async_sessionmaker[AsyncSession] = request.app.state.db_session_maker
+    if not async_session_maker:
+        middleware.logger.error("DB Session Maker not found in app.state.")
+        raise HTTPException(status_code=500, detail="Database connection not available")
 
-def get_async_session_maker():
-    """Создает maker сессий."""
-    engine = get_async_engine()
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Обеспечивает асинхронный сеанс работы с базой данных."""
-    session_maker = get_async_session_maker()
-    async with session_maker() as session:
-        yield session
+    async with async_session_maker() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 def get_user_repository(db: AsyncSession = Depends(get_db)) -> repositories.UserRepository:
     """Провайдер для UserRepository."""
@@ -89,8 +91,10 @@ def get_real_ip(request: Request) -> str:
     middleware.logger.debug(f"Falling back to client.host: {client_host}")
     return client_host
 
-async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_db)) -> str:
-    """Извлекает и проверяет текущий идентификатор пользователя из токена."""
+async def get_current_active_user(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> models.User:
+    """Извлекает и проверяет текущего активного пользователя из токена."""
     access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(
@@ -113,7 +117,7 @@ async def get_current_user_id(request: Request, db: AsyncSession = Depends(get_d
         if not user or not user.is_active:
             raise HTTPException(status_code=401, detail="User inactive or not found")
 
-        return user_id
+        return user    
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except InvalidSignatureError:
