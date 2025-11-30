@@ -14,7 +14,7 @@ export function withAuth<P extends object>(WrappedComponent: ComponentType<P>) {
 
     useEffect(() => {
       if (!isAuth) {
-        navigate('/sign-in', {
+        navigate('/auth/sign-in', {
           replace: true,
         })
       }
