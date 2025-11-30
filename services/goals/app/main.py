@@ -6,6 +6,7 @@ from arq.connections import RedisSettings
 from starlette.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from aiokafka.errors import KafkaError
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.routers import goals
 from app import (
@@ -14,18 +15,30 @@ from app import (
     exceptions,
     logging_config
 )
-from app.kafka_producer import kafka_producer
+from app.kafka_producer import KafkaProducer
 
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Управляет ресурсами (Kafka, Arq) во время жизни приложения."""
+    """Управляет ресурсами (DB, Kafka, Arq) во время жизни приложения."""
     logging_config.setup_logging()
     
     try:
-        await kafka_producer.start()
-        app.state.kafka_producer = kafka_producer
+        engine = create_async_engine(settings.settings.db.db_url)
+        session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        app.state.db_engine = engine
+        app.state.async_session_maker = session_maker
+        logger.info("Database engine and session maker created.")
+    except Exception as e:
+        logger.error(f"Failed to create DB engine: {e}")
+        app.state.db_engine = None
+        app.state.async_session_maker = None
+
+    try:
+        kafka_prod_instance = KafkaProducer() 
+        await kafka_prod_instance.start()
+        app.state.kafka_producer = kafka_prod_instance
     except KafkaError as e:
         logger.error(f"Failed to start Kafka producer: {e}")
         app.state.kafka_producer = None
@@ -42,8 +55,12 @@ async def lifespan(app: FastAPI):
     
     if app.state.kafka_producer:
         await app.state.kafka_producer.stop()
+        logger.info("Kafka producer stopped.")
     if arq_pool:
         await arq_pool.close()
+    if app.state.db_engine:
+        await app.state.db_engine.dispose()
+        logger.info("Database engine disposed.")
     
     logger.info("Application shutdown complete.")
 
