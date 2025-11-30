@@ -19,10 +19,10 @@ class AppSettings(BaseSettings):
     tz: str
 
 class Settings(BaseSettings):
-    db: DBSettings = DBSettings()
-    kafka: KafkaSettings = KafkaSettings()
-    arq: ArqSettings = ArqSettings()
-    app: AppSettings = AppSettings()
+    db: DBSettings
+    kafka: KafkaSettings
+    arq: ArqSettings
+    app: AppSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",
