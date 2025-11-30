@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getUserInfo } from '@shared/store/user'
+import { logoutHelper } from '@shared/utils'
 import { useDispatch } from 'react-redux'
 import { useLocation } from 'react-router'
-import { logoutHelper } from '../utils'
 
 const publicRoutes = ['/auth/sign-in', '/auth/registration', '/auth/reset-password', '/']
 
