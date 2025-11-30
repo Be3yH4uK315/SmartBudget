@@ -48,5 +48,3 @@ class KafkaProducer:
     async def send_notification(self, event_data: dict):
         topic = settings.settings.kafka.kafka_topic_budget_notification
         await self.send_event(topic, event_data, self._schemas[topic])
-
-kafka_producer = KafkaProducer()
