@@ -1,12 +1,13 @@
-import { api } from '@shared/api'
+import { apiME } from '@shared/api'
+
+//временное использование apiME для тестов, т.к. на бэке /user/me это /auth/me
 
 class User_api {
-  /** времменый роут на auth для тестов */
-  baseURL = '/auth'
+  baseURL = '/user'
 
   async getUserInfo(): Promise<User> {
     const url = `${this.baseURL}/me`
-    const response = await api.get<User>(url)
+    const response = await apiME.get<User>(url)
 
     return response.data
   }
