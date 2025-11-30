@@ -1,10 +1,12 @@
 import logging
 from arq.connections import RedisSettings
 from arq.cron import cron
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, AsyncEngine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession, async_sessionmaker, AsyncEngine, create_async_engine
+)
 
 from app import settings, logging_config, dependencies, repositories, services
-from app.kafka_producer import kafka_producer
+from app.kafka_producer import KafkaProducer 
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ async def check_goals_deadlines_task(ctx):
     'ctx' содержит ресурсы из 'on_startup'.
     """
     db_maker: async_sessionmaker[AsyncSession] = ctx["db_session_maker"]
-    kafka: services.KafkaProducer = ctx["kafka_producer"]
+    kafka: KafkaProducer = ctx["kafka_producer"]
     
     if not db_maker or not kafka:
         logger.error("Worker context not properly initialized.")
@@ -35,28 +37,34 @@ async def on_startup(ctx):
     logger.info("Arq worker starting...")
     
     try:
-        engine = dependencies.get_async_engine()
-        db_maker = dependencies.get_async_session_maker()
+        engine = create_async_engine(settings.settings.db.db_url)
+        db_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         ctx["db_engine"] = engine
         ctx["db_session_maker"] = db_maker
+        logger.info("Worker DB context created.")
     except Exception as e:
-        logger.error(f"Failed to create DB engine/session maker: {e}")
+        logger.error(f"Failed to create DB engine/session maker for worker: {e}")
         
     try:
-        await kafka_producer.start()
-        ctx["kafka_producer"] = kafka_producer
+        kafka_prod_instance = KafkaProducer()
+        await kafka_prod_instance.start()
+        ctx["kafka_producer"] = kafka_prod_instance
+        logger.info("Worker Kafka producer started.")
     except Exception as e:
         logger.error(f"Failed to start Kafka producer for worker: {e}")
+        ctx["kafka_producer"] = None
 
 async def on_shutdown(ctx):
     logger.info("Arq worker shutting down...")
     engine: AsyncEngine = ctx.get("db_engine")
     if engine:
         await engine.dispose()
+        logger.info("Worker DB engine disposed.")
         
-    kafka: services.KafkaProducer = ctx.get("kafka_producer")
+    kafka: KafkaProducer = ctx.get("kafka_producer")
     if kafka:
         await kafka.stop()
+        logger.info("Worker Kafka producer stopped.")
 
 class WorkerSettings:
     """Настройки Arq worker."""
