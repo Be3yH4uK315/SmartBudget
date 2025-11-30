@@ -1,21 +1,18 @@
 from fastapi import Depends, Path, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typing import AsyncGenerator
 from uuid import UUID
 from arq.connections import ArqRedis
 
 from app import settings, repositories, services
-from app.kafka_producer import KafkaProducer, kafka_producer
+from app.kafka_producer import KafkaProducer
 
-def get_async_engine():
-    return create_async_engine(settings.settings.db.db_url)
-
-def get_async_session_maker():
-    engine = get_async_engine()
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    session_maker = get_async_session_maker()
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """Получает session_maker из app.state и предоставляет сессию."""
+    session_maker = request.app.state.async_session_maker
+    if not session_maker:
+        raise HTTPException(status_code=500, detail="Database session factory not available")
+        
     async with session_maker() as session:
         yield session
 
@@ -23,9 +20,12 @@ def get_goal_repository(db: AsyncSession = Depends(get_db)) -> repositories.Goal
     """Провайдер для GoalRepository."""
     return repositories.GoalRepository(db)
 
-async def get_kafka_producer() -> KafkaProducer:
-    """Зависимость для Kafka-продюсера (из lifespan)."""
-    return kafka_producer
+async def get_kafka_producer(request: Request) -> KafkaProducer:
+    """Получает kafka_producer из app.state."""
+    kafka_prod = request.app.state.kafka_producer
+    if not kafka_prod:
+        raise HTTPException(status_code=500, detail="Kafka producer not available")
+    return kafka_prod
 
 async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq из app.state."""
