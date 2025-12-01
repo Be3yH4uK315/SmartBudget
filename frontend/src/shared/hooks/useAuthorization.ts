@@ -27,7 +27,7 @@ export function useAuthorization() {
         if (getUserInfo.rejected.match(action) && action.payload === 'noInfo') {
           await logoutHelper(dispatch)
         }
-      } catch (_) {
+      } catch {
       } finally {
         setIsLoading(false)
       }

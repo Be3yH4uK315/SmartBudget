@@ -4,7 +4,7 @@ import { clearUserState } from '@shared/store/user'
 export async function logoutHelper(dispatch: AppDispatch) {
   try {
     await authApi.logout()
-  } catch (_) {}
+  } catch {}
 
   dispatch(clearUserState())
 
