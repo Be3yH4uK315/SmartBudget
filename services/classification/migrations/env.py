@@ -20,7 +20,7 @@ target_metadata = Base.metadata
 
 # ---- Async engine setup ----
 def get_url():
-    return settings.db_url
+    return settings.db.db_url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
