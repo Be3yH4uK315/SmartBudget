@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { getUserInfo } from '@shared/store/user'
 import { logoutHelper } from '@shared/utils'
-import { useDispatch } from 'react-redux'
 import { useLocation } from 'react-router'
+import { useAppDispatch } from '@shared/store'
 
 const publicRoutes = ['/auth/sign-in', '/auth/registration', '/auth/reset-password', '/']
 
 export function useAuthorization() {
-  const dispatch = useDispatch<AppDispatch>()
+  const dispatch = useAppDispatch()
   const { pathname } = useLocation()
 
   const [isLoading, setIsLoading] = useState(true)

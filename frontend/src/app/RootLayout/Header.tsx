@@ -3,12 +3,12 @@ import { LogoutRounded } from '@mui/icons-material'
 import { AppBar, Box, Button, Container, IconButton, Tab, Tabs, useMediaQuery } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import { logoutHelper } from '@shared/utils'
-import { useDispatch } from 'react-redux'
 import { Link as RouterLink, useLocation } from 'react-router'
+import { useAppDispatch } from '@shared/store'
 
 export const Header = () => {
   const { pathname } = useLocation()
-  const dispatch = useDispatch<AppDispatch>()
+  const dispatch = useAppDispatch()
   const translate = useTranslate('HeaderTabs')
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down('sm'))
 
