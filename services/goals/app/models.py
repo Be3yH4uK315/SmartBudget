@@ -1,13 +1,13 @@
 from uuid import uuid4
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, ForeignKey, 
-    Integer, Index, UniqueConstraint, Date, DECIMAL
+    Column, String, DateTime,
+    Index, Date, DECIMAL
 )
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
 import enum
 
-from app.base import Base
+from app import base
 
 class GoalStatus(enum.Enum):
     IN_PROGRESS = 'in_progress'
@@ -15,7 +15,7 @@ class GoalStatus(enum.Enum):
     EXPIRED = 'expired'
     CLOSED = 'closed'
 
-class Goal(Base):
+class Goal(base.Base):
     __tablename__ = "goals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)

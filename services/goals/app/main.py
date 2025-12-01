@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 from app.routers import goals
 from app import (
-    dependencies,
     settings,
     exceptions,
     logging_config

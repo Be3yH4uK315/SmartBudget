@@ -1,10 +1,13 @@
-from fastapi import Depends, Path, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from fastapi import Depends, Path, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 from uuid import UUID
 from arq.connections import ArqRedis
 
-from app import settings, repositories, services
+from app import (
+    repositories, 
+    services
+)
 from app.kafka_producer import KafkaProducer
 
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:

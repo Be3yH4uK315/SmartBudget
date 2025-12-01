@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Dict, Any, Optional
+from typing import Optional
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date
 from uuid import UUID
 
 class CreateGoalRequest(BaseModel):
@@ -26,7 +26,7 @@ class MainGoalInfo(BaseModel):
     current_value: Decimal
 
 class MainGoalsResponse(BaseModel):
-    goals: List[MainGoalInfo]
+    goals: list[MainGoalInfo]
 
 class AllGoalsResponse(BaseModel):
     goal_id: UUID

@@ -1,9 +1,7 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-import sqlalchemy as sa
-from decimal import Decimal
 
 from app import models, exceptions
 

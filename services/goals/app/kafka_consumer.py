@@ -1,13 +1,17 @@
 import asyncio
 import json
 import logging
-from uuid import UUID
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker, AsyncSession, create_async_engine, AsyncEngine
 )
 
-from app import settings, dependencies, repositories, services, exceptions
+from app import (
+    settings, 
+    repositories,
+    services, 
+    exceptions
+)
 from app.kafka_producer import KafkaProducer 
 
 logger = logging.getLogger(__name__)
@@ -71,7 +75,7 @@ async def start_consumer():
                 logger.info("Attempting to start consumer...")
                 await consumer.start()
                 logger.info("Consumer started successfully.")
-                break  # Выход из цикла, если старт успешен
+                break
             except Exception as e:
                 logger.warning(f"Failed to start consumer (Kafka not ready?): {e}. Retrying in 5s...")
                 await asyncio.sleep(5)

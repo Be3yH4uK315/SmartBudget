@@ -1,5 +1,6 @@
 import asyncio
 import logging
+
 from app import logging_config, kafka_consumer
 
 if __name__ == "__main__":

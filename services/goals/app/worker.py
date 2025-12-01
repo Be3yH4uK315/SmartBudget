@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession, async_sessionmaker, AsyncEngine, create_async_engine
 )
 
-from app import settings, logging_config, dependencies, repositories, services
+from app import (
+    settings, 
+    logging_config, 
+    repositories, 
+    services
+)
 from app.kafka_producer import KafkaProducer 
 
 logger = logging.getLogger(__name__)

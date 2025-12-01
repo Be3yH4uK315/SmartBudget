@@ -3,7 +3,12 @@ from uuid import UUID, uuid4
 from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone
 
-from app import models, repositories, exceptions, schemas
+from app import (
+    models, 
+    repositories, 
+    exceptions, 
+    schemas
+)
 from app.kafka_producer import KafkaProducer
 
 logger = logging.getLogger(__name__)
