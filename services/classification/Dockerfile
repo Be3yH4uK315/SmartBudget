@@ -24,11 +24,6 @@ COPY ./app /app/app
 COPY alembic.ini /app/alembic.ini
 COPY ./migrations /app/migrations
 
-COPY wait-for-it.sh /app/wait-for-it.sh
-RUN chmod +x /app/wait-for-it.sh
-COPY wait-for-kafka.sh /app/wait-for-kafka.sh
-RUN chmod +x /app/wait-for-kafka.sh
-
 COPY run_consumers.py /app/run_consumers.py
 
 RUN mkdir /models
