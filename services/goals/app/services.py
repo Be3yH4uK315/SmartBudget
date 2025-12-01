@@ -64,18 +64,8 @@ class GoalService:
             raise exceptions.GoalNotFoundError("Goal not found")
 
         today = datetime.now(timezone.utc).date()
-        
-        if goal.status == models.GoalStatus.IN_PROGRESS.value and goal.finish_date < today:
-            goal.status = models.GoalStatus.EXPIRED.value
-            await self.repo.update(goal)
-            
-            event_updated = {"event": "goal.updated", "goal_id": str(goal_id), "status": "expired"}
-            await self.kafka.send_budget_event(event_updated)
-            
-            event_notif = {"event": "goal.expired", "goal_id": str(goal_id), "type": "expired"}
-            await self.kafka.send_notification(event_notif)
-
         days_left = max((goal.finish_date - today).days, 0)
+        
         return goal, days_left
 
     async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
