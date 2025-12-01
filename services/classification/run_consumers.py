@@ -4,25 +4,22 @@ import signal
 from aiocache import caches
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app import models, settings, middleware, consumers, dependencies
+from app import exceptions, logging_config, settings, consumers, dependencies, repositories
 from app.services.ml_service import MLService
 
-middleware.setup_logging()
 logger = logging.getLogger(__name__)
 
-async def load_active_ml_pipeline() -> dict | None:
+async def load_active_ml_pipeline(session_maker: async_sessionmaker[AsyncSession]) -> dict | None:
     """
     Загружает активную ML-модель из БД и кэша.
     """
     logger.info("Attempting to load ACTIVE ML pipeline...")
     try:
-        async with dependencies.async_session_maker() as session:
-            stmt = await session.execute(
-                select(models.Model).where(models.Model.is_active == True)
-            )
-            active_model = stmt.scalar_one_or_none()
+        async with session_maker() as session:
+            model_repo = repositories.ModelRepository(session)
+            active_model = await model_repo.get_active_model()
             
             if not active_model:
                 logger.warning("No ACTIVE model found in database. ML classification will be disabled.")
@@ -35,8 +32,7 @@ async def load_active_ml_pipeline() -> dict | None:
             )
 
             if not model:
-                logger.error(f"Failed to load ML model version {active_model.version}. ML disabled.")
-                return None
+                raise exceptions.ModelLoadError(f"Failed to load ML model version {active_model.version}")
 
             logger.info(f"Successfully loaded ML pipeline version: {active_model.version}")
             return {
@@ -50,19 +46,24 @@ async def load_active_ml_pipeline() -> dict | None:
         return None
 
 async def main():
+    logging_config.setup_logging()
     logger.info("Starting Kafka Consumer Service...")
+    
+    db_engine = create_async_engine(settings.settings.db.db_url)
+    session_maker = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
     
     caches.set_config({
         'default': {
             'cache': "aiocache.RedisCache",
-            'endpoint': settings.settings.redis_url.split('//')[1].split(':')[0],
-            'port': int(settings.settings.redis_url.split(':')[-1].split('/')[0]),
+            'endpoint': settings.settings.redis.redis_url.split('//')[1].split(':')[0],
+            'port': int(settings.settings.redis.redis_url.split(':')[-1].split('/')[0]),
             'db': 0,
             'ttl': 3600,
         }
     })
     logger.info("aiocache initialized with Redis backend.")
-    ml_pipeline = await load_active_ml_pipeline()
+    
+    ml_pipeline = await load_active_ml_pipeline(session_maker)
 
     redis_pool = None
     producer = None
@@ -78,7 +79,7 @@ async def main():
         for attempt in range(max_retries):
             try:
                 producer = AIOKafkaProducer(
-                    bootstrap_servers=settings.settings.kafka_bootstrap_servers,
+                    bootstrap_servers=settings.settings.kafka.kafka_bootstrap_servers,
                     request_timeout_ms=30000,
                     acks="all",
                 )
@@ -95,9 +96,9 @@ async def main():
         for attempt in range(max_retries):
             try:
                 consumer_need_cat = AIOKafkaConsumer(
-                    settings.settings.topic_need_category,
-                    bootstrap_servers=settings.settings.kafka_bootstrap_servers,
-                    group_id=settings.settings.kafka_group_id,
+                    settings.settings.kafka.topic_need_category,
+                    bootstrap_servers=settings.settings.kafka.kafka_bootstrap_servers,
+                    group_id=settings.settings.kafka.kafka_group_id,
                     auto_offset_reset='latest',
                     enable_auto_commit=False
                 )
@@ -112,7 +113,9 @@ async def main():
                     raise
         
         tasks = [
-            asyncio.create_task(consumers.consume_need_category(consumer_need_cat, producer, redis, ml_pipeline)),
+            asyncio.create_task(consumers.consume_need_category(
+                consumer_need_cat, producer, redis, ml_pipeline, session_maker
+            )),
         ]
         
         loop = asyncio.get_running_loop()
@@ -153,7 +156,7 @@ async def main():
         if redis_pool:
             await dependencies.close_redis_pool(redis_pool)
         
-        await dependencies.engine.dispose()
+        await db_engine.dispose()
 
         logger.info("Resources closed. Shutdown complete.")
 
