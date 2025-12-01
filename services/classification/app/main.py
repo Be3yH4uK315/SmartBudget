@@ -88,7 +88,7 @@ async def classification_exception_handler(request: Request, exc: exceptions.Cla
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.settings.frontend_url],
+    allow_origins=[settings.settings.app.frontend_url],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

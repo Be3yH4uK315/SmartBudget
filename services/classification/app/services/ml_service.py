@@ -95,8 +95,8 @@ class MLService:
             logger.info(f"Training complete. Train accuracy: {metrics['train_accuracy']:.4f}, Train F1: {metrics['train_f1']:.4f}")
 
         new_version = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_path = f"{settings.settings.model_path}/{new_version}_{MODEL_FILE_NAME}"
-        vectorizer_path = f"{settings.settings.model_path}/{new_version}_{VECTORIZER_FILE_NAME}"
+        model_path = f"{settings.settings.ml.model_path}/{new_version}_{MODEL_FILE_NAME}"
+        vectorizer_path = f"{settings.settings.ml.model_path}/{new_version}_{VECTORIZER_FILE_NAME}"
         
         joblib.dump(model, model_path)
         joblib.dump(vectorizer, vectorizer_path)
@@ -114,8 +114,8 @@ class MLService:
         """
         logger.info(f"Cache MISS: Loading ML pipeline version {model_version}...")
         try:
-            model_path = f"{settings.settings.model_path}/{model_version}_{MODEL_FILE_NAME}"
-            vectorizer_path = f"{settings.settings.model_path}/{model_version}_{VECTORIZER_FILE_NAME}"
+            model_path = f"{settings.settings.ml.model_path}/{model_version}_{MODEL_FILE_NAME}"
+            vectorizer_path = f"{settings.settings.ml.model_path}/{model_version}_{VECTORIZER_FILE_NAME}"
 
             model = joblib.load(model_path)
             vectorizer = joblib.load(vectorizer_path)
