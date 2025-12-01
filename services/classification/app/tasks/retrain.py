@@ -1,11 +1,8 @@
 import logging
 import pandas as pd
-from sqlalchemy.future import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Model, TrainingDataset, TrainingDatasetStatus
+from app import models, repositories, settings
 from app.services.ml_service import MLService
-from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +17,12 @@ async def retrain_model_task(ctx):
         return
 
     async with db_maker() as session:
+        dataset_repo = repositories.DatasetRepository(session)
+        model_repo = repositories.ModelRepository(session)
+        
         try:
             logger.info("Finding latest 'READY' training dataset...")
-            dataset_stmt = await session.execute(
-                select(TrainingDataset)
-                .where(TrainingDataset.status == TrainingDatasetStatus.READY)
-                .order_by(TrainingDataset.created_at.desc())
-                .limit(1)
-            )
-            dataset = dataset_stmt.scalar_one_or_none()
+            dataset = await dataset_repo.get_latest_ready_dataset()
 
             if not dataset:
                 logger.info("No 'READY' training datasets found. Skipping training.")
@@ -61,16 +55,15 @@ async def retrain_model_task(ctx):
                     logger.error("No 'val_f1' or 'train_f1' found in metrics. Setting 'val_f1' to 0.0.")
                     metrics["val_f1"] = 0.0
 
-            model_entry = Model(
+            model_entry = models.Model(
                 name="lightgbm_tfidf",
                 version=new_version,
-                path=f"{settings.model_path}/{new_version}", 
+                path=f"{settings.settings.ml.model_path}/{new_version}",
                 metrics=metrics,
                 is_active=False
             )
-            session.add(model_entry)
+            await model_repo.create_model(model_entry)
             
-            await session.commit()
             logger.info(f"Retraining task finished successfully. Metrics: {metrics}")
 
         except ValueError as e:
