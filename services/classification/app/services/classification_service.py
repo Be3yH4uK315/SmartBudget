@@ -8,8 +8,7 @@ from sqlalchemy.orm import joinedload
 from aiocache import cached  
 from aiocache.serializers import JsonSerializer 
 
-from app.models import Rule, Category, ClassificationResult, Model
-from app.settings import settings
+from app import models, settings
 from app.services.ml_service import MLService
 
 logger = logging.getLogger(__name__)
@@ -22,9 +21,9 @@ async def get_rules_from_db(db: AsyncSession):
     """
     logger.info("Cache MISS: Loading rules from database...")
     stmt = await db.execute(
-        select(Rule)
-        .options(joinedload(Rule.category))
-        .order_by(Rule.priority.asc())
+        select(models.Rule)
+        .options(joinedload(models.Rule.category))
+        .order_by(models.Rule.priority.asc())
     )
     rules_objects = stmt.scalars().all()
     
@@ -129,12 +128,12 @@ class ClassificationService:
 
         model_version = self._model_version
         
-        if confidence < settings.ml_confidence_threshold_audit:
+        if confidence < settings.settings.ml_confidence_threshold_audit:
             logger.debug(f"ML confidence {confidence:.4f} is too low. Fallback.")
             return await self._get_fallback_category(confidence, model_version)
         
         try:
-            category = await self.db.get(Category, UUID(category_id_str))
+            category = await self.db.get(models.Category, UUID(category_id_str))
             if not category:
                 logger.error(f"ML predicted non-existent category ID: {category_id_str}. Fallback.")
                 return await self._get_fallback_category(confidence, model_version)
@@ -142,7 +141,7 @@ class ClassificationService:
             logger.error(f"Invalid category ID from ML: {e}. Fallback.")
             return await self._get_fallback_category(confidence, model_version)
 
-        if confidence < settings.ml_confidence_threshold_accept:
+        if confidence < settings.settings.ml_confidence_threshold_accept:
             logger.info(f"ML classification requires audit (confidence: {confidence:.4f})")
             pass
 
@@ -150,7 +149,7 @@ class ClassificationService:
 
     async def _get_fallback_category(self, confidence=0.0, model_version=None):
         """Возвращает категорию 'Other'."""
-        stmt = await self.db.execute(select(Category).where(Category.name == "Other"))
+        stmt = await self.db.execute(select(models.Category).where(models.Category.name == "Other"))
         other_cat = stmt.scalar_one_or_none()
         
         if other_cat:

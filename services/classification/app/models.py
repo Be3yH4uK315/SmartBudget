@@ -2,13 +2,12 @@ import enum
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Float, String, Boolean, DateTime, ForeignKey, Integer, Enum as PgEnum,
-    UniqueConstraint, Index
+    Column, Float, String, Boolean, DateTime, ForeignKey, Integer, Enum as PgEnum, Index
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.orm import relationship
 
-from app.base import Base
+from app import base
 
 class RulePatternType(str, enum.Enum):
     REGEX = "regex"
@@ -21,7 +20,7 @@ class ClassificationSource(str, enum.Enum):
     ML = "ml"
     MANUAL = "manual"
 
-class Category(Base):
+class Category(base.Base):
     __tablename__ = "categories"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -36,7 +35,7 @@ class Category(Base):
         Index('ix_categories_name', name),
     )
 
-class Rule(Base):
+class Rule(base.Base):
     __tablename__ = "rules"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -56,7 +55,7 @@ class Rule(Base):
         Index('ix_rules_category_id', category_id),
     )
 
-class ClassificationResult(Base):
+class ClassificationResult(base.Base):
     __tablename__ = "classification_results"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -78,7 +77,7 @@ class ClassificationResult(Base):
         Index('ix_classification_results_source', source),
     )
 
-class Feedback(Base):
+class Feedback(base.Base):
     __tablename__ = "feedback"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -96,7 +95,7 @@ class Feedback(Base):
         Index('ix_feedback_processed', processed),
     )
 
-class Model(Base):
+class Model(base.Base):
     __tablename__ = "models"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -119,7 +118,7 @@ class TrainingDatasetStatus(str, enum.Enum):
     READY = "ready"
     FAILED = "failed"
 
-class TrainingDataset(Base):
+class TrainingDataset(base.Base):
     __tablename__ = "training_datasets"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from aiokafka.errors import KafkaError
 
-from app.settings import settings
+from app import settings
 
 logger = logging.getLogger(__name__)
 
@@ -59,4 +59,4 @@ def setup_logging():
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter(datefmt="%Y-%m-%dT%H:%M:%S%z"))
     root_logger.addHandler(handler)
-    root_logger.setLevel(settings.log_level)
+    root_logger.setLevel(settings.settings.log_level)

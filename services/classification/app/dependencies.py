@@ -7,9 +7,9 @@ from arq.connections import ArqRedis
 from aiokafka import AIOKafkaProducer
 from typing import AsyncGenerator
 
-from app.settings import settings
+from app import settings
 
-engine = create_async_engine(settings.db_url)
+engine = create_async_engine(settings.settings.db_url)
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -28,7 +28,7 @@ async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
 
 async def create_redis_pool() -> ConnectionPool:
     """Создает пул подключений Redis."""
-    return ConnectionPool.from_url(settings.redis_url, decode_responses=True)
+    return ConnectionPool.from_url(settings.settings.redis_url, decode_responses=True)
 
 async def close_redis_pool(pool: ConnectionPool):
     """Закрывает пул подключений Redis."""

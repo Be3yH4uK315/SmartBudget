@@ -2,7 +2,7 @@ import logging
 from arq.connections import RedisSettings
 from arq.cron import cron
 
-from app.settings import settings
+from app import settings
 from app.dependencies import async_session_maker, engine
 from app.tasks.retrain import retrain_model_task
 from app.tasks.promote import validate_and_promote_model
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def on_startup(ctx):
     """Выполняется при старте воркера Arq."""
     logger.info(
-        f"Arq worker starting. Redis: {settings.redis_url}, Queue: {settings.arq_queue_name}"
+        f"Arq worker starting. Redis: {settings.settings.redis_url}, Queue: {settings.settings.arq_queue_name}"
     )
     ctx["db_session_maker"] = async_session_maker
     logger.info("Arq: DB session maker injected.")
@@ -56,7 +56,7 @@ class WorkerSettings:
         )
     ]
     
-    redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    redis_settings.queue_name = settings.arq_queue_name
+    redis_settings = RedisSettings.from_dsn(settings.settings.redis_url)
+    redis_settings.queue_name = settings.settings.arq_queue_name
     max_tries = 3
     max_jobs = 10

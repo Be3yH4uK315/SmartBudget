@@ -6,7 +6,7 @@ from aiokafka import AIOKafkaProducer
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
-from app.kafka import SCHEMAS_MAP
+from app import kafka
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ async def send_kafka_event(
     """
     Валидирует и отправляет событие в Kafka.
     """
-    schema = SCHEMAS_MAP.get(topic)
+    schema = kafka.SCHEMAS_MAP.get(topic)
     if not schema:
         logger.error(f"No Kafka schema found for topic: {topic}")
     else:

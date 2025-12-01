@@ -7,15 +7,11 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 import aiokafka
 from aiokafka.errors import KafkaError
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from redis.asyncio import Redis
 
-from app.dependencies import async_session_maker
-from app.models import ClassificationResult, ClassificationSource, Feedback
+from app import dependencies, settings, kafka_producer, models
 from app.services.classification_service import ClassificationService
-from app.kafka_producer import send_kafka_event
-from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +23,7 @@ async def _handle_poison_pill(
     """
     Обрабатывает ошибочное сообщение, отправляя его в DLQ.
     """
-    dlq_topic = settings.topic_need_category_dlq
+    dlq_topic = settings.settings.topic_need_category_dlq
     logger.error(
         f"Failed to process message from {msg.topic} (Offset: {msg.offset}). "
         f"Error: {error}. Sending to DLQ: {dlq_topic}"
@@ -46,7 +42,7 @@ async def _handle_poison_pill(
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
-        await send_kafka_event(
+        await kafka_producer.send_kafka_event(
             producer,
             dlq_topic,
             dlq_data
@@ -84,9 +80,9 @@ async def consume_need_category(
                 
                 lock_key = f"lock:classification:{transaction_id}"
                 if await redis.set(lock_key, "locked", nx=True, ex=60):
-                    async with async_session_maker() as session:
+                    async with dependencies.async_session_maker() as session:
                         existing = await session.execute(
-                            select(ClassificationResult.id).where(ClassificationResult.transaction_id == transaction_id)
+                            select(models.ClassificationResult.id).where(models.ClassificationResult.transaction_id == transaction_id)
                         )
                         if existing.scalar_one_or_none():
                             logger.warning(f"Transaction {transaction_id} already processed. Skipping.")
@@ -102,7 +98,7 @@ async def consume_need_category(
                             description=data.get('description', '')
                         )
                         
-                        source = ClassificationSource.RULES
+                        source = models.ClassificationSource.RULES
                         confidence = 1.0
                         model_version = None
 
@@ -110,7 +106,7 @@ async def consume_need_category(
                             category_id, category_name, confidence, model_version = await service.apply_ml(
                                 data
                             )
-                            source = ClassificationSource.ML
+                            source = models.ClassificationSource.ML
 
                         if not category_id:
                             logger.error(f"Failed to classify transaction {transaction_id} even with fallback.")
@@ -118,7 +114,7 @@ async def consume_need_category(
                             await consumer.commit() 
                             continue
 
-                        result = ClassificationResult(
+                        result = models.ClassificationResult(
                             transaction_id=transaction_id,
                             category_id=category_id,
                             category_name=category_name,
@@ -146,8 +142,8 @@ async def consume_need_category(
                             "category_id": str(category_id),
                             "category_name": category_name
                         }
-                        await send_kafka_event(producer, settings.topic_classified, event_data)
-                        await send_kafka_event(producer, settings.topic_classification_events, event_data)
+                        await kafka_producer.send_kafka_event(producer, settings.settings.topic_classified, event_data)
+                        await kafka_producer.send_kafka_event(producer, settings.settings.topic_classification_events, event_data)
                     
                     await redis.delete(lock_key)
                     await consumer.commit() 
