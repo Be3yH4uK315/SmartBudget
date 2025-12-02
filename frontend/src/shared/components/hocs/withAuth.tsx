@@ -1,7 +1,7 @@
 import { ComponentType, useEffect } from 'react'
-import { useSelector } from 'react-redux'
 import { selectUser } from '@shared/store/user'
 import { useNavigate } from 'react-router'
+import { useAppSelector } from '@shared/store'
 
 /**
  * HOC для проверки авторизации.
@@ -10,11 +10,11 @@ export function withAuth<P extends object>(WrappedComponent: ComponentType<P>) {
   return function AuthWrapper(props: P) {
     const navigate = useNavigate()
 
-    const { isAuth } = useSelector(selectUser)
+    const { isAuth } = useAppSelector(selectUser)
 
     useEffect(() => {
       if (!isAuth) {
-        navigate('/sign-in', {
+        navigate('/auth/sign-in', {
           replace: true,
         })
       }

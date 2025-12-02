@@ -6,4 +6,6 @@ type userSliceState = {
   isAuth: boolean
 }
 
-type userSliceReducers = SliceCaseReducers<userSliceState>
+type userSliceReducers = SliceCaseReducers<userSliceState> & {
+  clearUserState(state: userSliceState): void
+}

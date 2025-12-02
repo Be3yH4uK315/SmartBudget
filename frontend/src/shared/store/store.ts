@@ -1,5 +1,6 @@
 import { configureStore, UnknownAction } from '@reduxjs/toolkit'
 import { rootReducer } from './rootReducer'
+import { useDispatch, useSelector } from 'react-redux'
 
 const resettableRootReducer = (
   state: ReturnType<typeof rootReducer> | undefined,
@@ -18,3 +19,7 @@ export const store = configureStore({
 
 export const getState = store.getState
 export const dispatch = store.dispatch
+
+export const useAppDispatch = useDispatch.withTypes<AppDispatch>()
+
+export const useAppSelector = useSelector.withTypes<RootState>()
