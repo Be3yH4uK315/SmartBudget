@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 from aiokafka import AIOKafkaConsumer
+from aiokafka.errors import KafkaError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker, AsyncSession, create_async_engine, AsyncEngine
 )
@@ -28,23 +30,26 @@ async def consume_transaction_goal(
     try:
         async for message in consumer:
             logger.debug(f"Received message: {message.value}")
+            data = None
             try:
                 data = json.loads(message.value)
-                
+
                 async with db_maker() as session:
                     repo = repositories.GoalRepository(session)
                     service = services.GoalService(repo, kafka)
                     await service.update_goal_balance(data)
-                    
+
                 await consumer.commit() 
                 
-            except json.JSONDecodeError:
-                logger.error(f"Failed to decode JSON: {message.value}")
-            except exceptions.GoalNotFoundError as e:
-                logger.warning(f"Consumer warning: {e}")
+            except (json.JSONDecodeError, exceptions.InvalidGoalDataError, exceptions.GoalNotFoundError) as e:
+                logger.warning(
+                    f"Skipping bad message (Offset: {message.offset}). Reason: {e}. Data: {data or message.value}"
+                )
                 await consumer.commit()
-            except (exceptions.InvalidGoalDataError, Exception) as e:
-                logger.error(f"Error processing message {data}: {e}")
+            except (SQLAlchemyError, KafkaError) as e:
+                logger.error(f"Infrastructure error processing message (Offset: {message.offset}): {e}. Will retry...")
+                await asyncio.sleep(5)
+            
     finally:
         logger.info("Consumer loop stopped.")
 
@@ -83,7 +88,7 @@ async def start_consumer():
         await consume_transaction_goal(consumer, db_maker, kafka_prod_instance)
         
     except Exception as e:
-        logger.error(f"Consumer failed to start or run: {e}")
+        logger.critical(f"Consumer service CRASHED with unexpected error: {e}", exc_info=True)
     finally:
         logger.info("Shutting down consumer process...")
         if consumer:
