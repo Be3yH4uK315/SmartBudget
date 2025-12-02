@@ -82,7 +82,7 @@ class GoalService:
         user_id: UUID, 
         goal_id: UUID, 
         req: schemas.GoalPatchRequest
-    ) -> models.Goal:
+    ) -> tuple[models.Goal, int]:
         """Логика обновления цели."""
         goal = await self.repo.get_by_id(user_id, goal_id)
         if not goal:
@@ -124,8 +124,11 @@ class GoalService:
         if achieved:
             event_notif = {"event": "goal.alert", "goal_id": str(goal_id), "type": "achieved"}
             await self.kafka.send_notification(event_notif)
+
+        today = datetime.now(timezone.utc).date()
+        days_left = max((goal.finish_date - today).days, 0)
             
-        return goal
+        return goal, days_left
 
     async def update_goal_balance(self, msg_data: dict):
         """Логика консьюмера."""
