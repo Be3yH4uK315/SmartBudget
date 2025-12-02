@@ -10,31 +10,35 @@ class CreateGoalRequest(BaseModel):
     finish_date: date = Field(..., description="Дата достижения (YYYY-MM-DD)")
 
 class CreateGoalResponse(BaseModel):
-    goal_id: UUID
+    goal_id: UUID = Field(..., description="ID созданной цели")
 
 class GoalResponse(BaseModel):
-    name: str
-    target_value: Decimal
-    current_value: Decimal
-    finish_date: date
-    days_left: int
-    status: str
+    name: str = Field(..., description="Название цели")
+    target_value: Decimal = Field(..., description="Целевая сумма")
+    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    finish_date: date = Field(..., description="Дата достижения")
+    days_left: int = Field(..., description="Дней осталось")
+    status: str = Field(..., description="Статус цели")
+    
+    model_config = ConfigDict(from_attributes=True) 
 
 class MainGoalInfo(BaseModel):
-    name: str
-    target_value: Decimal
-    current_value: Decimal
+    name: str = Field(..., description="Название цели")
+    target_value: Decimal = Field(..., description="Целевая сумма")
+    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class MainGoalsResponse(BaseModel):
     goals: list[MainGoalInfo]
 
 class AllGoalsResponse(BaseModel):
-    goal_id: UUID
-    name: str
-    target_value: Decimal
-    current_value: Decimal
-    finish_date: date
-    status: str
+    goal_id: UUID = Field(..., description="ID цели")
+    name: str = Field(..., description="Название цели")
+    target_value: Decimal = Field(..., description="Целевая сумма")
+    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    finish_date: date = Field(..., description="Дата достижения")
+    status: str = Field(..., description="Статус цели")
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,16 +48,8 @@ class GoalPatchRequest(BaseModel):
     finish_date: Optional[date] = None
     status: Optional[str] = None
 
-class GoalPatchResponse(BaseModel):
-    goal_id: UUID
-    name: str
-    target_value: Decimal
-    current_value: Decimal
-    finish_date: date
-    status: str
-
 class UnifiedErrorResponse(BaseModel):
-    detail: str
+    detail: str = Field(..., description="Описание ошибки")
 
 BUDGET_EVENTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
