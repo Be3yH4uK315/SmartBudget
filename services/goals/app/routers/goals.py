@@ -41,12 +41,8 @@ async def get_goal(
     try:
         goal, days_left = await service.get_goal_details(user_id, goal_id)
         return schemas.GoalResponse(
-            name=goal.name,
-            target_value=goal.target_value,
-            current_value=goal.current_value,
-            finish_date=goal.finish_date,
-            days_left=days_left,
-            status=goal.status
+            **goal.__dict__,
+            days_left=days_left
         )
     except exceptions.GoalNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -61,14 +57,8 @@ async def get_main_goals(
 ):
     """Получение целей для главного экрана."""
     goals = await service.get_main_goals(user_id)
-    response_goals = [
-        schemas.MainGoalInfo(
-            name=g.name,
-            target_value=g.target_value,
-            current_value=g.current_value
-        ) for g in goals
-    ]
-    return schemas.MainGoalsResponse(goals=response_goals)
+
+    return schemas.MainGoalsResponse(goals=goals)
 
 @router.get(
     "/",
@@ -84,7 +74,7 @@ async def get_all_goals(
 
 @router.patch(
     "/{goal_id}",
-    response_model=schemas.GoalPatchResponse,
+    response_model=schemas.GoalResponse,
     responses={
         404: {"model": schemas.UnifiedErrorResponse},
         400: {"model": schemas.UnifiedErrorResponse}
@@ -101,14 +91,11 @@ async def update_goal(
         if not request.model_dump(exclude_unset=True):
              raise exceptions.InvalidGoalDataError("At least one field must be provided")
              
-        goal = await service.update_goal(user_id, goal_id, request)
-        return schemas.GoalPatchResponse(
-            goal_id=goal.id,
-            name=goal.name,
-            target_value=goal.target_value,
-            current_value=goal.current_value,
-            finish_date=goal.finish_date,
-            status=goal.status
+        goal, days_left = await service.update_goal(user_id, goal_id, request)
+        
+        return schemas.GoalResponse(
+            **goal.__dict__,
+            days_left=days_left
         )
     except exceptions.GoalNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
