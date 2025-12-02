@@ -1,7 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app import models, exceptions
@@ -56,8 +57,30 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
     
+    async def adjust_balance(self, user_id: UUID, goal_id: UUID, amount: Decimal) -> models.Goal:
+        """Атомарно изменяет баланс цели."""
+        new_value_expr = models.Goal.current_value + amount
+
+        query = (
+            update(models.Goal)
+            .where(models.Goal.id == goal_id, models.Goal.user_id == user_id)
+            .values(current_value=new_value_expr)
+            .execution_options(synchronize_session="fetch")
+            .returning(models.Goal)
+        )
+
+        result = await self.db.execute(query)
+        updated_goal = result.scalar_one_or_none()
+
+        if not updated_goal:
+            raise exceptions.GoalNotFoundError(f"Goal {goal_id} not found")
+        
+        await self.db.commit()
+        return updated_goal
+
     async def update(self, goal: models.Goal) -> models.Goal:
         """Сохраняет изменения в цели."""
+        self.db.add(goal)
         await self.db.commit()
         await self.db.refresh(goal)
         return goal
