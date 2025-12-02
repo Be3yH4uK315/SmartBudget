@@ -1,7 +1,8 @@
 import logging
 from uuid import UUID, uuid4
 from decimal import Decimal
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
+import asyncio
 
 from app import (
     models, 
@@ -168,44 +169,57 @@ class GoalService:
             await self.kafka.send_notification(event_notif)
 
     async def check_deadlines(self):
-        """Логика Arq воркера."""
+        """
+        Логика Arq воркера.
+        Выбирает только нужные цели и отправляет Kafka-ивенты параллельно.
+        """
         logger.info("Starting daily check_goals_deadlines task...")
-        goals_to_check = await self.repo.get_goals_for_check()
         today = datetime.now(timezone.utc).date()
-        seven_days_from_now = today + timedelta(days=7)
         
-        updated_goals = []
+        kafka_tasks = []
+        goals_to_update = []
         
-        for goal in goals_to_check:
+        expired_goals = await self.repo.get_expired_goals(today)
+        
+        for goal in expired_goals:
+            goal.status = models.GoalStatus.EXPIRED.value
+            goals_to_update.append(goal)
+            
+            event_updated = {"event": "goal.updated", "goal_id": str(goal.id), "status": "expired"}
+            kafka_tasks.append(
+                self.kafka.send_budget_event(event_updated)
+            )
+            
+            event_notif = {"event": "goal.expired", "goal_id": str(goal.id), "type": "expired"}
+            kafka_tasks.append(
+                self.kafka.send_notification(event_notif)
+            )
+            
+        approaching_goals = await self.repo.get_approaching_goals(today, days_notice=7)
+        
+        for goal in approaching_goals:
             days_left = (goal.finish_date - today).days
+            goal.last_checked_date = datetime.now(timezone.utc)
+            goals_to_update.append(goal)
             
-            if goal.finish_date < today:
-                goal.status = models.GoalStatus.EXPIRED.value
-                updated_goals.append(goal)
-                
-                event_updated = {"event": "goal.updated", "goal_id": str(goal.id), "status": "expired"}
-                await self.kafka.send_budget_event(event_updated)
-                
-                event_notif = {"event": "goal.expired", "goal_id": str(goal.id), "type": "expired"}
-                await self.kafka.send_notification(event_notif)
-            
-            elif days_left <= 7:
-                if (
-                    not goal.last_checked_date or 
-                    (datetime.now(timezone.utc) - goal.last_checked_date) > timedelta(days=1)
-                ):
-                    goal.last_checked_date = datetime.now(timezone.utc)
-                    updated_goals.append(goal)
-                    
-                    event_notif = {
-                        "event": "goal.approaching", 
-                        "goal_id": str(goal.id), 
-                        "type": "approaching",
-                        "days_left": days_left
-                    }
-                    await self.kafka.send_notification(event_notif)
+            event_notif = {
+                "event": "goal.approaching", 
+                "goal_id": str(goal.id), 
+                "type": "approaching",
+                "days_left": days_left
+            }
+            kafka_tasks.append(
+                self.kafka.send_notification(event_notif)
+            )
 
-        if updated_goals:
-            await self.repo.update_bulk(updated_goals)
+        if goals_to_update:
+            logger.info(f"Updating {len(goals_to_update)} goals ({len(expired_goals)} expired, {len(approaching_goals)} approaching)...")
+            await self.repo.update_bulk(goals_to_update)
+        
+        if kafka_tasks:
+            logger.info(f"Sending {len(kafka_tasks)} Kafka events in parallel...")
+            await asyncio.gather(*kafka_tasks)
             
-        logger.info(f"Finished check_goals_deadlines. Processed {len(goals_to_check)} goals.")
+        logger.info(
+            f"Finished check_goals_deadlines. Processed {len(expired_goals)} expired and {len(approaching_goals)} approaching goals."
+        )

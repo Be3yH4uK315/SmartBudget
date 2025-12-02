@@ -1,6 +1,7 @@
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app import models, exceptions
@@ -61,10 +62,31 @@ class GoalRepository:
         await self.db.refresh(goal)
         return goal
         
-    async def get_goals_for_check(self) -> list[models.Goal]:
-        """Выбирает цели для фоновой проверки."""
+    async def get_expired_goals(self, today: date) -> list[models.Goal]:
+        """Выбирает цели, которые просрочены, но еще не отмечены."""
         query = select(models.Goal).where(
-            models.Goal.status == models.GoalStatus.IN_PROGRESS.value
+            models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+            models.Goal.finish_date < today
+        )
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def get_approaching_goals(self, today: date, days_notice: int = 7) -> list[models.Goal]:
+        """
+        Выбирает цели, до дедлайна которых <= N дней
+        и которые не проверялись за последние 24 часа.
+        """
+        seven_days_from_now = today + timedelta(days=days_notice)
+        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+
+        query = select(models.Goal).where(
+            models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+            models.Goal.finish_date <= seven_days_from_now,
+            models.Goal.finish_date >= today,
+            or_(
+                models.Goal.last_checked_date == None,
+                models.Goal.last_checked_date < one_day_ago
+            )
         )
         result = await self.db.execute(query)
         return result.scalars().all()
