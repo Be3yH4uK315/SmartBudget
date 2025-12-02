@@ -106,24 +106,13 @@ class GoalService:
             
             changes[field] = value if not isinstance(value, date) else value.isoformat()
 
-        achieved = False
-        if (
-            goal.current_value >= goal.target_value and 
-            goal.status == models.GoalStatus.IN_PROGRESS.value
-        ):
-            goal.status = models.GoalStatus.ACHIEVED.value
-            changes["status"] = models.GoalStatus.ACHIEVED.value
-            achieved = True
-
         goal = await self.repo.update(goal)
+
+        await self._check_and_process_achievement(goal)
 
         if changes:
             event_changed = {"event": "goal.changed", "goal_id": str(goal_id), "changes": changes}
             await self.kafka.send_budget_event(event_changed)
-        
-        if achieved:
-            event_notif = {"event": "goal.alert", "goal_id": str(goal_id), "type": "achieved"}
-            await self.kafka.send_notification(event_notif)
 
         today = datetime.now(timezone.utc).date()
         days_left = max((goal.finish_date - today).days, 0)
@@ -135,29 +124,14 @@ class GoalService:
         try:
             goal_id = UUID(msg_data['account_id'])
             user_id = UUID(msg_data['user_id'])
-            amount = Decimal(msg_data['amount'])
+            raw_amount = Decimal(msg_data['amount'])
             direction = msg_data['direction']
         except (KeyError, ValueError, TypeError):
             raise exceptions.InvalidGoalDataError(f"Invalid message data: {msg_data}")
 
-        goal = await self.repo.get_by_id(user_id, goal_id)
-        if not goal:
-            raise exceptions.GoalNotFoundError(f"Goal {goal_id} not found for user {user_id}")
-
-        if direction == 'income':
-            goal.current_value += amount
-        elif direction == 'expense':
-            goal.current_value = max(Decimal(0), goal.current_value - amount)
-
-        achieved = False
-        if (
-            goal.current_value >= goal.target_value and 
-            goal.status == models.GoalStatus.IN_PROGRESS.value
-        ):
-            goal.status = models.GoalStatus.ACHIEVED.value
-            achieved = True
-
-        await self.repo.update(goal)
+        amount = raw_amount if direction == 'income' else -raw_amount
+        
+        goal = await self.repo.adjust_balance(user_id, goal_id, amount)
 
         event_updated = {
             "event": "goal.updated", 
@@ -166,10 +140,29 @@ class GoalService:
             "status": goal.status
         }
         await self.kafka.send_budget_event(event_updated)
-        
-        if achieved:
-            event_notif = {"event": "goal.alert", "goal_id": str(goal_id), "type": "achieved"}
+
+        await self._check_and_process_achievement(goal)
+
+    async def _check_and_process_achievement(self, goal: models.Goal) -> bool:
+        """
+        Проверяет, достигнута ли цель. Если да — меняет статус и шлет уведомление.
+        """
+        if (
+            goal.current_value >= goal.target_value 
+            and goal.status == models.GoalStatus.IN_PROGRESS.value
+        ):
+            goal.status = models.GoalStatus.ACHIEVED.value
+            
+            await self.repo.update(goal)
+            
+            event_notif = {
+                "event": "goal.alert", 
+                "goal_id": str(goal.id), 
+                "type": "achieved"
+            }
             await self.kafka.send_notification(event_notif)
+            return True
+        return False
 
     async def check_deadlines(self):
         """
