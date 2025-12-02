@@ -8,6 +8,9 @@ type VerifyMode = 'signup' | 'reset' | null
 type AuthStep = 'email' | 'password' | 'verifyEmail'
 type TokenType = 'verification' | 'reset'
 
+type ErrorCode = 401 | 429 | null
+
+
 type AuthResponse = {
   action: SignInAction
   details: string

@@ -5,7 +5,11 @@ import { getUserInfo } from './user.thunks'
 export const userSlice = createSlice<userSliceState, userSliceReducers, 'user', any>({
   name: 'user',
   initialState: getUserInitialState(),
-  reducers: {},
+  reducers: {
+    clearUserState() {
+      return getUserInitialState()
+    },
+  },
 
   extraReducers: (builder) => {
     builder.addCase(getUserInfo.fulfilled, (state, { payload }) => {
@@ -19,3 +23,4 @@ export const userSlice = createSlice<userSliceState, userSliceReducers, 'user', 
 })
 
 export const userReducer = userSlice.reducer
+export const { clearUserState } = userSlice.actions
