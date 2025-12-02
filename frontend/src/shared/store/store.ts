@@ -22,7 +22,4 @@ export const dispatch = store.dispatch
 
 export const useAppDispatch = useDispatch.withTypes<AppDispatch>()
 
-export const useAppSelector: <TSelected>(
-  selector: (state: RootState) => TSelected,
-  equalityFn?: (left: TSelected, right: TSelected) => boolean,
-) => TSelected = useSelector
+export const useAppSelector = useSelector.withTypes<RootState>()
