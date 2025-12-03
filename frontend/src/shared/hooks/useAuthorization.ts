@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useAppDispatch } from '@shared/store'
 import { getUserInfo } from '@shared/store/user'
 import { logoutHelper } from '@shared/utils'
 import { useLocation } from 'react-router'
-import { useAppDispatch } from '@shared/store'
 
 const publicRoutes = ['/auth/sign-in', '/auth/registration', '/auth/reset-password', '/']
 
