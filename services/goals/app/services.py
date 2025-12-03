@@ -88,7 +88,8 @@ class GoalService:
         if not goal:
             raise exceptions.GoalNotFoundError("Goal not found")
 
-        changes = {}
+        changes_for_db = {}
+        changes_for_kafka = {}
         update_data = req.model_dump(exclude_unset=True)
 
         for field, value in update_data.items():
@@ -98,20 +99,25 @@ class GoalService:
             if field == 'status':
                 try:
                     status_enum = models.GoalStatus(value)
-                    setattr(goal, field, status_enum.value)
+                    changes_for_db[field] = status_enum.value
                 except ValueError:
                     raise exceptions.InvalidGoalDataError(f"Invalid status: {value}")
             else:
-                setattr(goal, field, value)
+                changes_for_db[field] = value
             
-            changes[field] = value if not isinstance(value, date) else value.isoformat()
+            changes_for_kafka[field] = value if not isinstance(value, date) else value.isoformat()
+        
+        if not changes_for_db:
+             today = datetime.now(timezone.utc).date()
+             days_left = max((goal.finish_date - today).days, 0)
+             return goal, days_left
 
-        goal = await self.repo.update(goal)
+        goal = await self.repo.update_fields(user_id, goal_id, changes_for_db)
 
         await self._check_and_process_achievement(goal)
 
-        if changes:
-            event_changed = {"event": "goal.changed", "goal_id": str(goal_id), "changes": changes}
+        if changes_for_kafka:
+            event_changed = {"event": "goal.changed", "goal_id": str(goal_id), "changes": changes_for_kafka}
             await self.kafka.send_budget_event(event_changed)
 
         today = datetime.now(timezone.utc).date()
@@ -122,6 +128,7 @@ class GoalService:
     async def update_goal_balance(self, msg_data: dict):
         """Логика консьюмера."""
         try:
+            transaction_id = UUID(msg_data['transaction_id'])
             goal_id = UUID(msg_data['account_id'])
             user_id = UUID(msg_data['user_id'])
             raw_amount = Decimal(msg_data['amount'])
@@ -131,8 +138,12 @@ class GoalService:
 
         amount = raw_amount if direction == 'income' else -raw_amount
         
-        goal = await self.repo.adjust_balance(user_id, goal_id, amount)
+        goal = await self.repo.adjust_balance(user_id, goal_id, amount, transaction_id)
 
+        if goal is None:
+            logger.info(f"Transaction {transaction_id} already processed. Skipping.")
+            return
+        
         event_updated = {
             "event": "goal.updated", 
             "goal_id": str(goal_id), 
@@ -144,16 +155,20 @@ class GoalService:
         await self._check_and_process_achievement(goal)
 
     async def _check_and_process_achievement(self, goal: models.Goal) -> bool:
-        """
-        Проверяет, достигнута ли цель. Если да — меняет статус и шлет уведомление.
-        """
+        """Проверяет, достигнута ли цель. Использует update_fields для атомарности."""
         if (
             goal.current_value >= goal.target_value 
             and goal.status == models.GoalStatus.IN_PROGRESS.value
         ):
-            goal.status = models.GoalStatus.ACHIEVED.value
+            new_status = models.GoalStatus.ACHIEVED.value
+
+            await self.repo.update_fields(
+                user_id=goal.user_id, 
+                goal_id=goal.id, 
+                changes={"status": new_status}
+            )
             
-            await self.repo.update(goal)
+            goal.status = new_status
             
             event_notif = {
                 "event": "goal.alert", 

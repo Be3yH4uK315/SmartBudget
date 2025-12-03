@@ -1,6 +1,6 @@
 from uuid import uuid4
 from sqlalchemy import (
-    Column, String, DateTime,
+    Column, ForeignKey, String, DateTime,
     Index, Date, DECIMAL
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -41,3 +41,10 @@ class Goal(base.Base):
         Index('ix_goals_user_id', 'user_id'),
         Index('ix_goals_status_finish_date', 'status', 'finish_date'),
     )
+
+class ProcessedTransaction(base.Base):
+    __tablename__ = "processed_goal_transactions"
+
+    transaction_id = Column(UUID(as_uuid=True), primary_key=True)
+    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))

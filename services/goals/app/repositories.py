@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, select, update
+from sqlalchemy import insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app import models, exceptions
@@ -57,8 +57,23 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
     
-    async def adjust_balance(self, user_id: UUID, goal_id: UUID, amount: Decimal) -> models.Goal:
+    async def adjust_balance(
+        self, user_id: UUID, 
+        goal_id: UUID, 
+        amount: Decimal, 
+        transaction_id: UUID
+    ) -> models.Goal | None:
         """Атомарно изменяет баланс цели."""
+        try:
+            stmt = insert(models.ProcessedTransaction).values(
+                transaction_id=transaction_id,
+                goal_id=goal_id
+            )
+            await self.db.execute(stmt)
+        except IntegrityError:
+            await self.db.rollback()
+            return None
+
         new_value_expr = models.Goal.current_value + amount
 
         query = (
@@ -73,17 +88,30 @@ class GoalRepository:
         updated_goal = result.scalar_one_or_none()
 
         if not updated_goal:
+            await self.db.rollback()
             raise exceptions.GoalNotFoundError(f"Goal {goal_id} not found")
-        
+
         await self.db.commit()
         return updated_goal
 
-    async def update(self, goal: models.Goal) -> models.Goal:
-        """Сохраняет изменения в цели."""
-        self.db.add(goal)
+    async def update_fields(self, user_id: UUID, goal_id: UUID, changes: dict) -> models.Goal:
+        """
+        Обновляет переданные поля, чтобы не затереть баланс.
+        """
+        stmt = (
+            update(models.Goal)
+            .where(models.Goal.id == goal_id, models.Goal.user_id == user_id)
+            .values(**changes)
+            .returning(models.Goal)
+        )
+        result = await self.db.execute(stmt)
+        updated_goal = result.scalar_one_or_none()
+        
+        if not updated_goal:
+             raise exceptions.GoalNotFoundError("Goal not found during update")
+             
         await self.db.commit()
-        await self.db.refresh(goal)
-        return goal
+        return updated_goal
         
     async def get_expired_goals(self, today: date) -> list[models.Goal]:
         """Выбирает цели, которые просрочены, но еще не отмечены."""
