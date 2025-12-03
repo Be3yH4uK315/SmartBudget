@@ -16,8 +16,6 @@ export const api = axios.create({
   },
 })
 
-//временное использование apiME для тестов, т.к. на бэке /user/me это /auth/me
-
 export const apiME = axios.create({
   baseURL: baseURLME,
   timeout: 3 * 60 * 1000,
