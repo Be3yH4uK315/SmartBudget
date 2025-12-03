@@ -140,6 +140,28 @@ export const components: ThemeOptions['components'] = {
           },
         }),
       },
+
+      {
+        props: { variant: 'white' },
+        style: ({ theme }) => ({
+          backgroundColor: theme.palette.grayButton.light,
+          color: theme.palette.text.primary,
+          padding: '6px',
+          margin: 0,
+          borderWidth: 2,
+          borderColor: 'transparent',
+          typography: 'caption',
+          width: 'min-content',
+          height: 'min-content',
+
+          '&:hover': {
+            backgroundColor: theme.palette.grayButton.main,
+          },
+          '&:active': {
+            backgroundColor: 'transparent',
+          },
+        }),
+      },
     ],
   },
 
@@ -172,7 +194,7 @@ export const components: ThemeOptions['components'] = {
     styleOverrides: {
       root: ({ theme: { palette } }) => ({
         animation: `pulse 2s ease-in-out infinite`,
-        backgroundColor: palette.gray.light,
+        backgroundColor: palette.gray.main,
 
         '@keyframes pulse': {
           '0%': {
@@ -244,6 +266,14 @@ export const components: ThemeOptions['components'] = {
             color: theme.palette.text.primary,
           },
         },
+      }),
+    },
+  },
+
+  MuiPaper: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        backgroundColor: theme.palette.surface.light,
       }),
     },
   },
