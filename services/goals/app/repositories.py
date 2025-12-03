@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -74,7 +75,7 @@ class GoalRepository:
             await self.db.rollback()
             return None
 
-        new_value_expr = models.Goal.current_value + amount
+        new_value_expr = sa.func.greatest(0, models.Goal.current_value + amount)
 
         query = (
             update(models.Goal)

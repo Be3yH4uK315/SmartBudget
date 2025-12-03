@@ -161,22 +161,29 @@ class GoalService:
             and goal.status == models.GoalStatus.IN_PROGRESS.value
         ):
             new_status = models.GoalStatus.ACHIEVED.value
-
             await self.repo.update_fields(
                 user_id=goal.user_id, 
                 goal_id=goal.id, 
                 changes={"status": new_status}
             )
-            
             goal.status = new_status
             
-            event_notif = {
-                "event": "goal.alert", 
-                "goal_id": str(goal.id), 
-                "type": "achieved"
-            }
+            event_notif = {"event": "goal.alert", "goal_id": str(goal.id), "type": "achieved"}
             await self.kafka.send_notification(event_notif)
             return True
+        elif (
+            goal.current_value < goal.target_value
+            and goal.status == models.GoalStatus.ACHIEVED.value
+        ):
+            new_status = models.GoalStatus.IN_PROGRESS.value
+            await self.repo.update_fields(
+                user_id=goal.user_id, 
+                goal_id=goal.id, 
+                changes={"status": new_status}
+            )
+            goal.status = new_status
+            return True
+            
         return False
 
     async def check_deadlines(self):
