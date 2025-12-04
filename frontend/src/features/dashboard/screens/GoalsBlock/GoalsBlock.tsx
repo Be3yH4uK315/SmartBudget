@@ -20,7 +20,6 @@ export const GoalsBlock = ({ goals }: Props) => {
         borderRadius: '24px',
         maxWidth: { xs: 'auto', md: '400px' },
         minWidth: '300px',
-        flex: '1 1 0%',
       }}
     >
       <Typography variant="h4">{title}</Typography>
