@@ -1,10 +1,11 @@
+import React from 'react'
 import { Box, Stack, Typography } from '@mui/material'
 
 type Props = {
   category: normalizedCategory
 }
 
-export const CategoryBlock = ({ category }: Props) => {
+export const CategoryBlock = React.memo(({ category }: Props) => {
   return (
     <Box
       component="span"
@@ -26,4 +27,4 @@ export const CategoryBlock = ({ category }: Props) => {
       </Stack>
     </Box>
   )
-}
+})

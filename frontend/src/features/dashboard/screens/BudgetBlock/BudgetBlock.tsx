@@ -1,3 +1,4 @@
+import React from 'react'
 import { Button, Paper, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
@@ -8,9 +9,10 @@ type Props = {
   budgetLimit: number
 }
 
-export const BudgetBlock = ({ categories, budgetLimit }: Props) => {
+export const BudgetBlock = React.memo(({ categories, budgetLimit }: Props) => {
   const translate = useTranslate('Dashboard.Budget')
   const navigate = useNavigate()
+
   const title = categories.length > 0 ? translate('title') : translate('emptyTitle')
 
   return (
@@ -20,13 +22,12 @@ export const BudgetBlock = ({ categories, budgetLimit }: Props) => {
         borderRadius: '24px',
         maxWidth: { xs: 'auto', md: '400px' },
         minWidth: '300px',
-        flex: '1 1 0%',
       }}
     >
-      <Typography variant="h4">{title}</Typography>
+      <Stack spacing={1}>
+        <Typography variant="h4">{title}</Typography>
 
-      <Stack spacing={2}>
-        {categories.length && <PercentLine categories={categories} limit={budgetLimit} />}
+        {categories.length > 0 && <PercentLine categories={categories} limit={budgetLimit} />}
 
         {!categories.length && (
           <Button
@@ -40,4 +41,4 @@ export const BudgetBlock = ({ categories, budgetLimit }: Props) => {
       </Stack>
     </Paper>
   )
-}
+})
