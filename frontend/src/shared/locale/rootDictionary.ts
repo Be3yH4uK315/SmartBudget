@@ -117,6 +117,7 @@ export const rootDictionary: LocaleDictionary = {
           10: 'ноябре',
           11: 'декабре',
         },
+        fallback: 'Нет операций за текущий период',
       },
 
       Buttons: {
