@@ -44,6 +44,7 @@ export function useTransactionFilters(data: DashboardCategory[]) {
       const normalizedData = data
         .filter((c) => Number(c.value) > 0)
         .filter((c) => c.type === activeType)
+        .sort((a, b) => b.value - a.value)
         .map((c, idx) => ({
           value: Number(c.value),
           label: translateCategory(`${c.categoryId}`),
