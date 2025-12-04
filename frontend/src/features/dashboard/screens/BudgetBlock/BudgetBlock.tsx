@@ -1,7 +1,7 @@
 import { Button, Paper, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
-import { BudgetProgress } from './PercentLine'
+import { PercentLine } from './PercentLine'
 
 type Props = {
   categories: DashboardCategory[]
@@ -26,7 +26,7 @@ export const BudgetBlock = ({ categories, budgetLimit }: Props) => {
       <Typography variant="h4">{title}</Typography>
 
       <Stack spacing={2}>
-        {categories.length && <BudgetProgress categories={categories} limit={budgetLimit} />}
+        {categories.length && <PercentLine categories={categories} limit={budgetLimit} />}
 
         {!categories.length && (
           <Button

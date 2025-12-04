@@ -5,7 +5,7 @@ type Props = {
   categories: { value: number }[]
 }
 
-export const BudgetProgress = ({ limit, categories }: Props) => {
+export const PercentLine = ({ limit, categories }: Props) => {
   const spent = categories.reduce((sum, c) => sum + c.value, 0)
   const percent = (spent / limit) * 100
   const overLimit = spent > limit
