@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatCurrency } from '@features/dashboard/utils'
 import { Box, Stack, Typography } from '@mui/material'
 
 type Props = {
@@ -22,7 +23,7 @@ export const CategoryBlock = React.memo(({ category }: Props) => {
         <Box sx={{ width: 12, height: 12, borderRadius: '6px', backgroundColor: category.color }} />
 
         <Typography variant="caption" noWrap>
-          {category.label} {`${category.value.toLocaleString('ru')} ₽`}
+          {category.label} {formatCurrency(category.value)}
         </Typography>
       </Stack>
     </Box>
