@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react'
-import { useTransactionFilters } from '@features/dashboard/hooks'
 import {
   getDashboardData,
   selectBudgetLimit,
