@@ -30,8 +30,6 @@ export default withAuth(function DashboardScreen() {
   const budgetLimit = useAppSelector(selectBudgetLimit)
   const isLoading = useAppSelector(selectIsDashboardLoading)
 
-  const { activeType, toggleFilter, normalizedData, total } = useTransactionFilters(categories)
-
   const ButtonsBlock = useMemo<IconButtonItem[]>(
     () => [
       {
@@ -88,12 +86,7 @@ export default withAuth(function DashboardScreen() {
 
           <IconButtonsBlock buttons={ButtonsBlock.slice(0, 2)} />
 
-          <TransactionsBlock
-            categories={normalizedData}
-            total={total}
-            activeType={activeType}
-            toggleFilter={toggleFilter}
-          />
+          <TransactionsBlock categories={categories} />
 
           <IconButtonsBlock buttons={ButtonsBlock.slice(2, 4)} />
         </Stack>
