@@ -1,0 +1,144 @@
+services:
+  # -------------------------
+  # Auth Service
+  # -------------------------
+  auth_service:
+    build: .
+    container_name: auth_service_dev
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      auth_postgres_dev:
+        condition: service_healthy
+      auth_redis_dev:
+        condition: service_started
+      auth_kafka_dev:
+        condition: service_started
+    volumes:
+      - .:/app
+      - geoip_data:/geoip
+      - ./certs:/app/certs
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Applying Alembic migrations...' && alembic upgrade head &&
+        echo 'Starting server...' && gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --forwarded-allow-ips '*' --access-logfile '-'
+      "
+
+  # -------------------------
+  # PostgreSQL
+  # -------------------------
+  auth_postgres_dev:
+    image: postgres:16
+    container_name: auth_postgres_dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data_auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Redis (async)
+  # -------------------------
+  auth_redis_dev:
+    image: redis:7
+    container_name: auth_redis_dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_auth:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Zookeeper (для Kafka)
+  # -------------------------
+  auth_zookeeper_dev:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: auth_zookeeper_dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "zkServer.sh", "status"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Kafka
+  # -------------------------
+  auth_kafka_dev:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: auth_kafka_dev
+    depends_on:
+      - auth_zookeeper_dev
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: auth_zookeeper_dev:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://auth_kafka_dev:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://auth_kafka_dev:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "auth_kafka_dev:9092", "--list"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  # -------------------------
+  # Mailhog для тестирования почты
+  # -------------------------
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "8025:8025" # веб интерфейс
+      - "1025:1025" # SMTP порт
+
+  # -------------------------
+  # Arq worker
+  # -------------------------
+  auth_worker:
+    build: .
+    container_name: auth_worker
+    env_file:
+      - .env
+    command: bash /app/wait-for-kafka.sh auth_kafka_dev 9092 arq app.worker.WorkerSettings
+    depends_on:
+      - auth_service
+      - auth_postgres_dev
+      - auth_redis_dev
+      - auth_kafka_dev
+    volumes:
+      - .:/app
+      - geoip_data:/geoip
+      - ./certs:/app/certs
+    restart: unless-stopped
+
+volumes:
+  pg_data_auth:
+  redis_data_auth:
+  pg_data_auth_test:
+  geoip_data: {}
+
+# docker cp ./geoip/GeoLite2-City.mmdb auth_service_dev:/geoip/GeoLite2-City.mmdb
