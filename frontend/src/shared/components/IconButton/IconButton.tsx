@@ -30,7 +30,7 @@ export const IconButton = ({ title, subtitle, Icon, path }: IconButtonItem) => {
 
   return (
     <Paper
-      role="link"
+      role="button"
       sx={{ p: 3, borderRadius: '24px', flex: '1 1 0%', textDecoration: 'none' }}
       component={path ? Link : 'div'}
       to={path && path}
