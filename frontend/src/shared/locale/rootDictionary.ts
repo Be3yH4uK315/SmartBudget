@@ -1,5 +1,12 @@
 export const rootDictionary: LocaleDictionary = {
   ru: {
+    Error: {
+      title: 'Произошла ошибка',
+      message: {
+        noInfo: 'Ошибка при получении данных пользователя',
+      },
+    },
+
     AuthScreen: {
       email: {
         title: 'Вход',

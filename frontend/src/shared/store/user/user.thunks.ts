@@ -4,12 +4,16 @@ import { user_api } from '@shared/api/user'
 export const getUserInfo = createAsyncThunk<User, void, { rejectValue: 'noInfo' }>(
   'getUserInfo',
   async (_, { rejectWithValue }) => {
-    const user = await user_api.getUserInfo()
+    try {
+      const user = await user_api.getUserInfo()
 
-    if (!user) {
+      if (!user) {
+        return rejectWithValue('noInfo')
+      }
+
+      return user
+    } catch (e) {
       return rejectWithValue('noInfo')
     }
-
-    return user
   },
 )
