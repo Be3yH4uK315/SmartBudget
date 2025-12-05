@@ -66,7 +66,7 @@ export default withAuth(function DashboardScreen() {
     dispatch(getDashboardData())
   }, [dispatch])
 
-  const title = `${translate('greeting', { name: username })}`
+  const title = translate('greeting', { name: username })
 
   return (
     <ScreenContent isLoading={isLoading} ContentSkeleton={DashboardScreenSkeleton} title={title}>
