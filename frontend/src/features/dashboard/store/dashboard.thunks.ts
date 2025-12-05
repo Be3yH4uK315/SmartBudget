@@ -2,11 +2,6 @@ import { dashboardApi } from '@features/dashboard/api'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { dashboardMock } from '../api/dashboard.mock'
 
-export const getDashboardData = createAsyncThunk<DashboardResponsePayload, void>(
-  'getDashboardData',
-  async () => {
-    const data = await dashboardMock.getDashboardData()
-
-    return data
-  },
+export const getDashboardData = createAsyncThunk<DashboardResponsePayload, void>('getDashboardData', () =>
+  dashboardMock.getDashboardData(),
 )
