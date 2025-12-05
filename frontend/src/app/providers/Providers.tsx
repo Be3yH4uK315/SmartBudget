@@ -3,15 +3,18 @@ import { LocalizationProvider } from './LocalizationProvider'
 import { ReduxProvider } from './ReduxProvider'
 import { RouterProvider } from './RouterProvider'
 import { ThemeProvider } from './ThemeProvider'
+import { ToastProvider } from './Toast/ToastProvider'
 
 export const Providers = ({ children }: PropsWithChildren) => {
   return (
-    <ReduxProvider>
-      <RouterProvider>
-        <ThemeProvider>
-          <LocalizationProvider>{children}</LocalizationProvider>
-        </ThemeProvider>
-      </RouterProvider>
-    </ReduxProvider>
+    <LocalizationProvider>
+      <ReduxProvider>
+        <RouterProvider>
+          <ThemeProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </ThemeProvider>
+        </RouterProvider>
+      </ReduxProvider>
+    </LocalizationProvider>
   )
 }
