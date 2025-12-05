@@ -12,11 +12,8 @@ export function useTransactionFilters(data: DashboardCategory[]) {
     setActiveType(type)
   }, [])
 
-  const { normalizedData, total } = useMemo<{
-    normalizedData: normalizedCategory[]
-    total: number
-  }>(() => {
-    const colors = [
+  const colors = useMemo(
+    () => [
       {
         main: theme.palette.additionalRed.main,
         light: theme.palette.additionalRed.light,
@@ -41,24 +38,38 @@ export function useTransactionFilters(data: DashboardCategory[]) {
         main: theme.palette.additionalPurple.main,
         light: theme.palette.additionalPurple.light,
       },
-    ]
+    ],
+    [theme],
+  )
 
-    const normalizedData = data
-      .filter((c) => Number(c.value) > 0)
-      .filter((c) => c.type === activeType)
-      .sort((a, b) => b.value - a.value)
-      .map((c, idx) => ({
-        value: Number(c.value),
-        label: translateCategory(`${c.categoryId}`),
-        color: colors[idx % colors.length].main,
-        lightColor: colors[idx % colors.length].light,
-      }))
-
-    return {
-      normalizedData,
-      total: normalizedData.reduce((sum, c) => sum + c.value, 0),
+  const { normalizedData, total } = useMemo(() => {
+    const init = {
+      normalizedData: [] as normalizedCategory[],
+      total: 0,
+      count: 0,
     }
-  }, [data, activeType, theme, translateCategory])
+
+    const acc = data.reduce((acc, c) => {
+      const value = Number(c.value)
+      if (value <= 0 || c.type !== activeType) return acc
+
+      const color = colors[acc.count % colors.length]
+
+      acc.normalizedData.push({
+        value,
+        label: translateCategory(String(c.categoryId)),
+        color: color.main,
+        lightColor: color.light,
+      })
+
+      acc.total += value
+      acc.count++
+
+      return acc
+    }, init)
+
+    return { normalizedData: acc.normalizedData, total: acc.total }
+  }, [data, activeType, translateCategory, colors])
 
   return { activeType, toggleFilter, normalizedData, total }
 }

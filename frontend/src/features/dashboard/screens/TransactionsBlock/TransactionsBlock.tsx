@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react'
+import { useTransactionFilters } from '@features/dashboard/hooks'
 import { Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import dayjs from 'dayjs'
 import { CategoryBlock } from './CategoryBlock'
 import { PieChartWithCenterLabel } from './TransactionsPie'
-import { useTransactionFilters } from '@features/dashboard/hooks'
 
 type Props = {
   categories: DashboardCategory[]
@@ -17,7 +17,7 @@ export const TransactionsBlock = React.memo(({ categories }: Props) => {
 
   const pieData = useMemo<Omit<normalizedCategory, 'lightColor'>[]>(
     () => normalizedData.map(({ lightColor, ...rest }) => rest),
-    [categories],
+    [normalizedData],
   )
 
   function renderFallback() {
