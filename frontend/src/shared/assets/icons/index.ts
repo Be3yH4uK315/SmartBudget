@@ -1,1 +1,5 @@
-export * from './Icons'
+export * from './BudgetIcon'
+export * from './GoalIcon'
+export * from './ProfileIcon'
+export * from './SecurityIcon'
+export * from './SettingsIcon'
