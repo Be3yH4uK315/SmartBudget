@@ -17,3 +17,4 @@ ENV PATH=/usr/local/bin:$PATH
 
 COPY ./app /app/app
 COPY alembic.ini /app/alembic.ini
+COPY ./alembic /app/alembic

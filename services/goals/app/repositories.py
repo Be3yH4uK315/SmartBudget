@@ -123,6 +123,31 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def mark_achieved_if_eligible(self, user_id: UUID, goal_id: UUID) -> models.Goal | None:
+        """
+        Атомарно переводит цель в ACHIEVED, только если она выполнена 
+        и еще находится в IN_PROGRESS.
+        """
+        stmt = (
+            update(models.Goal)
+            .where(
+                models.Goal.id == goal_id,
+                models.Goal.user_id == user_id,
+                models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+                models.Goal.current_value >= models.Goal.target_value
+            )
+            .values(status=models.GoalStatus.ACHIEVED.value)
+            .returning(models.Goal)
+        )
+        
+        result = await self.db.execute(stmt)
+        updated_goal = result.scalar_one_or_none()
+        
+        if updated_goal:
+            await self.db.commit()
+            
+        return updated_goal
+
     async def get_approaching_goals(self, today: date, days_notice: int = 7) -> list[models.Goal]:
         """
         Выбирает цели, до дедлайна которых <= N дней

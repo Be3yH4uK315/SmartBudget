@@ -125,20 +125,16 @@ class GoalService:
             
         return goal, days_left
 
-    async def update_goal_balance(self, msg_data: dict):
+    async def update_goal_balance(self, event: schemas.TransactionEvent):
         """Логика консьюмера."""
-        try:
-            transaction_id = UUID(msg_data['transaction_id'])
-            goal_id = UUID(msg_data['account_id'])
-            user_id = UUID(msg_data['user_id'])
-            raw_amount = Decimal(msg_data['amount'])
-            direction = msg_data['direction']
-        except (KeyError, ValueError, TypeError):
-            raise exceptions.InvalidGoalDataError(f"Invalid message data: {msg_data}")
-
-        amount = raw_amount if direction == 'income' else -raw_amount
+        amount = event.amount if event.direction == 'income' else -event.amount
         
-        goal = await self.repo.adjust_balance(user_id, goal_id, amount, transaction_id)
+        goal = await self.repo.adjust_balance(
+            event.user_id, 
+            event.account_id, 
+            amount, 
+            event.transaction_id
+        )
 
         if goal is None:
             logger.info(f"Transaction {transaction_id} already processed. Skipping.")
@@ -155,22 +151,23 @@ class GoalService:
         await self._check_and_process_achievement(goal)
 
     async def _check_and_process_achievement(self, goal: models.Goal) -> bool:
-        """Проверяет, достигнута ли цель. Использует update_fields для атомарности."""
-        if (
-            goal.current_value >= goal.target_value 
-            and goal.status == models.GoalStatus.IN_PROGRESS.value
-        ):
-            new_status = models.GoalStatus.ACHIEVED.value
-            await self.repo.update_fields(
-                user_id=goal.user_id, 
-                goal_id=goal.id, 
-                changes={"status": new_status}
-            )
-            goal.status = new_status
+        """
+        Проверяет, достигнута ли цель.
+        Использует атомарный update в БД, чтобы избежать двойных уведомлений.
+        """
+        achieved_goal = await self.repo.mark_achieved_if_eligible(goal.user_id, goal.id)
+        
+        if achieved_goal:
+            goal.status = achieved_goal.status
             
-            event_notif = {"event": "goal.alert", "goal_id": str(goal.id), "type": "achieved"}
+            event_notif = {
+                "event": "goal.alert", 
+                "goal_id": str(goal.id), 
+                "type": "achieved"
+            }
             await self.kafka.send_notification(event_notif)
             return True
+
         elif (
             goal.current_value < goal.target_value
             and goal.status == models.GoalStatus.ACHIEVED.value

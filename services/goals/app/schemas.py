@@ -51,6 +51,13 @@ class GoalPatchRequest(BaseModel):
 class UnifiedErrorResponse(BaseModel):
     detail: str = Field(..., description="Описание ошибки")
 
+class TransactionEvent(BaseModel):
+    transaction_id: UUID
+    account_id: UUID = Field(..., description="В контексте целей это goal_id")
+    user_id: UUID
+    amount: Decimal
+    direction: str = Field(..., pattern="^(income|expense)$")
+
 BUDGET_EVENTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Budget Events Schema",

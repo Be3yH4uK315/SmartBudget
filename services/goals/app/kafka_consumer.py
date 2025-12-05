@@ -8,12 +8,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker, AsyncSession, create_async_engine, AsyncEngine
 )
+from pydantic import ValidationError
 
 from app import (
     settings, 
     repositories,
     services, 
-    exceptions
+    exceptions,
+    schemas
 )
 from app.kafka_producer import KafkaProducer 
 
@@ -26,7 +28,6 @@ async def consume_transaction_goal(
 ):
     """
     Главный цикл обработки сообщений из 'transaction.goal'.
-    Обеспечивает надежность: коммит оффсета только после записи в БД.
     """
     logger.info(f"Starting consumer loop for topic '{settings.settings.kafka.kafka_topic_transaction_goal}'...")
     async for message in consumer:
@@ -35,15 +36,16 @@ async def consume_transaction_goal(
         try:
             try:
                 data = json.loads(message.value)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON Error (Offset: {message.offset}): {e}. Data: {message.value}")
+                event = schemas.TransactionEvent(**data)
+            except (json.JSONDecodeError, ValidationError) as e: 
+                logger.error(f"Data Validation Error (Offset: {message.offset}): {e}. Data: {message.value}")
                 await consumer.commit()
                 continue
 
             async with db_maker() as session:
                 repo = repositories.GoalRepository(session)
                 service = services.GoalService(repo, kafka)
-                await service.update_goal_balance(data)
+                await service.update_goal_balance(event)
 
             await consumer.commit()
             logger.info(f"Message processed and committed (Offset: {message.offset})")
