@@ -1,13 +1,9 @@
-import { createContext, PropsWithChildren, useCallback, useState } from 'react'
+import { createContext, PropsWithChildren, useCallback, useEffect, useState } from 'react'
 import { SnackbarProvider } from 'notistack'
 import { setShowToast } from './globalToast'
 import { Toast } from './Toast'
 
-export const ToastContext = createContext<{
-  showToast(toast: ToastOptions): void
-}>({
-  showToast() {},
-})
+export const ToastContext = createContext({ showToast: (t: ToastOptions) => {} })
 
 export const ToastProvider = ({ children }: PropsWithChildren) => {
   const [toast, setToast] = useState<ToastOptions | null>(null)
@@ -16,9 +12,15 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
     setToast(toast)
   }, [])
 
-  const closeToast = () => setToast(null)
+  const closeToast = useCallback(() => {
+    setToast(null)
+  }, [])
 
-  setShowToast(showToast)
+  useEffect(() => {
+    setShowToast(showToast)
+    return () => setShowToast(() => {})
+  }, [showToast])
+
   return (
     <SnackbarProvider>
       <ToastContext.Provider value={{ showToast }}>
