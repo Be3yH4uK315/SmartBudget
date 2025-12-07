@@ -1,6 +1,6 @@
+import { appLocaleDict } from '@app/locale'
 import { getInitialLanguage } from '@shared/utils/locale.helpers'
 import i18next, { i18n } from 'i18next'
-import { rootDictionary } from './rootDictionary'
 
 let _instance: i18n | null = null
 
@@ -13,7 +13,7 @@ export function initI18n(): i18n {
     lng: initialLng,
     fallbackLng: 'ru',
     resources: Object.fromEntries(
-      Object.entries(rootDictionary).map(([lng, dict]) => [lng, { translation: dict }]),
+      Object.entries(appLocaleDict).map(([lng, dict]) => [lng, { translation: dict }]),
     ) as any,
 
     interpolation: {
