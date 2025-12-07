@@ -9,7 +9,7 @@ from alembic import context
 
 from app.base import Base
 from app.settings import settings
-from app.models import Category, Rule, ClassificationResult, Feedback, Model
+from app.models import Category, Rule, ClassificationResult, Feedback, Model, TrainingDataset
 
 # ---- Alembic Config ----
 config = context.config
