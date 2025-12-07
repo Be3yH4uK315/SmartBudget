@@ -44,7 +44,7 @@ SCHEMA_NEED_CATEGORY_DLQ = {
         "original_topic": {"type": "string"},
         "original_message": {"type": "string"},
         "error": {"type": "string"},
-        "timestamp": {"type": "string", "format": "date-time"}
+        "timestamp": {"type": "string"}
     },
     "required": ["original_topic", "original_message", "error", "timestamp"]
 }
@@ -53,5 +53,6 @@ SCHEMAS_MAP = {
     "transaction.need_category": SCHEMA_NEED_CATEGORY,
     "transaction.classified": SCHEMA_CLASSIFIED,
     "budget.classification.events": SCHEMA_CLASSIFIED,
-    "transaction.updated": SCHEMA_UPDATED
+    "transaction.updated": SCHEMA_UPDATED,
+    "classification.dlq": SCHEMA_NEED_CATEGORY_DLQ 
 }

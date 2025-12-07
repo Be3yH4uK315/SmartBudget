@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from redis.asyncio import Redis
 
-from app import exceptions, settings, kafka_producer
+from app import exceptions, schemas, settings, kafka_producer
 from app.services.classification_service import ClassificationService
 
 logger = logging.getLogger(__name__)
@@ -35,17 +35,17 @@ async def _handle_poison_pill(
         except UnicodeDecodeError:
             message_str = msg.value.hex()
             
-        dlq_data = {
-            "original_topic": msg.topic,
-            "original_message": message_str,
-            "error": f"{type(error).__name__}: {str(error)}",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        dlq_event = schemas.DLQMessage(
+            original_topic=msg.topic,
+            original_message=message_str,
+            error=f"{type(error).__name__}: {str(error)}",
+            timestamp=datetime.now(timezone.utc)
+        )
         
         await kafka_producer.send_kafka_event(
             producer,
             dlq_topic,
-            dlq_data
+            dlq_event.model_dump()
         )
         logger.info(f"Successfully sent poison pill to {dlq_topic}")
         

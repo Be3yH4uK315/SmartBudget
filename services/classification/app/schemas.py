@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from uuid import UUID
@@ -25,3 +26,9 @@ class HealthResponse(BaseModel):
 class UnifiedSuccessResponse(BaseModel):
     ok: bool = Field(True)
     detail: Optional[str] = Field(None)
+
+class DLQMessage(BaseModel):
+    original_topic: str
+    original_message: str
+    error: str
+    timestamp: datetime

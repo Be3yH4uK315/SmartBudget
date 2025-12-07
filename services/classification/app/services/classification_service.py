@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import json
@@ -41,9 +42,14 @@ class ClassificationService:
 
     async def _load_rules(self):
         """Загружает правила из кэша или БД."""
+        if self._rules:
+            return
+
         rules_objects = await get_cached_rules(self.db)
-        self._rules = [
-            {
+        
+        processed_rules = []
+        for rule in rules_objects:
+            rule_dict = {
                 "id": str(rule.id),
                 "category_id": str(rule.category_id),
                 "category_name": rule.category.name,
@@ -51,8 +57,16 @@ class ClassificationService:
                 "pattern_type": rule.pattern_type.value,
                 "mcc": rule.mcc,
                 "priority": rule.priority
-            } for rule in rules_objects
-        ]
+            }
+            if rule.pattern_type.value == "regex":
+                try:
+                    rule_dict["compiled_regex"] = re.compile(rule.pattern, re.IGNORECASE)
+                except re.error as e:
+                    logger.error(f"Invalid regex in rule {rule.id}: {e}. Rule disabled.")
+                    continue 
+            processed_rules.append(rule_dict)
+
+        self._rules = processed_rules
         logger.debug(f"Loaded {len(self._rules)} rules.")
 
     async def apply_rules(self, merchant: str, mcc: int | None, description: str) -> tuple[UUID | None, str | None]:
@@ -83,12 +97,8 @@ class ClassificationService:
                     return UUID(rule["category_id"]), rule["category_name"]
                 
                 elif pattern_type == "regex":
-                    try:
-                        if re.search(pattern, transaction_text):
-                            return UUID(rule["category_id"]), rule["category_name"]
-                    except re.error as e:
-                        logger.error(f"Invalid regex in rule {rule['id']}: {e}")
-                        continue
+                    if "compiled_regex" in rule and rule["compiled_regex"].search(transaction_text):
+                        return UUID(rule["category_id"]), rule["category_name"]
                 
             logger.debug("No rules matched for transaction.")
             return None, None
@@ -106,12 +116,20 @@ class ClassificationService:
             logger.warning("No ML model loaded. ML classification disabled. Falling back.")
             return await self._get_fallback_category()
 
-        category_id_str, confidence = MLService.predict(
-            self._model, 
-            self._vectorizer, 
-            self._class_labels, 
-            transaction_data
-        )
+        loop = asyncio.get_running_loop()
+
+        try:
+            category_id_str, confidence = await loop.run_in_executor(
+                None, 
+                MLService.predict,
+                self._model, 
+                self._vectorizer, 
+                self._class_labels, 
+                transaction_data
+            )
+        except Exception as e:
+            logger.error(f"Error during ML prediction execution: {e}")
+            return await self._get_fallback_category()
 
         model_version = self._model_version
         
