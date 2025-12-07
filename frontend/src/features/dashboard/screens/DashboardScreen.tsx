@@ -1,5 +1,11 @@
 import { useEffect, useMemo } from 'react'
 import {
+  BudgetBlock,
+  DashboardScreenSkeleton,
+  GoalsBlock,
+  TransactionsBlock,
+} from '@features/dashboard/screens'
+import {
   getDashboardData,
   selectBudgetLimit,
   selectCategories,
@@ -8,16 +14,9 @@ import {
 } from '@features/dashboard/store'
 import { Stack } from '@mui/material'
 import { BudgetIcon, GoalIcon, ProfileIcon, SecurityIcon } from '@shared/assets/icons'
-import { withAuth } from '@shared/components/hocs'
-import { IconButtonsBlock } from '@shared/components/IconButton/IconButtonsBlock'
-import { ScreenContent } from '@shared/components/ScreenContent'
+import { IconButtonsBlock, ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
-import { useAppDispatch, useAppSelector } from '@shared/store'
-import { selectUser } from '@shared/store/user'
-import { BudgetBlock } from './BudgetBlock'
-import { DashboardScreenSkeleton } from './DashboardScreenSkeleton'
-import { GoalsBlock } from './GoalsBlock'
-import { TransactionsBlock } from './TransactionsBlock'
+import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
 
 export default withAuth(function DashboardScreen() {
   const dispatch = useAppDispatch()
