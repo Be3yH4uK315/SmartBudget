@@ -1,2 +1,2 @@
-export * from './IconButtonsBlock'
 export * from './IconButton'
+export * from './IconButtonsBlock'
