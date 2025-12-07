@@ -28,5 +28,3 @@ COPY run_consumers.py /app/run_consumers.py
 
 RUN mkdir /models
 ENV MODEL_PATH=/models
-
-CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8001", "--access-logfile", "-"]
