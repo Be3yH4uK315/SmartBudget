@@ -1,7 +1,7 @@
-export const errorsDict: LocaleDictionary = {
+export const toastsDict: LocaleDictionary = {
   ru: {
-    Error: {
-      title: 'Произошла ошибка',
+    Toasts: {
+      error: 'Произошла ошибка',
       message: {
         noInfo: 'Ошибка при получении данных пользователя',
       },
@@ -9,8 +9,8 @@ export const errorsDict: LocaleDictionary = {
   },
 
   en: {
-    Error: {
-      title: 'An error has occurred',
+    Toasts: {
+      error: 'An error has occurred',
       message: {
         noInfo: 'Error when receiving user data',
       },
