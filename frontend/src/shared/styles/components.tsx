@@ -285,6 +285,9 @@ export const components: ThemeOptions['components'] = {
 
     styleOverrides: {
       root: {
+        position: 'fixed',
+        left: 2,
+        bottom: 3,
         padding: 16,
         width: 440,
 
