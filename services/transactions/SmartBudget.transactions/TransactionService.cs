@@ -35,26 +35,5 @@ app.UseSwaggerUI();
 
 // Routing
 app.MapControllers();
-using (var scope = app.Services.CreateScope())
-            {
-                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var retries = 10;
-                while (retries-- > 0)
-                {
-                    try
-                    {
-                        db.Database.Migrate();
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning("Database not ready yet: {m}", ex.Message);
-                        if (retries == 0) throw;
-                        Thread.Sleep(2000);
-                    }
-                }
-            }
-
 
 app.Run();
