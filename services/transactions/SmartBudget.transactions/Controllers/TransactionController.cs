@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
-using SmartBudget.Transactions.Data;
+using SmartBudget.Transactions.Domain.DTO;
 using SmartBudget.Transactions.Domain.Entities;
 using SmartBudget.Transactions.Domain.Enums;
-using SmartBudget.Transactions.Domain.DTO;
 using SmartBudget.Transactions.Infrastructure.Kafka;
+using SmartBudget.Transactions.Repositories;
 
 namespace SmartBudget.Transactions.Controllers
 {
@@ -13,13 +12,13 @@ namespace SmartBudget.Transactions.Controllers
     [Route("api/v1/transactions")]
     public class TransactionsController : ControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly ITransactionRepository _repo;
         private readonly IKafkaService _kafka;
         private readonly ILogger<TransactionsController> _log;
 
-        public TransactionsController(AppDbContext db, IKafkaService kafka, ILogger<TransactionsController> log)
+        public TransactionsController(ITransactionRepository repo, IKafkaService kafka, ILogger<TransactionsController> log)
         {
-            _db = db;
+            _repo = repo;
             _kafka = kafka;
             _log = log;
         }
@@ -31,10 +30,9 @@ namespace SmartBudget.Transactions.Controllers
         public async Task<IActionResult> List([FromQuery] string USER_ID, [FromQuery] int LIMIT = 50, [FromQuery] int OFFSET = 0)
         {
             if (!Guid.TryParse(USER_ID, out var uid)) return BadRequest("Invalid USER_ID");
-            var q = _db.Transactions.Where(t => t.UserId == uid)
-                                    .OrderByDescending(t => t.Date)
-                                    .Skip(OFFSET).Take(LIMIT);
-            var list = await q.ToListAsync();
+
+            var list = await _repo.GetUserTransactionsAsync(uid, LIMIT, OFFSET);
+
             return Ok(list.Select(t => new {
                 TRANSACTION_ID = t.TransactionId,
                 VALUE = t.Value,
@@ -53,7 +51,7 @@ namespace SmartBudget.Transactions.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(string id)
         {
-            var tx = await _db.Transactions.FirstOrDefaultAsync(t => t.TransactionId == id);
+            var tx = await _repo.GetByTransactionIdAsync(id);
             if (tx == null) return NotFound();
             return Ok(tx);
         }
@@ -83,11 +81,11 @@ namespace SmartBudget.Transactions.Controllers
                 CategoryId = req.CategoryId
             };
 
-            using var transaction = await _db.Database.BeginTransactionAsync();
+            using var transaction = await _repo.BeginTransactionAsync();
             try
             {
-                _db.Transactions.Add(tx);
-                await _db.SaveChangesAsync();
+                await _repo.AddTransactionAsync(tx);
+                await _repo.SaveChangesAsync();
 
                 var simple = JsonSerializer.Serialize(new { ACCOUNT_ID = tx.AccountId, CATEGORY_ID = tx.CategoryId, VALUE = tx.Value });
                 await _kafka.ProduceAsync("transaction.new", tx.TransactionId, simple);
@@ -107,28 +105,25 @@ namespace SmartBudget.Transactions.Controllers
         }
 
         /// <summary>
-        /// POST import/mock - accept array or single object in the same shape as ImportTransactionItem
+        /// POST import/mock
         /// </summary>
         [HttpPost("import/mock")]
         public async Task<IActionResult> ImportMock([FromBody] JsonElement body)
         {
-            List<ImportTransactionItem> items = new();
-            if (body.ValueKind == JsonValueKind.Array)
+            List<ImportTransactionItem> items = body.ValueKind switch
             {
-                items = JsonSerializer.Deserialize<List<ImportTransactionItem>>(body.GetRawText());
-            }
-            else if (body.ValueKind == JsonValueKind.Object)
-            {
-                var single = JsonSerializer.Deserialize<ImportTransactionItem>(body.GetRawText());
-                items.Add(single);
-            }
-            else return BadRequest("Invalid body");
+                JsonValueKind.Array => JsonSerializer.Deserialize<List<ImportTransactionItem>>(body.GetRawText()),
+                JsonValueKind.Object => new List<ImportTransactionItem> { JsonSerializer.Deserialize<ImportTransactionItem>(body.GetRawText()) },
+                _ => null
+            };
+
+            if (items == null) return BadRequest("Invalid body");
 
             var created = new List<object>();
 
             foreach (var it in items)
             {
-                using var transaction = await _db.Database.BeginTransactionAsync();
+                using var transaction = await _repo.BeginTransactionAsync();
                 try
                 {
                     var tx = new Transaction
@@ -151,11 +146,10 @@ namespace SmartBudget.Transactions.Controllers
 
                     if (tx.UserId == Guid.Empty) continue;
 
-                    var exists = await _db.Transactions.AnyAsync(t => t.TransactionId == tx.TransactionId);
-                    if (!exists)
+                    if (!await _repo.ExistsAsync(tx.TransactionId))
                     {
-                        _db.Transactions.Add(tx);
-                        await _db.SaveChangesAsync();
+                        await _repo.AddTransactionAsync(tx);
+                        await _repo.SaveChangesAsync();
 
                         var importedPayload = JsonSerializer.Serialize(new { event_type = "transaction.imported", user_id = tx.UserId, details = tx });
                         await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, importedPayload);
@@ -164,7 +158,6 @@ namespace SmartBudget.Transactions.Controllers
                         await _kafka.ProduceAsync("transaction.need_category", tx.TransactionId, need);
 
                         await transaction.CommitAsync();
-
                         created.Add(new { tx.TransactionId });
                     }
                 }
@@ -179,7 +172,7 @@ namespace SmartBudget.Transactions.Controllers
         }
 
         /// <summary>
-        /// PATCH: change category of a transaction
+        /// PATCH: change category
         /// </summary>
         [HttpPatch("{id}")]
         public async Task<IActionResult> PatchCategory(string id, [FromBody] JsonElement body)
@@ -193,13 +186,14 @@ namespace SmartBudget.Transactions.Controllers
             }
             else return BadRequest("CATEGORY_ID required");
 
-            var tx = await _db.Transactions.FirstOrDefaultAsync(t => t.TransactionId == id);
+            var tx = await _repo.GetByTransactionIdAsync(id);
             if (tx == null) return NotFound();
 
             var old = tx.CategoryId;
             tx.CategoryId = newCat;
             tx.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+
+            await _repo.SaveChangesAsync();
 
             var upd = JsonSerializer.Serialize(new { event_type = "transaction.updated", user_id = tx.UserId, details = new { TRANSACTION_ID = tx.TransactionId, OLD_CATEGORY = old, NEW_CATEGORY = newCat } });
             await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, upd);
@@ -216,11 +210,11 @@ namespace SmartBudget.Transactions.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var tx = await _db.Transactions.FirstOrDefaultAsync(t => t.TransactionId == id);
+            var tx = await _repo.GetByTransactionIdAsync(id);
             if (tx == null) return NotFound();
 
-            _db.Transactions.Remove(tx);
-            await _db.SaveChangesAsync();
+            await _repo.RemoveTransactionAsync(tx);
+            await _repo.SaveChangesAsync();
 
             await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, JsonSerializer.Serialize(new { event_type = "transaction.deleted", user_id = tx.UserId, details = new { TRANSACTION_ID = tx.TransactionId } }));
 
