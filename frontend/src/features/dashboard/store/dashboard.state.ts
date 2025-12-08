@@ -1,4 +1,4 @@
-export function getDashboardInitialState(): dashboardSliceState {
+export function getDashboardInitialState(): DashboardSliceState {
   return {
     goals: [],
     categories: [],

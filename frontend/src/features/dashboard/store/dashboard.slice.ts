@@ -3,12 +3,7 @@ import { rootReducer } from '@shared/store'
 import { getDashboardInitialState } from './dashboard.state'
 import { getDashboardData } from './dashboard.thunks'
 
-export const dashboardSlice = createSlice<
-  dashboardSliceState,
-  dashboardSliceReducers,
-  'dashboard',
-  any
->({
+export const dashboardSlice = createSlice<DashboardSliceState, DashboardSliceReducers, 'dashboard', any>({
   name: 'dashboard',
   initialState: getDashboardInitialState(),
   reducers: {},

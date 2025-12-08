@@ -1,4 +1,4 @@
-type dashboardSliceState = {
+type DashboardSliceState = {
   goals: DashboardGoal[]
 
   categories: DashboardCategory[]
@@ -8,4 +8,4 @@ type dashboardSliceState = {
   isLoading: boolean
 }
 
-type dashboardSliceReducers = SliceCaseReducers<dashboardSliceState>
+type DashboardSliceReducers = SliceCaseReducers<DashboardSliceState>
