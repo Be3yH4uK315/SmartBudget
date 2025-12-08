@@ -7,14 +7,14 @@ import { ToastProvider } from './Toast/ToastProvider'
 
 export const Providers = ({ children }: PropsWithChildren) => {
   return (
-    <LocalizationProvider>
-      <ThemeProvider>
-        <ToastProvider>
-          <ReduxProvider>
-            <RouterProvider>{children}</RouterProvider>
-          </ReduxProvider>
-        </ToastProvider>
-      </ThemeProvider>
-    </LocalizationProvider>
+    <ReduxProvider>
+      <RouterProvider>
+        <ThemeProvider>
+          <LocalizationProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LocalizationProvider>
+        </ThemeProvider>
+      </RouterProvider>
+    </ReduxProvider>
   )
 }
