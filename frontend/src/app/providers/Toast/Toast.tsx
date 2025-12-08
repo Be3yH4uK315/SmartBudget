@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode } from 'react'
+import { ReactNode } from 'react'
 import {
   CheckCircleOutlineOutlined,
   CloseOutlined,
@@ -6,16 +6,17 @@ import {
   HighlightOffOutlined,
 } from '@mui/icons-material'
 import { Alert, AlertColor, AlertTitle, Typography } from '@mui/material'
+import { useTranslate } from '@shared/hooks'
 import { SnackbarContent } from 'notistack'
 
-export const Toast = forwardRef<
-  HTMLDivElement,
-  ToastOptions & {
-    onClose?: () => void
-  }
->(({ type, title, message, onClose }, ref) => {
+type Props = ToastOptions & {
+  onClose?: () => void
+}
+
+export const Toast = ({ type, titleKey, messageKey, onClose }: Props) => {
+  const translate = useTranslate('Toasts')
   return (
-    <SnackbarContent ref={ref}>
+    <SnackbarContent>
       <Alert
         severity={type}
         iconMapping={iconMapping}
@@ -33,13 +34,15 @@ export const Toast = forwardRef<
         }
         sx={{ alignItems: 'center' }}
       >
-        <AlertTitle>{title}</AlertTitle>
+        <AlertTitle>{translate(titleKey ? titleKey : type)}</AlertTitle>
 
-        {message && <Typography variant="caption">{message}</Typography>}
+        {messageKey && (
+          <Typography variant="caption">{translate(`message.${messageKey}`)}</Typography>
+        )}
       </Alert>
     </SnackbarContent>
   )
-})
+}
 
 const iconMapping: Partial<Record<AlertColor, ReactNode>> = {
   success: <CheckCircleOutlineOutlined sx={{ fontSize: '32px' }} />,

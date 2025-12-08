@@ -1,40 +1,39 @@
-import { createContext, PropsWithChildren, useCallback, useEffect, useState } from 'react'
+import { PropsWithChildren } from 'react'
+import { Box } from '@mui/material'
+import { useAppSelector } from '@shared/store'
+import { selectToasts } from '@shared/store/toast'
+import { closeToast } from '@shared/utils'
 import { SnackbarProvider } from 'notistack'
-import { setShowToast } from './globalToast'
 import { Toast } from './Toast'
 
-export const ToastContext = createContext({ showToast: (t: ToastOptions) => {} })
-
 export const ToastProvider = ({ children }: PropsWithChildren) => {
-  const [toast, setToast] = useState<ToastOptions | null>(null)
-
-  const showToast = useCallback((toast: ToastOptions) => {
-    setToast(toast)
-  }, [])
-
-  const closeToast = useCallback(() => {
-    setToast(null)
-  }, [])
-
-  useEffect(() => {
-    setShowToast(showToast)
-    return () => setShowToast(() => {})
-  }, [showToast])
+  const toasts = useAppSelector(selectToasts)
 
   return (
     <SnackbarProvider>
-      <ToastContext.Provider value={{ showToast }}>
-        {children}
+      {children}
 
-        {toast && (
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 16,
+          right: 16,
+          display: 'flex',
+          flexDirection: 'column-reverse',
+          gap: 1,
+          zIndex: 10000,
+        }}
+      >
+        {toasts.map((toast, index) => (
           <Toast
+            key={index}
             onClose={closeToast}
             type={toast.type}
-            title={toast.title}
-            message={toast.message}
+            titleKey={toast.titleKey}
+            messageKey={toast.messageKey}
           />
-        )}
-      </ToastContext.Provider>
+        ))}
+      </Box>
     </SnackbarProvider>
   )
 }
