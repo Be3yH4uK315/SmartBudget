@@ -105,7 +105,7 @@ namespace SmartBudget.Transactions.Controllers
         }
 
         /// <summary>
-        /// POST import/mock
+        /// POST import mocks
         /// </summary>
         [HttpPost("import/mock")]
         public async Task<IActionResult> ImportMock([FromBody] JsonElement body)
@@ -175,34 +175,42 @@ namespace SmartBudget.Transactions.Controllers
         /// PATCH: change category
         /// </summary>
         [HttpPatch("{id}")]
-        public async Task<IActionResult> PatchCategory(string id, [FromBody] JsonElement body)
+        public async Task<IActionResult> PatchCategory(string id, [FromBody] PatchTransactionCategoryRequest req)
         {
-            int? newCat = null;
-            if (body.TryGetProperty("CATEGORY_ID", out var catEl))
-            {
-                if (catEl.ValueKind == JsonValueKind.Number && catEl.TryGetInt32(out var v)) newCat = v;
-                else if (catEl.ValueKind == JsonValueKind.Null) newCat = null;
-                else return BadRequest("CATEGORY_ID must be integer or null");
-            }
-            else return BadRequest("CATEGORY_ID required");
-
             var tx = await _repo.GetByTransactionIdAsync(id);
             if (tx == null) return NotFound();
 
             var old = tx.CategoryId;
-            tx.CategoryId = newCat;
+            tx.CategoryId = req.CategoryId;
             tx.UpdatedAt = DateTime.UtcNow;
 
             await _repo.SaveChangesAsync();
 
-            var upd = JsonSerializer.Serialize(new { event_type = "transaction.updated", user_id = tx.UserId, details = new { TRANSACTION_ID = tx.TransactionId, OLD_CATEGORY = old, NEW_CATEGORY = newCat } });
+            // Событие для Kafka
+            var upd = JsonSerializer.Serialize(new 
+            { 
+                event_type = "transaction.updated", 
+                user_id = tx.UserId, 
+                details = new 
+                { 
+                    TRANSACTION_ID = tx.TransactionId, 
+                    OLD_CATEGORY = old, 
+                    NEW_CATEGORY = req.CategoryId 
+                } 
+            });
             await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, upd);
 
-            var simple = JsonSerializer.Serialize(new { TRANSACTION_ID = tx.TransactionId, OLD_CATEGORY = old, NEW_CATEGORY = newCat });
+            var simple = JsonSerializer.Serialize(new 
+            { 
+                TRANSACTION_ID = tx.TransactionId, 
+                OLD_CATEGORY = old, 
+                NEW_CATEGORY = req.CategoryId 
+            });
             await _kafka.ProduceAsync("transaction.updated", tx.TransactionId, simple);
 
             return Ok("OK");
         }
+
 
         /// <summary>
         /// DELETE transaction
