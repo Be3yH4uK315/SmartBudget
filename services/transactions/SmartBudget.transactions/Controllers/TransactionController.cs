@@ -27,11 +27,14 @@ namespace SmartBudget.Transactions.Controllers
         /// GET Transactions in list
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> List([FromQuery] string USER_ID, [FromQuery] int LIMIT = 50, [FromQuery] int OFFSET = 0)
+        public async Task<IActionResult> List(
+            [FromQuery(Name = "UserId")] string userId, 
+            [FromQuery(Name = "Limit")] int limit = 50, 
+            [FromQuery(Name = "Offset")] int offset = 0)
         {
-            if (!Guid.TryParse(USER_ID, out var uid)) return BadRequest("Invalid USER_ID");
+            if (!Guid.TryParse(userId, out var uid)) return BadRequest("Invalid UserId");
 
-            var list = await _repo.GetUserTransactionsAsync(uid, LIMIT, OFFSET);
+            var list = await _repo.GetUserTransactionsAsync(uid, limit, offset);
 
             return Ok(list.Select(t => new {
                 TRANSACTION_ID = t.TransactionId,
@@ -44,6 +47,7 @@ namespace SmartBudget.Transactions.Controllers
                 DATE = t.Date?.ToString("o")
             }));
         }
+
 
         /// <summary>
         /// GET single transaction
