@@ -67,7 +67,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Goals Service", 
     version="1.0", 
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/api/v1/goals/docs",
+    openapi_url="/api/v1/goals/openapi.json"
 )
 
 @app.exception_handler(exceptions.GoalServiceError)
@@ -86,4 +88,4 @@ async def db_error_middleware(request: Request, exc: SQLAlchemyError):
     logger.error(f"DB error: {exc}")
     return JSONResponse(status_code=500, content={"detail": "Database error"})
 
-app.include_router(goals.router)
+app.include_router(goals.router, prefix="/api/v1/goals")
