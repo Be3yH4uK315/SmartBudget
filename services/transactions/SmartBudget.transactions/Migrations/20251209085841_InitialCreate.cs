@@ -17,7 +17,7 @@ namespace SmartBudget.Transactions.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TransactionId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    TransactionId = table.Column<Guid>(type: "uuid", maxLength: 200, nullable: false),
                     AccountId = table.Column<Guid>(type: "uuid", nullable: false),
                     CategoryId = table.Column<int>(type: "integer", nullable: true),
                     Date = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),

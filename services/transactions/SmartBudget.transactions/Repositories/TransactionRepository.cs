@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Threading.Tasks.Dataflow;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SmartBudget.Transactions.Data;
@@ -18,21 +20,21 @@ namespace SmartBudget.Transactions.Repositories
                 .Skip(offset).Take(limit)
                 .ToListAsync();
 
-        public Task<Transaction> GetByTransactionIdAsync(string transactionId)
+        public Task<Transaction> GetByTransactionIdAsync(Guid transactionId)
             => _db.Transactions.FirstOrDefaultAsync(t => t.TransactionId == transactionId);
 
-        public Task AddTransactionAsync(Transaction tx)
+        public Task AddTransactionAsync(Transaction transaction)
         {
-            _db.Transactions.Add(tx);
+            _db.Transactions.Add(transaction);
             return Task.CompletedTask;
         }
 
-        public Task<bool> ExistsAsync(string transactionId)
+        public Task<bool> ExistsAsync(Guid transactionId)
             => _db.Transactions.AnyAsync(t => t.TransactionId == transactionId);
 
-        public Task RemoveTransactionAsync(Transaction tx)
+        public Task RemoveTransactionAsync(Transaction transaction)
         {
-            _db.Transactions.Remove(tx);
+            _db.Transactions.Remove(transaction);
             return Task.CompletedTask;
         }
 

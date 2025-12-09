@@ -12,13 +12,13 @@ namespace SmartBudget.Transactions.Controllers
     [Route("api/v1/transactions")]
     public class TransactionsController : ControllerBase
     {
-        private readonly ITransactionRepository _repo;
+        private readonly ITransactionRepository _repository;
         private readonly IKafkaService _kafka;
         private readonly ILogger<TransactionsController> _log;
 
-        public TransactionsController(ITransactionRepository repo, IKafkaService kafka, ILogger<TransactionsController> log)
+        public TransactionsController(ITransactionRepository repository, IKafkaService kafka, ILogger<TransactionsController> log)
         {
-            _repo = repo;
+            _repository = repository;
             _kafka = kafka;
             _log = log;
         }
@@ -28,23 +28,21 @@ namespace SmartBudget.Transactions.Controllers
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> List(
-            [FromQuery(Name = "UserId")] string userId, 
+            [FromQuery(Name = "UserId")] Guid userId, 
             [FromQuery(Name = "Limit")] int limit = 50, 
             [FromQuery(Name = "Offset")] int offset = 0)
         {
-            if (!Guid.TryParse(userId, out var uid)) return BadRequest("Invalid UserId");
+            var list = await _repository.GetUserTransactionsAsync(userId, limit, offset);
 
-            var list = await _repo.GetUserTransactionsAsync(uid, limit, offset);
-
-            return Ok(list.Select(t => new {
-                TRANSACTION_ID = t.TransactionId,
-                VALUE = t.Value,
-                CATEGORY_ID = t.CategoryId,
-                DESCRIPTION = t.Description,
-                NAME = t.Merchant,
-                MCC = t.Mcc,
-                STATUS = t.Status.ToString(),
-                DATE = t.Date?.ToString("o")
+            return Ok(list.Select(new_transaction => new {
+                TRANSACTION_ID = new_transaction.TransactionId,
+                VALUE = new_transaction.Value,
+                CATEGORY_ID = new_transaction.CategoryId,
+                DESCRIPTION = new_transaction.Description,
+                NAME = new_transaction.Merchant,
+                MCC = new_transaction.Mcc,
+                STATUS = new_transaction.Status.ToString(),
+                DATE = new_transaction.Date?.ToString("o")
             }));
         }
 
@@ -53,49 +51,46 @@ namespace SmartBudget.Transactions.Controllers
         /// GET single transaction
         /// </summary>
         [HttpGet("{id}")]
-        public async Task<IActionResult> Get(string id)
+        public async Task<IActionResult> Get(Guid id)
         {
-            var tx = await _repo.GetByTransactionIdAsync(id);
-            if (tx == null) return NotFound();
-            return Ok(tx);
+            var getted_transaction = await _repository.GetByTransactionIdAsync(id);
+            if (getted_transaction == null) return NotFound();
+            return Ok(getted_transaction);
         }
 
         /// <summary>
         /// POST create manual transaction
         /// </summary>
         [HttpPost("manual")]
-        public async Task<IActionResult> CreateManual([FromBody] CreateManualTransactionRequest req)
+        public async Task<IActionResult> CreateManual([FromBody] CreateManualTransactionRequest _request)
         {
-            if (!Guid.TryParse(req.UserId, out var uid)) return BadRequest("USER_ID invalid");
-            if (!Guid.TryParse(req.AccountId, out var aid)) return BadRequest("ACCOUNT_ID invalid");
-
-            var tx = new Transaction
+            var created_transaction = new Transaction
             {
                 Id = Guid.NewGuid(),
-                UserId = uid,
-                TransactionId = "MANUAL-" + Guid.NewGuid(),
-                AccountId = aid,
-                Value = req.Value,
-                Type = req.Value >= 0 ? TransactionType.income : TransactionType.expense,
+                UserId = _request.userId,
+                TransactionId = Guid.NewGuid(),
+                AccountId = _request.accountId,
+                Value = _request.value,
+                Type = _request.value >= 0 ? TransactionType.income : TransactionType.expense,
                 Status = TransactionStatus.confirmed,
-                Merchant = req.Name,
-                Description = req.Description,
+                Merchant = _request.name,
+                Description = _request.description,
                 ImportedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                CategoryId = req.CategoryId
+                CategoryId = _request.categoryId
             };
 
-            using var transaction = await _repo.BeginTransactionAsync();
+            using var transaction = await _repository.BeginTransactionAsync();
             try
             {
-                await _repo.AddTransactionAsync(tx);
-                await _repo.SaveChangesAsync();
+                await _repository.AddTransactionAsync(created_transaction);
+                await _repository.SaveChangesAsync();
 
-                var simple = JsonSerializer.Serialize(new { ACCOUNT_ID = tx.AccountId, CATEGORY_ID = tx.CategoryId, VALUE = tx.Value });
-                await _kafka.ProduceAsync("transaction.new", tx.TransactionId, simple);
+                var simple = JsonSerializer.Serialize(new { ACCOUNT_ID = created_transaction.AccountId, CATEGORY_ID = created_transaction.CategoryId, VALUE = created_transaction.Value });
+                await _kafka.ProduceAsync("transaction.new", created_transaction.TransactionId, simple);
 
-                var evt = JsonSerializer.Serialize(new { event_type = "transaction.new", user_id = tx.UserId, details = tx });
-                await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, evt);
+                var evt = JsonSerializer.Serialize(new { event_type = "transaction.new", user_id = created_transaction.UserId, details = created_transaction });
+                await _kafka.ProduceAsync("budget.transactions.events", created_transaction.TransactionId, evt);
 
                 await transaction.CommitAsync();
             }
@@ -105,7 +100,7 @@ namespace SmartBudget.Transactions.Controllers
                 throw;
             }
 
-            return Ok(new { TRANSACTION_ID = tx.TransactionId });
+            return Ok(new { TRANSACTION_ID = created_transaction.TransactionId });
         }
 
         /// <summary>
@@ -125,50 +120,50 @@ namespace SmartBudget.Transactions.Controllers
 
             var created = new List<object>();
 
-            foreach (var it in items)
+            foreach (var current_item in items)
             {
-                using var transaction = await _repo.BeginTransactionAsync();
+                using var transaction = await _repository.BeginTransactionAsync();
                 try
                 {
-                    var tx = new Transaction
+                    var current_imported_transaction = new Transaction
                     {
-                        Id = Guid.TryParse(it.Id, out var gid) ? gid : Guid.NewGuid(),
-                        UserId = Guid.TryParse(it.UserId, out var uid) ? uid : Guid.Empty,
-                        TransactionId = it.TransactionId ?? Guid.NewGuid().ToString(),
-                        AccountId = Guid.TryParse(it.AccountId, out var aid) ? aid : Guid.Empty,
-                        Date = DateTime.TryParse(it.Date, out var d) ? d : (DateTime?)null,
-                        Value = it.Value ?? 0m,
-                        Type = Enum.TryParse<TransactionType>(it.Type ?? "expense", true, out var tt) ? tt : TransactionType.expense,
-                        Status = Enum.TryParse<TransactionStatus>(it.Status ?? "pending", true, out var st) ? st : TransactionStatus.pending,
-                        Merchant = it.Merchant,
-                        Mcc = it.Mcc,
-                        Description = it.Description,
+                        Id = current_item.id == Guid.Empty ? Guid.NewGuid() : current_item.id,
+                        UserId = current_item.userId,
+                        TransactionId = current_item.transactionId == Guid.Empty ? Guid.NewGuid() : current_item.transactionId,
+                        AccountId = current_item.accountId,
+                        Date = current_item.date,
+                        Value = current_item.value ?? 0,
+                        Type = current_item.type ?? TransactionType.expense,
+                        Status = current_item.status ?? TransactionStatus.pending,
+                        Merchant = current_item.merchant,
+                        Mcc = current_item.mcc,
+                        Description = current_item.description,
                         ImportedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow,
                         CategoryId = null
                     };
 
-                    if (tx.UserId == Guid.Empty) continue;
+                    if (current_imported_transaction.UserId == Guid.Empty) continue;
 
-                    if (!await _repo.ExistsAsync(tx.TransactionId))
+                    if (!await _repository.ExistsAsync(current_imported_transaction.TransactionId))
                     {
-                        await _repo.AddTransactionAsync(tx);
-                        await _repo.SaveChangesAsync();
+                        await _repository.AddTransactionAsync(current_imported_transaction);
+                        await _repository.SaveChangesAsync();
 
-                        var importedPayload = JsonSerializer.Serialize(new { event_type = "transaction.imported", user_id = tx.UserId, details = tx });
-                        await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, importedPayload);
+                        var importedPayload = JsonSerializer.Serialize(new { event_type = "transaction.imported", user_id = current_imported_transaction.UserId, details = current_imported_transaction });
+                        await _kafka.ProduceAsync("budget.transactions.events", current_imported_transaction.TransactionId, importedPayload);
 
-                        var need = JsonSerializer.Serialize(new { TRANSACTION_ID = tx.TransactionId, ACCOUNT_ID = tx.AccountId, MERCHANT = tx.Merchant, MCC = tx.Mcc, Description = tx.Description });
-                        await _kafka.ProduceAsync("transaction.need_category", tx.TransactionId, need);
+                        var need = JsonSerializer.Serialize(new { TRANSACTION_ID = current_imported_transaction.TransactionId, ACCOUNT_ID = current_imported_transaction.AccountId, MERCHANT = current_imported_transaction.Merchant, MCC = current_imported_transaction.Mcc, Description = current_imported_transaction.Description });
+                        await _kafka.ProduceAsync("transaction.need_category", current_imported_transaction.TransactionId, need);
 
                         await transaction.CommitAsync();
-                        created.Add(new { tx.TransactionId });
+                        created.Add(new { current_imported_transaction.TransactionId });
                     }
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
                     await transaction.RollbackAsync();
-                    _log.LogError(ex, "Import mock item failed");
+                    _log.LogError(exception, "Import mock item failed");
                 }
             }
 
@@ -179,19 +174,19 @@ namespace SmartBudget.Transactions.Controllers
         /// PATCH: change category
         /// </summary>
         [HttpPatch("{id}")]
-        public async Task<IActionResult> PatchCategory(string id, [FromBody] PatchTransactionCategoryRequest req)
+        public async Task<IActionResult> PatchCategory(Guid id, [FromBody] PatchTransactionCategoryRequest request)
         {
-            var tx = await _repo.GetByTransactionIdAsync(id);
+            var tx = await _repository.GetByTransactionIdAsync(id);
             if (tx == null) return NotFound();
 
             var old = tx.CategoryId;
-            tx.CategoryId = req.CategoryId;
+            tx.CategoryId = request.categoryId;
             tx.UpdatedAt = DateTime.UtcNow;
 
-            await _repo.SaveChangesAsync();
+            await _repository.SaveChangesAsync();
 
             // Событие для Kafka
-            var upd = JsonSerializer.Serialize(new 
+            var updated = JsonSerializer.Serialize(new 
             { 
                 event_type = "transaction.updated", 
                 user_id = tx.UserId, 
@@ -199,16 +194,16 @@ namespace SmartBudget.Transactions.Controllers
                 { 
                     TRANSACTION_ID = tx.TransactionId, 
                     OLD_CATEGORY = old, 
-                    NEW_CATEGORY = req.CategoryId 
+                    NEW_CATEGORY = request.categoryId 
                 } 
             });
-            await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, upd);
+            await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, updated);
 
             var simple = JsonSerializer.Serialize(new 
             { 
                 TRANSACTION_ID = tx.TransactionId, 
                 OLD_CATEGORY = old, 
-                NEW_CATEGORY = req.CategoryId 
+                NEW_CATEGORY = request.categoryId 
             });
             await _kafka.ProduceAsync("transaction.updated", tx.TransactionId, simple);
 
@@ -220,15 +215,15 @@ namespace SmartBudget.Transactions.Controllers
         /// DELETE transaction
         /// </summary>
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(string id)
+        public async Task<IActionResult> Delete(Guid id)
         {
-            var tx = await _repo.GetByTransactionIdAsync(id);
-            if (tx == null) return NotFound();
+            var deleting_transaction = await _repository.GetByTransactionIdAsync(id);
+            if (deleting_transaction == null) return NotFound();
 
-            await _repo.RemoveTransactionAsync(tx);
-            await _repo.SaveChangesAsync();
+            await _repository.RemoveTransactionAsync(deleting_transaction);
+            await _repository.SaveChangesAsync();
 
-            await _kafka.ProduceAsync("budget.transactions.events", tx.TransactionId, JsonSerializer.Serialize(new { event_type = "transaction.deleted", user_id = tx.UserId, details = new { TRANSACTION_ID = tx.TransactionId } }));
+            await _kafka.ProduceAsync("budget.transactions.events", deleting_transaction.TransactionId, JsonSerializer.Serialize(new { event_type = "transaction.deleted", user_id = deleting_transaction.UserId, details = new { TRANSACTION_ID = deleting_transaction.TransactionId } }));
 
             return Ok("OK");
         }

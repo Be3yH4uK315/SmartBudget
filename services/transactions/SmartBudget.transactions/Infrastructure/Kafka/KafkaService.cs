@@ -27,13 +27,13 @@ public async Task ProduceAsync(string topic, object payload, string? key = null)
 {
     var json = JsonSerializer.Serialize(payload);
 
-    var msg = new Message<string, string>
+    var message = new Message<string, string>
     {
         Key = key ?? Guid.NewGuid().ToString(),
         Value = json
     };
 
-    await _producer.ProduceAsync(topic, msg);
+    await _producer.ProduceAsync(topic, message);
 }
 
 

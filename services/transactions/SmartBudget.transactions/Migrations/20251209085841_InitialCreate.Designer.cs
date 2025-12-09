@@ -12,7 +12,7 @@ using SmartBudget.Transactions.Data;
 namespace SmartBudget.Transactions.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251208123112_InitialCreate")]
+    [Migration("20251209085841_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -59,10 +59,9 @@ namespace SmartBudget.Transactions.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<string>("TransactionId")
-                        .IsRequired()
+                    b.Property<Guid>("TransactionId")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");

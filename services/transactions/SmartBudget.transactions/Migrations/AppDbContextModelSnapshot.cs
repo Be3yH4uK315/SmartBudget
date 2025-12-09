@@ -56,10 +56,9 @@ namespace SmartBudget.Transactions.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<string>("TransactionId")
-                        .IsRequired()
+                    b.Property<Guid>("TransactionId")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");

@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+using SmartBudget.Transactions.Domain.Enums;
 
 
 namespace SmartBudget.Transactions.Domain.DTO
@@ -8,27 +8,26 @@ namespace SmartBudget.Transactions.Domain.DTO
 /// </summary>
 public class ImportTransactionItem
 {
-public string Id { get; set; }
+public Guid id { get; set; }
 
-public string UserId { get; set; }
+public Guid userId { get; set; }
 
-public string TransactionId { get; set; }
+public Guid transactionId { get; set; }
 
+public Guid accountId { get; set; }
 
-public string AccountId { get; set; }
+public DateTime date { get; set; }
 
-public string Date { get; set; }
+public decimal? value { get; set; }
 
-public decimal? Value { get; set; }
+public TransactionType? type { get; set; }
 
-public string Type { get; set; }
+public TransactionStatus? status { get; set; }
 
-public string Status { get; set; }
+public string merchant { get; set; }
 
-public string Merchant { get; set; }
+public int? mcc { get; set; }
 
-public int? Mcc { get; set; }
-
-public string Description { get; set; }
+public string description { get; set; }
 }
 }

@@ -1,6 +1,3 @@
-using System.Text.Json.Serialization;
-
-
 namespace SmartBudget.Transactions.Domain.DTO
 {
 /// <summary>
@@ -8,16 +5,16 @@ namespace SmartBudget.Transactions.Domain.DTO
 /// </summary>
 public class CreateManualTransactionRequest
 {
-public string UserId { get; set; }
+public Guid userId { get; set; }
 
-public string AccountId { get; set; }
+public Guid accountId { get; set; }
 
-public decimal Value { get; set; }
+public decimal value { get; set; }
 
-public int? CategoryId { get; set; }
+public int? categoryId { get; set; }
 
-public string Description { get; set; }
+public string description { get; set; }
 
-public string Name { get; set; }
+public string name { get; set; }
 }
 }

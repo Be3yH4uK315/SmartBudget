@@ -1,8 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SmartBudget.Transactions.Domain.Enums;
-
-
 namespace SmartBudget.Transactions.Domain.Entities
 {
 /// <summary>
@@ -16,8 +14,7 @@ public Guid Id { get; set; }
 [Required]
 public Guid UserId { get; set; }
 
-[MaxLength(200)]
-public string TransactionId { get; set;}
+public Guid TransactionId { get; set;}
 
 public Guid AccountId { get; set; }
 
