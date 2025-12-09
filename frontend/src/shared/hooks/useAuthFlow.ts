@@ -7,6 +7,7 @@ export function useAuthFlow() {
   const navigate = useNavigate()
 
   const [step, setStep] = useState<AuthStep>('email')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [history, setHistory] = useState<AuthStep[]>(['email'])
 
   const pushStep = useCallback((next: AuthStep) => {
