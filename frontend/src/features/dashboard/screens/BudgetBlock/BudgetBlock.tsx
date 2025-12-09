@@ -1,9 +1,9 @@
 import React from 'react'
+import { DashboardCategory } from '@features/dashboard/types'
 import { Button, Paper, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
 import { PercentLine } from './PercentLine'
-import { DashboardCategory } from '@features/dashboard/types'
 
 type Props = {
   categories: DashboardCategory[]
