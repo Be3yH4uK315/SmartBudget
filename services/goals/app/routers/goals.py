@@ -1,13 +1,10 @@
-from fastapi import APIRouter, Depends, Body, Path, status, HTTPException
+from fastapi import APIRouter, Depends, Body, Path, Query, status, HTTPException
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 
 from app import dependencies, schemas, services, exceptions
 
-router = APIRouter(
-    prefix="/users/{user_id}/goals", 
-    tags=["Goals"]
-)
+router = APIRouter(tags=["Goals"])
 
 @router.post(
     "/",
@@ -16,8 +13,8 @@ router = APIRouter(
     responses={400: {"model": schemas.UnifiedErrorResponse}}
 )
 async def create_goal(
-    user_id: UUID = Depends(dependencies.get_user_id),
     request: schemas.CreateGoalRequest = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
     """Создает новую цель для пользователя."""
@@ -28,49 +25,40 @@ async def create_goal(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.get(
-    "/{goal_id}",
-    response_model=schemas.GoalResponse,
+    "/",
+    response_model=List[schemas.AllGoalsResponse] | schemas.GoalResponse,
     responses={404: {"model": schemas.UnifiedErrorResponse}}
 )
-async def get_goal(
-    user_id: UUID = Depends(dependencies.get_user_id),
-    goal_id: UUID = Path(...),
+async def get_goals(
+    goal_id: Optional[UUID] = Query(None, description="Получить конкретную цель по ID"),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
-    """Получение конкретной цели."""
-    try:
-        goal, days_left = await service.get_goal_details(user_id, goal_id)
-        return schemas.GoalResponse(
-            **goal.__dict__,
-            days_left=days_left
-        )
-    except exceptions.GoalNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    """
+    Универсальный метод:
+    - Если передан ?goal_id=..., возвращает одну цель.
+    - Если goal_id не передан, возвращает список всех целей.
+    """
+    if goal_id:
+        try:
+            goal, days_left = await service.get_goal_details(user_id, goal_id)
+            return schemas.GoalResponse(**goal.__dict__, days_left=days_left)
+        except exceptions.GoalNotFoundError as e:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    else:
+        return await service.get_all_goals(user_id)
 
 @router.get(
-    "/main/",
+    "/main",
     response_model=schemas.MainGoalsResponse
 )
 async def get_main_goals(
-    user_id: UUID = Depends(dependencies.get_user_id),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
     """Получение целей для главного экрана."""
     goals = await service.get_main_goals(user_id)
-
     return schemas.MainGoalsResponse(goals=goals)
-
-@router.get(
-    "/",
-    response_model=List[schemas.AllGoalsResponse]
-)
-async def get_all_goals(
-    user_id: UUID = Depends(dependencies.get_user_id),
-    service: services.GoalService = Depends(dependencies.get_goal_service)
-):
-    """Получение всех целей пользователя."""
-    goals = await service.get_all_goals(user_id)
-    return goals
 
 @router.patch(
     "/{goal_id}",
@@ -81,9 +69,9 @@ async def get_all_goals(
     }
 )
 async def update_goal(
-    user_id: UUID = Depends(dependencies.get_user_id),
     goal_id: UUID = Path(...),
     request: schemas.GoalPatchRequest = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
     """Обновление полей цели."""
