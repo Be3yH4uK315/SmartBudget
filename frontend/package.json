@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "yarn convert_dictionary && rsbuild build",
-    "start": "rsbuild dev --open"
+    "start": "rsbuild dev --open",
+    "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}' --fix"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -46,21 +47,8 @@
     "eslint-plugin-react-hooks": "^7.0.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^16.5.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
-  },
-  "lint-staged": {
-    "src/**/*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "git add"
-    ]
   }
 }
