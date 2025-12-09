@@ -1,6 +1,6 @@
+import { Languages, OneLocaleDictionary } from '@shared/types'
 import dayjs from 'dayjs'
 import { initI18n } from './localization.config'
-import { Languages, OneLocaleDictionary } from '@shared/types'
 
 class LocaleManager {
   private readonly i18n = initI18n()

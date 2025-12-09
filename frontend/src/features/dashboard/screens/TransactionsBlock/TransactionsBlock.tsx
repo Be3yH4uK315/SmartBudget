@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react'
 import { useTransactionFilters } from '@features/dashboard/hooks'
+import { DashboardCategory, normalizedCategory } from '@features/dashboard/types'
 import { Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import dayjs from 'dayjs'
 import { CategoryBlock } from './CategoryBlock'
 import { PieChartWithCenterLabel } from './TransactionsPie'
-import { DashboardCategory, normalizedCategory } from '@features/dashboard/types'
 
 type Props = {
   categories: DashboardCategory[]
