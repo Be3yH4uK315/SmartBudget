@@ -26,6 +26,9 @@
     "react-window": "^2.2.1"
   },
   "devDependencies": {
+    "@eslint/compat": "^2.0.0",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.1",
     "@rsbuild/core": "^1.5.14",
     "@rsbuild/plugin-eslint": "^1.1.2",
     "@rsbuild/plugin-react": "^1.4.1",
@@ -36,12 +39,28 @@
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
     "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
-    "prettier": "^3.6.2",
+    "globals": "^16.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "git add"
+    ]
   }
 }

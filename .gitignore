@@ -5,7 +5,6 @@
 /frontend/build/
 /frontend/.rspack-profile-*/
 !/frontend/.vscode/extensions.json
-!/frontend/.vscode/settings.json
 
 # --- UNIVERSAL IGNORE RULES ---
 **/__pycache__/
