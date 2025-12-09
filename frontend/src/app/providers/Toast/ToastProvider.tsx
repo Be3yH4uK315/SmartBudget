@@ -24,9 +24,9 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
           zIndex: 10000,
         }}
       >
-        {toasts.map((toast, index) => (
+        {toasts.map((toast) => (
           <Toast
-            key={index}
+            key={toast.id}
             onClose={() => closeToast(toast.id)}
             type={toast.type}
             titleKey={toast.titleKey}
