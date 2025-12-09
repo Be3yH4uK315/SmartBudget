@@ -14,6 +14,11 @@ class ArqSettings(BaseSettings):
     redis_url: str
     arq_queue_name: str
 
+class JWTSettings(BaseSettings):
+    jwt_public_key: str
+    jwt_algorithm: str
+    jwt_audience: str
+
 class AppSettings(BaseSettings):
     log_level: str
     tz: str
@@ -22,6 +27,7 @@ class Settings(BaseSettings):
     db: DBSettings
     kafka: KafkaSettings
     arq: ArqSettings
+    jwt: JWTSettings
     app: AppSettings
 
     model_config = SettingsConfigDict(
