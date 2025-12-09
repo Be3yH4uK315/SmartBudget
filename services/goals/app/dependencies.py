@@ -1,4 +1,6 @@
-from fastapi import Depends, Path, HTTPException, Request
+from fastapi import Depends, status, HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 from uuid import UUID
@@ -6,9 +8,12 @@ from arq.connections import ArqRedis
 
 from app import (
     repositories, 
-    services
+    services,
+    settings
 )
 from app.kafka_producer import KafkaProducer
+
+security = HTTPBearer()
 
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Получает session_maker из app.state и предоставляет сессию."""
@@ -45,11 +50,42 @@ def get_goal_service(
     """Провайдер для GoalService."""
     return services.GoalService(repo, kafka)
 
-def get_user_id(
-    user_id: UUID = Path(..., description="ID пользователя (UUID)")
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> UUID:
     """
-    Извлекает user_id из пути.
-    (Предполагается, что API Gateway уже проверил токен)
+    Декодирует JWT, валидирует подпись публичным ключом и возвращает user_id.
     """
-    return user_id
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(
+            token,
+            settings.settings.jwt.jwt_public_key,
+            algorithms=[settings.settings.jwt.jwt_algorithm],
+            audience=settings.settings.jwt.jwt_audience,
+        )
+        
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Token missing subject (user_id)"
+            )
+            
+        return UUID(user_id_str)
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Token has expired"
+        )
+    except jwt.PyJWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail=f"Could not validate credentials: {e}"
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid user ID format in token"
+        )
