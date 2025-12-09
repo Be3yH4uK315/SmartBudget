@@ -1,33 +1,38 @@
 import { useEffect, useState } from 'react'
-import { authApi } from '@shared/api/auth'
+import { useAppDispatch } from '@shared/store'
 import { getUserInfo } from '@shared/store/user'
-import { useDispatch } from 'react-redux'
+import { logoutHelper } from '@shared/utils'
+import { useLocation } from 'react-router'
+
+const publicRoutes = ['/auth/sign-in', '/auth/registration', '/auth/reset-password', '/']
 
 export function useAuthorization() {
-  const dispatch = useDispatch<AppDispatch>()
+  const dispatch = useAppDispatch()
+  const { pathname } = useLocation()
 
   const [isLoading, setIsLoading] = useState(true)
 
+  const isPublicRoute = (path: string) => publicRoutes.includes(path)
+
   useEffect(() => {
-    const auth = async () => {
+    if (isPublicRoute(pathname)) {
+      setIsLoading(false)
+      return
+    }
+
+    ;(async () => {
       try {
-        const refreshResponse = await authApi.refresh()
-
-        if (refreshResponse !== 200) return
-
         const action = await dispatch(getUserInfo())
 
         if (getUserInfo.rejected.match(action) && action.payload === 'noInfo') {
-          await authApi.logout()
+          await logoutHelper(dispatch)
         }
-      } catch (_) {
+      } catch {
       } finally {
         setIsLoading(false)
       }
-    }
-
-    auth()
-  }, [dispatch])
+    })()
+  }, [dispatch, pathname])
 
   return { isLoading }
 }

@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { authApi } from '@shared/api/auth'
+import { AuthStep, ErrorCode, VerifyMode } from '@shared/types'
 import { useNavigate } from 'react-router'
-
-type ErrorCode = 403 | 429 | null
 
 export function useAuthFlow() {
   const navigate = useNavigate()
@@ -72,8 +71,8 @@ export function useAuthFlow() {
         }
       } catch (e: any) {
         const code = Number(e?.status || e?.code)
-        if (code === 403) {
-          setErrorCode(403)
+        if (code === 401) {
+          setErrorCode(401)
         } else if (code === 429) {
           setErrorCode(429)
         }

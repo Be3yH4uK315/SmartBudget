@@ -4,6 +4,8 @@
       "@app": ["src/app"],
       "@app/*": ["src/app/*"],
 
+      "@features/dashboard/*": ["src/features/dashboard/*"],
+
       "@shared/api/*": ["src/shared/api/*"],
       "@shared/api": ["src/shared/api"],
       "@shared/assets/fonts/*": ["src/shared/assets/fonts/*"],
@@ -19,7 +21,8 @@
       "@shared/styles/*": ["src/shared/styles/*"],
       "@shared/types/*": ["src/shared/types/*"],
       "@shared/types": ["src/shared/types"],
-      "@shared/utils/*": ["src/shared/utils/*"]
+      "@shared/utils/*": ["src/shared/utils/*"],
+      "@shared/utils": ["src/shared/utils"]
     }
   }
 }

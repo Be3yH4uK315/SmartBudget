@@ -21,7 +21,7 @@ export const paletteLight: PaletteOptions = {
 
   gray: {
     light: '#E2E2E4',
-    main: '#747B8F',
+    main: '#8A8A8A',
     dark: '#333333',
   },
 
@@ -50,6 +50,7 @@ export const paletteLight: PaletteOptions = {
   },
 
   grayButton: {
+    light: '#E6E6E6',
     main: '#dedede',
     dark: '#d6d6d6', //hover
   },

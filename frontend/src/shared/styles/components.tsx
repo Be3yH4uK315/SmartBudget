@@ -140,6 +140,28 @@ export const components: ThemeOptions['components'] = {
           },
         }),
       },
+
+      {
+        props: { variant: 'white' },
+        style: ({ theme }) => ({
+          backgroundColor: theme.palette.grayButton.light,
+          color: theme.palette.text.primary,
+          padding: '6px',
+          margin: 0,
+          borderWidth: 2,
+          borderColor: 'transparent',
+          typography: 'caption',
+          width: 'min-content',
+          height: 'min-content',
+
+          '&:hover': {
+            backgroundColor: theme.palette.grayButton.main,
+          },
+          '&:active': {
+            backgroundColor: 'transparent',
+          },
+        }),
+      },
     ],
   },
 
@@ -172,7 +194,7 @@ export const components: ThemeOptions['components'] = {
     styleOverrides: {
       root: ({ theme: { palette } }) => ({
         animation: `pulse 2s ease-in-out infinite`,
-        backgroundColor: palette.gray.light,
+        backgroundColor: palette.gray.main,
 
         '@keyframes pulse': {
           '0%': {
@@ -244,6 +266,84 @@ export const components: ThemeOptions['components'] = {
             color: theme.palette.text.primary,
           },
         },
+      }),
+    },
+  },
+
+  MuiPaper: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        backgroundColor: theme.palette.surface.light,
+      }),
+    },
+  },
+
+  MuiAlert: {
+    defaultProps: {
+      variant: 'outlined',
+    },
+
+    styleOverrides: {
+      root: {
+        padding: 16,
+        width: 440,
+
+        boxShadow: '0px 6px 29px rgba(0, 77, 43, 0.16)',
+      },
+      outlined: ({ ownerState: { severity }, theme: { palette, shape } }) => {
+        const color =
+          severity === 'success'
+            ? 'success'
+            : severity === 'warning'
+              ? 'alert'
+              : severity === 'error'
+                ? 'error'
+                : 'info'
+
+        return {
+          borderWidth: 2,
+          borderColor: palette[color].main,
+          backgroundColor: palette.surface.main,
+
+          '& .MuiAlert-icon': {
+            width: 48,
+            height: 48,
+
+            alignSelf: 'center',
+
+            padding: 8,
+            marginRight: 16,
+
+            borderRadius: shape.borderRadius,
+            color: palette[color].main,
+            backgroundColor: palette[color].light,
+          },
+        }
+      },
+      message: {
+        flex: 1,
+        padding: 0,
+        overflow: 'visible',
+      },
+      action: {
+        width: 32,
+        height: 32,
+        margin: 0,
+        padding: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-start',
+      },
+    },
+  },
+
+  MuiAlertTitle: {
+    styleOverrides: {
+      root: ({ theme: { typography } }) => ({
+        ...typography.h5,
+
+        margin: 0,
+        marginBottom: 2,
       }),
     },
   },
