@@ -1,11 +1,12 @@
-import { rootDictionary } from '@shared/locale/rootDictionary'
+import { appLocaleDict } from '@app/locale'
+import { Languages, LocaleDictionary, UnionToIntersection } from '@shared/types'
 
 export function getInitialLanguage(fallback: Languages = 'ru'): Languages {
   const stored = localStorage.getItem('language') as Languages | null
-  if (stored && rootDictionary[stored]) return stored
+  if (stored && appLocaleDict[stored]) return stored
 
   const nav = navigator.language?.slice(0, 2).toLowerCase() as Languages
-  if (nav && rootDictionary[nav]) return nav
+  if (nav && appLocaleDict[nav]) return nav
 
   return fallback
 }

@@ -1,7 +1,7 @@
 import { ComponentType, useEffect } from 'react'
+import { useAppSelector } from '@shared/store'
 import { selectUser } from '@shared/store/user'
 import { useNavigate } from 'react-router'
-import { useAppSelector } from '@shared/store'
 
 /**
  * HOC для проверки авторизации.

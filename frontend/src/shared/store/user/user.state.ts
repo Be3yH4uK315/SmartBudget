@@ -1,3 +1,5 @@
+import { userSliceState } from '@shared/types'
+
 export function getUserInitialState(): userSliceState {
   return {
     userId: '',

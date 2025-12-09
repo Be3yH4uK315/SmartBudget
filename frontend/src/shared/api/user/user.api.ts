@@ -1,6 +1,5 @@
 import { apiME } from '@shared/api'
-
-//временное использование apiME для тестов, т.к. на бэке /user/me это /auth/me
+import { User } from '@shared/types'
 
 class User_api {
   baseURL = '/user'

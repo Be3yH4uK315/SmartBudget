@@ -1,2 +1,2 @@
 export * from './ScreenContent'
-export * from './ScreenSkeleton'  
+export * from './ScreenSkeleton'

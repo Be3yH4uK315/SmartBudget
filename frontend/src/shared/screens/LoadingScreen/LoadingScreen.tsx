@@ -19,7 +19,7 @@ export function LoadingScreen() {
         zIndex: 100000,
       }}
     >
-      <CircularProgress size={128} sx={{ alignSelf: 'center', color: 'primary.main'}} />
+      <CircularProgress size={128} sx={{ alignSelf: 'center', color: 'primary.main' }} />
 
       <Typography variant="h4">{translate('loading')}</Typography>
     </Stack>

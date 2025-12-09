@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { userSliceReducers, userSliceState } from '@shared/types'
 import { getUserInitialState } from './user.state'
 import { getUserInfo } from './user.thunks'
 

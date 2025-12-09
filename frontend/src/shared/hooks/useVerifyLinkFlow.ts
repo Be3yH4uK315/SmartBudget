@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { authApi } from '@shared/api/auth'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { AuthResponse, TokenType } from '@shared/types'
 
 export const useVerifyLinkFlow = () => {
   const navigate = useNavigate()
@@ -42,7 +43,7 @@ export const useVerifyLinkFlow = () => {
     return () => {
       cancelled = true
     }
-  }, [email, token])
+  }, [email, token, token_type])
 
   const wrapSubmit = useCallback(
     async (fn: () => Promise<AuthResponse>) => {

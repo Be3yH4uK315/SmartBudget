@@ -7,6 +7,7 @@ declare module '@mui/material/Button' {
     yellow: true
     blue: true
     link: true
+    white: true
   }
 }
 

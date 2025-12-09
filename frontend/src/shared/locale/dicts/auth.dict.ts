@@ -1,4 +1,6 @@
-export const rootDictionary: LocaleDictionary = {
+import { LocaleDictionary } from '@shared/types'
+
+export const authDict: LocaleDictionary = {
   ru: {
     AuthScreen: {
       email: {
@@ -6,6 +8,7 @@ export const rootDictionary: LocaleDictionary = {
         subtitle: 'Введите почту, чтобы войти или зарегистрироваться',
         placeholder: 'Электронная почта',
       },
+
       password: {
         title: 'Введите пароль',
         placeholder: 'Пароль',
@@ -13,17 +16,20 @@ export const rootDictionary: LocaleDictionary = {
         wrongPassword: 'Неверный пароль',
         tooManyAttempts: 'Слишком много попыток, попробуйте позже',
       },
+
       verifyEmail: {
         title: 'Проверьте почту',
         subtitleEmail: 'Письмо с подтверждением регистрации отправлено на почту {{email}}',
         subtitlePassword: 'Письмо для смены пароля отправлено на почту {{email}}',
         buttonText: 'Письмо не пришло',
       },
+
       signIn: 'Войти',
     },
+
     RegistrationScreen: {
       title: 'Регистрация',
-      caption: 'Нажимая кнопку «Зарегистрироваться» вы соглашаетесь с условиями использования.',
+      caption: 'Нажимая кнопку «Зарегистрироваться» вы соглашаетесь с условиями использования',
       name: 'Имя',
       country: 'Страна',
       password: 'Пароль',
@@ -31,6 +37,7 @@ export const rootDictionary: LocaleDictionary = {
       passwordsNotMatch: 'Пароли не совпадают',
       continue: 'Зарегистрироваться',
     },
+
     ResetPasswordScreen: {
       title: 'Восстановление пароля',
       password: 'Пароль',
@@ -38,21 +45,10 @@ export const rootDictionary: LocaleDictionary = {
       passwordsNotMatch: 'Пароли не совпадают',
       continue: 'Сбросить пароль',
     },
+
     WrongLink: {
       incorrectLink: 'К сожалению, эта страница недоступна',
       incorrectLinkCaption: 'Проверьте корректность ссылки или попробуйте еще раз',
-    },
-    HeaderTabs: {
-      main: 'Главная',
-      budget: 'Бюджет',
-      goals: 'Цели',
-      transactions: 'Операции',
-      settings: 'Настройки',
-      signIn: 'Войти',
-      logout: 'Выход',
-    },
-    LoadingScreen: {
-      loading: 'Загрузка...',
     },
   },
 
@@ -75,17 +71,29 @@ export const rootDictionary: LocaleDictionary = {
       },
       signIn: 'Sign In',
     },
-    HeaderTabs: {
-      main: 'Main',
-      budget: 'Budget',
-      goals: 'Goals',
-      transactions: 'Transactions',
-      settings: 'Settings',
-      signIn: 'Sign In',
-      logout: 'Logout',
+
+    RegistrationScreen: {
+      title: 'Registration',
+      caption: 'By clicking the "Register" button, you agree to the terms of use',
+      name: 'Name',
+      country: 'Country',
+      password: 'Password',
+      repeatPassword: 'Confirm the password',
+      passwordsNotMatch: 'Passwords do not match',
+      continue: 'Register',
     },
-    LoadingScreen: {
-      loading: 'Loading...',
+
+    ResetPasswordScreen: {
+      title: 'Password Recovery',
+      password: 'Password',
+      repeatPassword: 'Confirm the password',
+      passwordsNotMatch: 'Passwords do not match',
+      continue: 'Reset password',
+    },
+
+    WrongLink: {
+      incorrectLink: 'Unfortunately, this page is unavailable.',
+      incorrectLinkCaption: 'Check the correctness of the link or try again',
     },
   },
 }
