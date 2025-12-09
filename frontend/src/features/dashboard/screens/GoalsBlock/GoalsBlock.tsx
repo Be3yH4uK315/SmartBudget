@@ -1,8 +1,8 @@
+import { DashboardGoal } from '@features/dashboard/types'
 import { Button, Paper, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
 import { Goal } from './Goal'
-import { DashboardGoal } from '@features/dashboard/types'
 
 type Props = {
   goals: DashboardGoal[]
