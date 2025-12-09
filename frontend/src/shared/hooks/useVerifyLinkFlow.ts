@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { authApi } from '@shared/api/auth'
-import { AuthResponse, TokenType } from '@shared/types'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { AuthResponse, TokenType } from '@shared/types'
 
 export const useVerifyLinkFlow = () => {
   const navigate = useNavigate()

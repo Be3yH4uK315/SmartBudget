@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { authApi } from '@shared/api/auth'
-import { AuthStep, ErrorCode, VerifyMode } from '@shared/types'
 import { useNavigate } from 'react-router'
+import { AuthStep, ErrorCode, VerifyMode } from '@shared/types'
 
 export function useAuthFlow() {
   const navigate = useNavigate()

@@ -1,7 +1,7 @@
 import React from 'react'
-import { normalizedCategory } from '@features/dashboard/types'
 import { Box, Stack, Typography } from '@mui/material'
 import { formatCurrency } from '@shared/utils'
+import { normalizedCategory } from '@features/dashboard/types'
 
 type Props = {
   category: normalizedCategory

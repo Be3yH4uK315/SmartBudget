@@ -1,7 +1,7 @@
 import { dashboardApi } from '@features/dashboard/api'
-import { DashboardResponsePayload } from '@features/dashboard/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { dashboardMock } from '../api/dashboard.mock'
+import { DashboardResponsePayload } from '@features/dashboard/types'
 
 export const getDashboardData = createAsyncThunk<
   DashboardResponsePayload,

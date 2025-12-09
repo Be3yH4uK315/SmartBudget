@@ -1,12 +1,12 @@
 import { api } from '@shared/api'
 import {
+  VerifyEmail,
   AuthResponse,
+  VerifyLink,
   CompleteRegistration,
-  CompleteReset,
   Login,
   ResetPassword,
-  VerifyEmail,
-  VerifyLink,
+  CompleteReset,
 } from '@shared/types'
 
 class AuthApi {
