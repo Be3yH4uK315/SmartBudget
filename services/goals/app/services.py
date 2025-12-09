@@ -137,12 +137,12 @@ class GoalService:
         )
 
         if goal is None:
-            logger.info(f"Transaction {transaction_id} already processed. Skipping.")
+            logger.info(f"Transaction {event.transaction_id} already processed. Skipping.")
             return
         
         event_updated = {
             "event": "goal.updated", 
-            "goal_id": str(goal_id), 
+            "goal_id": str(goal.id), 
             "current_value": goal.current_value,
             "status": goal.status
         }
