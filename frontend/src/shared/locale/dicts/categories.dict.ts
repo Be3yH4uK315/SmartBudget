@@ -1,3 +1,5 @@
+import { LocaleDictionary } from '@shared/types'
+
 export const categoriesDict: LocaleDictionary = {
   ru: {
     Categories: {

@@ -1,5 +1,6 @@
 import { store } from '@shared/store'
 import { addToast, removeToast } from '@shared/store/toast'
+import { ToastOptions } from '@shared/types'
 
 export function closeToast(id: number) {
   store.dispatch(removeToast(id))

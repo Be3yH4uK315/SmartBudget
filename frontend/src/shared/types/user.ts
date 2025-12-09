@@ -1,5 +1,5 @@
 /** Тип описывающий пользователя */
-type User = {
+export type User = {
   /** ID пользователя */
   id: string
 

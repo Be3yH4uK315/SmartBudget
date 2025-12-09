@@ -1,4 +1,6 @@
-type ToastOptions = {
+import { PayloadAction, SliceCaseReducers } from "./reduxToolkit"
+
+export type ToastOptions = {
   id: number
   messageKey: string
   titleKey?: string
@@ -6,11 +8,11 @@ type ToastOptions = {
   duration?: number
 }
 
-type ToastSliceState = {
+export type ToastSliceState = {
   toasts: ToastOptions[]
 }
 
-type ToastSliceReducers = SliceCaseReducers<ToastSliceState> & {
+export type ToastSliceReducers = SliceCaseReducers<ToastSliceState> & {
   addToast(state: ToastSliceState, action: PayloadAction<ToastOptions>): void
 
   removeToast(state: ToastSliceState, action: PayloadAction<number>): void

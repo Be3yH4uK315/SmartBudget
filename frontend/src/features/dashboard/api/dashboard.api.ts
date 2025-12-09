@@ -1,4 +1,5 @@
 import { api } from '@shared/api'
+import { DashboardResponsePayload } from '@features/dashboard/types'
 
 class DashboardApi {
   baseUrl = '/dashboard'

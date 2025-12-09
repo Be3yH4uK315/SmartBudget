@@ -26,7 +26,7 @@ export const EmailStep = ({
     <Stack direction={{ sm: 'row' }} spacing={{ xs: 2, sm: 2 }}>
       <TextField
         type="email"
-        inputMode='email'
+        inputMode="email"
         autoFocus
         label={translate('email.placeholder')}
         value={email}

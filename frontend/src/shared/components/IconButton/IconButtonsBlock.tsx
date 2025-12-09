@@ -1,5 +1,6 @@
 import { Stack } from '@mui/material'
 import { IconButton } from './IconButton'
+import { IconButtonItem } from '@shared/types'
 
 type Props = {
   buttons: IconButtonItem[]

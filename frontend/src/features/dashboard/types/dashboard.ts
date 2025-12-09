@@ -1,4 +1,4 @@
-type DashboardResponsePayload = {
+export type DashboardResponsePayload = {
   goals: DashboardGoal[]
 
   categories: DashboardCategory[]
@@ -6,7 +6,7 @@ type DashboardResponsePayload = {
   budgetTotalLimit: number
 }
 
-type DashboardGoal = {
+export type DashboardGoal = {
   name: string
 
   totalValue: number
@@ -14,7 +14,7 @@ type DashboardGoal = {
   currentValue: number
 }
 
-type DashboardCategory = {
+export type DashboardCategory = {
   categoryId: number
 
   value: number
@@ -22,14 +22,14 @@ type DashboardCategory = {
   type: string
 }
 
-type normalizedCategory = {
+export type normalizedCategory = {
   value: number
 
   label: string
 
   color: string
-  
+
   lightColor: string
 }
 
-type FilterType = 'income' | 'expense'
+export type FilterType = 'income' | 'expense'

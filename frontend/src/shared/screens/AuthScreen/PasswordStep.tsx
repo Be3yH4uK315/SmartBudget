@@ -1,6 +1,7 @@
 import { NavigateNextOutlined } from '@mui/icons-material'
 import { Button, CircularProgress, IconButton, Stack, TextField, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
+import { ErrorCode } from '@shared/types'
 
 type Props = {
   password: string

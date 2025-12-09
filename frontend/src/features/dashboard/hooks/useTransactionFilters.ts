@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTheme } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
+import { DashboardCategory, FilterType, normalizedCategory } from '@features/dashboard/types'
 
 export function useTransactionFilters(data: DashboardCategory[]) {
   const translateCategory = useTranslate('Categories')

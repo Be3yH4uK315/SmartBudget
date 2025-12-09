@@ -1,4 +1,5 @@
 import { configureStore, UnknownAction } from '@reduxjs/toolkit'
+import { AppDispatch, RootState } from '@shared/types'
 import { useDispatch, useSelector } from 'react-redux'
 import { rootReducer } from './rootReducer'
 
@@ -13,9 +14,9 @@ const resettableRootReducer = (
   return rootReducer(state, action)
 }
 
-  export const store = configureStore({
-    reducer: resettableRootReducer,
-  })
+export const store = configureStore({
+  reducer: resettableRootReducer,
+})
 
 export const getState = store.getState
 export const dispatch = store.dispatch

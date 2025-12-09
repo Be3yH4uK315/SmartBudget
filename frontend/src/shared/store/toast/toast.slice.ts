@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { getToastInitialState } from './toast.state'
+import { ToastSliceState, ToastSliceReducers } from '@shared/types'
 
 export const toastSlice = createSlice<ToastSliceState, ToastSliceReducers, 'toast', any>({
   name: 'toast',

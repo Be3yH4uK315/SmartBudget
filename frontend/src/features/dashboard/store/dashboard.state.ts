@@ -1,3 +1,5 @@
+import { DashboardSliceState } from '@features/dashboard/types'
+
 export function getDashboardInitialState(): DashboardSliceState {
   return {
     goals: [],

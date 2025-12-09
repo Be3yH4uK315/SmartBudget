@@ -8,6 +8,7 @@ import {
 import { Alert, AlertColor, AlertTitle, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
 import { SnackbarContent } from 'notistack'
+import { ToastOptions } from '@shared/types'
 
 type Props = Omit<ToastOptions, 'id'> & {
   onClose?: () => void

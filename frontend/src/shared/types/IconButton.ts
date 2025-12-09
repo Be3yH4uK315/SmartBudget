@@ -1,4 +1,6 @@
-type IconButtonItem = {
+import { JSX } from 'react'
+
+export type IconButtonItem = {
   Icon?: JSX.Element
   title?: string
   subtitle?: string

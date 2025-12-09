@@ -1,4 +1,5 @@
 import { apiME } from '@shared/api'
+import { User } from '@shared/types'
 
 class User_api {
   baseURL = '/user'

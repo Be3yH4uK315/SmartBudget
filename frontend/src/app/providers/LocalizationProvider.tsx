@@ -1,5 +1,6 @@
 import { createContext, PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react'
 import { _localeManager } from '@shared/locale/localeManager'
+import { Languages, OneLocaleDictionary } from '@shared/types/locale'
 
 export const LocalizationContext = createContext<{
   language: Languages

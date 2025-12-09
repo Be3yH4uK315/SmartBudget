@@ -1,6 +1,7 @@
 import React from 'react'
 import { styled } from '@mui/material'
 import { PieChart, useDrawingArea } from '@mui/x-charts'
+import { normalizedCategory } from '@features/dashboard/types'
 
 type Props = {
   data: Omit<normalizedCategory, 'lightColor'>[]

@@ -1,33 +1,35 @@
-type SignInAction =
+export type SignInAction =
   | 'sign_in'
   | 'sign_up'
   | 'reset_password'
   | 'complete_registration'
   | 'complete_reset'
-type VerifyMode = 'signup' | 'reset' | null
-type AuthStep = 'email' | 'password' | 'verifyEmail'
-type TokenType = 'verification' | 'reset'
 
-type ErrorCode = 401 | 429 | null
+export type VerifyMode = 'signup' | 'reset' | null
 
+export type AuthStep = 'email' | 'password' | 'verifyEmail'
 
-type AuthResponse = {
+export type TokenType = 'verification' | 'reset'
+
+export type ErrorCode = 401 | 429 | null
+
+export type AuthResponse = {
   action: SignInAction
   details: string
   status: string
 }
 
-type VerifyEmail = {
+export type VerifyEmail = {
   email: string
 }
 
-type VerifyLink = {
+export type VerifyLink = {
   token: string
   email: string
   token_type: string
 }
 
-type CompleteRegistration = {
+export type CompleteRegistration = {
   email: string
   token: string
   password: string
@@ -35,16 +37,16 @@ type CompleteRegistration = {
   country: string
 }
 
-type Login = {
+export type Login = {
   email: string
   password: string
 }
 
-type ResetPassword = {
+export type ResetPassword = {
   email: string
 }
 
-type CompleteReset = {
+export type CompleteReset = {
   email: string
   token: string
   new_password: string

@@ -1,3 +1,5 @@
+import { LocaleDictionary } from '@shared/types'
+
 export const authDict: LocaleDictionary = {
   ru: {
     AuthScreen: {
@@ -49,7 +51,7 @@ export const authDict: LocaleDictionary = {
       incorrectLinkCaption: 'Проверьте корректность ссылки или попробуйте еще раз',
     },
   },
-  
+
   en: {
     AuthScreen: {
       email: {

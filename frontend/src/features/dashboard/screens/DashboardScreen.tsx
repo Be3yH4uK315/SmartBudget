@@ -17,6 +17,7 @@ import { BudgetIcon, GoalIcon, ProfileIcon, SecurityIcon } from '@shared/assets/
 import { IconButtonsBlock, ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
+import { IconButtonItem } from '@shared/types'
 
 export default withAuth(function DashboardScreen() {
   const dispatch = useAppDispatch()

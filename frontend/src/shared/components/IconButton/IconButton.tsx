@@ -1,4 +1,5 @@
 import { Box, Paper, Stack, Typography } from '@mui/material'
+import { IconButtonItem } from '@shared/types'
 import { Link } from 'react-router'
 
 export const IconButton = ({ title, subtitle, Icon, path }: IconButtonItem) => {

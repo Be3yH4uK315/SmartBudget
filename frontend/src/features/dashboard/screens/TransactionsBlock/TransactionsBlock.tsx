@@ -5,6 +5,7 @@ import { useTranslate } from '@shared/hooks'
 import dayjs from 'dayjs'
 import { CategoryBlock } from './CategoryBlock'
 import { PieChartWithCenterLabel } from './TransactionsPie'
+import { DashboardCategory, normalizedCategory } from '@features/dashboard/types'
 
 type Props = {
   categories: DashboardCategory[]

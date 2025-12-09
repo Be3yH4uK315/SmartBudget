@@ -2,6 +2,7 @@ import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getDashboardInitialState } from './dashboard.state'
 import { getDashboardData } from './dashboard.thunks'
+import { DashboardSliceState, DashboardSliceReducers } from '@features/dashboard/types'
 
 export const dashboardSlice = createSlice<
   DashboardSliceState,
