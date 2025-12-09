@@ -1,4 +1,4 @@
-import { DashboardSliceReducers,DashboardSliceState } from '@features/dashboard/types'
+import { DashboardSliceReducers, DashboardSliceState } from '@features/dashboard/types'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getDashboardInitialState } from './dashboard.state'
