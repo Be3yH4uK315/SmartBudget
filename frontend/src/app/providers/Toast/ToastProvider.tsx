@@ -27,7 +27,7 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
         {toasts.map((toast, index) => (
           <Toast
             key={index}
-            onClose={closeToast}
+            onClose={() => closeToast(toast.id)}
             type={toast.type}
             titleKey={toast.titleKey}
             messageKey={toast.messageKey}

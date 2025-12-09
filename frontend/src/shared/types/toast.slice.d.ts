@@ -1,4 +1,5 @@
 type ToastOptions = {
+  id: number
   messageKey: string
   titleKey?: string
   type: 'success' | 'error' | 'warning' | 'info'
@@ -12,5 +13,5 @@ type ToastSliceState = {
 type ToastSliceReducers = SliceCaseReducers<ToastSliceState> & {
   addToast(state: ToastSliceState, action: PayloadAction<ToastOptions>): void
 
-  removeToast(state: ToastSliceState): void
+  removeToast(state: ToastSliceState, action: PayloadAction<number>): void
 }

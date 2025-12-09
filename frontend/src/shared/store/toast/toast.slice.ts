@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { generateId } from '@shared/utils'
 import { getToastInitialState } from './toast.state'
 
 export const toastSlice = createSlice<ToastSliceState, ToastSliceReducers, 'toast', any>({
@@ -9,8 +10,8 @@ export const toastSlice = createSlice<ToastSliceState, ToastSliceReducers, 'toas
       state.toasts.push(payload)
     },
 
-    removeToast(state) {
-      state.toasts.shift()
+    removeToast(state, id) {
+      state.toasts = state.toasts.filter((toast) => toast.id !== id.payload)
     },
   },
 })
