@@ -1,5 +1,5 @@
-import { SliceCaseReducers } from "@reduxjs/toolkit"
-import { DashboardGoal, DashboardCategory } from "./dashboard"
+import { SliceCaseReducers } from '@reduxjs/toolkit'
+import { DashboardCategory, DashboardGoal } from './dashboard'
 
 export type DashboardSliceState = {
   goals: DashboardGoal[]

@@ -1,5 +1,5 @@
-import { PaletteOptions as MuiPaletteOptions } from '@mui/material/styles'
 import '@mui/material/Button'
+import { PaletteOptions as MuiPaletteOptions } from '@mui/material/styles'
 
 declare module '@mui/material/Button' {
   interface ButtonPropsVariantOverrides {

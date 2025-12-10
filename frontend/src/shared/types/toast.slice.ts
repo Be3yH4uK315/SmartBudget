@@ -1,4 +1,4 @@
-import { PayloadAction, SliceCaseReducers } from "./reduxToolkit"
+import { PayloadAction, SliceCaseReducers } from './reduxToolkit'
 
 export type ToastOptions = {
   id: number
