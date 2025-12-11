@@ -185,56 +185,76 @@ class GoalService:
 
     async def check_deadlines(self):
         """
-        Логика Arq воркера.
-        Выбирает только нужные цели и отправляет Kafka-ивенты параллельно.
+        Логика Arq воркера с защитой от переполнения памяти (Batching).
         """
         logger.info("Starting daily check_goals_deadlines task...")
         today = datetime.now(timezone.utc).date()
+        BATCH_SIZE = 100
         
-        kafka_tasks = []
-        goals_to_update = []
-        
-        expired_goals = await self.repo.get_expired_goals(today)
-        
-        for goal in expired_goals:
-            goal.status = models.GoalStatus.EXPIRED.value
-            goals_to_update.append(goal)
+        total_expired = 0
+        while True:
+            expired_batch = await self.repo.get_expired_goals_batch(today, limit=BATCH_SIZE)
+            if not expired_batch:
+                break
             
-            event_updated = {"event": "goal.updated", "goal_id": str(goal.id), "status": "expired"}
-            kafka_tasks.append(
-                self.kafka.send_budget_event(event_updated)
-            )
+            kafka_tasks = []
             
-            event_notif = {"event": "goal.expired", "goal_id": str(goal.id), "type": "expired"}
-            kafka_tasks.append(
-                self.kafka.send_notification(event_notif)
-            )
+            for goal in expired_batch:
+                goal.status = models.GoalStatus.EXPIRED.value
+                
+                event_updated = {
+                    "event": "goal.updated", 
+                    "goal_id": str(goal.id), 
+                    "status": "expired"
+                }
+                kafka_tasks.append(self.kafka.send_budget_event(event_updated))
+                
+                event_notif = {
+                    "event": "goal.expired", 
+                    "goal_id": str(goal.id), 
+                    "type": "expired"
+                }
+                kafka_tasks.append(self.kafka.send_notification(event_notif))
             
-        approaching_goals = await self.repo.get_approaching_goals(today, days_notice=7)
-        
-        for goal in approaching_goals:
-            days_left = (goal.finish_date - today).days
-            goal.last_checked_date = datetime.now(timezone.utc)
-            goals_to_update.append(goal)
+            await self.repo.update_bulk(expired_batch)
             
-            event_notif = {
-                "event": "goal.approaching", 
-                "goal_id": str(goal.id), 
-                "type": "approaching",
-                "days_left": days_left
-            }
-            kafka_tasks.append(
-                self.kafka.send_notification(event_notif)
-            )
+            if kafka_tasks:
+                results = await asyncio.gather(*kafka_tasks, return_exceptions=True)
+            
+            total_expired += len(expired_batch)
+            logger.info(f"Processed batch of {len(expired_batch)} expired goals.")
 
-        if goals_to_update:
-            logger.info(f"Updating {len(goals_to_update)} goals ({len(expired_goals)} expired, {len(approaching_goals)} approaching)...")
-            await self.repo.update_bulk(goals_to_update)
-        
-        if kafka_tasks:
-            logger.info(f"Sending {len(kafka_tasks)} Kafka events in parallel...")
-            await asyncio.gather(*kafka_tasks)
+        logger.info(f"Finished expired goals. Total processed: {total_expired}")
+
+        total_approaching = 0
+        while True:
+            approaching_batch = await self.repo.get_approaching_goals_batch(today, limit=BATCH_SIZE, days_notice=7)
             
+            if not approaching_batch:
+                break
+            
+            kafka_tasks = []
+            
+            for goal in approaching_batch:
+                days_left = (goal.finish_date - today).days
+                goal.last_checked_date = datetime.now(timezone.utc)
+                
+                event_notif = {
+                    "event": "goal.approaching", 
+                    "goal_id": str(goal.id), 
+                    "type": "approaching",
+                    "days_left": days_left
+                }
+                kafka_tasks.append(self.kafka.send_notification(event_notif))
+
+            await self.repo.update_bulk(approaching_batch)
+            
+            if kafka_tasks:
+                await asyncio.gather(*kafka_tasks, return_exceptions=True)
+                
+            total_approaching += len(approaching_batch)
+            logger.info(f"Processed batch of {len(approaching_batch)} approaching goals.")
+
         logger.info(
-            f"Finished check_goals_deadlines. Processed {len(expired_goals)} expired and {len(approaching_goals)} approaching goals."
+            f"Job finished. Total Expired: {total_expired}, Total Approaching: {total_approaching}"
         )

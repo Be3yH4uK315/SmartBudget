@@ -114,11 +114,15 @@ class GoalRepository:
         await self.db.commit()
         return updated_goal
         
-    async def get_expired_goals(self, today: date) -> list[models.Goal]:
-        """Выбирает цели, которые просрочены, но еще не отмечены."""
-        query = select(models.Goal).where(
-            models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
-            models.Goal.finish_date < today
+    async def get_expired_goals_batch(self, today: date, limit: int = 100) -> list[models.Goal]:
+        """Возвращает пачку целей, которые просрочены и все еще IN_PROGRESS."""
+        query = (
+            select(models.Goal)
+            .where(
+                models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+                models.Goal.finish_date < today
+            )
+            .limit(limit)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -148,26 +152,39 @@ class GoalRepository:
             
         return updated_goal
 
-    async def get_approaching_goals(self, today: date, days_notice: int = 7) -> list[models.Goal]:
+    async def get_approaching_goals_batch(
+        self, 
+        today: date, 
+        limit: int = 100, 
+        days_notice: int = 7
+    ) -> list[models.Goal]:
         """
-        Выбирает цели, до дедлайна которых <= N дней
-        и которые не проверялись за последние 24 часа.
+        Возвращает пачку целей, у которых скоро дедлайн и которые 
+        НЕ проверялись за последние 24 часа.
         """
         seven_days_from_now = today + timedelta(days=days_notice)
         one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
 
-        query = select(models.Goal).where(
-            models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
-            models.Goal.finish_date <= seven_days_from_now,
-            models.Goal.finish_date >= today,
-            or_(
-                models.Goal.last_checked_date == None,
-                models.Goal.last_checked_date < one_day_ago
+        query = (
+            select(models.Goal)
+            .where(
+                models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+                models.Goal.finish_date <= seven_days_from_now,
+                models.Goal.finish_date >= today,
+                or_(
+                    models.Goal.last_checked_date == None,
+                    models.Goal.last_checked_date < one_day_ago
+                )
             )
+            .limit(limit)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
 
     async def update_bulk(self, goals: list[models.Goal]):
         """Массово коммитит изменения (для воркера)."""
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
