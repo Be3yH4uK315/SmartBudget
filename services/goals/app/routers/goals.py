@@ -27,17 +27,16 @@ async def create_goal(
 @router.get(
     "/",
     response_model=List[schemas.AllGoalsResponse] | schemas.GoalResponse,
-    responses={404: {"model": schemas.UnifiedErrorResponse}}
+    responses={404: {"model": schemas.UnifiedErrorResponse}},
+    summary="Получить список целей или одну цель по ID"
 )
 async def get_goals(
-    goal_id: Optional[UUID] = Query(None, description="Получить конкретную цель по ID"),
+    goal_id: Optional[UUID] = Query(None, description="Если указан, возвращает детали конкретной цели (api/v1/goals?goal_id=...)"),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
     """
-    Универсальный метод:
-    - Если передан ?goal_id=..., возвращает одну цель.
-    - Если goal_id не передан, возвращает список всех целей.
+    Универсальная точка входа для получения целей.
     """
     if goal_id:
         try:
