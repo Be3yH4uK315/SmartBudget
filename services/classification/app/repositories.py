@@ -1,5 +1,6 @@
 import logging
 from uuid import UUID
+from sqlalchemy import insert
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -12,7 +13,7 @@ class BaseRepository:
         self.db = db
 
 class CategoryRepository(BaseRepository):
-    async def get_by_id(self, category_id: UUID) -> models.Category | None:
+    async def get_by_id(self, category_id: int) -> models.Category | None:
         return await self.db.get(models.Category, category_id)
 
     async def get_by_name(self, name: str) -> models.Category | None:
@@ -41,9 +42,39 @@ class ClassificationResultRepository(BaseRepository):
         return stmt.scalar_one_or_none()
 
     async def create_or_update(self, result: models.ClassificationResult) -> models.ClassificationResult:
-        self.db.add(result)
+        """
+        Использует ON CONFLICT для атомарного upsert.
+        """
+        stmt = insert(models.ClassificationResult).values(
+            transaction_id=result.transaction_id,
+            category_id=result.category_id,
+            category_name=result.category_name,
+            confidence=result.confidence,
+            source=result.source,
+            model_version=result.model_version,
+            merchant=result.merchant,
+            description=result.description,
+            mcc=result.mcc,
+            created_at=result.created_at
+        ).on_conflict_do_update(
+            index_elements=['transaction_id'],
+            set_={
+                "category_id": result.category_id,
+                "category_name": result.category_name,
+                "confidence": result.confidence,
+                "source": result.source,
+                "model_version": result.model_version,
+                "merchant": result.merchant,
+                "description": result.description
+            }
+        ).returning(models.ClassificationResult)
+
+        orm_stmt = select(models.ClassificationResult).from_statement(stmt)
+        res = await self.db.execute(orm_stmt)
+        updated_obj = res.scalar_one()
+        
         await self.db.commit()
-        return result
+        return updated_obj
 
 class FeedbackRepository(BaseRepository):
     async def create(self, feedback: models.Feedback) -> models.Feedback:
@@ -56,46 +87,30 @@ class FeedbackRepository(BaseRepository):
         Сложный запрос для build_dataset_task.
         Объединяет Feedback и ClassificationResult.
         """
-        feedback_list = []
-        batch_size = 1000
-        offset = 0
-        while True:
-            feedback_query = await self.db.execute(
-                select(models.Feedback).order_by(models.Feedback.id).limit(batch_size).offset(offset)
+        stmt = await self.db.execute(
+            select(
+                models.ClassificationResult.merchant, 
+                models.ClassificationResult.description, 
+                models.ClassificationResult.mcc, 
+                models.Feedback.correct_category_id
             )
-            batch = feedback_query.scalars().all()
-            if not batch:
-                break
-            feedback_list.extend(batch)
-            offset += batch_size
+            .join(
+                models.ClassificationResult, 
+                models.Feedback.transaction_id == models.ClassificationResult.transaction_id
+            )
+        )
         
-        if not feedback_list:
-            return []
+        results = stmt.mappings().all()
 
-        data_for_training = []
-        for i in range(0, len(feedback_list), batch_size):
-            batch_fb = feedback_list[i:i+batch_size]
-            feedback_transaction_ids = [fb.transaction_id for fb in batch_fb]
-            
-            results_stmt = await self.db.execute(
-                select(models.ClassificationResult)
-                .where(models.ClassificationResult.transaction_id.in_(feedback_transaction_ids))
-            )
-            results_map = {res.transaction_id: res for res in results_stmt.scalars().all()}
-            
-            for fb in batch_fb:
-                result_data = results_map.get(fb.transaction_id)
-                if not result_data:
-                    logger.warning(f"No ClassificationResult for feedback {fb.id}. Skipping.")
-                    continue
-
-                data_for_training.append({
-                    "merchant": result_data.merchant,
-                    "description": result_data.description,
-                    "mcc": result_data.mcc,
-                    "label": str(fb.correct_category_id)
-                })
-        return data_for_training
+        return [
+            {
+                "merchant": row["merchant"],
+                "description": row["description"],
+                "mcc": row["mcc"],
+                "label": int(row["correct_category_id"])
+            }
+            for row in results
+        ]
 
 class ModelRepository(BaseRepository):
     async def get_active_model(self) -> models.Model | None:
@@ -119,7 +134,9 @@ class ModelRepository(BaseRepository):
     async def promote_model(self, candidate: models.Model, active: models.Model | None):
         if active:
             active.is_active = False
+            self.db.add(active)
         candidate.is_active = True
+        self.db.add(candidate)
         await self.db.commit()
 
 class DatasetRepository(BaseRepository):
@@ -140,4 +157,5 @@ class DatasetRepository(BaseRepository):
     async def update_dataset_status(self, dataset: models.TrainingDataset, status: models.TrainingDatasetStatus, metrics: dict):
         dataset.status = status
         dataset.metrics = metrics
+        self.db.add(dataset)
         await self.db.commit()
