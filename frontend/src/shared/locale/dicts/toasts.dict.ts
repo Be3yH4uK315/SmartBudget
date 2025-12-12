@@ -6,6 +6,8 @@ export const toastsDict: LocaleDictionary = {
       error: 'Произошла ошибка',
       message: {
         noInfo: 'Ошибка при получении данных пользователя',
+        cannotChangeCategory: 'Ошибка при смене категории',
+        cannotGetTransactions: 'Ошибка при получении транзакций',
       },
     },
   },
@@ -15,6 +17,8 @@ export const toastsDict: LocaleDictionary = {
       error: 'An error has occurred',
       message: {
         noInfo: 'Error when receiving user data',
+        cannotChangeCategory: '',
+        cannotGetTransactions: '',
       },
     },
   },
