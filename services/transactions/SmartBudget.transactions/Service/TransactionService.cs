@@ -1,10 +1,9 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SmartBudget.Transactions.Data;
-using SmartBudget.Transactions.Domain.DTO;
+using SmartBudget.Transactions.DTO;
 using SmartBudget.Transactions.Domain.Entities;
 using SmartBudget.Transactions.Domain.Enums;
-using SmartBudget.Transactions.Services;
 using SmartBudget.Transactions.Infrastructure.Kafka;
 
 namespace SmartBudget.Transactions.Services
@@ -74,23 +73,9 @@ namespace SmartBudget.Transactions.Services
                 _db.Transactions.Add(transaction);
                 await _db.SaveChangesAsync();
 
-                var simple = JsonSerializer.Serialize(new
-                {
-                    AccountId = transaction.AccountId,
-                    CategoryId = transaction.CategoryId,
-                    Value = transaction.Value
-                });
+                await _kafka.TransactionNew.ProduceAsync( transaction.TransactionId, new TransactionNewMessage( transaction.AccountId, transaction.CategoryId, transaction.Value ));
 
-                await _kafka.ProduceAsync("transaction.new", transaction.TransactionId, simple);
-
-                var evt = JsonSerializer.Serialize(new
-                {
-                    EventType = "transaction.new",
-                    UserId = transaction.UserId,
-                    Details = transaction
-                });
-
-                await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
+                await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId, new BudgetEventMessage( "transaction.new", transaction.UserId, transaction ));
 
                 await transactionBD.CommitAsync();
             }
@@ -148,11 +133,9 @@ namespace SmartBudget.Transactions.Services
                         _db.Transactions.Add(new_transaction);
                         await _db.SaveChangesAsync();
 
-                        var imported = JsonSerializer.Serialize(new { EventType = "transaction.imported", UserId = new_transaction.UserId, Details = new_transaction });
-                        await _kafka.ProduceAsync("budget.transactions.events", new_transaction.TransactionId, imported);
+                        await _kafka.TransactionImported.ProduceAsync(new_transaction.TransactionId, new TransactionImportedMessage("transaction.imported", new_transaction.UserId, new_transaction ) );
 
-                        var need = JsonSerializer.Serialize(new { transaction_id = new_transaction.TransactionId, account_id = new_transaction.AccountId, merchant = new_transaction.Merchant, mcc = new_transaction.Mcc, description = new_transaction.Description });
-                        await _kafka.ProduceAsync("transaction.need_category", new_transaction.TransactionId, need);
+                        await _kafka.TransactionNeedCategory.ProduceAsync( new_transaction.TransactionId, new TransactionNeedCategoryMessage( new_transaction.TransactionId, new_transaction.AccountId, new_transaction.Merchant, new_transaction.Mcc, new_transaction.Description ) );
 
                         await transactionBD.CommitAsync();
                         created.Add(new { new_transaction.TransactionId });
@@ -179,11 +162,9 @@ namespace SmartBudget.Transactions.Services
 
             await _db.SaveChangesAsync();
 
-            var evt = JsonSerializer.Serialize(new { EventType = "transaction.updated", UserId = transaction.UserId, Details = new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = request.CategoryId } });
-            await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
+            await _kafka.TransactionUpdated.ProduceAsync( transaction.TransactionId, new TransactionUpdatedMessage( transaction.TransactionId, old, request.CategoryId ) );
 
-            var simple = JsonSerializer.Serialize(new { transaction_id = transaction.TransactionId, old_category = old, new_category = request.CategoryId });
-            await _kafka.ProduceAsync("transaction.updated", transaction.TransactionId, simple);
+            await _kafka.BudgetEvents.ProduceAsync( transaction.TransactionId, new BudgetEventMessage( "transaction.updated", transaction.UserId, new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = request.CategoryId } ) );
 
             return "OK";
         }
@@ -196,8 +177,9 @@ namespace SmartBudget.Transactions.Services
             _db.Transactions.Remove(transaction);
             await _db.SaveChangesAsync();
 
-            var evt = JsonSerializer.Serialize(new { EventType = "transaction.deleted", UserId = transaction.UserId, Details = new { transaction.TransactionId } });
-            await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
+            await _kafka.TransactionDeleted.ProduceAsync( transaction.TransactionId, new TransactionDeletedMessage( transaction.TransactionId, transaction.UserId ) );
+
+            await _kafka.BudgetEvents.ProduceAsync( transaction.TransactionId,   new BudgetEventMessage(    "transaction.deleted",  transaction.UserId,   new { transaction.TransactionId }  ) );
         }
     }
 }

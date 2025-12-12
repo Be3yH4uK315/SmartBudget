@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-namespace SmartBudget.Transactions.Domain.DTO
+namespace SmartBudget.Transactions.DTO
 {
     /// <summary>
     /// Модель запроса для изменения категории транзакции

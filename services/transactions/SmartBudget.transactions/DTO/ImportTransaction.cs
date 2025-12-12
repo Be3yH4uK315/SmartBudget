@@ -1,7 +1,7 @@
 using SmartBudget.Transactions.Domain.Enums;
 
 
-namespace SmartBudget.Transactions.Domain.DTO
+namespace SmartBudget.Transactions.DTO
 {
 /// <summary>
 /// Represents imported transaction item from external source.

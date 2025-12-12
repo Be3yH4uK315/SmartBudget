@@ -1,4 +1,4 @@
-using SmartBudget.Transactions.Domain.DTO;
+using SmartBudget.Transactions.DTO;
 using System.Text.Json;
 
 namespace SmartBudget.Transactions.Services
