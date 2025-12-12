@@ -1,0 +1,10 @@
+
+services/transactions/SmartBudget.transactions/obj/
+services/transactions/SmartBudget.transactions/Migrations/
+services/transactions/SmartBudget.transactions/bin/
+services/transactions/SmartBudget.transactions/Properties/
+services/transactions/SmartBudget.transactions/Docker-compose.yml
+
+frontend/
+/services/authentification/
+/services/classification/

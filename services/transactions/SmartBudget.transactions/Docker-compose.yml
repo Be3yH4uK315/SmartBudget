@@ -58,7 +58,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://+:8080"
-      DATABASE_DSN: "Host=db;Database=smartbudget;Username=postgres;Password=postgres"
+      ConnectionStrings__Default: "Host=db;Database=smartbudget;Username=postgres;Password=postgres"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       KAFKA_GROUP_ID: "transactions-service"
       USERS_ACTIVE_TOPIC: "users.active"
