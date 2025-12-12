@@ -2,7 +2,7 @@ import { TypographyVariantsOptions } from '@mui/material/styles'
 
 const brandTinkoffFont =
   '"Tinkoff Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-  
+
 const brandFont =
   '"Neue Haas Unica W1G", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 

@@ -1,8 +1,10 @@
-export function getDashboardInitialState(): dashboardSliceState {
+import { DashboardSliceState } from '@features/dashboard/types'
+
+export function getDashboardInitialState(): DashboardSliceState {
   return {
     goals: [],
     categories: [],
-    budgetTotalLimit: 0,
-    isLoading: true
+    budgetLimit: 0,
+    isLoading: true,
   }
 }

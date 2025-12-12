@@ -1,6 +1,7 @@
 import { useCallback, useContext } from 'react';
 import { LocalizationContext } from '@app/providers';
 import { _localeManager } from '@shared/locale/localeManager';
+import { LocaleDictionary } from '@shared/types'
 
 export function useTranslate<BlockName extends keyof LocaleDictionary['ru']>(
   block: BlockName,

@@ -1,4 +1,5 @@
 import { AppLazySlices } from '@shared/store'
+import { RootState } from '@shared/types'
 
 export function createLazySliceStateSelector<SliceName extends keyof AppLazySlices>(
   sliceName: SliceName,

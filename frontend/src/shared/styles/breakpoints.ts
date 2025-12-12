@@ -4,8 +4,8 @@ export const breakpoints: BreakpointsOptions = {
   values: {
     xs: 320,
     sm: 480,
-    md: 780,
-    lg: 900,
+    md: 880,
+    lg: 1200,
     xl: 1536,
   },
 }

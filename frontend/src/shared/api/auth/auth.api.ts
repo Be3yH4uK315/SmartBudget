@@ -1,4 +1,13 @@
 import { api } from '@shared/api'
+import {
+  AuthResponse,
+  CompleteRegistration,
+  CompleteReset,
+  Login,
+  ResetPassword,
+  VerifyEmail,
+  VerifyLink,
+} from '@shared/types'
 
 class AuthApi {
   baseUrl = '/auth'

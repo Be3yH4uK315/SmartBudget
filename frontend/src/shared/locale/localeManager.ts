@@ -1,3 +1,4 @@
+import { Languages, OneLocaleDictionary } from '@shared/types'
 import dayjs from 'dayjs'
 import { initI18n } from './localization.config'
 

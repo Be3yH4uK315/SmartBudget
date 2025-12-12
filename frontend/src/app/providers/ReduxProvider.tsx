@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { store } from '@shared/store/store'
+import { store } from '@shared/store'
 import { Provider } from 'react-redux'
 
 type Props = {

@@ -4,6 +4,8 @@
       "@app": ["src/app"],
       "@app/*": ["src/app/*"],
 
+      "@features/dashboard/*": ["src/features/dashboard/*"],
+
       "@shared/api/*": ["src/shared/api/*"],
       "@shared/api": ["src/shared/api"],
       "@shared/assets/fonts/*": ["src/shared/assets/fonts/*"],

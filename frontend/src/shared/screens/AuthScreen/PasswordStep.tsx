@@ -1,6 +1,7 @@
 import { NavigateNextOutlined } from '@mui/icons-material'
 import { Button, CircularProgress, IconButton, Stack, TextField, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
+import { ErrorCode } from '@shared/types'
 
 type Props = {
   password: string
@@ -10,7 +11,7 @@ type Props = {
   submit: () => void
   onEnterDown: (e: React.KeyboardEvent) => void
   isMobile: boolean
-  errorCode: 403 | 429 | null
+  errorCode: ErrorCode
   onForgot: () => void
 }
 
@@ -27,7 +28,7 @@ export const PasswordStep = ({
 }: Props) => {
   const translate = useTranslate('AuthScreen')
 
-  const showWrong = errorCode === 403
+  const showWrong = errorCode === 401
   const isBanned = errorCode === 429
 
   return (

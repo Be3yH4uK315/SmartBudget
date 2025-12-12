@@ -7,7 +7,7 @@ type Props = {
 
 export const ScreenSkeleton = ({ children: ContentSkeleton }: Props) => {
   return (
-    <Stack width='100%' alignItems={'center'}>
+    <Stack width="100%" alignItems={'center'}>
       {ContentSkeleton && <ContentSkeleton />}
     </Stack>
   )

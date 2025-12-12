@@ -1,3 +1,4 @@
+import { dashboardRoutes } from '@features/dashboard/routes'
 import { authRoutes } from '@shared/screens'
 import { Route, Routes, useLocation } from 'react-router'
 
@@ -10,6 +11,8 @@ export const PageRouter = () => {
       <Route path="/" />
 
       {authRoutes.pages}
+
+      {dashboardRoutes.pages}
     </Routes>
   )
 }

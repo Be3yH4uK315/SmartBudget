@@ -1,5 +1,6 @@
-import { Button, CircularProgress,Stack, Typography } from '@mui/material'
+import { Button, CircularProgress, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
+import { VerifyMode } from '@shared/types'
 
 type Props = {
   email: string

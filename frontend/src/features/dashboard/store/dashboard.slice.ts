@@ -1,29 +1,36 @@
-import { createSlice, WithSlice } from "@reduxjs/toolkit";
-import { getDashboardInitialState } from "./dashboard.state";
-import { getDashboardData } from "./dashboard.thunks";
-import { rootReducer } from "@shared/store";
+import { DashboardSliceReducers, DashboardSliceState } from '@features/dashboard/types'
+import { createSlice, WithSlice } from '@reduxjs/toolkit'
+import { rootReducer } from '@shared/store'
+import { getDashboardInitialState } from './dashboard.state'
+import { getDashboardData } from './dashboard.thunks'
 
-export const dashboardSlice = createSlice<dashboardSliceState, dashboardSliceReducers, 'dashboard', any>({
+export const dashboardSlice = createSlice<
+  DashboardSliceState,
+  DashboardSliceReducers,
+  'dashboard',
+  any
+>({
   name: 'dashboard',
   initialState: getDashboardInitialState(),
   reducers: {},
 
   extraReducers: (builder) => {
-    builder.addCase(getDashboardData.fulfilled, (state, {payload}) => {
-        state.budgetTotalLimit = payload.budgetTotalLimit
+    builder
+      .addCase(getDashboardData.fulfilled, (state, { payload }) => {
+        state.budgetLimit = payload.budgetTotalLimit
         state.categories = payload.categories
         state.goals = payload.goals
         state.isLoading = false
-    })
+      })
 
-    builder.addCase(getDashboardData.rejected, (state) => {
+      .addCase(getDashboardData.rejected, (state) => {
         state.isLoading = false
-    })
+      })
 
-    builder.addCase(getDashboardData.pending, (state) => {
+      .addCase(getDashboardData.pending, (state) => {
         state.isLoading = true
-    })
-  }
+      })
+  },
 })
 
 declare module '@shared/store' {
