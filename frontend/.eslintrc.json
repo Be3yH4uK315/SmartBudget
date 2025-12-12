@@ -42,11 +42,6 @@
     "simple-import-sort/imports": [
       "error",
       {
-        /** Дефолтная сортировка групп. Дефолтная сортировка групп.
-         * https://github.com/lydell/eslint-plugin-simple-import-sort/tree/main?tab=readme-ov-file#custom-grouping
-         * (на странице ниже есть описание элементов массива)
-         */
-
         "groups": [["^react$", "^\\u0000", "^@?\\w", "^", "^\\."]]
       }
     ],

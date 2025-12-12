@@ -1,4 +1,4 @@
-import type { EntityState as RTKEntityState, EntityId } from '@reduxjs/toolkit'
+import type { EntityId, EntityState as RTKEntityState } from '@reduxjs/toolkit'
 import { AppDispatch, RootState } from './store'
 
 export type PayloadAction<
