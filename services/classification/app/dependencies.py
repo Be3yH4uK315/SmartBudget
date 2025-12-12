@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException
+from fastapi import Depends, Request, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis, ConnectionPool
 from arq.connections import ArqRedis
@@ -6,6 +6,7 @@ from aiokafka import AIOKafkaProducer
 from typing import AsyncGenerator
 
 from app import settings
+from app.services.classification_service import ClassificationService
 
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
@@ -46,3 +47,19 @@ async def get_kafka_producer(request: Request) -> AIOKafkaProducer:
     if not producer:
         raise HTTPException(status_code=503, detail="Kafka producer not initialized")
     return producer
+
+def get_ml_pipeline(request: Request) -> dict | None:
+    """
+    Извлекает загруженный ML-пайплайн из состояния приложения.
+    """
+    return getattr(request.app.state, "ml_pipeline", None)
+
+async def get_classification_service(
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    ml_pipeline: dict | None = Depends(get_ml_pipeline)
+) -> ClassificationService:
+    """
+    Фабрика зависимостей.
+    """
+    return ClassificationService(db, redis, ml_pipeline)

@@ -6,52 +6,44 @@ from sqlalchemy.future import select
 from redis.asyncio import Redis
 from aiokafka import AIOKafkaProducer
 
-from app import dependencies, exceptions, models, schemas, kafka_producer, settings
+from app import dependencies, exceptions, schemas, kafka_producer, settings
 from app.services.classification_service import ClassificationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["API"])
 
-def get_classification_service(
-    db: AsyncSession = Depends(dependencies.get_db),
-    redis: Redis = Depends(dependencies.get_redis)
-) -> ClassificationService:
-    return ClassificationService(db, redis, ml_pipeline=None)
-
-@router.get(
-    "/health",
-    response_model=schemas.HealthResponse
-)
+@router.get("/health", response_model=schemas.HealthResponse)
 async def health_check(
     db: AsyncSession = Depends(dependencies.get_db),
     redis: Redis = Depends(dependencies.get_redis),
     kafka: AIOKafkaProducer = Depends(dependencies.get_kafka_producer)
 ):
-    """
-    Проверяет состояние сервиса и его зависимостей (DB, Redis, Kafka).
-    """
     health_details = {"db": "ok", "redis": "ok", "kafka": "ok"}
+    status_code = 200
+
     try:
         await db.execute(select(1))
     except Exception as e:
-        health_details["db"] = f"error: {e}"
-        raise HTTPException(503, detail={"status": "unhealthy", "details": health_details})
+        health_details["db"] = f"error: {str(e)}"
+        status_code = 503
 
     try:
         await redis.ping()
     except Exception as e:
-        health_details["redis"] = f"error: {e}"
-        raise HTTPException(503, detail={"status": "unhealthy", "details": health_details})
+        health_details["redis"] = f"error: {str(e)}"
+        status_code = 503
 
     try:
-        await kafka_producer.send_kafka_event(
-        producer=kafka,
-        topic=settings.settings.kafka.topic_classification_events,
-        event_data={"healthcheck": "ping"}
-    )
+        partitions = await kafka.partitions_for(settings.settings.kafka.topic_need_category)
+        if not partitions:
+             health_details["kafka"] = "error: no partitions found"
+             status_code = 503
     except Exception as e:
-        health_details["kafka"] = f"error: {e}"
-        raise HTTPException(503, detail={"status": "unhealthy", "details": health_details})
+        health_details["kafka"] = f"error: {str(e)}"
+        status_code = 503
+
+    if status_code != 200:
+        raise HTTPException(status_code=status_code, detail={"status": "unhealthy", "details": health_details})
 
     return schemas.HealthResponse(status="healthy", details=health_details)
 
@@ -62,7 +54,7 @@ async def health_check(
 )
 async def get_classification_result(
     transaction_id: UUID = Path(..., description="ID транзакции"),
-    service: ClassificationService = Depends(get_classification_service)
+    service: ClassificationService = Depends(dependencies.get_classification_service)
 ):
     """
     Получает результат классификации по ID транзакции (с кэшированием в Redis).
@@ -80,7 +72,7 @@ async def get_classification_result(
 )
 async def submit_feedback(
     body: schemas.FeedbackRequest = Body(...),
-    service: ClassificationService = Depends(get_classification_service),
+    service: ClassificationService = Depends(dependencies.get_classification_service),
     kafka: AIOKafkaProducer = Depends(dependencies.get_kafka_producer)
 ):
     """

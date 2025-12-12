@@ -9,8 +9,9 @@ from aiocache import caches
 from starlette.responses import JSONResponse
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app import middleware, dependencies, settings, exceptions, logging_config
+from app import middleware, dependencies, repositories, settings, exceptions, logging_config
 from app.routers import api
+from app.services.ml_service import MLService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,6 +54,32 @@ async def lifespan(app: FastAPI):
     })
     middleware.logger.info("aiocache initialized with Redis backend.")
 
+    middleware.logger.info("Loading ML model for API...")
+    try:
+        async with app.state.async_session_maker() as session:
+            model_repo = repositories.ModelRepository(session)
+            active_model = await model_repo.get_active_model()
+            
+            if active_model:
+                model, vectorizer, labels = await MLService.load_prediction_pipeline(active_model.version)
+                if model:
+                    app.state.ml_pipeline = {
+                        "model": model,
+                        "vectorizer": vectorizer,
+                        "class_labels": labels,
+                        "model_version": active_model.version
+                    }
+                    middleware.logger.info(f"API ML pipeline loaded: v{active_model.version}")
+                else:
+                    middleware.logger.error("Failed to load model files.")
+                    app.state.ml_pipeline = None
+            else:
+                middleware.logger.warning("No active model found in DB.")
+                app.state.ml_pipeline = None
+    except Exception as e:
+        middleware.logger.error(f"Error loading ML pipeline on startup: {e}")
+        app.state.ml_pipeline = None
+
     yield
     
     middleware.logger.info("CategorizationService shutting down...")
@@ -70,9 +97,11 @@ async def lifespan(app: FastAPI):
     middleware.logger.info("DB engine disposed.")
 
 app = FastAPI(
-    title="Categorization Service", 
+    title="Classification Service", 
     version="1.0", 
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/api/v1/class/docs",
+    openapi_url="/api/v1/class/openapi.json"
 )
 
 @app.exception_handler(exceptions.ClassificationServiceError)
@@ -95,4 +124,4 @@ app.add_middleware(
 )
 app.middleware("http")(middleware.error_middleware)
 Instrumentator().instrument(app).expose(app)
-app.include_router(api.router)
+app.include_router(api.router, prefix="api/v1/class")
