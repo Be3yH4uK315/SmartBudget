@@ -3,7 +3,6 @@ function generateMockTransactions(total = 60): Transaction[] {
   const result: Transaction[] = []
   const statuses = ['confirmed', 'rejected', 'pending'] as const
 
-  // Даты — несколько дней, чтобы проверить группировку
   const dates = [
     '2025-12-12',
     '2025-12-11',
@@ -36,7 +35,7 @@ function generateMockTransactions(total = 60): Transaction[] {
 
 const ALL_TRANSACTIONS = generateMockTransactions(11)
 
-// Отсортируем: новые сверху (даты DESC)
+
 ALL_TRANSACTIONS.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0))
 
 class TransactionsMock {
