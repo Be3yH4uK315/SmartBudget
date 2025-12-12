@@ -30,8 +30,20 @@ builder.Services.AddSwaggerGen(c =>
     c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy.WithOrigins("http://127.0.0.1:3000") // обязательно конкретный адрес
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // ключевое для работы с cookies/auth
+    });
+});
+
 var app = builder.Build();
 
+app.UseCors("FrontendPolicy");
 app.UseSwagger();
 app.UseSwaggerUI();
 
