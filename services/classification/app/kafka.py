@@ -16,7 +16,7 @@ SCHEMA_CLASSIFIED = {
     "type": "object",
     "properties": {
         "transaction_id": {"type": "string", "format": "uuid"},
-        "category_id": {"type": "string", "format": "uuid"},
+        "category_id": {"type": ["integer", "string"]}, 
         "category_name": {"type": "string"}
     },
     "required": ["transaction_id", "category_id"]
@@ -31,7 +31,7 @@ SCHEMA_UPDATED = {
         "mcc": {"type": "integer"},
         "description": {"type": "string"},
         "old_category": {"type": "string"},
-        "new_category_id": {"type": "string", "format": "uuid"},
+        "new_category_id": {"type": ["integer", "string"]},
         "new_category_name": {"type": "string"}
     },
     "required": ["transaction_id", "new_category_id"]

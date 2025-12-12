@@ -5,7 +5,7 @@ from uuid import UUID
 
 class CategorizationResultResponse(BaseModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
-    category_id: UUID = Field(..., description="ID присвоенной категории")
+    category_id: int = Field(..., description="ID присвоенной категории")
     category_name: str = Field(..., description="Имя присвоенной категории")
     confidence: float = Field(..., description="Уверенность модели (0.0 до 1.0)")
     source: str = Field(..., description="Источник (rules, ml, manual)")
@@ -15,7 +15,7 @@ class CategorizationResultResponse(BaseModel):
 
 class FeedbackRequest(BaseModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
-    correct_category_id: UUID = Field(..., description="ID категории, которую указал юзер")
+    correct_category_id: int = Field(..., description="ID категории, которую указал юзер")
     user_id: Optional[UUID] = Field(None, description="ID пользователя (если есть)")
     comment: Optional[str] = Field(None, max_length=1024, description="Комментарий")
 
