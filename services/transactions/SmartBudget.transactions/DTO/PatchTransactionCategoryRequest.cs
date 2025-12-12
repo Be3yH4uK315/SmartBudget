@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 namespace SmartBudget.Transactions.Domain.DTO
 {
     /// <summary>
@@ -5,6 +6,7 @@ namespace SmartBudget.Transactions.Domain.DTO
     /// </summary>
     public class PatchTransactionCategoryRequest
     {
-        public int? categoryId { get; set; }
+        [JsonPropertyName("categoryId")]
+        public int? CategoryId { get; set; }
     }
 }

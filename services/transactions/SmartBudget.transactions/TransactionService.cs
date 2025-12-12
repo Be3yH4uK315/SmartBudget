@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartBudget.Transactions.Data;
 using SmartBudget.Transactions.Infrastructure.Kafka;
 using System.Reflection;
+using SmartBudget.Transactions.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +16,8 @@ builder.Services.AddControllers()
 // DB
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-
+//Service
+builder.Services.AddScoped<ITransactionService, TransactionService>();
 // Kafka
 builder.Services.AddSingleton<IKafkaService, KafkaService>();
 
@@ -35,5 +37,10 @@ app.UseSwaggerUI();
 
 // Routing
 app.MapControllers();
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate(); // <-- автоматически применяет все миграции
+}
 
 app.Run();
