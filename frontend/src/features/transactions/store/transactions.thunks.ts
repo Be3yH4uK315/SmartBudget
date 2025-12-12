@@ -1,7 +1,6 @@
 import { transactionsApi } from '@features/transactions/api/transactions.api'
 import { transactionsMock } from '@features/transactions/api/transactions.mock'
-import { Transaction, TransactionsBlock } from '@features/transactions/types'
-import { groupByDate } from '@features/transactions/utils'
+import { Transaction } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { selectUser } from '@shared/store'
 import { RootState } from '@shared/types'
