@@ -33,7 +33,7 @@ services:
 
   db:
     image: postgres:15
-    container_name: smartbudget-db
+    container_name: db
     environment:
       POSTGRES_DB: smartbudget
       POSTGRES_USER: postgres

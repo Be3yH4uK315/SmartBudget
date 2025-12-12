@@ -158,39 +158,39 @@ namespace SmartBudget.Transactions.Services
                         created.Add(new { new_transaction.TransactionId });
                     }
                 }
-                catch (Exception ex)
+                catch (Exception except)
                 {
                     await transactionBD.RollbackAsync();
-                    _log.LogError(ex, "Import mock failed");
+                    _log.LogError(except, "Import mock failed");
                 }
             }
 
             return new { created_count = created.Count, created };
         }
 
-        public async Task<object> PatchCategoryAsync(Guid id, PatchTransactionCategoryRequest req)
+        public async Task<object> PatchCategoryAsync(Guid Id, PatchTransactionCategoryRequest request)
         {
-            var transaction = await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == id);
+            var transaction = await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == Id);
             if (transaction == null) throw new Exception("Not found");
 
             var old = transaction.CategoryId;
-            transaction.CategoryId = req.CategoryId;
+            transaction.CategoryId = request.CategoryId;
             transaction.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
 
-            var evt = JsonSerializer.Serialize(new { EventType = "transaction.updated", UserId = transaction.UserId, Details = new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = req.CategoryId } });
+            var evt = JsonSerializer.Serialize(new { EventType = "transaction.updated", UserId = transaction.UserId, Details = new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = request.CategoryId } });
             await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
 
-            var simple = JsonSerializer.Serialize(new { transaction_id = transaction.TransactionId, old_category = old, new_category = req.CategoryId });
+            var simple = JsonSerializer.Serialize(new { transaction_id = transaction.TransactionId, old_category = old, new_category = request.CategoryId });
             await _kafka.ProduceAsync("transaction.updated", transaction.TransactionId, simple);
 
             return "OK";
         }
 
-        public async Task DeleteAsync(Guid id)
+        public async Task DeleteAsync(Guid Id)
         {
-            var transaction = await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == id);
+            var transaction = await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == Id);
             if (transaction == null) return;
 
             _db.Transactions.Remove(transaction);

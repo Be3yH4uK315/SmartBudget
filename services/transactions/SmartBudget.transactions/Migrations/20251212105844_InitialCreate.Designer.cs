@@ -12,7 +12,7 @@ using SmartBudget.Transactions.Data;
 namespace SmartBudget.Transactions.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251209085841_InitialCreate")]
+    [Migration("20251212105844_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -37,6 +37,9 @@ namespace SmartBudget.Transactions.Migrations
                     b.Property<int?>("CategoryId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("Date")
                         .HasColumnType("timestamp with time zone");
 
@@ -45,7 +48,7 @@ namespace SmartBudget.Transactions.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
-                    b.Property<DateTime?>("ImportedAt")
+                    b.Property<DateTime>("ImportedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("Mcc")
@@ -66,7 +69,7 @@ namespace SmartBudget.Transactions.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("UserId")
