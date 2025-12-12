@@ -1,20 +1,29 @@
+using System.Text.Json.Serialization;
+
 namespace SmartBudget.Transactions.Domain.DTO
+
 {
 /// <summary>
 /// Request model for manually created transaction.
 /// </summary>
 public class CreateManualTransactionRequest
 {
-public Guid userId { get; set; }
+[JsonPropertyName("userId")]
+public Guid UserId { get; set; }
 
-public Guid accountId { get; set; }
+[JsonPropertyName("accountId")]
+public Guid AccountId { get; set; }
 
-public decimal value { get; set; }
+[JsonPropertyName("value")]
+public decimal Value { get; set; }
 
-public int? categoryId { get; set; }
+[JsonPropertyName("categoryId")]
+public int? CategoryId { get; set; }
 
-public string description { get; set; }
+[JsonPropertyName("desctiption")]
+public string Description { get; set; }
 
-public string name { get; set; }
+[JsonPropertyName("name")]
+public string Name { get; set; }
 }
 }

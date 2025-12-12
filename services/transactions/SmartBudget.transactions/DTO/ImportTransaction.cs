@@ -8,26 +8,26 @@ namespace SmartBudget.Transactions.Domain.DTO
 /// </summary>
 public class ImportTransactionItem
 {
-public Guid id { get; set; }
+public Guid Id { get; set; }
 
-public Guid userId { get; set; }
+public Guid UserId { get; set; }
 
-public Guid transactionId { get; set; }
+public Guid TransactionId { get; set; }
 
-public Guid accountId { get; set; }
+public Guid AccountId { get; set; }
 
-public DateTime date { get; set; }
+public DateTime Date { get; set; }
 
-public decimal? value { get; set; }
+public decimal? Value { get; set; }
 
-public TransactionType? type { get; set; }
+public TransactionType? Type { get; set; }
 
-public TransactionStatus? status { get; set; }
+public TransactionStatus? Status { get; set; }
 
-public string merchant { get; set; }
+public string Merchant { get; set; }
 
-public int? mcc { get; set; }
+public int? Mcc { get; set; }
 
-public string description { get; set; }
+public string Description { get; set; }
 }
 }
