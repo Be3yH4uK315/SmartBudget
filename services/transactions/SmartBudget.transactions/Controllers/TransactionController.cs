@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace SmartBudget.Transactions.Controllers
 {
     [ApiController]
-    [Route("api/v1/transactions")]
+    [Route("api/transactions")]
     public class TransactionsController : ControllerBase
     {
         private readonly ITransactionService _service;

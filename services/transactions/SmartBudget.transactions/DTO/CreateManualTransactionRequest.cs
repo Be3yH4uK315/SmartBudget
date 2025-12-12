@@ -20,7 +20,7 @@ public decimal Value { get; set; }
 [JsonPropertyName("categoryId")]
 public int? CategoryId { get; set; }
 
-[JsonPropertyName("desctiption")]
+[JsonPropertyName("description")]
 public string Description { get; set; }
 
 [JsonPropertyName("name")]

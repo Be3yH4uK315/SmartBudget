@@ -26,7 +26,7 @@ namespace SmartBudget.Transactions.Services
         {
             var list = await _db.Transactions
                 .Where(new_transaction => new_transaction.UserId == UserId)
-                .OrderByDescending(new_transaction => new_transaction.Date)
+                .OrderByDescending(new_transaction => new_transaction.CreatedAt)
                 .Skip(Offset)
                 .Take(Limit)
                 .ToListAsync();
