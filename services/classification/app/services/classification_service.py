@@ -1,7 +1,5 @@
-import asyncio
 import logging
 import re
-import json
 from uuid import UUID
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,10 +11,28 @@ from app.services.ml_service import MLService
 
 logger = logging.getLogger(__name__)
 
-@cached(ttl=3600, key="rules_from_db", serializer=JsonSerializer())
-async def get_cached_rules(db: AsyncSession):
-    """Кэширует вызов репозитория."""
-    return await repositories.RuleRepository.get_all_active_rules(db)
+@cached(ttl=3600, key="rules_config_v1", serializer=JsonSerializer())
+async def get_cached_rules_as_dict(db: AsyncSession) -> list[dict]:
+    """
+    Загружает правила из БД и преобразует их в список словарей.
+    Это необходимо для корректной работы JSON-кэша и избежания DetachedInstanceError.
+    """
+    rules_objects = await repositories.RuleRepository.get_all_active_rules(db)
+    
+    processed_rules = []
+    for rule in rules_objects:
+        rule_dict = {
+            "id": str(rule.id),
+            "category_id": rule.category_id,
+            "category_name": rule.category.name,
+            "pattern": rule.pattern,
+            "pattern_type": rule.pattern_type.value,
+            "mcc": rule.mcc,
+            "priority": rule.priority
+        }
+        processed_rules.append(rule_dict)
+    
+    return processed_rules
 
 class ClassificationService:
     def __init__(self, db: AsyncSession, redis: Redis, ml_pipeline: dict | None = None):
@@ -39,37 +55,30 @@ class ClassificationService:
             self._vectorizer = None
             self._class_labels = None
             self._model_version = None
+        self._rules = []
 
     async def _load_rules(self):
         """Загружает правила из кэша или БД."""
         if self._rules:
             return
 
-        rules_objects = await get_cached_rules(self.db)
-        
-        processed_rules = []
-        for rule in rules_objects:
-            rule_dict = {
-                "id": str(rule.id),
-                "category_id": str(rule.category_id),
-                "category_name": rule.category.name,
-                "pattern": rule.pattern,
-                "pattern_type": rule.pattern_type.value,
-                "mcc": rule.mcc,
-                "priority": rule.priority
-            }
-            if rule.pattern_type.value == "regex":
+        rules_dicts = await get_cached_rules_as_dict(self.db)
+
+        compiled_rules = []
+        for r_dict in rules_dicts:
+            rule = r_dict.copy()
+            
+            if rule["pattern_type"] == "regex":
                 try:
-                    rule_dict["compiled_regex"] = re.compile(rule.pattern, re.IGNORECASE)
+                    rule["compiled_regex"] = re.compile(rule["pattern"], re.IGNORECASE)
                 except re.error as e:
-                    logger.error(f"Invalid regex in rule {rule.id}: {e}. Rule disabled.")
+                    logger.error(f"Invalid regex in rule {rule['id']}: {e}. Rule disabled.")
                     continue 
-            processed_rules.append(rule_dict)
+            compiled_rules.append(rule)
 
-        self._rules = processed_rules
-        logger.debug(f"Loaded {len(self._rules)} rules.")
+        self._rules = compiled_rules
 
-    async def apply_rules(self, merchant: str, mcc: int | None, description: str) -> tuple[UUID | None, str | None]:
+    async def apply_rules(self, merchant: str, mcc: int | None, description: str) -> tuple[int | None, str | None]:
         """
         Применяет правила классификации по приоритету.
         Возвращает (category_id, category_name) если match, иначе (None, None).
@@ -82,32 +91,28 @@ class ClassificationService:
         
         transaction_text = f"{merchant} {description}".lower()
         
-        try:
-            for rule in sorted(self._rules, key=lambda r: r["priority"]):
-                pattern_type = rule["pattern_type"]
-                pattern = rule["pattern"].lower()
+        for rule in sorted(self._rules, key=lambda r: r["priority"]):
+            pattern_type = rule["pattern_type"]
+            pattern = rule["pattern"].lower()
+            
+            is_match = False
+            
+            if pattern_type == "mcc" and mcc is not None and rule["mcc"] == mcc:
+                is_match = True
+            elif pattern_type == "exact" and pattern == transaction_text:
+                is_match = True
+            elif pattern_type == "contains" and pattern in transaction_text:
+                is_match = True
+            elif pattern_type == "regex" and "compiled_regex" in rule:
+                if rule["compiled_regex"].search(transaction_text):
+                    is_match = True
+            
+            if is_match:
+                return rule["category_id"], rule["category_name"]
                 
-                if pattern_type == "mcc" and mcc is not None and rule["mcc"] == mcc:
-                    return UUID(rule["category_id"]), rule["category_name"]
-                
-                elif pattern_type == "exact" and pattern == transaction_text:
-                    return UUID(rule["category_id"]), rule["category_name"]
-                
-                elif pattern_type == "contains" and pattern in transaction_text:
-                    return UUID(rule["category_id"]), rule["category_name"]
-                
-                elif pattern_type == "regex":
-                    if "compiled_regex" in rule and rule["compiled_regex"].search(transaction_text):
-                        return UUID(rule["category_id"]), rule["category_name"]
-                
-            logger.debug("No rules matched for transaction.")
-            return None, None
-        
-        except Exception as e:
-            logger.error(f"Error applying rules: {e}")
-            return None, None
+        return None, None
 
-    async def apply_ml(self, transaction_data: dict) -> tuple[UUID | None, str | None, float, str | None]:
+    async def apply_ml(self, transaction_data: dict) -> tuple[int | None, str | None, float, str | None]:
         """
         Применяет ML-модель, если правила не сработали.
         Возвращает (category_id, category_name, confidence, model_version).
@@ -116,12 +121,8 @@ class ClassificationService:
             logger.warning("No ML model loaded. ML classification disabled. Falling back.")
             return await self._get_fallback_category()
 
-        loop = asyncio.get_running_loop()
-
         try:
-            category_id_str, confidence = await loop.run_in_executor(
-                None, 
-                MLService.predict,
+            category_id, confidence = await MLService.predict_async(
                 self._model, 
                 self._vectorizer, 
                 self._class_labels, 
@@ -138,12 +139,12 @@ class ClassificationService:
             return await self._get_fallback_category(confidence, model_version)
         
         try:
-            category = await self.db.get(models.Category, UUID(category_id_str))
+            category = await self.db.get(models.Category, category_id)
             if not category:
-                logger.error(f"ML predicted non-existent category ID: {category_id_str}. Fallback.")
+                logger.error(f"ML predicted non-existent category ID: {category_id}. Fallback.")
                 return await self._get_fallback_category(confidence, model_version)
-        except ValueError as e:
-            logger.error(f"Invalid category ID from ML: {e}. Fallback.")
+        except Exception as e:
+            logger.error(f"DB Error fetching category {category_id}: {e}")
             return await self._get_fallback_category(confidence, model_version)
 
         if confidence < settings.settings.ml.ml_confidence_threshold_accept:
@@ -153,38 +154,29 @@ class ClassificationService:
         return category.id, category.name, confidence, model_version
 
     async def _get_fallback_category(self, confidence=0.0, model_version=None):
-        """Возвращает категорию 'Other' из репозитория."""
-        other_cat = await self.category_repo.get_by_name("Other")
+        """Возвращает категорию 'Other' (ID=0)."""
+        other_cat = await self.category_repo.get_by_id(0)
         if other_cat:
             return other_cat.id, other_cat.name, confidence, model_version
-        return None, "Other", confidence, model_version
+        
+        return 0, "Other", confidence, model_version
     
-    async def get_classification(self, tx_id: UUID) -> models.ClassificationResult:
-        """Логика для GET /classification/{id}, перенесено из api.py"""
+    async def get_classification(self, tx_id: UUID) -> schemas.CategorizationResultResponse:
         cache_key = f"classification:{tx_id}"
-        try:
-            cached_result = await self.redis.get(cache_key)
-            if cached_result:
-                logger.debug(f"Cache HIT for transaction {tx_id}")
-                return schemas.CategorizationResultResponse.model_validate_json(cached_result)
-        except Exception as e:
-            logger.warning(f"Redis GET failed for {tx_id}: {e}. Fetching from DB.")
-
-        logger.debug(f"Cache MISS for transaction {tx_id}")
+        cached_result = await self.redis.get(cache_key)
+        if cached_result:
+            return schemas.CategorizationResultResponse.model_validate_json(cached_result)
         
         classification = await self.result_repo.get_by_transaction_id(tx_id)
         if not classification:
             raise exceptions.ClassificationResultNotFoundError("Classification result not found")
 
-        try:
-            response_model = schemas.CategorizationResultResponse.from_orm(classification)
-            await self.redis.set(
-                cache_key, 
-                response_model.model_dump_json(), 
-                ex=3600
-            )
-        except Exception as e:
-            logger.warning(f"Redis SET failed for {tx_id}: {e}")
+        response_model = schemas.CategorizationResultResponse.from_orm(classification)
+        await self.redis.set(
+            cache_key, 
+            response_model.model_dump_json(), 
+            ex=3600
+        )
 
         return response_model
 
@@ -196,7 +188,7 @@ class ClassificationService:
 
         correct_category = await self.category_repo.get_by_id(body.correct_category_id)
         if not correct_category:
-            raise exceptions.CategoryNotFoundError("Invalid 'correct_category_id' provided")
+            raise exceptions.CategoryNotFoundError(f"Invalid 'correct_category_id' {body.correct_category_id}")
 
         new_feedback = models.Feedback(
             transaction_id=body.transaction_id,
@@ -208,12 +200,15 @@ class ClassificationService:
         await self.feedback_repo.create(new_feedback)
         
         old_category_name = existing_result.category_name
+        
         existing_result.source = models.ClassificationSource.MANUAL
         existing_result.category_id = body.correct_category_id
         existing_result.category_name = correct_category.name
         existing_result.confidence = 1.0
-
+        
         await self.result_repo.create_or_update(existing_result)
+        
+        await self.redis.delete(f"classification:{body.transaction_id}")
         
         event_data = {
             "transaction_id": str(body.transaction_id),
@@ -232,7 +227,7 @@ class ClassificationService:
             transaction_id = UUID(data['transaction_id'])
         except (KeyError, ValueError):
             raise exceptions.InvalidKafkaMessageError(f"Invalid transaction_id: {data.get('transaction_id')}")
-        
+
         existing = await self.result_repo.get_by_transaction_id(transaction_id)
         if existing:
             logger.warning(f"Transaction {transaction_id} already processed. Skipping.")
@@ -248,13 +243,9 @@ class ClassificationService:
         confidence = 1.0
         model_version = None
 
-        if not category_id:
+        if category_id is None:
             category_id, category_name, confidence, model_version = await self.apply_ml(data)
             source = models.ClassificationSource.ML
-
-        if not category_id:
-            logger.error(f"Failed to classify transaction {transaction_id} even with fallback.")
-            return None
 
         result = models.ClassificationResult(
             transaction_id=transaction_id,
@@ -268,19 +259,27 @@ class ClassificationService:
             mcc=data.get('mcc')
         )
         await self.result_repo.create_or_update(result)
-        
-        try:
-            await self.redis.set(
-                f"classification:{transaction_id}", 
-                json.dumps({"category_name": category_name, "category_id": str(category_id)}),
-                ex=3600
-            )
-        except Exception as e:
-            logger.warning(f"Redis SET failed: {e}")
 
-        event_data = {
+        response_model = schemas.CategorizationResultResponse(
+            transaction_id=transaction_id,
+            category_id=category_id,
+            category_name=category_name,
+            confidence=confidence,
+            source=source.value,
+            model_version=model_version
+        )
+        await self.redis.set(
+            f"classification:{transaction_id}", 
+            response_model.model_dump_json(), 
+            ex=3600
+        )
+
+        event_classified = {
             "transaction_id": str(transaction_id),
-            "category_id": str(category_id),
+            "category_id": category_id,
             "category_name": category_name
         }
-        return event_data, event_data
+        
+        event_events = event_classified.copy()
+        
+        return event_classified, event_events
