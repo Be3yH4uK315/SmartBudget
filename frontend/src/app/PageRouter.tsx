@@ -1,21 +1,34 @@
 import { dashboardRoutes } from '@features/dashboard/routes'
-import { transactionRoutes } from '@features/transactions/routes'
+import { transactionsRoutes } from '@features/transactions/routes'
 import { authRoutes } from '@shared/screens'
-import { Route, Routes, useLocation } from 'react-router'
+import { matchPath, Navigate, Route, Routes, useLocation } from 'react-router'
 
 export const PageRouter = () => {
   const location = useLocation()
   const state = location.state as { backgroundLocation?: Location }
 
+  const modalPaths = ['/transactions/:id']
+
+  const isModalPath = modalPaths.some((p) => matchPath({ path: p, end: true }, location.pathname))
+
+  if (isModalPath && !state?.backgroundLocation) {
+    const parentPath = location.pathname.replace(/\/[^/]+$/, '')
+    return <Navigate to={parentPath} replace />
+  }
+
   return (
-    <Routes location={state?.backgroundLocation || location}>
-      <Route path="/" />
+    <>
+      <Routes location={state?.backgroundLocation || location}>
+        <Route path="/">
+          {authRoutes.pages}
 
-      {authRoutes.pages}
+          {dashboardRoutes.pages}
 
-      {dashboardRoutes.pages}
+          {transactionsRoutes.pages}
+        </Route>
+      </Routes>
 
-      {transactionRoutes.pages}
-    </Routes>
+      {state?.backgroundLocation && <Routes>{transactionsRoutes.modals}</Routes>}
+    </>
   )
 }
