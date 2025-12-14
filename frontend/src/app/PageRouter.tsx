@@ -7,7 +7,7 @@ export const PageRouter = () => {
   const location = useLocation()
   const state = location.state as { backgroundLocation?: Location }
 
-  const modalPaths = ['/transactions/:id']
+  const modalPaths = ['/transactions/:id', '/transactions/category/:id']
 
   const isModalPath = modalPaths.some((p) => matchPath({ path: p, end: true }, location.pathname))
 
