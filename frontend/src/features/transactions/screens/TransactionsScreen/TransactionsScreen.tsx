@@ -72,8 +72,8 @@ export default function TransactionsScreen() {
 
       {transactions.length > 0 && (
         <Stack spacing={2} maxWidth={'800px'}>
-          {transactions.map((t) => (
-            <TransactionsInBlock key={t.date} transactions={t} />
+          {transactions.map((t, index) => (
+            <TransactionsInBlock key={index} transactions={t} />
           ))}
 
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>

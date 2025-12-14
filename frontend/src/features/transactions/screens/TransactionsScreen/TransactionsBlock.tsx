@@ -1,8 +1,8 @@
 import React from 'react'
 import 'dayjs/locale/ru'
+import { TransactionsBlock } from '@features/transactions/types'
 import { Stack, Typography } from '@mui/material'
 import dayjs from 'dayjs'
-import { TransactionsBlock } from '../types'
 import { TransactionLine } from './TransactionLine'
 
 type Props = {
