@@ -5,7 +5,7 @@ import { OverridableComponent } from '@mui/material/OverridableComponent'
 const Supermarkets = lazy(() => import('@mui/icons-material/StorefrontOutlined'))
 const FastFood = lazy(() => import('@mui/icons-material/FastfoodOutlined'))
 const Cloth = lazy(() => import('@mui/icons-material/CheckroomOutlined'))
-const Electronics = lazy(() => import('@mui/icons-material/CheckroomOutlined'))
+const Electronics = lazy(() => import('@mui/icons-material/BlenderOutlined'))
 const BuildAndRepair = lazy(() => import('@mui/icons-material/ConstructionOutlined'))
 const HomeThings = lazy(() => import('@mui/icons-material/KingBedOutlined'))
 const Beauty = lazy(() => import('@mui/icons-material/SpaOutlined'))
@@ -69,3 +69,5 @@ export const CATEGORIES_ICONS_MAP = new Map<
   [28, Flowers],
   [29, Other],
 ])
+
+export const CATEGORY_IDS = Array.from(CATEGORIES_ICONS_MAP.keys())
