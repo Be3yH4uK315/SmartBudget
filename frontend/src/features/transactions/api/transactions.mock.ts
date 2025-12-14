@@ -4,13 +4,13 @@ function generateMockTransactions(total = 60): Transaction[] {
   const statuses = ['confirmed', 'rejected', 'pending'] as const
 
   const dates = [
-    '2025-12-12',
-    '2025-12-11',
-    '2025-12-10',
-    '2025-12-09',
-    '2025-11-29',
-    '2025-11-20',
-    '2025-11-15',
+    '2025-12-12T12:12:12',
+    '2025-12-11T12:12:12',
+    '2025-12-10T12:12:12',
+    '2025-12-09T12:12:12',
+    '2025-11-29T12:12:12',
+    '2025-11-20T12:12:12',
+    '2025-11-15T12:12:12',
   ]
 
   const type = ['income', 'expense'] as const
@@ -35,7 +35,6 @@ function generateMockTransactions(total = 60): Transaction[] {
 
 const ALL_TRANSACTIONS = generateMockTransactions(11)
 
-
 ALL_TRANSACTIONS.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0))
 
 class TransactionsMock {
@@ -48,6 +47,10 @@ class TransactionsMock {
 
     const PAGE_SIZE = 10
     return ALL_TRANSACTIONS.slice(offset, offset + PAGE_SIZE)
+  }
+
+  async changeCategory(payload: any): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
   }
 }
 
