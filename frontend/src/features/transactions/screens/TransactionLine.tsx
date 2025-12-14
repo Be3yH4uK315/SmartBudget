@@ -4,7 +4,7 @@ import { Box, Stack, Typography } from '@mui/material'
 import { TransactionIcon } from '@shared/assets/icons'
 import { useTranslate } from '@shared/hooks'
 import { formatCurrency } from '@shared/utils'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 
 type Props = {
   transaction: Transaction
@@ -14,6 +14,7 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
   const translate = useTranslate('Transactions')
   const translateCategory = useTranslate('Categories')
   const navigate = useNavigate()
+  const location = useLocation()
 
   const color =
     transaction.status === 'pending'
@@ -22,7 +23,8 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
         ? 'success.main'
         : 'text.primary'
 
-  const handleClick = () => navigate(`./?id=${transaction.transactionId}`)
+  const handleClick = () =>
+    navigate(`./${transaction.transactionId}`, { state: { backgroundLocation: location } })
 
   return (
     <Box display={'flex'} justifyContent={'space-between'} onClick={handleClick}>
