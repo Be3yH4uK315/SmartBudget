@@ -2,7 +2,6 @@ import { transactionsApi } from '@features/transactions/api/transactions.api'
 import { transactionsMock } from '@features/transactions/api/transactions.mock'
 import { Transaction } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { selectUser } from '@shared/store'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
@@ -22,7 +21,7 @@ export const getTransactions = createAsyncThunk<
 
     const offset = state.transactions?.offset
 
-    const response = await transactionsMock.getTransactions(offset)
+    const response = await transactionsApi.getTransactions(offset)
 
     return { transactions: response, length: response.length }
   } catch (e: any) {
@@ -32,20 +31,20 @@ export const getTransactions = createAsyncThunk<
   }
 })
 
-export const changeCategory = createAsyncThunk<void, Transaction, { state: RootState }>(
-  'changeCategory',
-  async (payload, { getState }) => {
-    try {
-      const userid = selectUser(getState()).userId
-      const data = {
-        userId: userid,
-        payload,
-      }
-      const response = await transactionsApi.changeCategory(data)
+export const changeCategory = createAsyncThunk<
+  void,
+  Pick<Transaction, 'categoryId' | 'transactionId'>,
+  { state: RootState; rejectValue: string }
+>('changeCategory', async (payload, { rejectWithValue }) => {
+  try {
+    const response = await transactionsApi.changeCategory(payload)
 
-      return response
-    } catch (e: any) {
-      showToast({ messageKey: 'cannotChangeCategory', type: 'error', duration: 5000 })
-    }
-  },
-)
+    showToast({ messageKey: 'categoryChanged', type: 'success', duration: 5000 })
+
+    return response
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotChangeCategory', type: 'error', duration: 5000 })
+
+    return rejectWithValue('cannotChangeCategory')
+  }
+})

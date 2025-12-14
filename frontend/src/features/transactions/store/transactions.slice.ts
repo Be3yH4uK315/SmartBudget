@@ -1,10 +1,10 @@
+import { PAGE_SIZE } from '@features/transactions/constants/transactionsPage'
 import { TransactionsSliceReducers, TransactionsSliceState } from '@features/transactions/types'
+import { groupByDate } from '@features/transactions/utils'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
-import { PAGE_SIZE } from '../constants/transactionsPage'
-import { groupByDate } from '../utils'
 import { getTransactionsInitialState } from './transactions.state'
-import { getTransactions } from './transactions.thunks'
+import { changeCategory, getTransactions } from './transactions.thunks'
 
 export const transactionsSlice = createSlice<
   TransactionsSliceState,
@@ -59,6 +59,18 @@ export const transactionsSlice = createSlice<
 
       .addCase(getTransactions.pending, (state) => {
         state.isLoading = true
+      })
+
+      .addCase(changeCategory.fulfilled, (state, { meta }) => {
+        const { categoryId, transactionId } = meta.arg
+
+        for (const block of state.transactions) {
+          const transaction = block.transactions.find((t) => t.transactionId === transactionId)
+          if (transaction) {
+            transaction.categoryId = categoryId
+            break
+          }
+        }
       })
   },
 })
