@@ -44,7 +44,7 @@ export const transactionsRoutes = {
       />
 
       <Route
-        path="category/:id"
+        path=":id/category"
         element={
           <SuspenseFallbackWrapper Fallback={<LoadingScreen />}>
             <ChangeCategory />

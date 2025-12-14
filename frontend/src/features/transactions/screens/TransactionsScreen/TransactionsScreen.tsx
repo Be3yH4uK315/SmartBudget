@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import {
+  clearTransactionsState,
   getTransactions,
   selectIsTransactionsLoading,
   selectTransactions,
@@ -7,15 +8,18 @@ import {
 } from '@features/transactions/store'
 import { CancelOutlined } from '@mui/icons-material'
 import { Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { withAuth } from '@shared/components'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
+import { useLocation } from 'react-router'
 import { TransactionsInBlock } from './TransactionsBlock'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
-export default function TransactionsScreen() {
+export default withAuth(function TransactionsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
+  const location = useLocation()
 
   const isLoading = useAppSelector(selectIsTransactionsLoading)
   const transactions = useAppSelector(selectTransactions)
@@ -27,6 +31,14 @@ export default function TransactionsScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch])
+
+  useEffect(() => {
+    return () => {
+      if (location.pathname === '/transactions') {
+        dispatch(clearTransactionsState())
+      }
+    }
+  }, [dispatch, location.pathname])
 
   const handleLoadMore = () => {
     if (isLoading || isLast) return
@@ -91,4 +103,4 @@ export default function TransactionsScreen() {
       )}
     </ScreenContent>
   )
-}
+})

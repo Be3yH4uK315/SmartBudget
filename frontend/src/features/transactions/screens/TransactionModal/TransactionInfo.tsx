@@ -51,8 +51,8 @@ const TransactionInfo = () => {
 
           <Button
             onClick={() =>
-              navigate(`../category/${transaction.transactionId}`, {
-                state: { backgroundLocation: location },
+              navigate(`./category`, {
+                state: { backgroundLocation: location.state?.backgroundLocation || location },
               })
             }
           >

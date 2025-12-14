@@ -9,4 +9,6 @@ export type TransactionsSliceState = {
   isLast: boolean
 }
 
-export type TransactionsSliceReducers = SliceCaseReducers<TransactionsSliceState>
+export type TransactionsSliceReducers = SliceCaseReducers<TransactionsSliceState> & {
+  clearTransactionsState(state: TransactionsSliceState): void
+}

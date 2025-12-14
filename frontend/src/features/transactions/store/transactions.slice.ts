@@ -14,7 +14,11 @@ export const transactionsSlice = createSlice<
 >({
   name: 'transactions',
   initialState: getTransactionsInitialState(),
-  reducers: {},
+  reducers: {
+    clearTransactionsState() {
+      return getTransactionsInitialState()
+    },
+  },
 
   extraReducers: (builder) => {
     builder
@@ -80,3 +84,5 @@ declare module '@shared/store' {
 }
 
 transactionsSlice.injectInto(rootReducer)
+
+export const { clearTransactionsState } = transactionsSlice.actions

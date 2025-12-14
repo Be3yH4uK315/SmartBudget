@@ -1,4 +1,5 @@
 import { transactionsApi } from '@features/transactions/api/transactions.api'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { transactionsMock } from '@features/transactions/api/transactions.mock'
 import { Transaction } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
