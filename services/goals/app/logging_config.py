@@ -20,7 +20,7 @@ class JsonFormatter(Formatter):
         if record.exc_info:
             log_data['exc_info'] = self.formatException(record.exc_info)
 
-        return json.dumps(log_data)
+        return json.dumps(log_data, default=str, ensure_ascii=False)
 
 def setup_logging():
     """Настраивает ведение журнала с помощью JSON formatter."""
