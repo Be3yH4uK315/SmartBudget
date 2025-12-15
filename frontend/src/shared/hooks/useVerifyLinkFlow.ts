@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { authApi } from '@shared/api/auth'
+import { ROUTES } from '@shared/constants/routes'
 import { AuthResponse, TokenType } from '@shared/types'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 
@@ -51,11 +52,11 @@ export const useVerifyLinkFlow = () => {
       try {
         const res = await fn()
         if (res.status === 'success' && res.action === 'complete_registration') {
-          navigate('/main')
+          navigate(ROUTES.PAGES.DASHBOARD)
           return
         }
         if (res.status === 'success' && res.action === 'complete_reset') {
-          navigate('/auth/sign-in')
+          navigate(ROUTES.PAGES.LOGIN)
           return
         }
       } finally {

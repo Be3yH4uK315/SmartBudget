@@ -1,4 +1,5 @@
 import { ComponentType, useEffect } from 'react'
+import { ROUTES } from '@shared/constants/routes'
 import { useAppSelector } from '@shared/store'
 import { selectUser } from '@shared/store/user'
 import { useNavigate } from 'react-router'
@@ -14,7 +15,7 @@ export function withAuth<P extends object>(WrappedComponent: ComponentType<P>) {
 
     useEffect(() => {
       if (!isAuth) {
-        navigate('/auth/sign-in', {
+        navigate(ROUTES.PAGES.LOGIN, {
           replace: true,
         })
       }

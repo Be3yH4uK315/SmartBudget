@@ -1,6 +1,7 @@
 import React from 'react'
 import { DashboardCategory } from '@features/dashboard/types'
 import { Button, Paper, Stack, Typography } from '@mui/material'
+import { ROUTES } from '@shared/constants/routes'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
 import { PercentLine } from './PercentLine'
@@ -34,7 +35,7 @@ export const BudgetBlock = React.memo(({ categories, budgetLimit }: Props) => {
           <Button
             variant="gray"
             sx={{ height: 'auto', width: '100%' }}
-            onClick={() => navigate('/budget')}
+            onClick={() => navigate(ROUTES.PAGES.BUDGET)}
           >
             {translate('createButton')}
           </Button>
