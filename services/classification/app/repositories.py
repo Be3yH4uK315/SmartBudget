@@ -39,11 +39,15 @@ class RuleRepository(BaseRepository):
 class ClassificationResultRepository(BaseRepository):
     async def get_by_transaction_id(self, tx_id: UUID) -> models.ClassificationResult | None:
         stmt = await self.db.execute(
-            select(models.ClassificationResult).where(models.ClassificationResult.transaction_id == tx_id)
+            select(models.ClassificationResult)
+            .where(models.ClassificationResult.transaction_id == tx_id)
         )
         return stmt.scalar_one_or_none()
 
-    async def create_or_update(self, result: models.ClassificationResult) -> models.ClassificationResult:
+    async def create_or_update(
+        self, 
+        result: models.ClassificationResult
+    ) -> models.ClassificationResult:
         """
         Использует ON CONFLICT для атомарного upsert.
         """
@@ -144,7 +148,10 @@ class ModelRepository(BaseRepository):
         await self.db.commit()
 
 class DatasetRepository(BaseRepository):
-    async def create_dataset_entry(self, dataset: models.TrainingDataset) -> models.TrainingDataset:
+    async def create_dataset_entry(
+        self, 
+        dataset: models.TrainingDataset
+    ) -> models.TrainingDataset:
         self.db.add(dataset)
         await self.db.commit()
         return dataset
@@ -158,7 +165,12 @@ class DatasetRepository(BaseRepository):
         )
         return stmt.scalar_one_or_none()
         
-    async def update_dataset_status(self, dataset: models.TrainingDataset, status: models.TrainingDatasetStatus, metrics: dict):
+    async def update_dataset_status(
+        self, 
+        dataset: models.TrainingDataset, 
+        status: models.TrainingDatasetStatus, 
+        metrics: dict
+    ):
         dataset.status = status
         dataset.metrics = metrics
         self.db.add(dataset)
