@@ -14,13 +14,7 @@ export const getTransactions = createAsyncThunk<
   try {
     const state = getState()
 
-    if (!state.transactions) {
-      showToast({ messageKey: 'cannotGetTransactions', type: 'error', duration: 5000 })
-
-      return { transactions: [], length: 0 }
-    }
-
-    const offset = state.transactions?.offset
+    const offset = state.transactions?.offset ?? 0
 
     const response = await transactionsApi.getTransactions(offset)
 
