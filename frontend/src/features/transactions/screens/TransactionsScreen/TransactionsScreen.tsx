@@ -7,19 +7,17 @@ import {
   selectTransactionsIsLast,
 } from '@features/transactions/store'
 import { CancelOutlined } from '@mui/icons-material'
-import { Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { Box, Paper, Stack, Typography } from '@mui/material'
 import { withAuth } from '@shared/components'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
-import { useLocation } from 'react-router'
-import { TransactionsInBlock } from './TransactionsBlock'
+import { TransactionsList } from './TransactionList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
 export default withAuth(function TransactionsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
-  const location = useLocation()
 
   const isLoading = useAppSelector(selectIsTransactionsLoading)
   const transactions = useAppSelector(selectTransactions)
@@ -36,12 +34,7 @@ export default withAuth(function TransactionsScreen() {
     return () => {
       dispatch(clearTransactionsState())
     }
-  }, [dispatch, location.pathname])
-
-  const handleLoadMore = () => {
-    if (isLoading || isLast) return
-    dispatch(getTransactions())
-  }
+  }, [dispatch])
 
   return (
     <ScreenContent
@@ -81,23 +74,7 @@ export default withAuth(function TransactionsScreen() {
       )}
 
       {transactions.length > 0 && (
-        <Stack spacing={2} maxWidth={'800px'}>
-          {transactions.map((t, index) => (
-            <TransactionsInBlock key={index} transactions={t} />
-          ))}
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-            {isLoading ? (
-              <Button variant="yellow" disabled>
-                {translate('loading')}
-              </Button>
-            ) : !isLast ? (
-              <Button variant="yellow" onClick={handleLoadMore}>
-                {translate('loadMore')}
-              </Button>
-            ) : null}
-          </Box>
-        </Stack>
+        <TransactionsList isLast={isLast} isLoading={isLoading} transactions={transactions} />
       )}
     </ScreenContent>
   )
