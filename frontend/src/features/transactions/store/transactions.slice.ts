@@ -1,6 +1,6 @@
 import { PAGE_SIZE } from '@features/transactions/constants/transactionsPage'
 import { TransactionsSliceReducers, TransactionsSliceState } from '@features/transactions/types'
-import { groupByDate } from '@features/transactions/utils'
+import { groupByDate, mergeTransactionBlocks } from '@features/transactions/utils'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getTransactionsInitialState } from './transactions.state'
@@ -36,17 +36,10 @@ export const transactionsSlice = createSlice<
         if (state.transactions.length === 0) {
           state.transactions = blocks
         } else {
-          state.transactions = [
-            ...state.transactions.slice(0, -1),
-            {
-              ...state.transactions[state.transactions.length - 1],
-              transactions: [
-                ...state.transactions[state.transactions.length - 1].transactions,
-                ...blocks[0].transactions,
-              ],
-            },
-            ...blocks.slice(1),
-          ]
+          state.transactions = mergeTransactionBlocks({
+            currentBlocks: state.transactions,
+            newBlocks: blocks,
+          })
         }
 
         state.offset += length
