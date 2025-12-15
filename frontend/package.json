@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "yarn convert_dictionary && rsbuild build",
-    "start": "rsbuild dev --open",
+    "start": "yarn lint & rsbuild dev --open",
     "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}' --fix"
   },
   "dependencies": {
