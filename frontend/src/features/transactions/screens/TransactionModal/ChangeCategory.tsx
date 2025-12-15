@@ -1,4 +1,4 @@
-import { LazyExoticComponent, Suspense, useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import {
   CATEGORIES_ICONS_MAP,
   CATEGORY_IDS,
@@ -51,7 +51,7 @@ const ChangeCategory = () => {
   const renderCategory = (
     value: number,
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    Icon: LazyExoticComponent<OverridableComponent<SvgIconTypeMap<{}, 'svg'>>>,
+    Icon: OverridableComponent<SvgIconTypeMap<{}, 'svg'>>,
   ) => {
     return (
       <Stack direction="row" spacing={1} alignItems="center">
