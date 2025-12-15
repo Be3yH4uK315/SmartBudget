@@ -20,7 +20,7 @@ export const getTransactions = createAsyncThunk<
 
     return { transactions: response, length: response.length }
   } catch (e: any) {
-    showToast({ messageKey: 'cannotGetTransactions', type: 'error', duration: 5000 })
+    showToast({ messageKey: 'cannotGetTransactions', type: 'error' })
 
     return { transactions: [], length: 0 }
   }
@@ -34,11 +34,11 @@ export const changeCategory = createAsyncThunk<
   try {
     const response = await transactionsApi.changeCategory(payload)
 
-    showToast({ messageKey: 'categoryChanged', type: 'success', duration: 5000 })
+    showToast({ messageKey: 'categoryChanged', type: 'success' })
 
     return response
   } catch (e: any) {
-    showToast({ messageKey: 'cannotChangeCategory', type: 'error', duration: 5000 })
+    showToast({ messageKey: 'cannotChangeCategory', type: 'error' })
 
     return rejectWithValue('cannotChangeCategory')
   }
