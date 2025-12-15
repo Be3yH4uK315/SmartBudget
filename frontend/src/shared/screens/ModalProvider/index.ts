@@ -1,2 +1,2 @@
 export * from './ModalLayout'
-export * from './ModalProvider'
+export { default } from './ModalProvider'

@@ -1,8 +1,9 @@
+import { withAuth } from '@shared/components/hocs'
 import { MODALS_MAP } from '@shared/constants/modals'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { closeModal } from '@shared/store/modal'
 
-export const ModalProvider = () => {
+export default withAuth(function ModalProvider() {
   const dispatch = useAppDispatch()
   const { id, props } = useAppSelector((s) => s.modal)
 
@@ -17,4 +18,4 @@ export const ModalProvider = () => {
   if (!ModalComponent) return null
 
   return <ModalComponent {...props} onClose={handleClose} />
-}
+})
