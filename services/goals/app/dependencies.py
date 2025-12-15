@@ -11,7 +11,6 @@ from app import (
     services,
     settings
 )
-from app.kafka_producer import KafkaProducer
 
 security = HTTPBearer()
 
@@ -28,13 +27,6 @@ def get_goal_repository(db: AsyncSession = Depends(get_db)) -> repositories.Goal
     """Провайдер для GoalRepository."""
     return repositories.GoalRepository(db)
 
-async def get_kafka_producer(request: Request) -> KafkaProducer:
-    """Получает kafka_producer из app.state."""
-    kafka_prod = request.app.state.kafka_producer
-    if not kafka_prod:
-        raise HTTPException(status_code=500, detail="Kafka producer not available")
-    return kafka_prod
-
 async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq из app.state."""
     arq_pool: ArqRedis = request.app.state.arq_pool
@@ -45,16 +37,16 @@ async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
 
 def get_goal_service(
     repo: repositories.GoalRepository = Depends(get_goal_repository),
-    kafka: KafkaProducer = Depends(get_kafka_producer)
 ) -> services.GoalService:
     """Провайдер для GoalService."""
-    return services.GoalService(repo, kafka)
+    return services.GoalService(repo)
 
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> UUID:
     """
     Декодирует JWT, валидирует подпись публичным ключом и возвращает user_id.
+    Далее перенести в API Gateway.
     """
     token = credentials.credentials
     try:
