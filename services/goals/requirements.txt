@@ -11,3 +11,4 @@ prometheus-fastapi-instrumentator
 jsonschema
 asyncpg
 greenlet
+tenacity
