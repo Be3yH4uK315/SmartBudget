@@ -1,9 +1,11 @@
 import logging
 from uuid import UUID
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import insert
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+
 from app import models
 
 logger = logging.getLogger(__name__)
@@ -82,11 +84,12 @@ class FeedbackRepository(BaseRepository):
         await self.db.commit()
         return feedback
         
-    async def get_all_feedback_data(self) -> list[dict]:
+    async def get_all_feedback_data(self, days_limit: int = 180) -> list[dict]:
         """
-        Сложный запрос для build_dataset_task.
-        Объединяет Feedback и ClassificationResult.
+        Получает данные для обучения.
         """
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
+        
         stmt = await self.db.execute(
             select(
                 models.ClassificationResult.merchant, 
@@ -98,6 +101,7 @@ class FeedbackRepository(BaseRepository):
                 models.ClassificationResult, 
                 models.Feedback.transaction_id == models.ClassificationResult.transaction_id
             )
+            .where(models.Feedback.created_at >= cutoff_date)
         )
         
         results = stmt.mappings().all()

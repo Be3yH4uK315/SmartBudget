@@ -29,8 +29,8 @@ async def build_training_dataset_task(ctx):
         await dataset_repo.create_dataset_entry(dataset_entry)
         
         try:
-            logger.info("Loading all feedback data using repository...")
-            data_for_training = await feedback_repo.get_all_feedback_data()
+            logger.info("Loading feedback data (last 180 days)...")
+            data_for_training = await feedback_repo.get_all_feedback_data(days_limit=180)
             
             if not data_for_training:
                 logger.info("No valid training data after ETL. Aborting.")
