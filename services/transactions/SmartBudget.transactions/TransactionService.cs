@@ -20,7 +20,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 // Kafka
 builder.Services.AddSingleton<IKafkaService, KafkaService>();
-
+//Background Service
+builder.Services.AddHostedService<BackgroundService>();
+builder.Services.AddScoped<ClassificationHandler>();
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -35,7 +37,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins("http://127.0.0.1:3000") 
+        policy.WithOrigins("http://127.0.0.1:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

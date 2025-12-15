@@ -1,15 +1,17 @@
 using SmartBudget.Transactions.DTO;
+using SmartBudget.Transactions.Domain.Entities;
 using System.Text.Json;
 
 namespace SmartBudget.Transactions.Services
 {
     public interface ITransactionService
-    {
-        Task<IEnumerable<object>> GetUserTransactionsAsync(Guid userId, int limit, int offset);
-        Task<object?> GetByTransactionIdAsync(Guid transactionId);
-        Task<object> CreateManualTransactionAsync(CreateManualTransactionRequest request);
-        Task<object> ImportMockAsync(JsonElement body);
-        Task<object> PatchCategoryAsync(Guid id, PatchTransactionCategoryRequest request);
-        Task DeleteAsync(Guid id);
-    }
+{
+    Task<List<Transaction>> GetUserTransactionsAsync(Guid userId, int limit, int offset, CancellationToken stoppingToken);
+    Task<Transaction?> GetByTransactionIdAsync(Guid transactionId, CancellationToken stoppingToken);
+    Task<string> CreateManualTransactionAsync(Transaction transaction, CancellationToken stoppingToken);
+    Task<int> ImportMockAsync(List<Transaction> transactions, CancellationToken stoppingToken);
+    Task<string> PatchCategoryAsync(Guid id, PatchTransactionCategoryRequest request, CancellationToken stoppingToken);
+    Task DeleteAsync(Guid id, CancellationToken stoppingToken);
+}
+
 }
