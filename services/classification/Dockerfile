@@ -13,7 +13,7 @@ FROM python:${PYTHON_VERSION}-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libgomp1 && \
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libgomp1 curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local

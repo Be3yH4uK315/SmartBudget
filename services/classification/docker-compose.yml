@@ -109,6 +109,11 @@ services:
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
       "
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/class/health"]
+      interval: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - smartbudget-net
 
@@ -119,15 +124,23 @@ services:
       - ../../services/classification/.env
     container_name: class_worker_dev
     depends_on:
-      - categorization_service
-      - kafka
-      - redis_cache
+      categorization_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
     command: arq app.worker.WorkerSettings
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 30s
+      retries: 3
+      start_period: 30s
     networks:
       - smartbudget-net
 
@@ -138,15 +151,23 @@ services:
       - ../../services/classification/.env
     container_name: class_consumers_dev
     depends_on:
-      - categorization_service
-      - kafka
-      - redis_cache
+      categorization_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
     command: python run_consumers.py
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 30s
+      retries: 3
+      start_period: 30s
     networks:
       - smartbudget-net
 
