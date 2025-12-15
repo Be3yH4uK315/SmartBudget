@@ -34,9 +34,7 @@ export default withAuth(function TransactionsScreen() {
 
   useEffect(() => {
     return () => {
-      if (location.pathname === '/transactions') {
-        dispatch(clearTransactionsState())
-      }
+      dispatch(clearTransactionsState())
     }
   }, [dispatch, location.pathname])
 
