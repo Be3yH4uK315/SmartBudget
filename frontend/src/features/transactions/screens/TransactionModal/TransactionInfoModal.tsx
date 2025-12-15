@@ -3,27 +3,35 @@ import { selectTransactionById } from '@features/transactions/store'
 import { CloseOutlined } from '@mui/icons-material'
 import { Box, Button, IconButton, Stack, Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
-import { useAppSelector } from '@shared/store'
+import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
+import { useAppDispatch, useAppSelector } from '@shared/store'
+import { openModal } from '@shared/store/modal'
 import { formatCurrency } from '@shared/utils/formatCurrency'
 import dayjs from 'dayjs'
-import { useLocation, useNavigate, useParams } from 'react-router'
 
-const TransactionInfo = () => {
+type Props = {
+  transactionId: string
+  onClose: () => void
+}
+
+export const TransactionInfoModal = ({ transactionId, onClose }: Props) => {
   const translate = useTranslate('Transactions.Modal')
   const translateCategory = useTranslate('Categories')
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  const { id: transactionId } = useParams()
+  const dispatch = useAppDispatch()
 
   const transaction = useAppSelector(selectTransactionById(transactionId!))
+
+  const handleChangeCategory = () =>
+    dispatch(
+      openModal({ id: 'changeTransactionCategory', props: { transactionId: transactionId } }),
+    )
 
   if (!transaction) return null
 
   return (
-    <>
+    <ModalLayout>
       <IconButton
-        onClick={() => navigate(-1)}
+        onClick={onClose}
         sx={{
           position: 'absolute',
           top: 12,
@@ -49,15 +57,7 @@ const TransactionInfo = () => {
             {formatCurrency(transaction.value, transaction.type)}
           </Typography>
 
-          <Button
-            onClick={() =>
-              navigate(`./category`, {
-                state: { backgroundLocation: location.state?.backgroundLocation || location },
-              })
-            }
-          >
-            {translate('changeCategory')}
-          </Button>
+          <Button onClick={handleChangeCategory}>{translate('changeCategory')}</Button>
 
           <Box
             sx={{
@@ -74,8 +74,6 @@ const TransactionInfo = () => {
           </Box>
         </Stack>
       </Stack>
-    </>
+    </ModalLayout>
   )
 }
-
-export default TransactionInfo

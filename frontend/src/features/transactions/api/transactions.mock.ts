@@ -8,6 +8,12 @@ function generateMockTransactions(total = 60): Transaction[] {
     '2025-12-11T12:12:12',
     '2025-12-10T12:12:12',
     '2025-12-09T12:12:12',
+    '2025-12-08T12:12:12',
+    '2025-12-07T12:12:12',
+    '2025-12-06T12:12:12',
+    '2025-12-05T12:12:12',
+    '2025-12-04T12:12:12',
+    '2025-12-03T12:12:12',
     '2025-11-29T12:12:12',
     '2025-11-20T12:12:12',
     '2025-11-15T12:12:12',
@@ -33,7 +39,7 @@ function generateMockTransactions(total = 60): Transaction[] {
   return result
 }
 
-const ALL_TRANSACTIONS = generateMockTransactions(11)
+const ALL_TRANSACTIONS = generateMockTransactions(1000)
 
 ALL_TRANSACTIONS.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0))
 
@@ -49,6 +55,7 @@ class TransactionsMock {
     return ALL_TRANSACTIONS.slice(offset, offset + PAGE_SIZE)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async changeCategory(payload: any): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 1000))
   }

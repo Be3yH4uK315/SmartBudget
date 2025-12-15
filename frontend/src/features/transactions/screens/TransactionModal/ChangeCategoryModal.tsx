@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CATEGORIES_ICONS_MAP,
   CATEGORY_IDS,
@@ -6,7 +6,6 @@ import {
 import { changeCategory, selectCategoryByTransactionId } from '@features/transactions/store'
 import { ArrowBackOutlined } from '@mui/icons-material'
 import {
-  Box,
   Button,
   IconButton,
   MenuItem,
@@ -17,16 +16,18 @@ import {
 } from '@mui/material'
 import { OverridableComponent } from '@mui/material/OverridableComponent'
 import { useTranslate } from '@shared/hooks'
+import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
 import { useAppDispatch, useAppSelector } from '@shared/store'
-import { useNavigate, useParams } from 'react-router'
+import { openModal } from '@shared/store/modal'
 
-const ChangeCategory = () => {
-  const navigate = useNavigate()
+type Props = {
+  transactionId: string
+}
+
+export const ChangeCategoryModal = ({ transactionId }: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions.Modal.ChangeCategory')
   const translateCategory = useTranslate('Categories')
-
-  const { id: transactionId } = useParams()
   const currentCategory = useAppSelector(selectCategoryByTransactionId(transactionId!))
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
@@ -45,8 +46,11 @@ const ChangeCategory = () => {
         categoryId: Number(selectedCategory),
       }),
     )
-    navigate(-1)
+    handleClose()
   }
+
+  const handleClose = () =>
+    dispatch(openModal({ id: 'transactionInfo', props: { transactionId: transactionId } }))
 
   const renderCategory = (
     value: number,
@@ -55,9 +59,7 @@ const ChangeCategory = () => {
   ) => {
     return (
       <Stack direction="row" spacing={1} alignItems="center">
-        <Suspense fallback={<Box width={16} height={16} />}>
-          <Icon fontSize="small" />
-        </Suspense>
+        <Icon fontSize="small" />
 
         <Typography>{translateCategory(value)}</Typography>
       </Stack>
@@ -65,9 +67,9 @@ const ChangeCategory = () => {
   }
 
   return (
-    <>
+    <ModalLayout>
       <IconButton
-        onClick={() => navigate(-1)}
+        onClick={handleClose}
         sx={{
           position: 'absolute',
           top: 12,
@@ -118,8 +120,6 @@ const ChangeCategory = () => {
           {translate('confirm')}
         </Button>
       </Stack>
-    </>
+    </ModalLayout>
   )
 }
-
-export default ChangeCategory

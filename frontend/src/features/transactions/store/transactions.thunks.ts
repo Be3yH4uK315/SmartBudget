@@ -1,5 +1,4 @@
 import { transactionsApi } from '@features/transactions/api/transactions.api'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { transactionsMock } from '@features/transactions/api/transactions.mock'
 import { Transaction } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
@@ -16,7 +15,7 @@ export const getTransactions = createAsyncThunk<
 
     const offset = state.transactions?.offset ?? 0
 
-    const response = await transactionsApi.getTransactions(offset)
+    const response = await transactionsMock.getTransactions(offset)
 
     return { transactions: response, length: response.length }
   } catch (e: any) {
@@ -32,7 +31,7 @@ export const changeCategory = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('changeCategory', async (payload, { rejectWithValue }) => {
   try {
-    const response = await transactionsApi.changeCategory(payload)
+    const response = await transactionsMock.changeCategory(payload)
 
     showToast({ messageKey: 'categoryChanged', type: 'success' })
 
