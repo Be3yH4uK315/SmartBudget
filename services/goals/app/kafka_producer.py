@@ -10,7 +10,7 @@ from app import settings, schemas
 
 logger = logging.getLogger(__name__)
 
-def json_default(obj):
+def jsonDefault(obj):
     """Расширенная сериализация: обрабатывает Decimal и даты."""
     if isinstance(obj, Decimal):
         return str(obj)
@@ -22,11 +22,11 @@ class KafkaProducer:
     """Обертка для AIOKafkaProducer с валидацией по JSON Schema."""
     def __init__(self):
         self.producer = AIOKafkaProducer(
-            bootstrap_servers=settings.settings.kafka.kafka_bootstrap_servers
+            bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS
         )
         self._schemas = {
-            settings.settings.kafka.kafka_topic_budget_events: schemas.BUDGET_EVENTS_SCHEMA,
-            settings.settings.kafka.kafka_topic_budget_notification: schemas.BUDGET_NOTIFICATIONS_SCHEMA,
+            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS: schemas.BUDGET_EVENTS_SCHEMA,
+            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION: schemas.BUDGET_NOTIFICATIONS_SCHEMA,
         }
 
     async def start(self):
@@ -37,10 +37,10 @@ class KafkaProducer:
         await self.producer.stop()
         logger.info("KafkaProducer stopped.")
 
-    async def send_event(self, topic: str, event_data: dict, schema: dict = None):
+    async def sendEvent(self, topic: str, event_data: dict, schema: dict = None):
         """Валидирует и отправляет событие."""
         try:
-            dumped_str = json.dumps(event_data, default=json_default)
+            dumped_str = json.dumps(event_data, default=jsonDefault)
 
             if schema:
                 validate_data = json.loads(dumped_str)
@@ -57,10 +57,10 @@ class KafkaProducer:
             logger.error(f"Failed to send Kafka event to {topic}: {e}")
             raise
 
-    async def send_budget_event(self, event_data: dict):
-        topic = settings.settings.kafka.kafka_topic_budget_events
-        await self.send_event(topic, event_data, self._schemas[topic])
+    async def sendBudgetEvent(self, event_data: dict):
+        topic = settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS
+        await self.sendEvent(topic, event_data, self._schemas[topic])
 
-    async def send_notification(self, event_data: dict):
-        topic = settings.settings.kafka.kafka_topic_budget_notification
-        await self.send_event(topic, event_data, self._schemas[topic])
+    async def sendNotification(self, event_data: dict):
+        topic = settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION
+        await self.sendEvent(topic, event_data, self._schemas[topic])

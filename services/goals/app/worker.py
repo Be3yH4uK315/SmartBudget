@@ -16,23 +16,23 @@ from app.kafka_producer import KafkaProducer
 
 logger = logging.getLogger(__name__)
 
-async def touch_health_file():
+async def touchHealthFile():
     """Обновляет файл статуса здоровья."""
     try:
         Path("/tmp/healthy").touch()
     except Exception as e:
         logger.error(f"Failed to touch health file: {e}")
 
-async def process_outbox_task(ctx):
+async def processOutboxTask(ctx):
     """Задача для вычитывания событий из Outbox и отправки в Kafka."""
     db_maker = ctx["db_session_maker"]
     kafka: KafkaProducer = ctx["kafka_producer"]
     
-    await touch_health_file()
+    await touchHealthFile()
 
     async with db_maker() as session:
         repo = repositories.GoalRepository(session)
-        events = await repo.get_pending_outbox_events(limit=50)
+        events = await repo.getPendingOutboxEvents(limit=50)
         
         if not events:
             return
@@ -42,16 +42,16 @@ async def process_outbox_task(ctx):
 
         for event in events:
             try:
-                await kafka.send_event(event.topic, event.payload, schema=None)
-                sent_ids.append(event.id)
+                await kafka.sendEvent(event.topic, event.payload, schema=None)
+                sent_ids.append(event.eventId)
             except Exception as e:
-                logger.error(f"Failed to send outbox event {event.id}: {e}")
-                failed_updates.append((event.id, str(e)))
+                logger.error(f"Failed to send outbox event {event.eventId}: {e}")
+                failed_updates.append((event.eventId, str(e)))
 
         if sent_ids:
-            await repo.delete_outbox_events(sent_ids)
+            await repo.deleteOutboxEvents(sent_ids)
         for f_id, f_msg in failed_updates:
-            await repo.handle_failed_outbox_event(f_id, f_msg)
+            await repo.handleFailedOutboxEvent(f_id, f_msg)
 
         await repo.db.commit()
         
@@ -60,14 +60,14 @@ async def process_outbox_task(ctx):
         if failed_updates:
             logger.warning(f"Failed to send {len(failed_updates)} events.")
 
-async def check_goals_deadlines_task(ctx):
+async def checkGoalsDeadlinesTask(ctx):
     """
     ARQ-задача для проверки сроков целей.
-    'ctx' содержит ресурсы из 'on_startup'.
+    'ctx' содержит ресурсы из 'onStartup'.
     """
     db_maker = ctx["db_session_maker"]
     
-    await touch_health_file()
+    await touchHealthFile()
 
     async with db_maker() as session:
         try:
@@ -75,13 +75,13 @@ async def check_goals_deadlines_task(ctx):
             service = services.GoalService(repo)
             await service.check_deadlines()
         except Exception as e:
-            logger.error(f"Error in check_goals_deadlines_task: {e}")
+            logger.error(f"Error in checkGoalsDeadlinesTask: {e}")
 
-async def on_startup(ctx):
-    logging_config.setup_logging()
+async def onStartup(ctx):
+    logging_config.setupLogging()
     logger.info("Arq worker starting...")
 
-    engine = create_async_engine(settings.settings.db.db_url)
+    engine = create_async_engine(settings.settings.DB.DB_URL)
     db_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     ctx["db_engine"] = engine
     ctx["db_session_maker"] = db_maker
@@ -90,9 +90,9 @@ async def on_startup(ctx):
     await kafka_prod.start()
     ctx["kafka_producer"] = kafka_prod
 
-    await touch_health_file()
+    await touchHealthFile()
 
-async def on_shutdown(ctx):
+async def onShutdown(ctx):
     logger.info("Arq worker shutting down...")
     if ctx.get("db_engine"):
         await ctx["db_engine"].dispose()
@@ -100,12 +100,12 @@ async def on_shutdown(ctx):
         await ctx["kafka_producer"].stop()
 
 class WorkerSettings:
-    functions = [check_goals_deadlines_task, process_outbox_task]
-    on_startup = on_startup
-    on_shutdown = on_shutdown
+    functions = [checkGoalsDeadlinesTask, processOutboxTask]
+    onStartup = onStartup
+    onShutdown = onShutdown
     cron_jobs = [
-        cron(check_goals_deadlines_task, hour=0, minute=0),
-        cron(process_outbox_task, minute=set(range(60))), 
+        cron(checkGoalsDeadlinesTask, hour=0, minute=0),
+        cron(processOutboxTask, minute=set(range(60))), 
     ]
-    queue_name = settings.settings.arq.arq_queue_name
-    redis_settings = RedisSettings.from_dsn(settings.settings.arq.redis_url)
+    queue_name = settings.settings.ARQ.ARQ_QUEUE_NAME
+    redis_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)

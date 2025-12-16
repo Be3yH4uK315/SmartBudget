@@ -21,7 +21,7 @@ from app.kafka_producer import KafkaProducer
 
 logger = logging.getLogger(__name__)
 
-async def consume_transaction_goal(
+async def consumeTransactionGoal(
     consumer: AIOKafkaConsumer, 
     db_maker: async_sessionmaker[AsyncSession]
 ):
@@ -47,7 +47,7 @@ async def consume_transaction_goal(
             async with db_maker() as session:
                 repo = repositories.GoalRepository(session)
                 service = services.GoalService(repo)
-                await service.update_goal_balance(event)
+                await service.updateGoalBalance(event)
 
             await consumer.commit()
 
@@ -59,14 +59,14 @@ async def consume_transaction_goal(
             logger.critical(f"CRITICAL FAILURE (Offset: {message.offset}): {e}", exc_info=True)
             raise e
 
-async def start_consumer():
+async def startConsumer():
     """Инициализирует и запускает консьюмер и его зависимости."""
     db_engine: AsyncEngine | None = None
     kafka_prod_instance: KafkaProducer | None = None
     consumer: AIOKafkaConsumer | None = None
 
     try:
-        db_engine = create_async_engine(settings.settings.db.db_url)
+        db_engine = create_async_engine(settings.settings.DB.DB_URL)
         db_maker = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
         logger.info("Consumer DB context created.")
 
@@ -75,9 +75,9 @@ async def start_consumer():
         logger.info("Consumer Kafka producer started.")
 
         consumer = AIOKafkaConsumer(
-            settings.settings.kafka.kafka_topic_transaction_goal,
-            bootstrap_servers=settings.settings.kafka.kafka_bootstrap_servers,
-            group_id=settings.settings.kafka.kafka_goals_group_id,
+            settings.settings.KAFKA.KAFKA_TOPIC_TRANSACTION_GOAL,
+            bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
+            group_id=settings.settings.KAFKA.KAFKA_GOALS_GROUP_ID,
             enable_auto_commit=False,
             auto_offset_reset='earliest'
         )
@@ -96,7 +96,7 @@ async def start_consumer():
         if not started:
             raise RuntimeError("Could not connect to Kafka after retries")
 
-        await consume_transaction_goal(consumer, db_maker, kafka_prod_instance)
+        await consumeTransactionGoal(consumer, db_maker)
         
     except Exception as e:
         logger.critical(f"Consumer process failed: {e}", exc_info=True)

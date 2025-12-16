@@ -1,34 +1,35 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class DBSettings(BaseSettings):
-    db_url: str
+    DB_URL: str
 
 class KafkaSettings(BaseSettings):
-    kafka_bootstrap_servers: str
-    kafka_goals_group_id: str
-    kafka_topic_transaction_goal: str
-    kafka_topic_budget_events: str
-    kafka_topic_budget_notification: str
+    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_GOALS_GROUP_ID: str
+    KAFKA_TOPIC_TRANSACTION_GOAL: str
+    KAFKA_TOPIC_BUDGET_EVENTS: str
+    KAFKA_TOPIC_BUDGET_NOTIFICATION: str
 
 class ArqSettings(BaseSettings):
-    redis_url: str
-    arq_queue_name: str
+    REDIS_URL: str
+    ARQ_QUEUE_NAME: str
 
 class JWTSettings(BaseSettings):
-    jwt_public_key: str
-    jwt_algorithm: str
-    jwt_audience: str
+    JWT_PUBLIC_KEY: str
+    JWT_ALGORITHM: str
+    JWT_AUDIENCE: str
 
 class AppSettings(BaseSettings):
-    log_level: str
-    tz: str
+    LOG_LEVEL: str
+    TZ: str
+    FRONTEND_URL: str
 
 class Settings(BaseSettings):
-    db: DBSettings
-    kafka: KafkaSettings
-    arq: ArqSettings
-    jwt: JWTSettings
-    app: AppSettings
+    DB: DBSettings
+    KAFKA: KafkaSettings
+    ARQ: ArqSettings
+    JWT: JWTSettings
+    APP: AppSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",

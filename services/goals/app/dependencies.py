@@ -1,6 +1,5 @@
-from fastapi import Depends, status, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+from fastapi import Depends, status, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 from uuid import UUID
@@ -12,9 +11,7 @@ from app import (
     settings
 )
 
-security = HTTPBearer()
-
-async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+async def getDb(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Получает session_maker из app.state и предоставляет сессию."""
     session_maker = request.app.state.async_session_maker
     if not session_maker:
@@ -23,11 +20,11 @@ async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     async with session_maker() as session:
         yield session
 
-def get_goal_repository(db: AsyncSession = Depends(get_db)) -> repositories.GoalRepository:
+def getGoalRepository(db: AsyncSession = Depends(getDb)) -> repositories.GoalRepository:
     """Провайдер для GoalRepository."""
     return repositories.GoalRepository(db)
 
-async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
+async def getArqPool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq из app.state."""
     arq_pool: ArqRedis = request.app.state.arq_pool
     try:
@@ -35,36 +32,39 @@ async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     finally:
         pass
 
-def get_goal_service(
-    repo: repositories.GoalRepository = Depends(get_goal_repository),
+def getGoalService(
+    repo: repositories.GoalRepository = Depends(getGoalRepository),
 ) -> services.GoalService:
     """Провайдер для GoalService."""
     return services.GoalService(repo)
 
-async def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> UUID:
+async def getCurrentUserId(request: Request) -> UUID:
     """
-    Декодирует JWT, валидирует подпись публичным ключом и возвращает user_id.
+    Декодирует JWT, валидирует подпись публичным ключом и возвращает userId.
     Далее перенести в API Gateway.
     """
-    token = credentials.credentials
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No access token provided")
+
     try:
+        public_key = settings.settings.JWT.JWT_PUBLIC_KEY.replace("\\n", "\n")
         payload = jwt.decode(
-            token,
-            settings.settings.jwt.jwt_public_key,
-            algorithms=[settings.settings.jwt.jwt_algorithm],
-            audience=settings.settings.jwt.jwt_audience,
+            access_token,
+            public_key,
+            algorithms=[settings.settings.JWT.JWT_ALGORITHM],
+            audience=settings.settings.JWT.JWT_AUDIENCE,
         )
-        
-        user_id_str = payload.get("sub")
-        if not user_id_str:
+
+        userId_str = payload.get("sub")
+        if not userId_str:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, 
-                detail="Token missing subject (user_id)"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token missing subject (userId)"
             )
-            
-        return UUID(user_id_str)
+
+        userId = UUID(userId_str)
+        return userId
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(

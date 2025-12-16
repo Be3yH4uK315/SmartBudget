@@ -19,7 +19,7 @@ target_metadata = Base.metadata
 
 # ---- Async engine setup ----
 def get_url():
-    return settings.db.db_url
+    return settings.DB.DB_URL
 
 
 def run_migrations_offline() -> None:

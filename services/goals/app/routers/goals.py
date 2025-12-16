@@ -13,7 +13,7 @@ router = APIRouter(tags=["Goals"])
     status_code=status.HTTP_200_OK,
     summary="Health check сервиса целей"
 )
-async def health_check(request: Request):
+async def healthCheck(request: Request):
     """
     Проверяет доступность DB, Redis (ARQ) и Kafka Producer.
     """
@@ -75,15 +75,15 @@ async def health_check(request: Request):
     responses={400: {"model": schemas.UnifiedErrorResponse}},
     summary="Создание цели"
 )
-async def create_goal(
+async def createCoal(
     request: schemas.CreateGoalRequest = Body(...),
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: services.GoalService = Depends(dependencies.get_goal_service)
+    userId: UUID = Depends(dependencies.getCurrentUserId),
+    service: services.GoalService = Depends(dependencies.getGoalService)
 ):
     """Создает новую цель для пользователя."""
     try:
-        goal = await service.create_goal(user_id, request)
-        return schemas.CreateGoalResponse(goal_id=goal.id)
+        goal = await service.createGoal(userId, request)
+        return schemas.CreateGoalResponse(goalId=goal.goalId)
     except exceptions.InvalidGoalDataError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -92,28 +92,28 @@ async def create_goal(
     response_model=List[schemas.AllGoalsResponse],
     summary="Получение списка целей"
 )
-async def get_goals(
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: services.GoalService = Depends(dependencies.get_goal_service)
+async def getGoals(
+    userId: UUID = Depends(dependencies.getCurrentUserId),
+    service: services.GoalService = Depends(dependencies.getGoalService)
 ):
     """Получение списка целей."""
-    return await service.get_all_goals(user_id)
+    return await service.getAllGoals(userId)
 
 @router.get(
-    "/{goal_id}",
+    "/{goalId}",
     response_model=schemas.GoalResponse,
     responses={404: {"model": schemas.UnifiedErrorResponse}},
     summary="Получение цели по ID"
 )
 async def get_goal(
-    goal_id: UUID = Path(..., description="ID цели"),
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: services.GoalService = Depends(dependencies.get_goal_service)
+    goalId: UUID = Path(..., description="ID цели"),
+    userId: UUID = Depends(dependencies.getCurrentUserId),
+    service: services.GoalService = Depends(dependencies.getGoalService)
 ):
     """Получение цели по ID."""
     try:
-        goal, days_left = await service.get_goal_details(user_id, goal_id)
-        return schemas.GoalResponse(**goal.__dict__, days_left=days_left)
+        goal, daysLeft = await service.getGoalDetails(userId, goalId)
+        return schemas.GoalResponse(**goal.__dict__, daysLeft=daysLeft)
     except exceptions.GoalNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -123,15 +123,15 @@ async def get_goal(
     summary="Получение целей для главного экрана"
 )
 async def get_main_goals(
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: services.GoalService = Depends(dependencies.get_goal_service)
+    userId: UUID = Depends(dependencies.getCurrentUserId),
+    service: services.GoalService = Depends(dependencies.getGoalService)
 ):
     """Получение целей для главного экрана."""
-    goals = await service.get_main_goals(user_id)
+    goals = await service.getMainGoals(userId)
     return schemas.MainGoalsResponse(goals=goals)
 
 @router.patch(
-    "/{goal_id}",
+    "/{goalId}",
     response_model=schemas.GoalResponse,
     responses={
         404: {"model": schemas.UnifiedErrorResponse},
@@ -140,21 +140,21 @@ async def get_main_goals(
     summary="Обновление полей цели"
 )
 async def update_goal(
-    goal_id: UUID = Path(...),
+    goalId: UUID = Path(...),
     request: schemas.GoalPatchRequest = Body(...),
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: services.GoalService = Depends(dependencies.get_goal_service)
+    userId: UUID = Depends(dependencies.getCurrentUserId),
+    service: services.GoalService = Depends(dependencies.getGoalService)
 ):
     """Обновление полей цели."""
     try:
         if not request.model_dump(exclude_unset=True):
              raise exceptions.InvalidGoalDataError("At least one field must be provided")
              
-        goal, days_left = await service.update_goal(user_id, goal_id, request)
+        goal, daysLeft = await service.updateGoal(userId, goalId, request)
         
         return schemas.GoalResponse(
             **goal.__dict__,
-            days_left=days_left
+            daysLeft=daysLeft
         )
     except exceptions.GoalNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
