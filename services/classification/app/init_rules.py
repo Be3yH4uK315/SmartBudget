@@ -23,53 +23,53 @@ DANGEROUS_KEYWORDS = {
 REGEX_RULES_LIST = [
     # --- Экосистема APPLE ---
     # Apple Services (Music, iCloud) -> Подписки (16)
-    (16, r"apple\.com/bill"),
-    (16, r"itunes\.com"),
+    (17, r"apple\.com/bill"),
+    (17, r"itunes\.com"),
     # Apple Store -> Электроника (4)
-    (4, r"apple\s*store"),
-    (4, r"re:?store"),
+    (5, r"apple\s*store"),
+    (5, r"re:?store"),
 
     # --- Экосистема YANDEX ---
     # Такси -> Такси (20)
-    (20, r"^yandex.*taxi"),
-    (20, r"^yandex\.go"),
-    (20, r"^uber.*trip"),
+    (21, r"^yandex.*taxi"),
+    (21, r"^yandex\.go"),
+    (21, r"^uber.*trip"),
     # Еда/Лавка -> Рестораны/Продукты
-    (2, r"^yandex.*eda"),
-    (1, r"^yandex.*lavka"),
+    (3, r"^yandex.*eda"),
+    (2, r"^yandex.*lavka"),
     # Драйв -> Такси/Каршеринг (20)
-    (20, r"^yandex.*drive"),
+    (21, r"^yandex.*drive"),
     # Маркет -> Маркетплейсы (18)
-    (18, r"^yandex.*market"),
-    (18, r"^ym\s*market"),
+    (19, r"^yandex.*market"),
+    (19, r"^ym\s*market"),
     # Плюс -> Подписки (16)
-    (16, r"^yandex\s*plus"),
-    (16, r"^ya\s*plus"),
+    (17, r"^yandex\s*plus"),
+    (17, r"^ya\s*plus"),
 
     # --- Экосистема SBER ---
     # СберМаркет -> Продукты (1)
-    (1, r"^sbermarket"),
+    (2, r"^sbermarket"),
     # Мегамаркет -> Маркетплейсы (18)
-    (18, r"^sbermegamarket"),
+    (19, r"^sbermegamarket"),
     # СберПрайм -> Подписки (16)
-    (16, r"^sberprime"),
+    (17, r"^sberprime"),
     
     # --- Каршеринг и Самокаты ---
-    (20, r"^delimobil"),
-    (20, r"^belkacar"),
-    (20, r"^citydrive"),
-    (20, r"^whoosh"),
-    (20, r"^urent"),
+    (21, r"^delimobil"),
+    (21, r"^belkacar"),
+    (21, r"^citydrive"),
+    (21, r"^whoosh"),
+    (21, r"^urent"),
 
     # --- Маркетплейсы ---
-    (18, r"^wb\sretail"),
-    (18, r"^wildberries"),
-    (18, r"^ozon\.\d+"),
-    (18, r"^aliexpress"),
+    (19, r"^wb\sretail"),
+    (19, r"^wildberries"),
+    (19, r"^ozon\.\d+"),
+    (19, r"^aliexpress"),
 
     # --- Магнит ---
-    (7, r"magnit\s*cosmetic"), # Красота
-    (1, r"magnit"),            # Продукты
+    (8, r"magnit\s*cosmetic"), # Красота
+    (2, r"magnit"),            # Продукты
 ]
 
 # =========================================================
@@ -77,23 +77,23 @@ REGEX_RULES_LIST = [
 # =========================================================
 MCC_SPECIFIC = {
     # Продукты
-    1: [5411, 5422, 5441, 5451, 5462],
+    2: [5411, 5422, 5441, 5451, 5462],
     # Аптеки
-    10: [5912, 5122],
+    11: [5912, 5122],
     # АЗС
-    12: [5541, 5542],
+    13: [5541, 5542],
     # Алкоголь/Бары
-    2: [5813],
+    3: [5813],
     # Авиа
-    27: [4511, 3000, 3001],
+    28: [4511, 3000, 3001],
 }
 
 MCC_GENERIC = {
     # Разное / Маркетплейсы (очень часто 5999)
-    18: [5311, 5331, 5399, 5964], 
-    0: [5999], # Misc Specialty Retail -> Прочее
-    2: [5812, 5814], # Рестораны/Фастфуд
-    1: [5499], # Misc Food
+    19: [5311, 5331, 5399, 5964], 
+    1: [5999], # Misc Specialty Retail -> Прочее
+    3: [5812, 5814], # Рестораны/Фастфуд
+    2: [5499], # Misc Food
 }
 
 async def init_all_rules():
