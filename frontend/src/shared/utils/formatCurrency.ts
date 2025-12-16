@@ -9,6 +9,6 @@ export function formatCurrency(value: number | string, type?: string): string {
 
   if (Number.isNaN(num)) return '—'
 
-  const prefix = type === 'income' ? '+' : ''
-  return `${prefix} ${rubFormatter.format(num)}`
+  const prefix = type === 'income' ? '+ ' : ''
+  return `${prefix}${rubFormatter.format(num)}`
 }

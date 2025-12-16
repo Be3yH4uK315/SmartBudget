@@ -116,7 +116,13 @@ async def lifespan(app: FastAPI):
         del app.state.redis_pool
         del app.state.arq_pool
 
-app = FastAPI(title="Auth Service", version="1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Auth Service", 
+    version="1.0", 
+    lifespan=lifespan,
+    docs_url="/api/v1/class/docs",
+    openapi_url="/api/v1/class/openapi.json"
+)
 
 @app.exception_handler(exceptions.AuthServiceError)
 async def auth_service_exception_handler(request: Request, exc: exceptions.AuthServiceError):
@@ -162,4 +168,4 @@ app.add_middleware(
 )
 Instrumentator().instrument(app).expose(app)
 app.middleware("http")(middleware.error_middleware)
-app.include_router(auth.router)
+app.include_router(auth.router, prefix="/api/v1/auth")

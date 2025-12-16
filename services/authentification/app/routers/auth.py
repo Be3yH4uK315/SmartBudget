@@ -16,7 +16,7 @@ from app import (
     services
 )
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
 
 def _set_auth_cookies(
     response: Response,

@@ -1,32 +1,34 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from uuid import UUID
 
 class CategorizationResultResponse(BaseModel):
-    """Модель ответа для GET /classification/{id}"""
-    transaction_id: UUID
-    category_id: UUID
-    category_name: str
-    confidence: float
-    source: str
-    model_version: Optional[str] = None
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    category_id: int = Field(..., description="ID присвоенной категории")
+    category_name: str = Field(..., description="Имя присвоенной категории")
+    confidence: float = Field(..., description="Уверенность модели (0.0 до 1.0)")
+    source: str = Field(..., description="Источник (rules, ml, manual)")
+    model_version: Optional[str] = Field(None, description="Версия модели, если source=ml")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class FeedbackRequest(BaseModel):
-    """Модель запроса для POST /feedback"""
-    transaction_id: UUID
-    correct_category_id: UUID
-    user_id: Optional[UUID] = None
-    comment: Optional[str] = Field(None, max_length=1024)
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    correct_category_id: int = Field(..., description="ID категории, которую указал юзер")
+    user_id: Optional[UUID] = Field(None, description="ID пользователя (если есть)")
+    comment: Optional[str] = Field(None, max_length=1024, description="Комментарий")
 
 class HealthResponse(BaseModel):
-    """Модель ответа для GET /health"""
-    status: str
-    details: dict
+    status: str = Field(...)
+    details: dict = Field(...)
 
 class UnifiedSuccessResponse(BaseModel):
-    """Единый ответ для успешных POST/PUT операций"""
-    ok: bool = True
-    detail: Optional[str] = None
+    ok: bool = Field(True)
+    detail: Optional[str] = Field(None)
+
+class DLQMessage(BaseModel):
+    original_topic: str
+    original_message: str
+    error: str
+    timestamp: datetime

@@ -1,3 +1,4 @@
+import { DEFAULT_DURATION } from '@shared/constants/toast'
 import { store } from '@shared/store'
 import { addToast, removeToast } from '@shared/store/toast'
 import { ToastOptions } from '@shared/types'
@@ -8,12 +9,13 @@ export function closeToast(id: number) {
 
 export function showToast(toast: Omit<ToastOptions, 'id'>) {
   const id = generateId()
-  store.dispatch(addToast({ id, ...toast }))
+  const duration = toast.duration ?? DEFAULT_DURATION[toast.type]
+  store.dispatch(addToast({ id, ...toast, duration }))
 
-  if (toast.duration && toast.duration > 0) {
+  if (duration > 0) {
     setTimeout(() => {
       closeToast(id)
-    }, toast.duration)
+    }, duration)
   }
 }
 

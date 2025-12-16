@@ -1,7 +1,6 @@
 import logging
-from sqlalchemy.future import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import Model
+
+from app import repositories
 
 logger = logging.getLogger(__name__)
 
@@ -18,19 +17,10 @@ async def validate_and_promote_model(ctx):
         return
 
     async with db_maker() as session:
+        model_repo = repositories.ModelRepository(session)
         try:
-            active_model_stmt = await session.execute(
-                select(Model).where(Model.is_active == True)
-            )
-            active_model = active_model_stmt.scalar_one_or_none()
-
-            candidate_model_stmt = await session.execute(
-                select(Model)
-                .where(Model.is_active == False)
-                .order_by(Model.created_at.desc())
-                .limit(1)
-            )
-            candidate_model = candidate_model_stmt.scalar_one_or_none()
+            active_model = await model_repo.get_active_model()
+            candidate_model = await model_repo.get_latest_candidate_model()
 
             if not candidate_model:
                 logger.info("No new candidate models found. Nothing to promote.")
@@ -57,20 +47,14 @@ async def validate_and_promote_model(ctx):
 
                 if candidate_f1 > active_f1:
                     logger.info("Candidate is better. Promoting...")
-                    active_model.is_active = False
-                    candidate_model.is_active = True
-                    await session.commit()
+                    await model_repo.promote_model(candidate_model, active_model)
                     logger.info(f"SUCCESS: Model {candidate_model.version} is now active.")
                 else:
                     logger.info("Candidate is not better than active model. No changes made.")
-            
+
             else:
-                logger.info(
-                    f"No active model found. Promoting candidate {candidate_model.version} "
-                    f"(F1: {candidate_f1:.4f}) as it meets threshold."
-                )
-                candidate_model.is_active = True
-                await session.commit()
+                logger.info("No active model found. Promoting candidate...")
+                await model_repo.promote_model(candidate_model, None)
                 logger.info(f"SUCCESS: Model {candidate_model.version} is now active.")
 
         except Exception as e:

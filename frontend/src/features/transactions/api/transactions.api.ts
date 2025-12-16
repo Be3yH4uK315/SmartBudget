@@ -4,23 +4,27 @@ import { api } from '@shared/api'
 class TransactionsApi {
   baseUrl = '/transactions'
 
-  async getTransactions(offset: number): Promise<Transaction[]> {
-    const url = `${this.baseUrl}/?offset=${offset}`
-    const response = await api.get<Transaction[]>(url)
+  async getTransactions(offset: number, categoryId: number | null): Promise<Transaction[]> {
+    const url = `${this.baseUrl}`
+    const params = {
+      offset,
+      categoryId: categoryId,
+    }
+    const response = await api.get<Transaction[]>(url, { params })
 
     return response.data
   }
 
-  async changeCategory(data: { userId: string; payload: Transaction }): Promise<void> {
-    const url = `${this.baseUrl}/id`
-    const response = await api.patch(url, data)
+  async changeCategory(payload: Pick<Transaction, 'categoryId' | 'transactionId'>): Promise<void> {
+    const url = `${this.baseUrl}/edit/${payload.transactionId}`
+    const response = await api.patch(url, payload.categoryId)
 
     return response.data
   }
 
   /** Временный эндпоинт для тестов */
   async addTransaction(payload: TempAddPayload): Promise<{ transactionId: string }> {
-    const url = `${this.baseUrl}/manual`
+    const url = `${this.baseUrl}/edit`
     const response = await api.post<{ transactionId: string }>(url, payload)
 
     return response.data
@@ -28,7 +32,7 @@ class TransactionsApi {
 
   /** Временный эндпоинт для тестов */
   async deleteTransaction(transactionId: string): Promise<number> {
-    const url = `${this.baseUrl}/?id=${transactionId}`
+    const url = `${this.baseUrl}/edit/${transactionId}`
     const response = await api.delete<Transaction[]>(url)
 
     return response.status

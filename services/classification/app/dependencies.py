@@ -1,20 +1,19 @@
-from fastapi import Request, HTTPException, Depends
-from sqlalchemy.ext.asyncio import (
-    AsyncSession, create_async_engine, async_sessionmaker
-)
+from fastapi import Depends, Request, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis, ConnectionPool
 from arq.connections import ArqRedis
 from aiokafka import AIOKafkaProducer
 from typing import AsyncGenerator
 
-from app.settings import settings
+from app import settings
+from app.services.classification_service import ClassificationService
 
-engine = create_async_engine(settings.db_url)
-async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Обеспечивает асинхронный сеанс работы с базой данных."""
-    async with async_session_maker() as session:
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
+    session_maker = request.app.state.async_session_maker
+    if not session_maker:
+        raise HTTPException(status_code=503, detail="Database session factory not available")
+    async with session_maker() as session:
         yield session
 
 async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
@@ -28,7 +27,7 @@ async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
 
 async def create_redis_pool() -> ConnectionPool:
     """Создает пул подключений Redis."""
-    return ConnectionPool.from_url(settings.redis_url, decode_responses=True)
+    return ConnectionPool.from_url(settings.settings.redis.redis_url, decode_responses=True)
 
 async def close_redis_pool(pool: ConnectionPool):
     """Закрывает пул подключений Redis."""
@@ -44,10 +43,23 @@ async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
 
 async def get_kafka_producer(request: Request) -> AIOKafkaProducer:
     """Зависимость для получения Kafka-продюсера."""
-    try:
-        producer: AIOKafkaProducer = request.app.state.kafka_producer
-        if not producer:
-            raise HTTPException(status_code=503, detail="Kafka producer not initialized")
-        return producer
-    except AttributeError:
-        raise HTTPException(status_code=503, detail="Kafka service not available")
+    producer: AIOKafkaProducer = request.app.state.kafka_producer
+    if not producer:
+        raise HTTPException(status_code=503, detail="Kafka producer not initialized")
+    return producer
+
+def get_ml_pipeline(request: Request) -> dict | None:
+    """
+    Извлекает загруженный ML-пайплайн из состояния приложения.
+    """
+    return getattr(request.app.state, "ml_pipeline", None)
+
+async def get_classification_service(
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    ml_pipeline: dict | None = Depends(get_ml_pipeline)
+) -> ClassificationService:
+    """
+    Фабрика зависимостей.
+    """
+    return ClassificationService(db, redis, ml_pipeline)

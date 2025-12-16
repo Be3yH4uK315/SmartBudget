@@ -1,10 +1,12 @@
 import React from 'react'
+import { CategoryIcon } from '@features/transactions/components'
 import { Transaction } from '@features/transactions/types'
 import { Box, Stack, Typography } from '@mui/material'
-import { TransactionIcon } from '@shared/assets/icons'
-import { useTranslate } from '@shared/hooks'
+import { MODAL_IDS } from '@shared/constants/modals'
+import { useTheme, useTranslate } from '@shared/hooks'
+import { useAppDispatch } from '@shared/store'
+import { openModal } from '@shared/store/modal'
 import { formatCurrency } from '@shared/utils'
-import { useNavigate } from 'react-router'
 
 type Props = {
   transaction: Transaction
@@ -13,7 +15,16 @@ type Props = {
 export const TransactionLine = React.memo(function TransactionLine({ transaction }: Props) {
   const translate = useTranslate('Transactions')
   const translateCategory = useTranslate('Categories')
-  const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const theme = useTheme()
+
+  const handleClick = () =>
+    dispatch(
+      openModal({
+        id: MODAL_IDS.TRANSACTION_INFO_MODAL,
+        props: { transactionId: transaction.transactionId },
+      }),
+    )
 
   const color =
     transaction.status === 'pending'
@@ -22,24 +33,21 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
         ? 'success.main'
         : 'text.primary'
 
-  const handleClick = () => navigate(`./?id=${transaction.transactionId}`)
+  const iconBgColor = theme.colorMode === 'light' ? 'gray.light' : 'surface.light'
+  const iconColor = theme.colorMode === 'light' ? 'gray.dark' : 'text.primary'
 
   return (
-    <Box display={'flex'} justifyContent={'space-between'} onClick={handleClick}>
-      <Stack direction={'row'} spacing={2}>
-        <Box
-          sx={{
-            bgcolor: 'gray.main',
-            width: 'max-content',
-            height: 'max-content',
-            borderRadius: '24px',
-            p: 1,
-            lineHeight: 0,
-            color: '#FFFFFF',
-          }}
-        >
-          {<TransactionIcon />}
-        </Box>
+    <Box
+      sx={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}
+      onClick={handleClick}
+    >
+      <Stack direction={'row'} spacing={2} alignItems={'center'}>
+        <CategoryIcon
+          categoryId={transaction.categoryId}
+          size={48}
+          boxSx={{ p: 1, width: 'max-content', height: 'max-content', bgcolor: iconBgColor }}
+          iconSx={{ color: iconColor }}
+        />
 
         <Stack>
           <Typography variant="h5">{transaction.name}</Typography>

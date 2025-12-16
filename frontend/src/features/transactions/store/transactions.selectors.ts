@@ -18,8 +18,12 @@ export const selectTransactionsOffset = sliceStateSelector((state) => state.offs
 export const selectTransactionById = (transactionId: string) =>
   createSelector(selectTransactions, (blocks) => {
     for (const block of blocks) {
-      const res = block.transactions.find((t) => t.transactionId === transactionId)
-      if (res) return res
+      const transaction = block.transactions.find((t) => t.transactionId === transactionId)
+      if (transaction) return transaction
     }
-    return
+  })
+
+export const selectCategoryByTransactionId = (transactionId: string) =>
+  createSelector(selectTransactionById(transactionId), (transaction) => {
+    if (transaction) return transaction.categoryId
   })

@@ -1,20 +1,21 @@
-import { lazy, Suspense } from 'react'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Container } from '@mui/material'
+import { lazy } from 'react'
+import { SuspenseFallbackWrapper } from '@shared/components'
 import { Route } from 'react-router'
+import { TransactionsScreenSkeleton } from './screens/TransactionsScreen/TransactionsScreenSkeleton'
 
-const TransactionsScreen = lazy(() => import('./screens/TransactionsScreen'))
+const TransactionsScreen = lazy(() => import('./screens/TransactionsScreen/TransactionsScreen'))
 
-export const transactionRoutes = {
+export const transactionsRoutes = {
   pages: (
-    <Route
-      path="transactions"
-      index
-      element={
-        <Suspense>
-          <TransactionsScreen />
-        </Suspense>
-      }
-    />
+    <Route path="transactions">
+      <Route
+        index
+        element={
+          <SuspenseFallbackWrapper Fallback={<TransactionsScreenSkeleton />}>
+            <TransactionsScreen />
+          </SuspenseFallbackWrapper>
+        }
+      />
+    </Route>
   ),
 }

@@ -1,10 +1,10 @@
+import { PAGE_SIZE } from '@features/transactions/constants/transactionsPage'
 import { TransactionsSliceReducers, TransactionsSliceState } from '@features/transactions/types'
+import { groupByDate, mergeTransactionBlocks } from '@features/transactions/utils'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
-import { PAGE_SIZE } from '../constants/transactionsPage'
-import { groupByDate } from '../utils'
 import { getTransactionsInitialState } from './transactions.state'
-import { getTransactions } from './transactions.thunks'
+import { changeCategory, getTransactions } from './transactions.thunks'
 
 export const transactionsSlice = createSlice<
   TransactionsSliceState,
@@ -14,7 +14,11 @@ export const transactionsSlice = createSlice<
 >({
   name: 'transactions',
   initialState: getTransactionsInitialState(),
-  reducers: {},
+  reducers: {
+    clearTransactionsState() {
+      return getTransactionsInitialState()
+    },
+  },
 
   extraReducers: (builder) => {
     builder
@@ -32,17 +36,10 @@ export const transactionsSlice = createSlice<
         if (state.transactions.length === 0) {
           state.transactions = blocks
         } else {
-          state.transactions = [
-            ...state.transactions.slice(0, -1),
-            {
-              ...state.transactions[state.transactions.length - 1],
-              transactions: [
-                ...state.transactions[state.transactions.length - 1].transactions,
-                ...blocks[0].transactions,
-              ],
-            },
-            ...blocks.slice(1),
-          ]
+          state.transactions = mergeTransactionBlocks({
+            currentBlocks: state.transactions,
+            newBlocks: blocks,
+          })
         }
 
         state.offset += length
@@ -60,6 +57,18 @@ export const transactionsSlice = createSlice<
       .addCase(getTransactions.pending, (state) => {
         state.isLoading = true
       })
+
+      .addCase(changeCategory.fulfilled, (state, { meta }) => {
+        const { categoryId, transactionId } = meta.arg
+
+        for (const block of state.transactions) {
+          const transaction = block.transactions.find((t) => t.transactionId === transactionId)
+          if (transaction) {
+            transaction.categoryId = categoryId
+            break
+          }
+        }
+      })
   },
 })
 
@@ -68,3 +77,5 @@ declare module '@shared/store' {
 }
 
 transactionsSlice.injectInto(rootReducer)
+
+export const { clearTransactionsState } = transactionsSlice.actions

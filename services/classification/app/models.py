@@ -2,13 +2,12 @@ import enum
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Float, String, Boolean, DateTime, ForeignKey, Integer, Enum as PgEnum,
-    UniqueConstraint, Index
+    Column, Float, String, Boolean, DateTime, ForeignKey, Integer, Enum as PgEnum, Index
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.orm import relationship
 
-from app.base import Base
+from app import base
 
 class RulePatternType(str, enum.Enum):
     REGEX = "regex"
@@ -21,10 +20,10 @@ class ClassificationSource(str, enum.Enum):
     ML = "ml"
     MANUAL = "manual"
 
-class Category(Base):
+class Category(base.Base):
     __tablename__ = "categories"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Integer, primary_key=True, autoincrement=False) 
     name = Column(String(255), nullable=False, unique=True)
     description = Column(String(1024), nullable=True)
     keywords = Column(ARRAY(String), default=[])
@@ -36,11 +35,11 @@ class Category(Base):
         Index('ix_categories_name', name),
     )
 
-class Rule(Base):
+class Rule(base.Base):
     __tablename__ = "rules"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     pattern = Column(String, nullable=False)
     pattern_type = Column(PgEnum(RulePatternType, name="rule_pattern_type_enum"), default=RulePatternType.CONTAINS, nullable=False)
@@ -56,12 +55,12 @@ class Rule(Base):
         Index('ix_rules_category_id', category_id),
     )
 
-class ClassificationResult(Base):
+class ClassificationResult(base.Base):
     __tablename__ = "classification_results"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     transaction_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
     category_name = Column(String(255), nullable=False)
     confidence = Column(Float, default=1.0, nullable=False)
     source = Column(PgEnum(ClassificationSource, name="classification_source_enum"), nullable=False)
@@ -78,12 +77,12 @@ class ClassificationResult(Base):
         Index('ix_classification_results_source', source),
     )
 
-class Feedback(Base):
+class Feedback(base.Base):
     __tablename__ = "feedback"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     transaction_id = Column(UUID(as_uuid=True), nullable=False)
-    correct_category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    correct_category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), nullable=True)
     comment = Column(String, nullable=True)
     processed = Column(Boolean, default=False, nullable=False)
@@ -96,7 +95,7 @@ class Feedback(Base):
         Index('ix_feedback_processed', processed),
     )
 
-class Model(Base):
+class Model(base.Base):
     __tablename__ = "models"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -119,7 +118,7 @@ class TrainingDatasetStatus(str, enum.Enum):
     READY = "ready"
     FAILED = "failed"
 
-class TrainingDataset(Base):
+class TrainingDataset(base.Base):
     __tablename__ = "training_datasets"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

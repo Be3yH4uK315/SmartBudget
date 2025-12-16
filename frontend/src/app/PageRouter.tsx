@@ -1,5 +1,5 @@
 import { dashboardRoutes } from '@features/dashboard/routes'
-import { transactionRoutes } from '@features/transactions/routes'
+import { transactionsRoutes } from '@features/transactions/routes'
 import { authRoutes } from '@shared/screens'
 import { Route, Routes, useLocation } from 'react-router'
 
@@ -9,13 +9,13 @@ export const PageRouter = () => {
 
   return (
     <Routes location={state?.backgroundLocation || location}>
-      <Route path="/" />
+      <Route path="/">
+        {authRoutes.pages}
 
-      {authRoutes.pages}
+        {dashboardRoutes.pages}
 
-      {dashboardRoutes.pages}
-
-      {transactionRoutes.pages}
+        {transactionsRoutes.pages}
+      </Route>
     </Routes>
   )
 }

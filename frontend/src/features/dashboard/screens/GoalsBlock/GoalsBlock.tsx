@@ -1,5 +1,6 @@
 import { DashboardGoal } from '@features/dashboard/types'
 import { Button, Paper, Stack, Typography } from '@mui/material'
+import { ROUTES } from '@shared/constants/routes'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
 import { Goal } from './Goal'
@@ -35,7 +36,7 @@ export const GoalsBlock = ({ goals }: Props) => {
         <Button
           variant="gray"
           sx={{ height: 'auto', width: '100%' }}
-          onClick={() => navigate('/goals')}
+          onClick={() => navigate(ROUTES.PAGES.GOALS)}
         >
           {translate('createButton')}
         </Button>

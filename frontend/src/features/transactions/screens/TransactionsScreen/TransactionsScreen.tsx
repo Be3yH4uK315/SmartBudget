@@ -1,19 +1,23 @@
 import { useEffect } from 'react'
+import { useCategoryFilter } from '@features/transactions/hooks/useCategoryFilter'
 import {
+  clearTransactionsState,
   getTransactions,
   selectIsTransactionsLoading,
   selectTransactions,
   selectTransactionsIsLast,
 } from '@features/transactions/store'
 import { CancelOutlined } from '@mui/icons-material'
-import { Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { Box, Paper, Stack, Typography } from '@mui/material'
+import { withAuth } from '@shared/components'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
-import { TransactionsInBlock } from './TransactionsBlock'
+import { CategoryFilter } from './CategoryFilter'
+import { TransactionsList } from './TransactionList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
-export default function TransactionsScreen() {
+export default withAuth(function TransactionsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
 
@@ -21,17 +25,29 @@ export default function TransactionsScreen() {
   const transactions = useAppSelector(selectTransactions)
   const isLast = useAppSelector(selectTransactionsIsLast)
 
-  useEffect(() => {
-    if (transactions.length === 0) {
-      dispatch(getTransactions())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch])
+  const { selectedCategory, parsedCategoryId, handleCategoryChange, setSelectedCategory } =
+    useCategoryFilter()
 
-  const handleLoadMore = () => {
-    if (isLoading || isLast) return
-    dispatch(getTransactions())
-  }
+  useEffect(() => {
+    dispatch(clearTransactionsState())
+
+    if (selectedCategory) {
+      dispatch(getTransactions({ categoryId: selectedCategory }))
+    } else {
+      dispatch(getTransactions({}))
+    }
+  }, [dispatch, selectedCategory])
+
+  useEffect(() => {
+    setSelectedCategory(Number.isFinite(parsedCategoryId) ? parsedCategoryId : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsedCategoryId])
+
+  useEffect(() => {
+    return () => {
+      dispatch(clearTransactionsState())
+    }
+  }, [dispatch])
 
   return (
     <ScreenContent
@@ -71,24 +87,17 @@ export default function TransactionsScreen() {
       )}
 
       {transactions.length > 0 && (
-        <Stack spacing={2} maxWidth={'800px'}>
-          {transactions.map((t) => (
-            <TransactionsInBlock key={t.date} transactions={t} />
-          ))}
+        <>
+          <CategoryFilter onChange={handleCategoryChange} selectedCategory={selectedCategory} />
 
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-            {isLoading ? (
-              <Button variant="yellow" disabled>
-                {translate('loading')}
-              </Button>
-            ) : !isLast ? (
-              <Button variant="yellow" onClick={handleLoadMore}>
-                {translate('loadMore')}
-              </Button>
-            ) : null}
-          </Box>
-        </Stack>
+          <TransactionsList
+            isLast={isLast}
+            isLoading={isLoading}
+            transactions={transactions}
+            selectedCategory={selectedCategory}
+          />
+        </>
       )}
     </ScreenContent>
   )
-}
+})
