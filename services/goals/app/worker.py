@@ -101,8 +101,8 @@ async def onShutdown(ctx):
 
 class WorkerSettings:
     functions = [checkGoalsDeadlinesTask, processOutboxTask]
-    onStartup = onStartup
-    onShutdown = onShutdown
+    on_startup = onStartup
+    on_shutdown = onShutdown
     cron_jobs = [
         cron(checkGoalsDeadlinesTask, hour=0, minute=0),
         cron(processOutboxTask, minute=set(range(60))), 

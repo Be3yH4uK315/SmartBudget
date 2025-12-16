@@ -243,7 +243,7 @@ class GoalRepository:
         """
         Увеличивает счетчик попыток. Если > 5, помечает как failed.
         """
-        stmt = select(models.OutboxEvent).where(models.OutboxEvent.goalId == event_id)
+        stmt = select(models.OutboxEvent).where(models.OutboxEvent.eventId == event_id)
         result = await self.db.execute(stmt)
         event = result.scalar_one_or_none()
         
@@ -258,5 +258,5 @@ class GoalRepository:
         """Удаляет успешно отправленные события."""
         if not event_ids:
             return
-        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.goalId.in_(event_ids))
+        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.eventId.in_(event_ids))
         await self.db.execute(stmt)
