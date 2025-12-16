@@ -22,6 +22,7 @@ class JWTSettings(BaseSettings):
 class AppSettings(BaseSettings):
     log_level: str
     tz: str
+    frontend_url: str
 
 class Settings(BaseSettings):
     db: DBSettings
