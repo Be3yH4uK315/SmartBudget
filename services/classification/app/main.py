@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 from arq import create_pool
@@ -9,9 +10,9 @@ from aiocache import caches
 from starlette.responses import JSONResponse
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app import middleware, dependencies, repositories, settings, exceptions, logging_config
+from app import middleware, dependencies, settings, exceptions, logging_config
 from app.routers import api
-from app.services.ml_service import MLService
+from app.services.ml_service import model_manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,7 +42,9 @@ async def lifespan(app: FastAPI):
     )
     await producer.start()
     app.state.kafka_producer = producer
-    middleware.logger.info(f"AIOKafkaProducer started for {settings.settings.kafka.kafka_bootstrap_servers}")
+    middleware.logger.info(
+        f"AIOKafkaProducer started for {settings.settings.kafka.kafka_bootstrap_servers}"
+    )
 
     caches.set_config({
         'default': {
@@ -52,37 +55,26 @@ async def lifespan(app: FastAPI):
             'ttl': 3600,
         }
     })
-    middleware.logger.info("aiocache initialized with Redis backend.")
 
-    middleware.logger.info("Loading ML model for API...")
-    try:
-        async with app.state.async_session_maker() as session:
-            model_repo = repositories.ModelRepository(session)
-            active_model = await model_repo.get_active_model()
-            
-            if active_model:
-                model, vectorizer, labels = await MLService.load_prediction_pipeline(active_model.version)
-                if model:
-                    app.state.ml_pipeline = {
-                        "model": model,
-                        "vectorizer": vectorizer,
-                        "class_labels": labels,
-                        "model_version": active_model.version
-                    }
-                    middleware.logger.info(f"API ML pipeline loaded: v{active_model.version}")
-                else:
-                    middleware.logger.error("Failed to load model files.")
-                    app.state.ml_pipeline = None
-            else:
-                middleware.logger.warning("No active model found in DB.")
-                app.state.ml_pipeline = None
-    except Exception as e:
-        middleware.logger.error(f"Error loading ML pipeline on startup: {e}")
-        app.state.ml_pipeline = None
+    middleware.logger.info("Initializing Model Manager...")
+    await model_manager.check_for_updates(session_maker)
+    
+    async def model_reloader_task():
+        """Фоновая задача для обновления модели в API."""
+        while True:
+            await asyncio.sleep(60)
+            try:
+                await model_manager.check_for_updates(session_maker)
+            except Exception as e:
+                middleware.logger.error(f"Error in background model reloader: {e}")
+
+    reloader = asyncio.create_task(model_reloader_task())
 
     yield
     
     middleware.logger.info("CategorizationService shutting down...")
+    
+    reloader.cancel()
     
     await app.state.kafka_producer.stop()
     middleware.logger.info("AIOKafkaProducer stopped.")
@@ -105,9 +97,13 @@ app = FastAPI(
 )
 
 @app.exception_handler(exceptions.ClassificationServiceError)
-async def classification_exception_handler(request: Request, exc: exceptions.ClassificationServiceError):
+async def classification_exception_handler(
+    request: Request, 
+    exc: exceptions.ClassificationServiceError
+):
     status_code = 400
-    if isinstance(exc, exceptions.ClassificationResultNotFoundError) or isinstance(exc, exceptions.CategoryNotFoundError):
+    if isinstance(exc, exceptions.ClassificationResultNotFoundError) \
+        or isinstance(exc, exceptions.CategoryNotFoundError):
         status_code = 404
     
     return JSONResponse(
@@ -124,4 +120,4 @@ app.add_middleware(
 )
 app.middleware("http")(middleware.error_middleware)
 Instrumentator().instrument(app).expose(app)
-app.include_router(api.router, prefix="api/v1/class")
+app.include_router(api.router, prefix="/api/v1/class")

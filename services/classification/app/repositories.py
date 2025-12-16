@@ -1,9 +1,11 @@
 import logging
 from uuid import UUID
-from sqlalchemy import insert
+from datetime import datetime, timedelta, timezone
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+
 from app import models
 
 logger = logging.getLogger(__name__)
@@ -37,44 +39,58 @@ class RuleRepository(BaseRepository):
 class ClassificationResultRepository(BaseRepository):
     async def get_by_transaction_id(self, tx_id: UUID) -> models.ClassificationResult | None:
         stmt = await self.db.execute(
-            select(models.ClassificationResult).where(models.ClassificationResult.transaction_id == tx_id)
+            select(models.ClassificationResult)
+            .where(models.ClassificationResult.transaction_id == tx_id)
         )
         return stmt.scalar_one_or_none()
 
-    async def create_or_update(self, result: models.ClassificationResult) -> models.ClassificationResult:
+    async def create_or_update(
+        self, 
+        result: models.ClassificationResult
+    ) -> models.ClassificationResult:
         """
         Использует ON CONFLICT для атомарного upsert.
         """
-        stmt = insert(models.ClassificationResult).values(
-            transaction_id=result.transaction_id,
-            category_id=result.category_id,
-            category_name=result.category_name,
-            confidence=result.confidence,
-            source=result.source,
-            model_version=result.model_version,
-            merchant=result.merchant,
-            description=result.description,
-            mcc=result.mcc,
-            created_at=result.created_at
-        ).on_conflict_do_update(
-            index_elements=['transaction_id'],
-            set_={
-                "category_id": result.category_id,
-                "category_name": result.category_name,
-                "confidence": result.confidence,
-                "source": result.source,
-                "model_version": result.model_version,
-                "merchant": result.merchant,
-                "description": result.description
-            }
-        ).returning(models.ClassificationResult)
+        insert_stmt = (
+            insert(models.ClassificationResult)
+            .values(
+                transaction_id=result.transaction_id,
+                category_id=result.category_id,
+                category_name=result.category_name,
+                confidence=result.confidence,
+                source=result.source,
+                model_version=result.model_version,
+                merchant=result.merchant,
+                description=result.description,
+                mcc=result.mcc,
+            )
+            .on_conflict_do_update(
+                index_elements=[models.ClassificationResult.transaction_id],
+                set_={
+                    "category_id": result.category_id,
+                    "category_name": result.category_name,
+                    "confidence": result.confidence,
+                    "source": result.source,
+                    "model_version": result.model_version,
+                    "merchant": result.merchant,
+                    "description": result.description,
+                    "mcc": result.mcc,
+                },
+            )
+            .returning(models.ClassificationResult.id)
+        )
 
-        orm_stmt = select(models.ClassificationResult).from_statement(stmt)
-        res = await self.db.execute(orm_stmt)
-        updated_obj = res.scalar_one()
-        
+        result_id = await self.db.scalar(insert_stmt)
+
+        stmt = (
+            select(models.ClassificationResult)
+            .where(models.ClassificationResult.id == result_id)
+        )
+
+        obj = await self.db.scalar(stmt)
+
         await self.db.commit()
-        return updated_obj
+        return obj
 
 class FeedbackRepository(BaseRepository):
     async def create(self, feedback: models.Feedback) -> models.Feedback:
@@ -82,11 +98,12 @@ class FeedbackRepository(BaseRepository):
         await self.db.commit()
         return feedback
         
-    async def get_all_feedback_data(self) -> list[dict]:
+    async def get_all_feedback_data(self, days_limit: int = 180) -> list[dict]:
         """
-        Сложный запрос для build_dataset_task.
-        Объединяет Feedback и ClassificationResult.
+        Получает данные для обучения.
         """
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
+        
         stmt = await self.db.execute(
             select(
                 models.ClassificationResult.merchant, 
@@ -98,6 +115,7 @@ class FeedbackRepository(BaseRepository):
                 models.ClassificationResult, 
                 models.Feedback.transaction_id == models.ClassificationResult.transaction_id
             )
+            .where(models.Feedback.created_at >= cutoff_date)
         )
         
         results = stmt.mappings().all()
@@ -140,7 +158,10 @@ class ModelRepository(BaseRepository):
         await self.db.commit()
 
 class DatasetRepository(BaseRepository):
-    async def create_dataset_entry(self, dataset: models.TrainingDataset) -> models.TrainingDataset:
+    async def create_dataset_entry(
+        self, 
+        dataset: models.TrainingDataset
+    ) -> models.TrainingDataset:
         self.db.add(dataset)
         await self.db.commit()
         return dataset
@@ -154,7 +175,12 @@ class DatasetRepository(BaseRepository):
         )
         return stmt.scalar_one_or_none()
         
-    async def update_dataset_status(self, dataset: models.TrainingDataset, status: models.TrainingDatasetStatus, metrics: dict):
+    async def update_dataset_status(
+        self, 
+        dataset: models.TrainingDataset, 
+        status: models.TrainingDatasetStatus, 
+        metrics: dict
+    ):
         dataset.status = status
         dataset.metrics = metrics
         self.db.add(dataset)

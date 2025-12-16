@@ -1,8 +1,8 @@
-"""correct structure
+"""correct schema
 
-Revision ID: 5fadbb2b833e
+Revision ID: 8bd009546353
 Revises: 
-Create Date: 2025-12-07 18:59:35.775945+00:00
+Create Date: 2025-12-16 15:04:30.552245+00:00
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '5fadbb2b833e'
+revision: str = '8bd009546353'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,8 +26,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=1024), nullable=True),
     sa.Column('keywords', postgresql.ARRAY(sa.String()), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
@@ -39,13 +39,13 @@ def upgrade() -> None:
     sa.Column('version', sa.String(length=100), nullable=False),
     sa.Column('path', sa.String(length=1024), nullable=False),
     sa.Column('metrics', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('version')
     )
-    op.create_index('ix_models_active', 'models', ['is_active'], unique=True, postgresql_where=sa.text('is_active = true'))
-    op.create_index('ix_models_created_at', 'models', [sa.text('created_at DESC')], unique=False)
+    op.create_index('ix_models_active_unique', 'models', ['is_active'], unique=True, postgresql_where=sa.text('is_active IS true'))
+    op.create_index('ix_models_created_at', 'models', [sa.literal_column('created_at DESC')], unique=False)
     op.create_index('ix_models_version', 'models', ['version'], unique=True)
     op.create_table('training_datasets',
     sa.Column('id', sa.UUID(), nullable=False),
@@ -53,27 +53,12 @@ def upgrade() -> None:
     sa.Column('file_path', sa.String(length=1024), nullable=False),
     sa.Column('status', sa.Enum('PENDING', 'BUILDING', 'READY', 'FAILED', name='training_dataset_status_enum'), nullable=False),
     sa.Column('metrics', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('version')
     )
-    op.create_index('ix_training_datasets_status_created', 'training_datasets', ['created_at', 'status'], unique=False, postgresql_where=sa.text("status = 'ready'"))
+    op.create_index('ix_training_datasets_status_created', 'training_datasets', ['created_at', 'status'], unique=False, postgresql_where=sa.text("status = 'READY'"))
     op.create_index('ix_training_datasets_version', 'training_datasets', ['version'], unique=True)
-    op.create_table('rules',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('category_id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('pattern', sa.String(), nullable=False),
-    sa.Column('pattern_type', sa.Enum('REGEX', 'CONTAINS', 'MCC', 'EXACT', name='rule_pattern_type_enum'), nullable=False),
-    sa.Column('mcc', sa.Integer(), nullable=True),
-    sa.Column('priority', sa.Integer(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('ix_rules_category_id', 'rules', ['category_id'], unique=False)
-    op.create_index('ix_rules_priority', 'rules', ['priority'], unique=False)
     op.create_table('classification_results',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('transaction_id', sa.UUID(), nullable=False),
@@ -82,10 +67,10 @@ def upgrade() -> None:
     sa.Column('confidence', sa.Float(), nullable=False),
     sa.Column('source', sa.Enum('RULES', 'ML', 'MANUAL', name='classification_source_enum'), nullable=False),
     sa.Column('model_version', sa.String(length=255), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('merchant', sa.String(length=255), nullable=True),
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('mcc', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('transaction_id')
@@ -99,33 +84,48 @@ def upgrade() -> None:
     sa.Column('user_id', sa.UUID(), nullable=True),
     sa.Column('comment', sa.String(), nullable=True),
     sa.Column('processed', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['correct_category_id'], ['categories.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_feedback_processed', 'feedback', ['processed'], unique=False)
     op.create_index('ix_feedback_transaction_id', 'feedback', ['transaction_id'], unique=False)
+    op.create_table('rules',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('category_id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('pattern', sa.String(), nullable=False),
+    sa.Column('pattern_type', sa.Enum('REGEX', 'CONTAINS', 'MCC', 'EXACT', name='rule_pattern_type_enum'), nullable=False),
+    sa.Column('mcc', sa.Integer(), nullable=True),
+    sa.Column('priority', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_rules_category_id', 'rules', ['category_id'], unique=False)
+    op.create_index('ix_rules_priority', 'rules', ['priority'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index('ix_rules_priority', table_name='rules')
+    op.drop_index('ix_rules_category_id', table_name='rules')
+    op.drop_table('rules')
     op.drop_index('ix_feedback_transaction_id', table_name='feedback')
     op.drop_index('ix_feedback_processed', table_name='feedback')
     op.drop_table('feedback')
     op.drop_index('ix_classification_results_transaction_id', table_name='classification_results')
     op.drop_index('ix_classification_results_source', table_name='classification_results')
     op.drop_table('classification_results')
-    op.drop_index('ix_rules_priority', table_name='rules')
-    op.drop_index('ix_rules_category_id', table_name='rules')
-    op.drop_table('rules')
     op.drop_index('ix_training_datasets_version', table_name='training_datasets')
-    op.drop_index('ix_training_datasets_status_created', table_name='training_datasets', postgresql_where=sa.text("status = 'ready'"))
+    op.drop_index('ix_training_datasets_status_created', table_name='training_datasets', postgresql_where=sa.text("status = 'READY'"))
     op.drop_table('training_datasets')
     op.drop_index('ix_models_version', table_name='models')
     op.drop_index('ix_models_created_at', table_name='models')
-    op.drop_index('ix_models_active', table_name='models', postgresql_where=sa.text('is_active = true'))
+    op.drop_index('ix_models_active_unique', table_name='models', postgresql_where=sa.text('is_active IS true'))
     op.drop_table('models')
     op.drop_index('ix_categories_name', table_name='categories')
     op.drop_index('ix_categories_keywords_gin', table_name='categories', postgresql_using='gin')

@@ -7,6 +7,7 @@ from typing import AsyncGenerator
 
 from app import settings
 from app.services.classification_service import ClassificationService
+from app.services.ml_service import model_manager
 
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
@@ -50,9 +51,9 @@ async def get_kafka_producer(request: Request) -> AIOKafkaProducer:
 
 def get_ml_pipeline(request: Request) -> dict | None:
     """
-    Извлекает загруженный ML-пайплайн из состояния приложения.
+    Извлекает актуальный ML-пайплайн из менеджера.
     """
-    return getattr(request.app.state, "ml_pipeline", None)
+    return model_manager.get_pipeline()
 
 async def get_classification_service(
     db: AsyncSession = Depends(get_db),
