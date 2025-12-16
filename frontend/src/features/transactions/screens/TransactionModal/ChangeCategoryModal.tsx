@@ -1,20 +1,12 @@
 import { useMemo, useState } from 'react'
+import { CategoryOption } from '@features/transactions/components'
 import {
   CATEGORIES_ICONS_MAP,
   CATEGORY_IDS,
 } from '@features/transactions/constants/categoriesIcons'
 import { changeCategory, selectCategoryByTransactionId } from '@features/transactions/store'
 import { ArrowBackOutlined } from '@mui/icons-material'
-import {
-  Button,
-  IconButton,
-  MenuItem,
-  Select,
-  Stack,
-  SvgIconTypeMap,
-  Typography,
-} from '@mui/material'
-import { OverridableComponent } from '@mui/material/OverridableComponent'
+import { Button, IconButton, MenuItem, Select, Stack, Typography } from '@mui/material'
 import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
 import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
@@ -55,20 +47,6 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
       openModal({ id: MODAL_IDS.TRANSACTION_INFO_MODAL, props: { transactionId: transactionId } }),
     )
 
-  const renderCategory = (
-    value: number,
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    Icon: OverridableComponent<SvgIconTypeMap<{}, 'svg'>>,
-  ) => {
-    return (
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Icon fontSize="small" />
-
-        <Typography>{translateCategory(value)}</Typography>
-      </Stack>
-    )
-  }
-
   return (
     <ModalLayout>
       <IconButton
@@ -101,14 +79,14 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
 
             const Icon = CATEGORIES_ICONS_MAP.get(value)!
 
-            return renderCategory(value, Icon)
+            return <CategoryOption value={value} Icon={Icon} />
           }}
         >
           {availableCategories.map((categoryId) => {
-            const Icon = CATEGORIES_ICONS_MAP.get(categoryId)!
+            const Icon = CATEGORIES_ICONS_MAP.get(categoryId)
             return (
               <MenuItem key={categoryId} value={String(categoryId)}>
-                {renderCategory(categoryId, Icon)}
+                <CategoryOption value={categoryId} Icon={Icon} />
               </MenuItem>
             )
           })}

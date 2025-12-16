@@ -4,9 +4,13 @@ import { api } from '@shared/api'
 class TransactionsApi {
   baseUrl = '/transactions'
 
-  async getTransactions(offset: number): Promise<Transaction[]> {
-    const url = `${this.baseUrl}/?offset=${offset}`
-    const response = await api.get<Transaction[]>(url)
+  async getTransactions(offset: number, categoryId: number | null): Promise<Transaction[]> {
+    const url = `${this.baseUrl}`
+    const params = {
+      offset,
+      categoryId: categoryId,
+    }
+    const response = await api.get<Transaction[]>(url, { params })
 
     return response.data
   }

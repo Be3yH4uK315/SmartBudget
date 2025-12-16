@@ -46,8 +46,9 @@ ALL_TRANSACTIONS.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0)
 class TransactionsMock {
   baseUrl = ''
 
-  async getTransactions(offset: number): Promise<Transaction[]> {
+  async getTransactions(offset: number, categoryId: number | null): Promise<Transaction[]> {
     console.log('%cMOCK CALL offset=' + offset, 'color: orange')
+    console.log(categoryId)
 
     await new Promise((resolve) => setTimeout(resolve, 1000))
 

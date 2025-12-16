@@ -8,6 +8,8 @@ export const transactionsDict: LocaleDictionary = {
       noTransactions: 'Нет транзакций',
       loading: 'Загрузка...',
       loadMore: 'Загрузить еще',
+      emptyCategory: 'Сбросить фильтр',
+      categoryFilter: 'Категория',
 
       Modal: {
         changeCategory: 'Сменить категорию',

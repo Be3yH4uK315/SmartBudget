@@ -14,16 +14,19 @@ type Props = {
   isLast: boolean
   isLoading: boolean
   transactions: TransactionsBlock[]
+  selectedCategory: number | null
 }
 
-export const TransactionsList = ({ isLast, isLoading, transactions }: Props) => {
+export const TransactionsList = ({ isLast, isLoading, transactions, selectedCategory }: Props) => {
   const dispatch = useAppDispatch()
 
   const normalizedBlocks = useMemo(() => normalizeBlocksList(transactions), [transactions])
 
   const loadMore = useCallback(() => {
-    dispatch(getTransactions())
-  }, [dispatch])
+    const payload = selectedCategory ? { categoryId: selectedCategory } : {}
+
+    dispatch(getTransactions(payload))
+  }, [dispatch, selectedCategory])
 
   return (
     <GroupedVirtuoso
