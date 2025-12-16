@@ -12,3 +12,5 @@ jsonschema
 asyncpg
 greenlet
 tenacity
+pyjwt
+cryptography
