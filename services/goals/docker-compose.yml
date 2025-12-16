@@ -109,6 +109,11 @@ services:
         alembic upgrade head &&
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
       "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
     networks:
       - smartbudget-net
 
@@ -119,13 +124,20 @@ services:
       - ../../services/goals/.env
     container_name: goals_worker_dev
     depends_on:
-      - goals_service
-      - kafka
-      - redis_cache
+      goals_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
     volumes:
       - ../../services/goals:/app
     command: arq app.worker.WorkerSettings
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
     networks:
       - smartbudget-net
 
@@ -136,13 +148,20 @@ services:
       - ../../services/goals/.env
     container_name: goals_consumer_dev
     depends_on:
-      - goals_service
-      - kafka
-      - redis_cache
+      goals_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
     volumes:
       - ../../services/goals:/app
     command: python run_consumer.py
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
     networks:
       - smartbudget-net
 

@@ -1,12 +1,26 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+import json
+import logging
 from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import insert, or_, select, update
+from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app import models, exceptions
+
+logger = logging.getLogger(__name__)
+
+def _json_serializer(obj):
+    """Преобразует сложные типы в строки для сохранения в JSON column."""
+    if isinstance(obj, Decimal):
+        return str(obj)
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    if isinstance(obj, UUID):
+        return str(obj)
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 class GoalRepository:
     """Репозиторий для операций с целями."""
@@ -27,12 +41,12 @@ class GoalRepository:
         """Создает новую цель."""
         try:
             self.db.add(goal_model)
-            await self.db.commit()
-            await self.db.refresh(goal_model)
+            await self.db.flush() 
             return goal_model
-        except IntegrityError:
+        except IntegrityError as e:
+            logger.error(f"DATABASE INTEGRITY ERROR: {e}")
             await self.db.rollback()
-            raise exceptions.InvalidGoalDataError("Goal creation failed")
+            raise exceptions.InvalidGoalDataError(f"Goal creation failed: {e.orig}")
 
     async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
         """Получает цели для главного экрана."""
@@ -40,7 +54,7 @@ class GoalRepository:
             select(models.Goal)
             .where(
                 models.Goal.user_id == user_id,
-                models.Goal.status == models.GoalStatus.IN_PROGRESS.value
+                models.Goal.status == models.GoalStatus.ONGOING.value
             )
             .order_by((models.Goal.target_value - models.Goal.current_value).asc())
             .limit(10)
@@ -58,6 +72,17 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
     
+    async def add_outbox_event(self, topic: str, event_data: dict):
+        """Добавляет событие в Outbox."""
+        event_type = event_data.get("event", "unknown")
+        safe_payload = json.loads(json.dumps(event_data, default=_json_serializer))
+        outbox_entry = models.OutboxEvent(
+            topic=topic,
+            event_type=event_type,
+            payload=safe_payload
+        )
+        self.db.add(outbox_entry)
+
     async def adjust_balance(
         self, user_id: UUID, 
         goal_id: UUID, 
@@ -81,7 +106,7 @@ class GoalRepository:
             update(models.Goal)
             .where(models.Goal.id == goal_id, models.Goal.user_id == user_id)
             .values(current_value=new_value_expr)
-            .execution_options(synchronize_session="fetch")
+            .execution_options(synchronize_session=False)
             .returning(models.Goal)
         )
 
@@ -92,7 +117,6 @@ class GoalRepository:
             await self.db.rollback()
             raise exceptions.GoalNotFoundError(f"Goal {goal_id} not found")
 
-        await self.db.commit()
         return updated_goal
 
     async def update_fields(self, user_id: UUID, goal_id: UUID, changes: dict) -> models.Goal:
@@ -107,19 +131,25 @@ class GoalRepository:
         )
         result = await self.db.execute(stmt)
         updated_goal = result.scalar_one_or_none()
-        
         if not updated_goal:
              raise exceptions.GoalNotFoundError("Goal not found during update")
-             
-        await self.db.commit()
         return updated_goal
-        
+    
+    async def update_status(self, goal_id: UUID, new_status: str):
+        """Метод для атомарного обновления статуса (для воркера)."""
+        stmt = (
+            update(models.Goal)
+            .where(models.Goal.id == goal_id)
+            .values(status=new_status)
+        )
+        await self.db.execute(stmt)
+
     async def get_expired_goals_batch(self, today: date, limit: int = 100) -> list[models.Goal]:
-        """Возвращает пачку целей, которые просрочены и все еще IN_PROGRESS."""
+        """Возвращает пачку целей, которые просрочены и все еще ONGOING."""
         query = (
             select(models.Goal)
             .where(
-                models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+                models.Goal.status == models.GoalStatus.ONGOING.value,
                 models.Goal.finish_date < today
             )
             .limit(limit)
@@ -130,27 +160,21 @@ class GoalRepository:
     async def mark_achieved_if_eligible(self, user_id: UUID, goal_id: UUID) -> models.Goal | None:
         """
         Атомарно переводит цель в ACHIEVED, только если она выполнена 
-        и еще находится в IN_PROGRESS.
+        и еще находится в ONGOING.
         """
         stmt = (
             update(models.Goal)
             .where(
                 models.Goal.id == goal_id,
                 models.Goal.user_id == user_id,
-                models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+                models.Goal.status == models.GoalStatus.ONGOING.value,
                 models.Goal.current_value >= models.Goal.target_value
             )
             .values(status=models.GoalStatus.ACHIEVED.value)
             .returning(models.Goal)
         )
-        
         result = await self.db.execute(stmt)
-        updated_goal = result.scalar_one_or_none()
-        
-        if updated_goal:
-            await self.db.commit()
-            
-        return updated_goal
+        return result.scalar_one_or_none()
 
     async def get_approaching_goals_batch(
         self, 
@@ -168,7 +192,7 @@ class GoalRepository:
         query = (
             select(models.Goal)
             .where(
-                models.Goal.status == models.GoalStatus.IN_PROGRESS.value,
+                models.Goal.status == models.GoalStatus.ONGOING.value,
                 models.Goal.finish_date <= seven_days_from_now,
                 models.Goal.finish_date >= today,
                 or_(
@@ -181,10 +205,58 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def update_bulk(self, goals: list[models.Goal]):
-        """Массово коммитит изменения (для воркера)."""
-        try:
-            await self.db.commit()
-        except Exception:
-            await self.db.rollback()
-            raise
+    async def update_last_checked(self, goals_ids: list[UUID]):
+        """Обновляем дату проверки, чтобы не спамить уведомлениями."""
+        if not goals_ids:
+            return
+        stmt = (
+            update(models.Goal)
+            .where(models.Goal.id.in_(goals_ids))
+            .values(last_checked_date=datetime.now(timezone.utc))
+        )
+        await self.db.execute(stmt)
+        await self.db.commit()
+    
+    async def get_goal_by_transaction_id(self, transaction_id: UUID) -> models.Goal | None:
+        """Находит цель, связанную с уже обработанной транзакцией."""
+        query = (
+            select(models.Goal)
+            .join(models.ProcessedTransaction, models.Goal.id == models.ProcessedTransaction.goal_id)
+            .where(models.ProcessedTransaction.transaction_id == transaction_id)
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_pending_outbox_events(self, limit: int = 100) -> list[models.OutboxEvent]:
+        """Получает пачку событий для отправки с блокировкой строк."""
+        query = (
+            select(models.OutboxEvent)
+            .where(models.OutboxEvent.status == 'pending')
+            .order_by(models.OutboxEvent.created_at.asc())
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await self.db.execute(query)
+        return result.scalars().all()
+    
+    async def handle_failed_outbox_event(self, event_id: UUID, error_msg: str):
+        """
+        Увеличивает счетчик попыток. Если > 5, помечает как failed.
+        """
+        stmt = select(models.OutboxEvent).where(models.OutboxEvent.id == event_id)
+        result = await self.db.execute(stmt)
+        event = result.scalar_one_or_none()
+        
+        if event:
+            event.retry_count += 1
+            if event.retry_count >= 5:
+                event.status = 'failed'
+                
+            self.db.add(event)
+
+    async def delete_outbox_events(self, event_ids: list[UUID]):
+        """Удаляет успешно отправленные события."""
+        if not event_ids:
+            return
+        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.id.in_(event_ids))
+        await self.db.execute(stmt)

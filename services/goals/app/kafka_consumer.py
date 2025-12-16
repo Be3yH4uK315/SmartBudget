@@ -1,10 +1,10 @@
 import asyncio
 import json
 import logging
+from pathlib import Path
 import sys
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker, AsyncSession, create_async_engine, AsyncEngine
 )
@@ -23,43 +23,40 @@ logger = logging.getLogger(__name__)
 
 async def consume_transaction_goal(
     consumer: AIOKafkaConsumer, 
-    db_maker: async_sessionmaker[AsyncSession],
-    kafka: KafkaProducer
+    db_maker: async_sessionmaker[AsyncSession]
 ):
     """
     Главный цикл обработки сообщений из 'transaction.goal'.
     """
-    logger.info(f"Starting consumer loop for topic '{settings.settings.kafka.kafka_topic_transaction_goal}'...")
+    logger.info(f"Starting consumer loop...")
     async for message in consumer:
-        logger.debug(f"Received message: offset={message.offset}, partition={message.partition}")
-        
+        try:
+            Path("/tmp/healthy").touch()
+        except OSError:
+            pass
+
         try:
             try:
                 data = json.loads(message.value)
                 event = schemas.TransactionEvent(**data)
             except (json.JSONDecodeError, ValidationError) as e: 
-                logger.error(f"Data Validation Error (Offset: {message.offset}): {e}. Data: {message.value}")
+                logger.error(f"POISON PILL DETECTED (Offset: {message.offset}): {e}. Skipping.")
                 await consumer.commit()
                 continue
 
             async with db_maker() as session:
                 repo = repositories.GoalRepository(session)
-                service = services.GoalService(repo, kafka)
+                service = services.GoalService(repo)
                 await service.update_goal_balance(event)
 
             await consumer.commit()
-            logger.info(f"Message processed and committed (Offset: {message.offset})")
 
         except (exceptions.InvalidGoalDataError, exceptions.GoalNotFoundError) as e:
-            logger.warning(f"Business logic error (Offset: {message.offset}): {e}. Skipping message.")
+            logger.warning(f"Business logic error (Offset: {message.offset}): {e}. Skipping.")
             await consumer.commit()
 
-        except (SQLAlchemyError, OSError, KafkaError) as e:
-            logger.critical(f"Infrastructure failure (Offset: {message.offset}): {e}.")
-            raise e 
-            
         except Exception as e:
-            logger.critical(f"Unexpected crash (Offset: {message.offset}): {e}", exc_info=True)
+            logger.critical(f"CRITICAL FAILURE (Offset: {message.offset}): {e}", exc_info=True)
             raise e
 
 async def start_consumer():
