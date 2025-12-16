@@ -22,10 +22,10 @@ namespace SmartBudget.Transactions.Services
             _log = log;
         }
 
-        public async Task<List<Transaction>> GetUserTransactionsAsync(Guid userId, int limit, int offset, CancellationToken stoppingToken)
+        public async Task<List<Transaction>> GetUserTransactionsAsync(Guid userId, int limit, int offset, int category_id, CancellationToken stoppingToken)
         {
             return await _db.Transactions
-                .Where(new_transaction => new_transaction.UserId == userId)
+                .Where(new_transaction => new_transaction.UserId == userId && (category_id == 0 || new_transaction.CategoryId == category_id))
                 .OrderByDescending(new_transaction => new_transaction.CreatedAt)
                 .Skip(offset)
                 .Take(limit)

@@ -29,10 +29,11 @@ namespace SmartBudget.Transactions.Controllers
             [FromQuery(Name = "userId")] Guid userId,
             [FromQuery(Name = "limit")] int limit = 50,
             [FromQuery(Name = "offset")] int offset = 0,
+            [FromQuery(Name = "category_id")] int category_id = 0,
             CancellationToken stoppingToken = default)
         {
             List<Transaction> list =
-                await _service.GetUserTransactionsAsync(userId, limit, offset, stoppingToken);
+                await _service.GetUserTransactionsAsync(userId, limit, offset, category_id, stoppingToken);
 
             list.Select(new_transaction => new
             {
