@@ -2,6 +2,7 @@ import { CategoryIcon } from '@features/transactions/components'
 import { selectTransactionById } from '@features/transactions/store'
 import { CloseOutlined } from '@mui/icons-material'
 import { Box, Button, IconButton, Stack, Typography } from '@mui/material'
+import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
 import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
 import { useAppDispatch, useAppSelector } from '@shared/store'
@@ -23,7 +24,7 @@ export const TransactionInfoModal = ({ transactionId, onClose }: Props) => {
 
   const handleChangeCategory = () =>
     dispatch(
-      openModal({ id: 'changeTransactionCategory', props: { transactionId: transactionId } }),
+      openModal({ id: MODAL_IDS.CHANGE_CATEGORY_MODAL, props: { transactionId: transactionId } }),
     )
 
   if (!transaction) return null

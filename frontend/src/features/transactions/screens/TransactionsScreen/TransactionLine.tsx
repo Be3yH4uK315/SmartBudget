@@ -2,6 +2,7 @@ import React from 'react'
 import { CategoryIcon } from '@features/transactions/components'
 import { Transaction } from '@features/transactions/types'
 import { Box, Stack, Typography } from '@mui/material'
+import { MODAL_IDS } from '@shared/constants/modals'
 import { useTheme, useTranslate } from '@shared/hooks'
 import { useAppDispatch } from '@shared/store'
 import { openModal } from '@shared/store/modal'
@@ -19,7 +20,10 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
 
   const handleClick = () =>
     dispatch(
-      openModal({ id: 'transactionInfo', props: { transactionId: transaction.transactionId } }),
+      openModal({
+        id: MODAL_IDS.TRANSACTION_INFO_MODAL,
+        props: { transactionId: transaction.transactionId },
+      }),
     )
 
   const color =
