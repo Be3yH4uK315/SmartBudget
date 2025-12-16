@@ -15,6 +15,7 @@ import {
   Typography,
 } from '@mui/material'
 import { OverridableComponent } from '@mui/material/OverridableComponent'
+import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
 import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
 import { useAppDispatch, useAppSelector } from '@shared/store'
@@ -46,11 +47,13 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
         categoryId: Number(selectedCategory),
       }),
     )
-    handleClose()
+    openPrev()
   }
 
-  const handleClose = () =>
-    dispatch(openModal({ id: 'transactionInfo', props: { transactionId: transactionId } }))
+  const openPrev = () =>
+    dispatch(
+      openModal({ id: MODAL_IDS.TRANSACTION_INFO_MODAL, props: { transactionId: transactionId } }),
+    )
 
   const renderCategory = (
     value: number,
@@ -69,7 +72,7 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
   return (
     <ModalLayout>
       <IconButton
-        onClick={handleClose}
+        onClick={openPrev}
         sx={{
           position: 'absolute',
           top: 12,
