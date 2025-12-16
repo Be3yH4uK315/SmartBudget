@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управляет ресурсами (DB, Kafka, Arq) во время жизни приложения."""
-    logging_config.setup_logging()
+    logging_config.setupLogging()
     
     try:
-        engine = create_async_engine(settings.settings.db.db_url)
+        engine = create_async_engine(settings.settings.DB.DB_URL)
         session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         app.state.db_engine = engine
         app.state.async_session_maker = session_maker
@@ -43,10 +43,10 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to start Kafka producer: {e}")
         app.state.kafka_producer = None
 
-    arq_redis_settings = RedisSettings.from_dsn(settings.settings.arq.redis_url)
+    arq_redis_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
     arq_pool = await create_pool(
         arq_redis_settings, 
-        default_queue_name=settings.settings.arq.arq_queue_name
+        default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
     )
     app.state.arq_pool = arq_pool
     
@@ -74,7 +74,7 @@ app = FastAPI(
 )
 
 @app.exception_handler(exceptions.GoalServiceError)
-async def goal_service_exception_handler(request: Request, exc: exceptions.GoalServiceError):
+async def goalServiceExceptionHandler(request: Request, exc: exceptions.GoalServiceError):
     status_code = 400
     if isinstance(exc, exceptions.GoalNotFoundError):
         status_code = 404
@@ -85,13 +85,13 @@ async def goal_service_exception_handler(request: Request, exc: exceptions.GoalS
     )
 
 @app.exception_handler(SQLAlchemyError)
-async def db_error_middleware(request: Request, exc: SQLAlchemyError):
+async def dbErrorMiddleware(request: Request, exc: SQLAlchemyError):
     logger.error(f"DB error: {exc}")
     return JSONResponse(status_code=500, content={"detail": "Database error"})
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.settings.app.frontend_url],
+    allow_origins=[settings.settings.APP.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
