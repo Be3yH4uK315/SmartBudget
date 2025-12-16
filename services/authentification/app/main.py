@@ -120,8 +120,8 @@ app = FastAPI(
     title="Auth Service", 
     version="1.0", 
     lifespan=lifespan,
-    docs_url="/api/v1/class/docs",
-    openapi_url="/api/v1/class/openapi.json"
+    docs_url="/api/v1/auth/docs",
+    openapi_url="/api/v1/auth/openapi.json"
 )
 
 @app.exception_handler(exceptions.AuthServiceError)
