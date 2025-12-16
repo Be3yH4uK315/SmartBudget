@@ -1,6 +1,5 @@
-from fastapi import Depends, status, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+from fastapi import Depends, status, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 from uuid import UUID
@@ -11,8 +10,6 @@ from app import (
     services,
     settings
 )
-
-security = HTTPBearer()
 
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Получает session_maker из app.state и предоставляет сессию."""
@@ -41,30 +38,33 @@ def get_goal_service(
     """Провайдер для GoalService."""
     return services.GoalService(repo)
 
-async def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> UUID:
+async def get_current_user_id(request: Request) -> UUID:
     """
     Декодирует JWT, валидирует подпись публичным ключом и возвращает user_id.
     Далее перенести в API Gateway.
     """
-    token = credentials.credentials
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No access token provided")
+
     try:
+        public_key = settings.settings.jwt.jwt_public_key.replace("\\n", "\n")
         payload = jwt.decode(
-            token,
-            settings.settings.jwt.jwt_public_key,
+            access_token,
+            public_key,
             algorithms=[settings.settings.jwt.jwt_algorithm],
             audience=settings.settings.jwt.jwt_audience,
         )
-        
+
         user_id_str = payload.get("sub")
         if not user_id_str:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, 
+                status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token missing subject (user_id)"
             )
-            
-        return UUID(user_id_str)
+
+        user_id = UUID(user_id_str)
+        return user_id
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(
