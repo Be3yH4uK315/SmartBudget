@@ -7,15 +7,15 @@ import { showToast } from '@shared/utils'
 
 export const getTransactions = createAsyncThunk<
   { transactions: Transaction[]; length: number },
-  void,
+  { categoryId?: number },
   { state: RootState }
->('getTransactions', async (_, { getState }) => {
+>('getTransactions', async ({ categoryId = null }, { getState }) => {
   try {
     const state = getState()
 
     const offset = state.transactions?.offset ?? 0
 
-    const response = await transactionsMock.getTransactions(offset)
+    const response = await transactionsMock.getTransactions(offset, categoryId)
 
     return { transactions: response, length: response.length }
   } catch (e: any) {

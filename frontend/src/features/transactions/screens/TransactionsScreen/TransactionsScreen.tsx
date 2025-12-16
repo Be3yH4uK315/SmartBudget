@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useCategoryFilter } from '@features/transactions/hooks/useCategoryFilter'
 import {
   clearTransactionsState,
   getTransactions,
@@ -12,6 +13,7 @@ import { withAuth } from '@shared/components'
 import { ScreenContent } from '@shared/components/ScreenContent'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
+import { CategoryFilter } from './CategoryFilter'
 import { TransactionsList } from './TransactionList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
@@ -23,12 +25,23 @@ export default withAuth(function TransactionsScreen() {
   const transactions = useAppSelector(selectTransactions)
   const isLast = useAppSelector(selectTransactionsIsLast)
 
+  const { selectedCategory, parsedCategoryId, handleCategoryChange, setSelectedCategory } =
+    useCategoryFilter()
+
   useEffect(() => {
-    if (transactions.length === 0) {
-      dispatch(getTransactions())
+    dispatch(clearTransactionsState())
+
+    if (selectedCategory) {
+      dispatch(getTransactions({ categoryId: selectedCategory }))
+    } else {
+      dispatch(getTransactions({}))
     }
+  }, [dispatch, selectedCategory])
+
+  useEffect(() => {
+    setSelectedCategory(Number.isFinite(parsedCategoryId) ? parsedCategoryId : null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch])
+  }, [parsedCategoryId])
 
   useEffect(() => {
     return () => {
@@ -74,7 +87,16 @@ export default withAuth(function TransactionsScreen() {
       )}
 
       {transactions.length > 0 && (
-        <TransactionsList isLast={isLast} isLoading={isLoading} transactions={transactions} />
+        <>
+          <CategoryFilter onChange={handleCategoryChange} selectedCategory={selectedCategory} />
+
+          <TransactionsList
+            isLast={isLast}
+            isLoading={isLoading}
+            transactions={transactions}
+            selectedCategory={selectedCategory}
+          />
+        </>
       )}
     </ScreenContent>
   )
