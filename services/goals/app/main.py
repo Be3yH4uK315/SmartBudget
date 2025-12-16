@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -87,5 +88,13 @@ async def goal_service_exception_handler(request: Request, exc: exceptions.GoalS
 async def db_error_middleware(request: Request, exc: SQLAlchemyError):
     logger.error(f"DB error: {exc}")
     return JSONResponse(status_code=500, content={"detail": "Database error"})
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.settings.app.frontend_url],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 app.include_router(goals.router, prefix="/api/v1/goals")
