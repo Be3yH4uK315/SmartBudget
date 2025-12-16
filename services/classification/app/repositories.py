@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -51,36 +51,46 @@ class ClassificationResultRepository(BaseRepository):
         """
         Использует ON CONFLICT для атомарного upsert.
         """
-        stmt = insert(models.ClassificationResult).values(
-            transaction_id=result.transaction_id,
-            category_id=result.category_id,
-            category_name=result.category_name,
-            confidence=result.confidence,
-            source=result.source,
-            model_version=result.model_version,
-            merchant=result.merchant,
-            description=result.description,
-            mcc=result.mcc,
-            created_at=result.created_at
-        ).on_conflict_do_update(
-            index_elements=['transaction_id'],
-            set_={
-                "category_id": result.category_id,
-                "category_name": result.category_name,
-                "confidence": result.confidence,
-                "source": result.source,
-                "model_version": result.model_version,
-                "merchant": result.merchant,
-                "description": result.description
-            }
-        ).returning(models.ClassificationResult)
+        insert_stmt = (
+            insert(models.ClassificationResult)
+            .values(
+                transaction_id=result.transaction_id,
+                category_id=result.category_id,
+                category_name=result.category_name,
+                confidence=result.confidence,
+                source=result.source,
+                model_version=result.model_version,
+                merchant=result.merchant,
+                description=result.description,
+                mcc=result.mcc,
+            )
+            .on_conflict_do_update(
+                index_elements=[models.ClassificationResult.transaction_id],
+                set_={
+                    "category_id": result.category_id,
+                    "category_name": result.category_name,
+                    "confidence": result.confidence,
+                    "source": result.source,
+                    "model_version": result.model_version,
+                    "merchant": result.merchant,
+                    "description": result.description,
+                    "mcc": result.mcc,
+                },
+            )
+            .returning(models.ClassificationResult.id)
+        )
 
-        orm_stmt = select(models.ClassificationResult).from_statement(stmt)
-        res = await self.db.execute(orm_stmt)
-        updated_obj = res.scalar_one()
-        
+        result_id = await self.db.scalar(insert_stmt)
+
+        stmt = (
+            select(models.ClassificationResult)
+            .where(models.ClassificationResult.id == result_id)
+        )
+
+        obj = await self.db.scalar(stmt)
+
         await self.db.commit()
-        return updated_obj
+        return obj
 
 class FeedbackRepository(BaseRepository):
     async def create(self, feedback: models.Feedback) -> models.Feedback:
