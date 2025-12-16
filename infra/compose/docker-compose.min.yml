@@ -239,9 +239,9 @@ services:
   #   networks:
   #     - smartbudget-net
 
-  # # ============================
-  # # 4. TRANSACTIONS SERVICE
-  # # ============================
+  # ============================
+  # 4. TRANSACTIONS SERVICE
+  # ============================
 
   transactions_postgres:
     image: postgres:16
@@ -287,12 +287,113 @@ services:
       - smartbudget-net
 
 # ----------------------------------------------------
-# 4. VOLUMES
+# 4. GOALS
+# ----------------------------------------------------
+  goals_postgres:
+    image: postgres:16
+    container_name: goals_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: goals_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - pg_data_goals:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  goals_service:
+    build:
+      context: ../../services/goals/
+    env_file:
+      - ../../services/goals/.env
+    container_name: goals_service_dev
+    ports:
+      - "8002:8000"
+    depends_on:
+      goals_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/goals:/app
+    restart: unless-stopped
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  goals_worker:
+    build:
+      context: ../../services/goals/
+    env_file:
+      - ../../services/goals/.env
+    container_name: goals_worker_dev
+    depends_on:
+      goals_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/goals:/app
+    command: arq app.worker.WorkerSettings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+
+  goals_consumer:
+    build:
+      context: ../../services/goals/
+    env_file:
+      - ../../services/goals/.env
+    container_name: goals_consumer_dev
+    depends_on:
+      goals_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/goals:/app
+    command: python run_consumer.py
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+# ----------------------------------------------------
+# 5. VOLUMES
 # ----------------------------------------------------
 volumes:
   pg_data_auth:
   # pg_data_class:
   pg_data_transactions:
+  pg_data_goals:
   geoip_data:
   models_data:
   datasets_data:
