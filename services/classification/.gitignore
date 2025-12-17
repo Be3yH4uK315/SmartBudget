@@ -1,0 +1,8 @@
+# services/classification/.gitignore
+__pycache__/
+.pytest_cache/
+.env
+.env.test
+*.sh
+*.db
+*.log

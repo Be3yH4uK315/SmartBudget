@@ -9,7 +9,7 @@ export const getUserInfo = createAsyncThunk<User, void, { rejectValue: 'noInfo' 
     const user = await user_api.getUserInfo()
 
     if (!user) {
-      showToast({ messageKey: 'noInfo', type: 'error', duration: 5000 })
+      showToast({ messageKey: 'noInfo', type: 'error' })
       return rejectWithValue('noInfo')
     }
 

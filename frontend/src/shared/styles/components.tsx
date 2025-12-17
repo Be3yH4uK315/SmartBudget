@@ -347,4 +347,31 @@ export const components: ThemeOptions['components'] = {
       }),
     },
   },
+
+  MuiDialog: {
+    styleOverrides: {
+      container: {
+        alignItems: 'flex-start',
+        padding: 0,
+      },
+
+      paper: ({ theme }) => ({
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        margin: 0,
+        backgroundColor: theme.palette.surface.main,
+      }),
+    },
+  },
+
+  MuiDialogTitle: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        ...theme.typography.h2,
+        padding: 0,
+      }),
+    },
+  },
 }

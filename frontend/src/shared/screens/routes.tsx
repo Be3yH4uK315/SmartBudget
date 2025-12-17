@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react'
+import { Container } from '@mui/material'
 import { Route } from 'react-router'
+import { LoadingScreen } from './LoadingScreen'
 
 const AuthScreen = lazy(() => import('./AuthScreen/AuthScreen'))
 const RegistrationScreen = lazy(() => import('./AuthScreen/RegistrationScreen'))
@@ -12,7 +14,7 @@ export const authRoutes = {
         path="sign-in"
         index
         element={
-          <Suspense>
+          <Suspense fallback={showFallback()}>
             <AuthScreen />
           </Suspense>
         }
@@ -22,7 +24,7 @@ export const authRoutes = {
         path="registration"
         index
         element={
-          <Suspense>
+          <Suspense fallback={showFallback()}>
             <RegistrationScreen />
           </Suspense>
         }
@@ -32,11 +34,19 @@ export const authRoutes = {
         path="reset-password"
         index
         element={
-          <Suspense>
+          <Suspense fallback={showFallback()}>
             <ResetPasswordScreen />
           </Suspense>
         }
       />
     </Route>
   ),
+}
+
+export function showFallback() {
+  return (
+    <Container maxWidth="lg" sx={{ pt: 4 }}>
+      <LoadingScreen />
+    </Container>
+  )
 }
