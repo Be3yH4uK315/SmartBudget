@@ -12,44 +12,44 @@ from app.services.ml_service import MLService
 logger = logging.getLogger(__name__)
 
 @cached(ttl=3600, key="rules_config_v1", serializer=JsonSerializer())
-async def get_cached_rules_as_dict(db: AsyncSession) -> list[dict]:
+async def getCachedRulesAsDict(db: AsyncSession) -> list[dict]:
     """
     Загружает правила из БД и преобразует их в список словарей.
     Это необходимо для корректной работы JSON-кэша и избежания DetachedInstanceError.
     """
-    rules_objects = await repositories.RuleRepository.get_all_active_rules(db)
+    rulesObjects = await repositories.RuleRepository.getAllActiveRules(db)
     
-    processed_rules = []
-    for rule in rules_objects:
-        rule_dict = {
-            "id": str(rule.id),
-            "category_id": rule.category_id,
-            "category_name": rule.category.name,
+    processedRules = []
+    for rule in rulesObjects:
+        ruleDict = {
+            "ruleId": str(rule.ruleId),
+            "categoryId": rule.categoryId,
+            "categoryName": rule.category.name,
             "pattern": rule.pattern,
-            "pattern_type": rule.pattern_type.value,
+            "patternType": rule.patternType.value,
             "mcc": rule.mcc,
             "priority": rule.priority
         }
-        processed_rules.append(rule_dict)
+        processedRules.append(ruleDict)
     
-    return processed_rules
+    return processedRules
 
 class ClassificationService:
-    def __init__(self, db: AsyncSession, redis: Redis, ml_pipeline: dict | None = None):
+    def __init__(self, db: AsyncSession, redis: Redis, mlPipeline: dict | None = None):
         """
         Сервис классификации.
         """
         self.db = db
         self.redis = redis
-        self.category_repo = repositories.CategoryRepository(db)
-        self.result_repo = repositories.ClassificationResultRepository(db)
-        self.feedback_repo = repositories.FeedbackRepository(db)
+        self.categoryReposity = repositories.CategoryRepository(db)
+        self.resultReposity = repositories.ClassificationResultRepository(db)
+        self.feedbackReposity = repositories.FeedbackRepository(db)
         
-        if ml_pipeline:
-            self._model = ml_pipeline.get("model")
-            self._vectorizer = ml_pipeline.get("vectorizer")
-            self._class_labels = ml_pipeline.get("class_labels")
-            self._model_version = ml_pipeline.get("model_version")
+        if mlPipeline:
+            self._model = mlPipeline.get("model")
+            self._vectorizer = mlPipeline.get("vectorizer")
+            self._class_labels = mlPipeline.get("class_labels")
+            self._model_version = mlPipeline.get("modelVersion")
         else:
             self._model = None
             self._vectorizer = None
@@ -57,183 +57,183 @@ class ClassificationService:
             self._model_version = None
         self._rules = []
 
-    async def _load_rules(self):
+    async def _loadRules(self):
         """Загружает правила из кэша или БД."""
         if self._rules:
             return
 
-        rules_dicts = await get_cached_rules_as_dict(self.db)
+        rulesDicts = await getCachedRulesAsDict(self.db)
 
-        compiled_rules = []
-        for r_dict in rules_dicts:
-            rule = r_dict.copy()
+        compiledRules = []
+        for rDict in rulesDicts:
+            rule = rDict.copy()
             
-            if rule["pattern_type"] == "regex":
+            if rule["patternType"] == "regex":
                 try:
                     rule["compiled_regex"] = re.compile(rule["pattern"], re.IGNORECASE)
                 except re.error as e:
                     logger.error(f"Invalid regex in rule {rule['id']}: {e}. Rule disabled.")
                     continue 
-            compiled_rules.append(rule)
+            compiledRules.append(rule)
 
-        self._rules = compiled_rules
+        self._rules = compiledRules
 
-    async def apply_rules(self, merchant: str, mcc: int | None, description: str) -> tuple[int | None, str | None]:
+    async def applyRules(self, merchant: str, mcc: int | None, description: str) -> tuple[int | None, str | None]:
         """
         Применяет правила классификации по приоритету.
-        Возвращает (category_id, category_name) если match, иначе (None, None).
+        Возвращает (categoryId, categoryName) если match, иначе (None, None).
         """
-        await self._load_rules()
+        await self._loadRules()
         
         if not self._rules:
             logger.warning("No rules loaded. Skipping rules application.")
             return None, None
         
-        transaction_text = f"{merchant} {description}".lower()
+        transactionText = f"{merchant} {description}".lower()
         
         for rule in sorted(self._rules, key=lambda r: r["priority"]):
-            pattern_type = rule["pattern_type"]
+            patternType = rule["patternType"]
             pattern = rule["pattern"].lower()
             
-            is_match = False
+            isMatch = False
             
-            if pattern_type == "mcc" and mcc is not None and rule["mcc"] == mcc:
-                is_match = True
-            elif pattern_type == "exact" and pattern == transaction_text:
-                is_match = True
-            elif pattern_type == "contains" and pattern in transaction_text:
-                is_match = True
-            elif pattern_type == "regex" and "compiled_regex" in rule:
-                if rule["compiled_regex"].search(transaction_text):
-                    is_match = True
+            if patternType == "mcc" and mcc is not None and rule["mcc"] == mcc:
+                isMatch = True
+            elif patternType == "exact" and pattern == transactionText:
+                isMatch = True
+            elif patternType == "contains" and pattern in transactionText:
+                isMatch = True
+            elif patternType == "regex" and "compiled_regex" in rule:
+                if rule["compiled_regex"].search(transactionText):
+                    isMatch = True
             
-            if is_match:
-                return rule["category_id"], rule["category_name"]
+            if isMatch:
+                return rule["categoryId"], rule["categoryName"]
                 
         return None, None
 
-    async def apply_ml(self, transaction_data: dict) -> tuple[int | None, str | None, float, str | None]:
+    async def applyMl(self, transactionData: dict) -> tuple[int | None, str | None, float, str | None]:
         """
         Применяет ML-модель, если правила не сработали.
-        Возвращает (category_id, category_name, confidence, model_version).
+        Возвращает (categoryId, categoryName, confidence, modelVersion).
         """
         if not self._model:
             logger.warning("No ML model loaded. ML classification disabled. Falling back.")
-            return await self._get_fallback_category()
+            return await self._getFallbackCategory()
 
         try:
-            category_id, confidence = await MLService.predict_async(
+            categoryId, confidence = await MLService.predict_async(
                 self._model, 
                 self._vectorizer, 
                 self._class_labels, 
-                transaction_data
+                transactionData
             )
         except Exception as e:
             logger.error(f"Error during ML prediction execution: {e}")
-            return await self._get_fallback_category()
+            return await self._getFallbackCategory()
 
-        model_version = self._model_version
+        modelVersion = self._model_version
         
-        if confidence < settings.settings.ml.ml_confidence_threshold_audit:
+        if confidence < settings.settings.ML.ML_CONFIDENCE_THRESHOLD_AUDIT:
             logger.debug(f"ML confidence {confidence:.4f} is too low. Fallback.")
-            return await self._get_fallback_category(confidence, model_version)
+            return await self._getFallbackCategory(confidence, modelVersion)
         
         try:
-            category = await self.db.get(models.Category, category_id)
+            category = await self.db.get(models.Category, categoryId)
             if not category:
-                logger.error(f"ML predicted non-existent category ID: {category_id}. Fallback.")
-                return await self._get_fallback_category(confidence, model_version)
+                logger.error(f"ML predicted non-existent category ID: {categoryId}. Fallback.")
+                return await self._getFallbackCategory(confidence, modelVersion)
         except Exception as e:
-            logger.error(f"DB Error fetching category {category_id}: {e}")
-            return await self._get_fallback_category(confidence, model_version)
+            logger.error(f"DB Error fetching category {categoryId}: {e}")
+            return await self._getFallbackCategory(confidence, modelVersion)
 
-        if confidence < settings.settings.ml.ml_confidence_threshold_accept:
+        if confidence < settings.settings.ML.ML_CONFIDENCE_THRESHOLD_ACCEPT:
             logger.info(f"ML classification requires audit (confidence: {confidence:.4f})")
             pass
 
-        return category.id, category.name, confidence, model_version
+        return category.categoryId, category.name, confidence, modelVersion
 
-    async def _get_fallback_category(self, confidence=0.0, model_version=None):
+    async def _getFallbackCategory(self, confidence=0.0, modelVersion=None):
         """Возвращает категорию 'Other' (ID=0)."""
-        other_cat = await self.category_repo.get_by_id(0)
-        if other_cat:
-            return other_cat.id, other_cat.name, confidence, model_version
+        otherCat = await self.categoryReposity.getById(0)
+        if otherCat:
+            return otherCat.categoryId, otherCat.name, confidence, modelVersion
         
-        return 0, "Other", confidence, model_version
+        return 0, "Other", confidence, modelVersion
     
-    async def get_classification(self, tx_id: UUID) -> schemas.CategorizationResultResponse:
-        cache_key = f"classification:{tx_id}"
-        cached_result = await self.redis.get(cache_key)
-        if cached_result:
-            return schemas.CategorizationResultResponse.model_validate_json(cached_result)
+    async def getClassification(self, txId: UUID) -> schemas.CategorizationResultResponse:
+        cacheKey = f"classification:{txId}"
+        cachedResult = await self.redis.get(cacheKey)
+        if cachedResult:
+            return schemas.CategorizationResultResponse.model_validate_json(cachedResult)
         
-        classification = await self.result_repo.get_by_transaction_id(tx_id)
+        classification = await self.resultReposity.getByTransactionId(txId)
         if not classification:
             raise exceptions.ClassificationResultNotFoundError("Classification result not found")
 
-        response_model = schemas.CategorizationResultResponse.from_orm(classification)
+        responseModel = schemas.CategorizationResultResponse.from_orm(classification)
         await self.redis.set(
-            cache_key, 
-            response_model.model_dump_json(), 
+            cacheKey, 
+            responseModel.model_dump_json(), 
             ex=3600
         )
 
-        return response_model
+        return responseModel
 
-    async def submit_feedback(self, body: schemas.FeedbackRequest) -> tuple[dict, models.Category]:
+    async def submitFeedback(self, body: schemas.FeedbackRequest) -> tuple[dict, models.Category]:
         """Логика для POST /feedback, перенесено из api.py"""
-        existing_result = await self.result_repo.get_by_transaction_id(body.transaction_id)
-        if not existing_result:
+        existingResult = await self.resultReposity.getByTransactionId(body.transactionId)
+        if not existingResult:
             raise exceptions.ClassificationResultNotFoundError("Transaction result to update not found")
 
-        correct_category = await self.category_repo.get_by_id(body.correct_category_id)
-        if not correct_category:
-            raise exceptions.CategoryNotFoundError(f"Invalid 'correct_category_id' {body.correct_category_id}")
+        correctCategory = await self.categoryReposity.getById(body.correctCategoryId)
+        if not correctCategory:
+            raise exceptions.CategoryNotFoundError(f"Invalid 'correctCategoryId' {body.correctCategoryId}")
 
-        new_feedback = models.Feedback(
-            transaction_id=body.transaction_id,
-            correct_category_id=body.correct_category_id,
-            user_id=body.user_id,
+        newFeedback = models.Feedback(
+            transactionId=body.transactionId,
+            correctCategoryId=body.correctCategoryId,
+            userId=body.userId,
             comment=body.comment,
             processed=False
         )
-        await self.feedback_repo.create(new_feedback)
+        await self.feedbackReposity.create(newFeedback)
         
-        old_category_name = existing_result.category_name
+        oldCategoryName = existingResult.categoryName
         
-        existing_result.source = models.ClassificationSource.MANUAL
-        existing_result.category_id = body.correct_category_id
-        existing_result.category_name = correct_category.name
-        existing_result.confidence = 1.0
+        existingResult.source = models.ClassificationSource.MANUAL
+        existingResult.categoryId = body.correctCategoryId
+        existingResult.categoryName = correctCategory.name
+        existingResult.confidence = 1.0
         
-        await self.result_repo.create_or_update(existing_result)
+        await self.resultReposity.createOrUpdate(existingResult)
         
-        await self.redis.delete(f"classification:{body.transaction_id}")
+        await self.redis.delete(f"classification:{body.transactionId}")
         
-        event_data = {
-            "transaction_id": str(body.transaction_id),
-            "old_category": old_category_name,
-            "new_category_id": str(body.correct_category_id),
-            "new_category_name": correct_category.name
+        eventData = {
+            "transactionId": str(body.transactionId),
+            "oldCategory": oldCategoryName,
+            "newCategoryId": str(body.correctCategoryId),
+            "newCategoryName": correctCategory.name
         }
-        return event_data, correct_category
+        return eventData, correctCategory
 
-    async def process_transaction(self, data: dict) -> tuple[dict, dict] | None:
+    async def processTransaction(self, data: dict) -> tuple[dict, dict] | None:
         """
         Полная логика обработки из consumers.py.
         Возвращает (event_data_classified, event_data_events) или None.
         """
         try:
-            transaction_id = UUID(data['transaction_id'])
+            transactionId = UUID(data['transactionId'])
         except (KeyError, ValueError):
-            raise exceptions.InvalidKafkaMessageError(f"Invalid transaction_id: {data.get('transaction_id')}")
+            raise exceptions.InvalidKafkaMessageError(f"Invalid transactionId: {data.get('transactionId')}")
 
-        existing = await self.result_repo.get_by_transaction_id(transaction_id)
+        existing = await self.resultReposity.getByTransactionId(transactionId)
         if existing:
-            logger.warning(f"Transaction {transaction_id} already processed. Skipping.")
+            logger.warning(f"Transaction {transactionId} already processed. Skipping.")
             return None
 
-        category_id, category_name = await self.apply_rules(
+        categoryId, categoryName = await self.applyRules(
             merchant=data.get('merchant', ''),
             mcc=data.get('mcc'),
             description=data.get('description', '')
@@ -241,45 +241,45 @@ class ClassificationService:
         
         source = models.ClassificationSource.RULES
         confidence = 1.0
-        model_version = None
+        modelVersion = None
 
-        if category_id is None:
-            category_id, category_name, confidence, model_version = await self.apply_ml(data)
+        if categoryId is None:
+            categoryId, categoryName, confidence, modelVersion = await self.applyMl(data)
             source = models.ClassificationSource.ML
 
         result = models.ClassificationResult(
-            transaction_id=transaction_id,
-            category_id=category_id,
-            category_name=category_name,
+            transactionId=transactionId,
+            categoryId=categoryId,
+            categoryName=categoryName,
             confidence=confidence,
             source=source,
-            model_version=model_version,
+            modelVersion=modelVersion,
             merchant=data.get('merchant', ''),
             description=data.get('description', ''),
             mcc=data.get('mcc')
         )
-        await self.result_repo.create_or_update(result)
+        await self.resultReposity.createOrUpdate(result)
 
-        response_model = schemas.CategorizationResultResponse(
-            transaction_id=transaction_id,
-            category_id=category_id,
-            category_name=category_name,
+        responseModel = schemas.CategorizationResultResponse(
+            transactionId=transactionId,
+            categoryId=categoryId,
+            categoryName=categoryName,
             confidence=confidence,
             source=source.value,
-            model_version=model_version
+            modelVersion=modelVersion
         )
         await self.redis.set(
-            f"classification:{transaction_id}", 
-            response_model.model_dump_json(), 
+            f"classification:{transactionId}", 
+            responseModel.model_dump_json(), 
             ex=3600
         )
 
-        event_classified = {
-            "transaction_id": str(transaction_id),
-            "category_id": category_id,
-            "category_name": category_name
+        eventClassified = {
+            "transactionId": str(transactionId),
+            "categoryId": categoryId,
+            "categoryName": categoryName
         }
         
-        event_events = event_classified.copy()
+        eventEvents = eventClassified.copy()
         
-        return event_classified, event_events
+        return eventClassified, eventEvents

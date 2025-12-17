@@ -12,63 +12,65 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 from app import middleware, dependencies, settings, exceptions, logging_config
 from app.routers import api
-from app.services.ml_service import model_manager
+from app.services.ml_service import modelManager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging_config.setup_logging() 
+    logging_config.setupLogging() 
     middleware.logger.info("CategorizationService starting...")
     
-    engine = create_async_engine(settings.settings.db.db_url)
-    session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    app.state.db_engine = engine
-    app.state.async_session_maker = session_maker
+    engine = create_async_engine(settings.settings.DB.DB_URL)
+    dbSessionMaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    app.state.engine = engine
+    app.state.dbSessionMaker = dbSessionMaker
     middleware.logger.info("Database engine and session maker created.")
 
-    redis_pool = await dependencies.create_redis_pool()
-    app.state.redis_pool = redis_pool
-    middleware.logger.info(f"Redis pool created for {settings.settings.redis.redis_url}")
+    redisPool = await dependencies.create_redis_pool()
+    app.state.redisPool = redisPool
+    middleware.logger.info(f"Redis pool created for {settings.settings.ARQ.REDIS_URL}")
     
-    arq_redis_settings = RedisSettings.from_dsn(settings.settings.redis.redis_url)
-    arq_redis_settings.queue_name = settings.settings.arq.arq_queue_name
-    arq_pool = await create_pool(arq_redis_settings)
-    app.state.arq_pool = arq_pool
-    middleware.logger.info(f"Arq pool created for queue '{settings.settings.arq.arq_queue_name}'")
+    arqSettings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
+    arqPool = await create_pool(
+        arqSettings,
+        default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
+    )
+    app.state.arqPool = arqPool
+    middleware.logger.info("ARQ Pool initialized")
 
-    producer = AIOKafkaProducer(
-        bootstrap_servers=settings.settings.kafka.kafka_bootstrap_servers,
+    kafkaProducer = AIOKafkaProducer(
+        bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
         request_timeout_ms=30000,
         retry_backoff_ms=1000
     )
-    await producer.start()
-    app.state.kafka_producer = producer
+    await kafkaProducer.start()
+    app.state.kafkaProducer = kafkaProducer
     middleware.logger.info(
-        f"AIOKafkaProducer started for {settings.settings.kafka.kafka_bootstrap_servers}"
+        f"AIOKafkaProducer started for {settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS}"
     )
 
     caches.set_config({
         'default': {
             'cache': "aiocache.RedisCache",
-            'endpoint': settings.settings.redis.redis_url.split('//')[1].split(':')[0],
-            'port': int(settings.settings.redis.redis_url.split(':')[-1].split('/')[0]),
+            'endpoint': settings.settings.ARQ.REDIS_URL.split('//')[1].split(':')[0],
+            'port': int(settings.settings.ARQ.REDIS_URL.split(':')[-1].split('/')[0]),
             'db': 0,
             'ttl': 3600,
         }
     })
 
     middleware.logger.info("Initializing Model Manager...")
-    await model_manager.check_for_updates(session_maker)
+    await modelManager.checkForUpdates(dbSessionMaker)
     
-    async def model_reloader_task():
+    async def modelReloaderTask():
         """Фоновая задача для обновления модели в API."""
         while True:
             await asyncio.sleep(60)
             try:
-                await model_manager.check_for_updates(session_maker)
+                await modelManager.checkForUpdates(dbSessionMaker)
             except Exception as e:
                 middleware.logger.error(f"Error in background model reloader: {e}")
 
-    reloader = asyncio.create_task(model_reloader_task())
+    reloader = asyncio.create_task(modelReloaderTask())
 
     yield
     
@@ -76,16 +78,16 @@ async def lifespan(app: FastAPI):
     
     reloader.cancel()
     
-    await app.state.kafka_producer.stop()
+    await app.state.kafkaProducer.stop()
     middleware.logger.info("AIOKafkaProducer stopped.")
     
-    await arq_pool.close()
+    await arqPool.close()
     middleware.logger.info("Arq pool closed.")
 
-    await dependencies.close_redis_pool(redis_pool)
+    await dependencies.closeRedisPool(redisPool)
     middleware.logger.info("Redis pool closed.")
         
-    await app.state.db_engine.dispose()
+    await app.state.engine.dispose()
     middleware.logger.info("DB engine disposed.")
 
 app = FastAPI(
@@ -97,7 +99,7 @@ app = FastAPI(
 )
 
 @app.exception_handler(exceptions.ClassificationServiceError)
-async def classification_exception_handler(
+async def classificationExceptionHandler(
     request: Request, 
     exc: exceptions.ClassificationServiceError
 ):
@@ -113,11 +115,11 @@ async def classification_exception_handler(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.settings.app.frontend_url],
+    allow_origins=[settings.settings.APP.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-app.middleware("http")(middleware.error_middleware)
+app.middleware("http")(middleware.errorMiddleware)
 Instrumentator().instrument(app).expose(app)
 app.include_router(api.router, prefix="/api/v1/class")

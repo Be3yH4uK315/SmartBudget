@@ -6,46 +6,46 @@ from app.services.ml_service import MLService
 
 logger = logging.getLogger(__name__)
 
-async def retrain_model_task(ctx):
+async def retrainModelTask(ctx):
     """
     ARQ-задача для дообучения модели.
     """
     logger.info("Starting scheduled model retraining...")
-    db_maker = ctx.get("db_session_maker")
-    if not db_maker:
+    dbSessionMaker = ctx.get("db_session_maker")
+    if not dbSessionMaker:
         logger.error("No db_session_maker in arq context. Aborting.")
         return
 
-    async with db_maker() as session:
-        dataset_repo = repositories.DatasetRepository(session)
-        model_repo = repositories.ModelRepository(session)
+    async with dbSessionMaker() as session:
+        datasetReposity = repositories.DatasetRepository(session)
+        modelReposity = repositories.ModelRepository(session)
         
         try:
             logger.info("Finding latest 'READY' training dataset...")
-            dataset = await dataset_repo.get_latest_ready_dataset()
+            dataset = await datasetReposity.getLatestReadyDataset()
 
             if not dataset:
                 logger.info("No 'READY' training datasets found. Skipping training.")
                 return
             
-            logger.info(f"Found dataset: {dataset.version} (Path: {dataset.file_path})")
+            logger.info(f"Found dataset: {dataset.version} (Path: {dataset.filePath})")
 
             try:
-                training_df = pd.read_parquet(dataset.file_path)
+                trainingDf = pd.read_parquet(dataset.filePath)
             except FileNotFoundError:
-                logger.error(f"Dataset file not found: {dataset.file_path}. Skipping.")
+                logger.error(f"Dataset file not found: {dataset.filePath}. Skipping.")
                 return
             
-            if training_df.empty:
+            if trainingDf.empty:
                  logger.info("Training dataset file is empty. Skipping.")
                  return
 
-            min_samples = 10 
-            if len(training_df) < min_samples:
-                logger.info(f"Insufficient data in dataset ({len(training_df)} < {min_samples}). Skipping.")
+            minSamples = 10 
+            if len(trainingDf) < minSamples:
+                logger.info(f"Insufficient data in dataset ({len(trainingDf)} < {minSamples}). Skipping.")
                 return
 
-            new_version, metrics = MLService.train_model(training_df)
+            newVersion, metrics = MLService.train_model(trainingDf)
             
             if "val_f1" not in metrics:
                 if "train_f1" in metrics:
@@ -55,14 +55,14 @@ async def retrain_model_task(ctx):
                     logger.error("No 'val_f1' or 'train_f1' found in metrics. Setting 'val_f1' to 0.0.")
                     metrics["val_f1"] = 0.0
 
-            model_entry = models.Model(
+            modelEntry = models.Model(
                 name="lightgbm_tfidf",
-                version=new_version,
-                path=f"{settings.settings.ml.model_path}/{new_version}",
+                version=newVersion,
+                path=f"{settings.settings.ML.MODEL_PATH}/{newVersion}",
                 metrics=metrics,
-                is_active=False
+                isActive=False
             )
-            await model_repo.create_model(model_entry)
+            await modelReposity.createModel(modelEntry)
             
             logger.info(f"Retraining task finished successfully. Metrics: {metrics}")
 
