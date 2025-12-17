@@ -13,7 +13,8 @@ from app.routers import goals
 from app import (
     settings,
     exceptions,
-    logging_config
+    logging_config,
+    schemas
 )
 from app.kafka_producer import KafkaProducer
 
@@ -69,6 +70,7 @@ app = FastAPI(
     title="Goals Service", 
     version="1.0", 
     lifespan=lifespan,
+    default_response_class=schemas.DecimalJSONResponse,
     docs_url="/api/v1/goals/docs",
     openapi_url="/api/v1/goals/openapi.json"
 )
