@@ -10,7 +10,7 @@ class JsonFormatter(Formatter):
         log_data = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
-            "message": record.msg,
+            "message": record.getMessage(),
             "logger": record.name,
         }
         
@@ -20,9 +20,9 @@ class JsonFormatter(Formatter):
         if record.exc_info:
             log_data['exc_info'] = self.formatException(record.exc_info)
 
-        return json.dumps(log_data)
+        return json.dumps(log_data, default=str, ensure_ascii=False)
 
-def setup_logging():
+def setupLogging():
     """Настраивает ведение журнала с помощью JSON formatter."""
     root_logger = logging.getLogger()
     
@@ -33,7 +33,7 @@ def setup_logging():
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter(datefmt="%Y-%m-%dT%H:%M:%S%z"))
     root_logger.addHandler(handler)
-    root_logger.setLevel(settings.settings.app.log_level)
+    root_logger.setLevel(settings.settings.APP.LOG_LEVEL)
 
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("aiokafka").setLevel(logging.WARNING)

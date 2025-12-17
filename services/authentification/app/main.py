@@ -22,42 +22,41 @@ from app import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging_config.setup_logging()
+    logging_config.setupLogging()
 
     try:
-        geoip_reader = geoip2.database.Reader(settings.settings.app.geoip_db_path)
-        app.state.geoip_reader = geoip_reader
+        geoIpReader = geoip2.database.Reader(settings.settings.APP.GEOIP_DB_PATH)
+        app.state.geoIpReader = geoIpReader
         middleware.logger.info(
-            f"GeoIP DB loaded: {settings.settings.app.geoip_db_path}"
+            f"GeoIP DB loaded: {settings.settings.APP.GEOIP_DB_PATH}"
         )
     except FileNotFoundError:
         middleware.logger.warning(
-            f"GeoIP DB not found: {settings.settings.app.geoip_db_path}. "
+            f"GeoIP DB not found: {settings.settings.APP.GEOIP_DB_PATH}. "
             f"Geolocation service disabled."
         )
-        app.state.geoip_reader = None
+        app.state.geoIpReader = None
     except Exception as e:
         middleware.logger.error(f"GeoIP init error: {e}")
-        app.state.geoip_reader = None
+        app.state.geoIpReader = None
 
     try:
-        db_engine: AsyncEngine = create_async_engine(settings.settings.db.db_url)
-        db_session_maker = async_sessionmaker(db_engine, expire_on_commit=False)
-
-        app.state.db_engine = db_engine
-        app.state.db_session_maker = db_session_maker
-
+        engine: AsyncEngine = create_async_engine(settings.settings.DB.DB_URL)
+        dbSessionMaker = async_sessionmaker(engine, expire_on_commit=False)
+        app.state.engine = engine
+        app.state.dbSessionMaker = dbSessionMaker
         middleware.logger.info("DB Engine & Session Maker initialized")
+
     except Exception as e:
         middleware.logger.critical(f"DB initialization failed: {e}")
         raise RuntimeError("Database initialization failed") from e
 
     try:
-        redis_pool = await dependencies.create_redis_pool()
-        app.state.redis_pool = redis_pool
+        redisPool = await dependencies.createRedisPool()
+        app.state.redisPool = redisPool
 
-        redis_limiter = Redis(connection_pool=redis_pool)
-        await FastAPILimiter.init(redis_limiter)
+        redisLimiter = Redis(connection_pool=redisPool)
+        await FastAPILimiter.init(redisLimiter)
 
         middleware.logger.info("Redis pool & rate limiter initialized")
     except Exception as e:
@@ -65,12 +64,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Redis initialization failed") from e
     
     try:
-        arq_settings = RedisSettings.from_dsn(settings.settings.app.redis_url)
-        arq_pool = await create_pool(
-            arq_settings,
-            default_queue_name=settings.settings.app.arq_queue_name
+        arqSettings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
+        arqPool = await create_pool(
+            arqSettings,
+            default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
         )
-        app.state.arq_pool = arq_pool
+        app.state.arqPool = arqPool
         middleware.logger.info("ARQ Pool initialized")
     except Exception as e:
         middleware.logger.critical(f"ARQ initialization failed: {e}")
@@ -81,7 +80,7 @@ async def lifespan(app: FastAPI):
 
     finally:
         try:
-            geo = app.state.geoip_reader
+            geo = app.state.geoIpReader
             if geo is not None:
                 geo.close()
                 middleware.logger.info("GeoIP DB closed")
@@ -89,8 +88,8 @@ async def lifespan(app: FastAPI):
             middleware.logger.error(f"Error closing GeoIP: {e}")
 
         try:
-            if app.state.db_engine:
-                await app.state.db_engine.dispose()
+            if app.state.engine:
+                await app.state.engine.dispose()
                 middleware.logger.info("DB engine disposed")
         except Exception as e:
             middleware.logger.error(f"Error disposing DB engine: {e}")
@@ -101,20 +100,20 @@ async def lifespan(app: FastAPI):
             middleware.logger.error(f"Error closing FastAPILimiter: {e}")
 
         try:
-            redis_pool = app.state.redis_pool
-            await dependencies.close_redis_pool(redis_pool)
+            redisPool = app.state.redisPool
+            await dependencies.closeRedisPool(redisPool)
             middleware.logger.info("Redis pool closed")
         except Exception as e:
             middleware.logger.error(f"Error closing redis pool: {e}")
 
         try:
-            if app.state.arq_pool:
-                await app.state.arq_pool.close()
+            if app.state.arqPool:
+                await app.state.arqPool.close()
                 middleware.logger.info("ARQ pool closed")
         except Exception as e:
             middleware.logger.error(f"Error closing ARQ pool: {e}")
-        del app.state.redis_pool
-        del app.state.arq_pool
+        del app.state.redisPool
+        del app.state.arqPool
 
 app = FastAPI(
     title="Auth Service", 
@@ -125,7 +124,7 @@ app = FastAPI(
 )
 
 @app.exception_handler(exceptions.AuthServiceError)
-async def auth_service_exception_handler(request: Request, exc: exceptions.AuthServiceError):
+async def authServiceExceptionHandler(request: Request, exc: exceptions.AuthServiceError):
     status_code = 400
     detail = str(exc)
     
@@ -161,11 +160,11 @@ app.add_middleware(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.settings.app.frontend_url],
+    allow_origins=[settings.settings.APP.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 Instrumentator().instrument(app).expose(app)
-app.middleware("http")(middleware.error_middleware)
+app.middleware("http")(middleware.errorMiddleware)
 app.include_router(auth.router, prefix="/api/v1/auth")

@@ -82,7 +82,7 @@ class CompleteResetRequest(BaseModel):
         title="Reset Token",
         description="Токен подтверждения восстановления пароля"
     )
-    new_password: str = Field(
+    newPassword: str = Field(
         ...,
         min_length=8,
         title="New Password",
@@ -96,7 +96,7 @@ class ChangePasswordRequest(BaseModel):
         title="Current Password",
         description="Текущий пароль пользователя"
     )
-    new_password: str = Field(
+    newPassword: str = Field(
         ...,
         min_length=8,
         title="New Password",
@@ -131,7 +131,7 @@ class UnifiedResponse(BaseModel):
 
 class UserInfo(BaseModel):
     """Безопасная информация о пользователе."""
-    id: UUID = Field(
+    userId: UUID = Field(
         ...,
         title="User ID",
         description="Уникальный идентификатор пользователя"
@@ -156,12 +156,12 @@ class UserInfo(BaseModel):
         title="Role",
         description="Роль пользователя в системе"
     )
-    last_login: Optional[datetime] = Field(
+    lastLogin: Optional[datetime] = Field(
         None,
         title="Last Login",
         description="Дата последнего входа пользователя"
     )
-    created_at: datetime = Field(
+    createdAt: datetime = Field(
         ...,
         title="Created At",
         description="Дата создания учетной записи"
@@ -171,12 +171,12 @@ class UserInfo(BaseModel):
 
 class SessionInfo(BaseModel):
     """Безопасная информация о сессии, передаваемая на фронтенд."""
-    id: UUID = Field(
+    sessionId: UUID = Field(
         ...,
         title="Session ID",
         description="Уникальный идентификатор сессии"
     )
-    device_name: str = Field(
+    deviceName: str = Field(
         ...,
         title="Device Name",
         description="Название или тип устройства"
@@ -191,12 +191,12 @@ class SessionInfo(BaseModel):
         title="IP Address",
         description="IP-адрес сессии"
     )
-    created_at: datetime = Field(
+    createdAt: datetime = Field(
         ...,
         title="Created At",
         description="Дата создания сессии"
     )
-    is_current_session: bool = Field(
+    isCurrentSession: bool = Field(
         False,
         title="Is Current Session",
         description="Является ли сессия текущей"
@@ -211,3 +211,58 @@ class AllSessionsResponse(BaseModel):
         title="Sessions",
         description="Список активных и прошедших сессий пользователя"
     )
+
+AUTH_EVENTS_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Auth Events Schema",
+    "type": "object",
+    "properties": {
+        "event": {
+            "type": "string",
+            "enum": [
+                "user.registered", "user.login", "user.logout", "user.sessionMismatchDetected",
+                "user.passwordReset", "user.tokenInvalid", "user.verificationStarted",
+                "user.verificationValidated", "user.tokenRefreshed", "user.passwordChanged",
+                "user.loginFailed", "user.passwordResetStarted", "user.passwordResetValidated"
+            ],
+            "description": "Type of authentication event"
+        },
+        "userId": {"type": "string", "format": "uuid", "description": "User UUID"},
+        "email": {"type": "string", "description": "User email"},
+        "ip": {"type": "string", "description": "IP address"},
+        "location": {"type": "string", "description": "Geolocation"}
+    },
+    "required": ["event"],
+    "if": {
+        "properties": { 
+            "event": { 
+                "enum": [
+                    "user.registered", "user.login", "user.logout", "user.sessionMismatchDetected",
+                    "user.passwordReset", "user.tokenRefreshed", "user.passwordChanged"
+                ] 
+            } 
+        }
+    },
+    "then": {
+        "required": ["userId"]
+    }
+}
+
+USERS_ACTIVE_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "userId": {"type": "string", "format": "uuid", "description": "User UUID"},
+        "email": {"type": "string", "description": "User email"},
+        "name": {"type": "string", "description": "User name"},
+        "country": {"type": "string", "description": "User country"},
+        "role": {"type": "integer", "description": "User role"},
+        "isActive": {"type": "boolean", "description": "Active status"}
+    },
+    "required": ["userId", "email"]
+}
+
+SCHEMAS_MAP = {
+    "AUTH_EVENTS_SCHEMA": AUTH_EVENTS_SCHEMA,
+    "USERS_ACTIVE_SCHEMA": USERS_ACTIVE_SCHEMA
+}
