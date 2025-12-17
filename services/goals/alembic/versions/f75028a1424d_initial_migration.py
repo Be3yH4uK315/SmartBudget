@@ -32,7 +32,7 @@ def upgrade() -> None:
     sa.Column('createdAt', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updatedAt', sa.DateTime(timezone=True), nullable=True),
     sa.Column('lastCheckedDate', sa.DateTime(timezone=True), nullable=True),
-    sa.PrimaryKeyConstraint('goalid')
+    sa.PrimaryKeyConstraint('goalId')
     )
     op.create_index('ix_goals_status_finishDate', 'goals', ['status', 'finishDate'], unique=False)
     op.create_index('ix_goals_userId', 'goals', ['userId'], unique=False)
