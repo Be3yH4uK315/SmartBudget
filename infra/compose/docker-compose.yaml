@@ -108,11 +108,11 @@ services:
         alembic upgrade head &&
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
       "
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health"]
-    #   interval: 10s
-    #   retries: 3
-    #   timeout: 5s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
     networks:
       - smartbudget-net
 
@@ -123,8 +123,8 @@ services:
       - ../../services/authentification/.env
     container_name: auth_worker
     depends_on:
-      # auth_service:
-      #   condition: service_healthy
+      auth_service:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       redis_cache:
@@ -135,10 +135,10 @@ services:
       - ../../services/authentification/certs:/app/certs
     command: arq app.worker.WorkerSettings
     restart: unless-stopped
-    # healthcheck:
-    #   test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
-    #   interval: 20s
-    #   retries: 3
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
     networks:
       - smartbudget-net
 
