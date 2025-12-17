@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from aiosmtplib import SMTP
 from email.message import EmailMessage
 import sqlalchemy as sa
@@ -25,8 +26,16 @@ from app import (
 logging_config.setupLogging()
 logger = getLogger(__name__)
 
+async def touchHealthFile():
+    """Обновляет файл статуса здоровья воркера."""
+    try:
+        Path("/tmp/healthy").touch()
+    except Exception as e:
+        logger.error(f"Failed to touch health file: {e}")
+
 async def sendEmail(ctx, to: str, subject: str, body: str):
     """Задача Arq для отправки email. 'ctx' - это словарь контекста воркера."""
+    await touchHealthFile()
     logger.info(f"sendEmail START", extra={"email_to": to})
     
     message = EmailMessage()
@@ -71,6 +80,7 @@ async def sendEmail(ctx, to: str, subject: str, body: str):
 
 async def sendKafkaEvent(ctx, topic: str, eventData: dict, schemaName: str):
     """Задача Arq для отправки события Kafka."""
+    await touchHealthFile()
     schema = schemas.SCHEMAS_MAP.get(schemaName)
     if not schema:
         logger.error(f"Arq: Invalid schema name: {schemaName}")
@@ -102,6 +112,7 @@ async def sendKafkaEvent(ctx, topic: str, eventData: dict, schemaName: str):
 
 async def cleanupSessions(ctx):
     """Задача Arq (Cron) для очистки старых сессий."""
+    await touchHealthFile()
     dbSessionMaker: async_sessionmaker[AsyncSession] = ctx["db_session_maker"]
     if not dbSessionMaker:
         logger.error("Arq: DB session maker not available for cleanup task")
@@ -147,6 +158,8 @@ async def onStartup(ctx):
         logger.error(f"Arq: Failed to create DB engine/session maker: {e}")
         ctx["db_engine"] = None
         ctx["db_session_maker"] = None
+    
+    await touchHealthFile()
 
 async def onShutdown(ctx):
     """Выполняется при остановке воркера Arq."""

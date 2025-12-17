@@ -1,10 +1,12 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
 import base64
 from functools import lru_cache
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+from sqlalchemy import text
 
 from app import (
     dependencies,
@@ -50,6 +52,79 @@ def _deleteAuthCookies(response: Response):
     response.delete_cookie("access_token", httponly=True, secure=secure, samesite='None', path='/')
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='None', path='/')
 
+@router.get(
+    "/health",
+    status_code=status.HTTP_200_OK,
+    summary="Health check сервиса авторизации"
+)
+async def health_check(request: Request):
+    app = request.app
+
+    health_status = {
+        "db": "unknown",
+        "redis": "unknown",
+        "arq": "unknown",
+        "geoip": "unknown",
+    }
+
+    has_error = False
+
+    engine = getattr(app.state, "engine", None)
+    if not engine:
+        health_status["db"] = "disconnected"
+        has_error = True
+    else:
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            health_status["db"] = "ok"
+        except Exception:
+            health_status["db"] = "failed"
+            has_error = True
+
+    redis_pool = getattr(app.state, "redisPool", None)
+    if not redis_pool:
+        health_status["redis"] = "disconnected"
+        has_error = True
+    else:
+        try:
+            await redis_pool.ping()
+            health_status["redis"] = "ok"
+        except Exception:
+            health_status["redis"] = "failed"
+            has_error = True
+
+    arq_pool = getattr(app.state, "arqPool", None)
+    if not arq_pool:
+        health_status["arq"] = "disconnected"
+        has_error = True
+    else:
+        try:
+            await arq_pool.ping()
+            health_status["arq"] = "ok"
+        except Exception:
+            health_status["arq"] = "failed"
+            has_error = True
+
+    geoip = getattr(app.state, "geoIpReader", None)
+    if geoip is None:
+        health_status["geoip"] = "disabled"
+    else:
+        health_status["geoip"] = "ok"
+
+    if has_error:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "error",
+                "components": health_status,
+            },
+        )
+
+    return {
+        "status": "ok",
+        "components": health_status,
+    }
 
 @router.post(
     "/verify-email",
