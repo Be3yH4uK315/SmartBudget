@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 async def consumeTransactionGoal(
     consumer: AIOKafkaConsumer, 
-    db_maker: async_sessionmaker[AsyncSession]
+    dbSessionMaker: async_sessionmaker[AsyncSession]
 ):
     """
     Главный цикл обработки сообщений из 'transaction.goal'.
@@ -44,9 +44,9 @@ async def consumeTransactionGoal(
                 await consumer.commit()
                 continue
 
-            async with db_maker() as session:
-                repo = repositories.GoalRepository(session)
-                service = services.GoalService(repo)
+            async with dbSessionMaker() as session:
+                repository = repositories.GoalRepository(session)
+                service = services.GoalService(repository)
                 await service.updateGoalBalance(event)
 
             await consumer.commit()
@@ -61,17 +61,17 @@ async def consumeTransactionGoal(
 
 async def startConsumer():
     """Инициализирует и запускает консьюмер и его зависимости."""
-    db_engine: AsyncEngine | None = None
-    kafka_prod_instance: KafkaProducer | None = None
+    engine: AsyncEngine | None = None
+    kafkaProducer: KafkaProducer | None = None
     consumer: AIOKafkaConsumer | None = None
 
     try:
-        db_engine = create_async_engine(settings.settings.DB.DB_URL)
-        db_maker = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+        engine = create_async_engine(settings.settings.DB.DB_URL)
+        dbSessionMaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         logger.info("Consumer DB context created.")
 
-        kafka_prod_instance = KafkaProducer()
-        await kafka_prod_instance.start()
+        kafkaProducer = KafkaProducer()
+        await kafkaProducer.start()
         logger.info("Consumer Kafka producer started.")
 
         consumer = AIOKafkaConsumer(
@@ -96,7 +96,7 @@ async def startConsumer():
         if not started:
             raise RuntimeError("Could not connect to Kafka after retries")
 
-        await consumeTransactionGoal(consumer, db_maker)
+        await consumeTransactionGoal(consumer, dbSessionMaker)
         
     except Exception as e:
         logger.critical(f"Consumer process failed: {e}", exc_info=True)
@@ -107,9 +107,9 @@ async def startConsumer():
         if consumer:
             await consumer.stop()
             logger.info("Kafka consumer stopped.")
-        if kafka_prod_instance:
-            await kafka_prod_instance.stop()
+        if kafkaProducer:
+            await kafkaProducer.stop()
             logger.info("Kafka producer stopped.")
-        if db_engine:
-            await db_engine.dispose()
+        if engine:
+            await engine.dispose()
             logger.info("DB engine disposed.")

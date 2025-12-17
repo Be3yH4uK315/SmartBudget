@@ -27,40 +27,40 @@ async def lifespan(app: FastAPI):
     
     try:
         engine = create_async_engine(settings.settings.DB.DB_URL)
-        session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        app.state.db_engine = engine
-        app.state.async_session_maker = session_maker
+        dbSessionMaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        app.state.engine = engine
+        app.state.dbSessionMaker = dbSessionMaker
         logger.info("Database engine and session maker created.")
     except Exception as e:
         logger.error(f"Failed to create DB engine: {e}")
-        app.state.db_engine = None
-        app.state.async_session_maker = None
+        app.state.engine = None
+        app.state.dbSessionMaker = None
 
     try:
-        kafka_prod_instance = KafkaProducer() 
-        await kafka_prod_instance.start()
-        app.state.kafka_producer = kafka_prod_instance
+        kafkaProducer = KafkaProducer() 
+        await kafkaProducer.start()
+        app.state.kafkaProducer = kafkaProducer
     except KafkaError as e:
         logger.error(f"Failed to start Kafka producer: {e}")
-        app.state.kafka_producer = None
+        app.state.kafkaProducer = None
 
-    arq_redis_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
-    arq_pool = await create_pool(
-        arq_redis_settings, 
+    arqSettings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
+    arqPool = await create_pool(
+        arqSettings, 
         default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
     )
-    app.state.arq_pool = arq_pool
+    app.state.arqPool = arqPool
     
     logger.info("Application startup complete.")
     yield
     
-    if app.state.kafka_producer:
-        await app.state.kafka_producer.stop()
+    if app.state.kafkaProducer:
+        await app.state.kafkaProducer.stop()
         logger.info("Kafka producer stopped.")
-    if arq_pool:
-        await arq_pool.close()
-    if app.state.db_engine:
-        await app.state.db_engine.dispose()
+    if arqPool:
+        await arqPool.close()
+    if app.state.engine:
+        await app.state.engine.dispose()
         logger.info("Database engine disposed.")
     
     logger.info("Application shutdown complete.")
