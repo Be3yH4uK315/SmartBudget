@@ -1,4 +1,3 @@
-import jwt
 from fastapi import Depends, status, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
@@ -7,8 +6,7 @@ from arq.connections import ArqRedis
 
 from app import (
     repositories, 
-    services,
-    settings
+    services
 )
 
 async def getDb(request: Request) -> AsyncGenerator[AsyncSession, None]:
