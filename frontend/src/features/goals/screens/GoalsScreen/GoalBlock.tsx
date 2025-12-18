@@ -26,7 +26,6 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
     { value: targetValue, label: '1', color: pieColor },
     { value: targetValue - currentValue, label: '2', color: theme.palette.grayButton.dark },
   ]
-  console.log(pieData)
 
   const centerLabel: CenterLabel = {
     type: 'percent',
