@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from arq import create_pool
 from arq.connections import RedisSettings
 from aiokafka import AIOKafkaProducer
-from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from aiocache import caches
 from starlette.responses import JSONResponse
@@ -113,13 +112,6 @@ async def classificationExceptionHandler(
         content={"detail": str(exc)},
     )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.settings.APP.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
 app.middleware("http")(middleware.errorMiddleware)
 Instrumentator().instrument(app).expose(app)
 app.include_router(api.router, prefix="/api/v1/class")

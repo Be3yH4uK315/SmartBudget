@@ -45,7 +45,7 @@ async def retrainModelTask(ctx):
                 logger.info(f"Insufficient data in dataset ({len(trainingDf)} < {minSamples}). Skipping.")
                 return
 
-            newVersion, metrics = MLService.train_model(trainingDf)
+            newVersion, metrics = MLService.trainModel(trainingDf)
             
             if "val_f1" not in metrics:
                 if "train_f1" in metrics:

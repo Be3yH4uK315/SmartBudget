@@ -86,8 +86,8 @@ def _trainInternalProcess(df_dict: dict) -> tuple[str, dict]:
         metrics["val_f1"] = f1_score(y_val, y_val_pred, average='macro')
         
         new_version = datetime.now().strftime("%Y%m%d_%H%M%S")
-        modelPath = f"{settings.settings.ml.modelPath}/{new_version}_{MODEL_FILE_NAME}"
-        vectorizerPath = f"{settings.settings.ml.modelPath}/{new_version}_{VECTORIZER_FILE_NAME}"
+        modelPath = f"{settings.settings.ML.MODEL_PATH}/{new_version}_{MODEL_FILE_NAME}"
+        vectorizerPath = f"{settings.settings.ML.MODEL_PATH}/{new_version}_{VECTORIZER_FILE_NAME}"
         
         joblib.dump(model, modelPath)
         joblib.dump(vectorizer, vectorizerPath)

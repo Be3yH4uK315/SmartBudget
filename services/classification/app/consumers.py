@@ -41,7 +41,7 @@ async def _handlePoisonPill(
             error=f"{type(error).__name__}: {str(error)}",
             timestamp=datetime.now(timezone.utc)
         )
-        await kafka_producer.send_kafka_event(producer, dlqTopic, dlqEvent.model_dump())
+        await kafka_producer.sendKafkaEvent(producer, dlqTopic, dlqEvent.model_dump())
     except Exception as e:
         logger.critical(f"FAILED TO SEND TO DLQ: {e}")
 
@@ -81,8 +81,8 @@ async def consumeNeedCategory(
 
                 if events:
                     eventClassified, eventEvents = events
-                    await kafka_producer.send_kafka_event(producer, settings.settings.KAFKA.TOPIC_CLASSIFIED, eventClassified)
-                    await kafka_producer.send_kafka_event(producer, settings.settings.KAFKA.TOPIC_CLASSIFICATION_EVENTS, eventEvents)
+                    await kafka_producer.sendKafkaEvent(producer, settings.settings.KAFKA.TOPIC_CLASSIFIED, eventClassified)
+                    await kafka_producer.sendKafkaEvent(producer, settings.settings.KAFKA.TOPIC_CLASSIFICATION_EVENTS, eventEvents)
                 
                 await consumer.commit() 
                 
