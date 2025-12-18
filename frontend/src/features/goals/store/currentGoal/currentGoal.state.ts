@@ -9,9 +9,11 @@ export function getCurrentGoalInitialState(): CurrentGoalSliceState {
       currentValue: 0,
       finishDate: '',
       status: 'closed',
-      transactions: [],
       daysLeft: 0,
     },
+    transactions: [],
+
+    isTransactionsLoading: true,
     isLoading: true,
     isEditLoading: false,
   }

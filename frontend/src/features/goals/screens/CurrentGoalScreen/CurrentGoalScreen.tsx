@@ -3,7 +3,9 @@ import { GoalsStats } from '@features/goals/components'
 import {
   clearCurrentGoalState,
   getGoal,
+  getGoalTransactions,
   selectCurrentGoal,
+  selectGoalTransactions,
   selectIsCurrentGoalLoading,
 } from '@features/goals/store/currentGoal'
 import { ArrowBackOutlined } from '@mui/icons-material'
@@ -28,9 +30,10 @@ export default function GoalScreen() {
 
   const goal = useAppSelector(selectCurrentGoal)
   const isLoading = useAppSelector(selectIsCurrentGoalLoading)
+  const transactions = useAppSelector(selectGoalTransactions)
 
   const { activeType, toggleFilter, normalizedData } = useTransactionFilters(
-    goal.transactions,
+    transactions,
     mapGoalTransaction,
     'income',
   )
@@ -55,7 +58,10 @@ export default function GoalScreen() {
     dispatch(openModal({ id: MODAL_IDS.CREATE_GOAL, props: { goal: goal } }))
 
   useEffect(() => {
-    if (params.id) dispatch(getGoal({ goalId: params.id }))
+    if (params.id) {
+      dispatch(getGoal({ goalId: params.id }))
+      dispatch(getGoalTransactions({ goalId: params.id }))
+    }
     return
   }, [params.id, dispatch])
 

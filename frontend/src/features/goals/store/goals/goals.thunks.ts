@@ -23,12 +23,12 @@ export const getGoals = createAsyncThunk<
 })
 
 export const createGoal = createAsyncThunk<
-  string,
+  { goalId: string },
   { payload: Omit<EditGoalPayload, 'goalId'> },
   { state: RootState; rejectWithValue: string }
 >('createGoal', async ({ payload }, { rejectWithValue }) => {
   try {
-    const response = await goalsMock.createGoal(payload)
+    const response = await goalsApi.createGoal(payload)
 
     return response
   } catch (e: any) {

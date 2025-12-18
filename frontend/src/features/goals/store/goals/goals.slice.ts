@@ -24,6 +24,7 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
         state.goalsStats.targetValue = targetValue
         state.isLoading = false
       })
+
       .addCase(getGoals.rejected, (state) => {
         state.isLoading = false
       })
@@ -34,7 +35,7 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
 
       .addCase(createGoal.fulfilled, (state, { payload, meta }) => {
         const newGoal: Goal = {
-          goalId: payload,
+          goalId: payload.goalId,
           ...meta.arg.payload,
           currentValue: 0,
           status: 'ongoing',
