@@ -1,10 +1,10 @@
 import React from 'react'
-import { normalizedCategory } from '@features/dashboard/types'
 import { Box, Stack, Typography } from '@mui/material'
+import { PieDataItem } from '@shared/types/components'
 import { formatCurrency } from '@shared/utils'
 
 type Props = {
-  category: normalizedCategory
+  category: PieDataItem
 }
 
 export const CategoryBlock = React.memo(({ category }: Props) => {
