@@ -21,7 +21,7 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 // Kafka
 builder.Services.AddSingleton<IKafkaService, KafkaService>();
 //Background Service
-builder.Services.AddHostedService<BackgroundService>();
+builder.Services.AddHostedService<TransactionClassifiedBackgroundService>();
 builder.Services.AddScoped<ClassificationHandler>();
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -57,7 +57,7 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate(); // <-- автоматически применяет все миграции
+    db.Database.Migrate(); 
 }
 
 app.Run();

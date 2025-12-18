@@ -5,17 +5,16 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
 {
     public class TransactionClassifiedBackgroundService : BackgroundService
     {
-        private readonly IKafkaTopicConsumer<TransactionClassifiedMessage> _consumer;
+        private readonly IKafkaService _kafka;
 
-        public TransactionClassifiedBackgroundService(
-            IKafkaTopicConsumer<TransactionClassifiedMessage> consumer)
+        public TransactionClassifiedBackgroundService(IKafkaService kafka)
         {
-            _consumer = consumer;
+            _kafka = kafka;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            return _consumer.ConsumeAsync(stoppingToken);
+            return _kafka.TransactionClassified.ConsumeAsync(stoppingToken);
         }
     }
 }

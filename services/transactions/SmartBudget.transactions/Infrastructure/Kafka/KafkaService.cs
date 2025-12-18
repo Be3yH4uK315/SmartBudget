@@ -48,18 +48,20 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
         public IKafkaTopicProducer<TransactionDeletedMessage> TransactionDeleted { get; }
 
         public IKafkaTopicProducer<BudgetEventMessage> BudgetEvents { get; }
+        private readonly IServiceScopeFactory _scopeFactory;
 
         private readonly List<IDisposable> _producers = new();
-        public KafkaService(IConfiguration cfg, ClassificationHandler handler)
+        public KafkaService(IConfiguration cfg, IServiceScopeFactory scopeFactory)
         {
+            _scopeFactory = scopeFactory;
             var config = new ProducerConfig
             {
-                BootstrapServers = cfg["KAFKA_BOOTSTRAP_SERVERS"] ?? "localhost:9092",
+                BootstrapServers = cfg["KAFKA_BOOTSTRAP_SERVERS"] ?? "kafka:9092",
                 Acks = Acks.All
             };
             var consumerConfig = new ConsumerConfig
             {
-                BootstrapServers = cfg["KAFKA_BOOTSTRAP_SERVERS"] ?? "localhost:9092",
+                BootstrapServers = cfg["KAFKA_BOOTSTRAP_SERVERS"] ?? "kafka:9092",
                 GroupId = "transactions-service",
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 EnableAutoCommit = false
@@ -72,11 +74,16 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
             TransactionUpdated = Add(new KafkaTopicProducer<TransactionUpdatedMessage>(config, "transaction.updated"));
             TransactionDeleted = new KafkaTopicProducer<TransactionDeletedMessage>(config, "transaction.deleted");
             BudgetEvents = Add(new KafkaTopicProducer<BudgetEventMessage>(config, "budget.transactions.events"));
-            TransactionClassified = Add(new KafkaTopicConsumer<TransactionClassifiedMessage>(
-            consumerConfig,
-            "transaction.classified",
-            handler.HandleAsync
-        ));
+
+            TransactionClassified = new KafkaTopicConsumer<TransactionClassifiedMessage>(
+        consumerConfig,
+        "transaction.classified",
+        async (msg, token) =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider.GetRequiredService<ClassificationHandler>();
+            await handler.HandleAsync(msg, token);
+        });
         }
 
         private T Add<T>(T producer) where T : IDisposable

@@ -15,6 +15,7 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
     }
     public interface IKafkaService
     {
+        
         IKafkaTopicConsumer<TransactionClassifiedMessage> TransactionClassified { get; }
         IKafkaTopicProducer<TransactionNewMessage> TransactionNew { get; }
         IKafkaTopicProducer<TransactionNewGoalMessage> TransactionNewGoal { get; }

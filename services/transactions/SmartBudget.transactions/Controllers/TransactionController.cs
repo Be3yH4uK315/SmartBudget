@@ -5,6 +5,7 @@ using SmartBudget.Transactions.Domain.Entities;
 using SmartBudget.Transactions.Domain.Enums;
 using SmartBudget.Transactions.Infrastructure.Kafka;
 using SmartBudget.Transactions.Services;
+using System.Text.Json.Serialization;
 
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -92,26 +93,38 @@ namespace SmartBudget.Transactions.Controllers
         /// </summary>
         [HttpPost("import/mock")]
         public async Task<IActionResult> ImportMock(
-            [FromBody] JsonElement body,
-            CancellationToken stoppingToken = default)
+    [FromBody] JsonElement body,
+    CancellationToken stoppingToken = default)
         {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            // JsonStringEnumConverter поддерживает nullable enum с StringCaseInsensitive
+            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+
             List<ImportTransactionItem> items = body.ValueKind switch
             {
-                JsonValueKind.Array => JsonSerializer.Deserialize<List<ImportTransactionItem>>(body.GetRawText()),
+                JsonValueKind.Array => JsonSerializer.Deserialize<List<ImportTransactionItem>>(body.GetRawText(), options),
                 JsonValueKind.Object => new List<ImportTransactionItem>
-                {
-                    JsonSerializer.Deserialize<ImportTransactionItem>(body.GetRawText())
-                },
+        {
+            JsonSerializer.Deserialize<ImportTransactionItem>(body.GetRawText(), options)
+        },
                 _ => null
             };
 
-            if (items == null) throw new Exception("Invalid body");
+            if (items == null)
+                throw new Exception("Invalid body");
 
             var imported = new List<Transaction>();
 
             foreach (var current_transaction in items)
             {
-                Transaction imported_transaction = new Transaction
+                if (current_transaction.UserId == Guid.Empty)
+                    continue;
+                var transactionDateUtc = DateTime.SpecifyKind(current_transaction.Date, DateTimeKind.Utc);
+                var imported_transaction = new Transaction
                 {
                     Id = current_transaction.Id == Guid.Empty ? Guid.NewGuid() : current_transaction.Id,
                     UserId = current_transaction.UserId,
@@ -119,20 +132,18 @@ namespace SmartBudget.Transactions.Controllers
                         ? Guid.NewGuid()
                         : current_transaction.TransactionId,
                     AccountId = current_transaction.AccountId,
-                    Date = current_transaction.Date,
                     Value = current_transaction.Value ?? 0,
                     Type = current_transaction.Type ?? TransactionType.expense,
                     Status = current_transaction.Status ?? TransactionStatus.pending,
                     Merchant = current_transaction.Merchant,
                     Mcc = current_transaction.Mcc,
                     Description = current_transaction.Description,
-                    CreatedAt = current_transaction.Date,
+                    CreatedAt = transactionDateUtc,
                     ImportedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     CategoryId = null
                 };
 
-                if (imported_transaction.UserId == Guid.Empty) continue;
                 imported.Add(imported_transaction);
             }
 
@@ -176,6 +187,14 @@ namespace SmartBudget.Transactions.Controllers
                 date = new_transaction.CreatedAt.ToString("o"),
                 type = new_transaction.Type.ToString()
             }));
+        }
+        /// <summary>
+        /// Health check endpoint
+        /// </summary>
+        [HttpGet("/health")]
+        public IActionResult Health()
+        {
+            return Ok(new { status = "Healthy" });
         }
 
 

@@ -5,6 +5,7 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
 {
     public class KafkaTopicConsumer<T> : IKafkaTopicConsumer<T>, IDisposable
     {
+        
         private readonly IConsumer<string, string> _consumer;
         private readonly string _topic;
         private readonly Func<T, CancellationToken, Task> _handler;
@@ -23,16 +24,34 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
 
         public async Task ConsumeAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                var result = _consumer.Consume(stoppingToken);
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var result = _consumer.Consume(stoppingToken);
+                        if (result == null || string.IsNullOrEmpty(result.Message?.Value))
+                            continue;
 
-                var message = JsonSerializer.Deserialize<T>(result.Message.Value);
-                if (message == null) continue;
+                        var message = JsonSerializer.Deserialize<T>(result.Message.Value);
+                        if (message == null) continue;
 
-                await _handler(message, stoppingToken);
+                        await _handler(message, stoppingToken);
 
-                _consumer.Commit(result);
+                        _consumer.Commit(result);
+                    }
+                    catch (ConsumeException ex)
+                    {
+                        Console.WriteLine($"Kafka consume error: {ex.Error.Reason}");
+                        await Task.Delay(1000, stoppingToken); // ждем перед повторной попыткой
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Graceful shutdown
+                Console.WriteLine("Kafka consumer stopping.");
             }
         }
 
