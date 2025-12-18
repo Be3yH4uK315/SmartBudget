@@ -13,4 +13,6 @@ export type GoalsSliceState = {
   }
 }
 
-export type GoalsSliceReducers = SliceCaseReducers<GoalsSliceState>
+export type GoalsSliceReducers = SliceCaseReducers<GoalsSliceState> & {
+  clearGoalsState(state: GoalsSliceState): void
+}

@@ -1,4 +1,4 @@
-import { GoalsSliceState } from '../../types'
+import { GoalsSliceState } from '@features/goals/types'
 
 export function getGoalsInitialState(): GoalsSliceState {
   return {

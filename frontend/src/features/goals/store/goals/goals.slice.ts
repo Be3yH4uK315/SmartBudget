@@ -1,20 +1,25 @@
+import { Goal, GoalsSliceReducers, GoalsSliceState } from '@features/goals/types'
+import { pushIntoSorted, sortGoals } from '@features/goals/utils'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
-import { GoalsSliceReducers, GoalsSliceState } from '../../types'
 import { getGoalsInitialState } from './goals.state'
 import { createGoal, getGoals } from './goals.thunks'
 
 export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goals', any>({
   name: 'goals',
   initialState: getGoalsInitialState(),
-  reducers: {},
+  reducers: {
+    clearGoalsState() {
+      return getGoalsInitialState()
+    },
+  },
 
   extraReducers: (builder) => {
     builder
       .addCase(getGoals.fulfilled, (state, { payload }) => {
         const { goals, targetValue, currentValue } = payload
 
-        state.goals = goals
+        state.goals = sortGoals(goals)
         state.goalsStats.currentValue = currentValue
         state.goalsStats.targetValue = targetValue
         state.isLoading = false
@@ -28,14 +33,14 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
       })
 
       .addCase(createGoal.fulfilled, (state, { payload, meta }) => {
-        const newGoal = {
+        const newGoal: Goal = {
           goalId: payload,
           ...meta.arg.payload,
           currentValue: 0,
-          status: 'ongoing' as const,
+          status: 'ongoing',
         }
 
-        state.goals.unshift(newGoal)
+        state.goals = pushIntoSorted(state.goals, newGoal)
         state.goalsStats.targetValue += meta.arg.payload.targetValue
 
         state.isCreateLoading = false
@@ -56,3 +61,5 @@ declare module '@shared/store' {
 }
 
 goalsSlice.injectInto(rootReducer)
+export const { clearGoalsState } = goalsSlice.actions
+
