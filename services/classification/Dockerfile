@@ -22,7 +22,7 @@ ENV PATH=/usr/local/bin:$PATH
 COPY ./app /app/app
 
 COPY alembic.ini /app/alembic.ini
-COPY ./migrations /app/migrations
+COPY ./alembic /app/alembic
 
 COPY run_consumers.py /app/run_consumers.py
 
