@@ -1,4 +1,12 @@
 import { useEffect } from 'react'
+import { GoalsStats } from '@features/goals/components'
+import {
+  clearGoalsState,
+  getGoals,
+  selectGoals,
+  selectGoalsStats,
+  selectIsGoalsLoading,
+} from '@features/goals/store/goals'
 import AddIcon from '@mui/icons-material/Add'
 import { Button, Paper, Stack, Typography } from '@mui/material'
 import { ScreenContent } from '@shared/components'
@@ -6,7 +14,6 @@ import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
-import { getGoals, selectGoals, selectIsGoalsLoading } from '../../store/goals'
 import { GoalBlock } from './GoalBlock'
 
 export default function GoalsScreen() {
@@ -14,10 +21,17 @@ export default function GoalsScreen() {
   const translate = useTranslate('Goals')
   const isLoading = useAppSelector(selectIsGoalsLoading)
   const goals = useAppSelector(selectGoals)
+  const goalsStats = useAppSelector(selectGoalsStats)
 
   useEffect(() => {
     dispatch(getGoals())
   }, [])
+
+  useEffect(() => {
+    return () => {
+      dispatch(clearGoalsState())
+    }
+  }, [dispatch])
 
   const handleOpenModal = () => dispatch(openModal({ id: MODAL_IDS.CREATE_GOAL }))
 
@@ -65,9 +79,15 @@ export default function GoalsScreen() {
 
         {goals.length > 0 && (
           <Stack spacing={2}>
+            <GoalsStats
+              targetValue={goalsStats.targetValue}
+              currentValue={goalsStats.currentValue}
+            />
+
             <Button startIcon={<AddIcon />} onClick={handleOpenModal}>
               {translate('create')}
             </Button>
+
             {goals.map((g) => (
               <GoalBlock key={g.goalId} goal={g} />
             ))}
