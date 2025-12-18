@@ -88,6 +88,19 @@ async def createCoal(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.get(
+    "/main",
+    response_model=schemas.MainGoalsResponse,
+    summary="Получение целей для главного экрана"
+)
+async def get_main_goals(
+    userId: UUID = Depends(dependencies.getCurrentUserId),
+    service: services.GoalService = Depends(dependencies.getGoalService)
+):
+    """Получение целей для главного экрана."""
+    goals = await service.getMainGoals(userId)
+    return schemas.MainGoalsResponse(goals=goals)
+
+@router.get(
     "/",
     response_model=List[schemas.AllGoalsResponse],
     summary="Получение списка целей"
@@ -116,19 +129,6 @@ async def get_goal(
         return schemas.GoalResponse(**goal.__dict__, daysLeft=daysLeft)
     except exceptions.GoalNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-@router.get(
-    "/main",
-    response_model=schemas.MainGoalsResponse,
-    summary="Получение целей для главного экрана"
-)
-async def get_main_goals(
-    userId: UUID = Depends(dependencies.getCurrentUserId),
-    service: services.GoalService = Depends(dependencies.getGoalService)
-):
-    """Получение целей для главного экрана."""
-    goals = await service.getMainGoals(userId)
-    return schemas.MainGoalsResponse(goals=goals)
 
 @router.patch(
     "/{goalId}",
