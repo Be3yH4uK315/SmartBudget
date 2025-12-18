@@ -16,7 +16,7 @@ namespace SmartBudget.Transactions.Domain.Entities
 
         public Guid TransactionId { get; set; }
 
-        public Guid AccountId { get; set; }
+        public Guid? AccountId { get; set; }
 
         public int? CategoryId { get; set; }
 

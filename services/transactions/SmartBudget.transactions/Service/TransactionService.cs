@@ -72,14 +72,14 @@ namespace SmartBudget.Transactions.Services
             int count = 0;
             foreach (var current_transaction in transactions)
             {
-                if (currentTransaction.AccountId != Guid.Empty)
+                if (current_transaction.AccountId != Guid.Empty)
                 {
-                    currentTransaction.CategoryId = 24;
-                    currentTransaction.Description = currentTransaction.Type switch
+                    current_transaction.CategoryId = 24;
+                    current_transaction.Description = current_transaction.Type switch
                     {
                         TransactionType.income => "Пополнение цели",
                         TransactionType.expense => "Списание с цели",
-                        _ => currentTransaction.Description
+                        _ => current_transaction.Description
                     };
                 }
                 using var transactionBD = await _db.Database.BeginTransactionAsync(stoppingToken);
@@ -94,7 +94,7 @@ namespace SmartBudget.Transactions.Services
 
                         if (current_transaction.CategoryId == 24)
                         {
-                            await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.AccountId, transaction.CategoryId, transaction.Value, transaction.Type), stoppingToken);
+                            await _kafka.TransactionNew.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewMessage(current_transaction.AccountId, current_transaction.CategoryId, current_transaction.Value, current_transaction.Type), stoppingToken);
 
                             await _kafka.TransactionNewGoal.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewGoalMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.UserId, current_transaction.Value, current_transaction.Type), stoppingToken);
                         }
@@ -158,7 +158,15 @@ namespace SmartBudget.Transactions.Services
                 await transactionBD.RollbackAsync();
                 _log.LogError(except, "Deleting transaction failed");
             }
-
         }
+
+        public async Task<List<Transaction>> GetUserTransactionsGoalsAsync(Guid accountId, CancellationToken stoppingToken)
+        {
+            return await _db.Transactions
+                .Where(new_transaction => new_transaction.AccountId == accountId)
+                .OrderByDescending(new_transaction => new_transaction.CreatedAt)
+                .ToListAsync(stoppingToken);
+        }
+
     }
 }

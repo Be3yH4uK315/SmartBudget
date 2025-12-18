@@ -160,5 +160,25 @@ namespace SmartBudget.Transactions.Controllers
             await _service.DeleteAsync(id, stoppingToken);
             return Ok();
         }
+
+        /// <summary>
+        /// GET transactions for goals
+        /// </summary>
+        [HttpGet("goals")]
+        public async Task<IActionResult> Goals([FromQuery(Name = "accountId")] Guid accountId,
+            CancellationToken stoppingToken = default)
+        {
+            List<Transaction> list =
+                await _service.GetUserTransactionsGoalsAsync(accountId, stoppingToken);
+
+            return Ok(list.Select(new_transaction => new
+            {
+                value = new_transaction.Value,
+                date = new_transaction.CreatedAt.ToString("o"),
+                type = new_transaction.Type.ToString()
+            }));
+        }
+
+
     }
 }
