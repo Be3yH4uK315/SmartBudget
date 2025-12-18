@@ -164,9 +164,8 @@ namespace SmartBudget.Transactions.Controllers
         /// <summary>
         /// GET transactions for goals
         /// </summary>
-        [HttpGet("goals")]
-        public async Task<IActionResult> Goals([FromQuery(Name = "accountId")] Guid accountId,
-            CancellationToken stoppingToken = default)
+        [HttpGet("goals/{accountId}")]
+        public async Task<IActionResult> Goals( Guid accountId,CancellationToken stoppingToken = default)
         {
             List<Transaction> list =
                 await _service.GetUserTransactionsGoalsAsync(accountId, stoppingToken);
