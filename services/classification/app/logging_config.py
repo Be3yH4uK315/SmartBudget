@@ -33,7 +33,7 @@ def setupLogging():
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter(datefmt="%Y-%m-%dT%H:%M:%S%z"))
     rootLogger.addHandler(handler)
-    rootLogger.setLevel(settings.settings.app.log_level)
+    rootLogger.setLevel(settings.settings.APP.LOG_LEVEL)
 
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("aiokafka").setLevel(logging.WARNING)

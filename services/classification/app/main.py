@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     app.state.dbSessionMaker = dbSessionMaker
     middleware.logger.info("Database engine and session maker created.")
 
-    redisPool = await dependencies.create_redis_pool()
+    redisPool = await dependencies.createRedisPool()
     app.state.redisPool = redisPool
     middleware.logger.info(f"Redis pool created for {settings.settings.ARQ.REDIS_URL}")
     
