@@ -37,19 +37,19 @@ class KafkaProducer:
         await self.producer.stop()
         logger.info("KafkaProducer stopped.")
 
-    async def sendEvent(self, topic: str, event_data: dict, schema: dict = None):
+    async def sendEvent(self, topic: str, eventData: dict, schema: dict = None):
         """Валидирует и отправляет событие."""
         try:
-            dumped_str = json.dumps(event_data, default=jsonDefault)
+            dumped = json.dumps(eventData, default=jsonDefault)
 
             if schema:
-                validate_data = json.loads(dumped_str)
-                validate(instance=validate_data, schema=schema)
+                validateData = json.loads(dumped)
+                validate(instance=validateData, schema=schema)
 
-            value_bytes = dumped_str.encode('utf-8')
+            valueBytes = dumped.encode('utf-8')
 
-            await self.producer.send_and_wait(topic, value=value_bytes)
-            logger.info(f"Sent event to {topic}: {event_data.get('event', 'unknown')}")
+            await self.producer.send_and_wait(topic, value=valueBytes)
+            logger.info(f"Sent event to {topic}: {eventData.get('event', 'unknown')}")
             
         except ValidationError as e:
             logger.error(f"Invalid event data for {topic}: {e}")
@@ -57,10 +57,10 @@ class KafkaProducer:
             logger.error(f"Failed to send Kafka event to {topic}: {e}")
             raise
 
-    async def sendBudgetEvent(self, event_data: dict):
+    async def sendBudgetEvent(self, eventData: dict):
         topic = settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS
-        await self.sendEvent(topic, event_data, self._schemas[topic])
+        await self.sendEvent(topic, eventData, self._schemas[topic])
 
-    async def sendNotification(self, event_data: dict):
+    async def sendNotification(self, eventData: dict):
         topic = settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION
-        await self.sendEvent(topic, event_data, self._schemas[topic])
+        await self.sendEvent(topic, eventData, self._schemas[topic])

@@ -18,54 +18,54 @@ async def healthCheck(request: Request):
     Проверяет доступность DB, Redis (ARQ) и Kafka Producer.
     """
     app = request.app
-    health_status = {
+    healthStatus = {
         "db": "unknown",
         "redis": "unknown",
         "kafka": "unknown"
     }
-    has_error = False
+    hasError = False
 
-    if not getattr(app.state, "db_engine", None):
-        health_status["db"] = "disconnected"
-        has_error = True
+    if not getattr(app.state, "engine", None):
+        healthStatus["db"] = "disconnected"
+        hasError = True
     else:
         try:
-            async with app.state.db_engine.connect() as conn:
+            async with app.state.engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
-            health_status["db"] = "ok"
+            healthStatus["db"] = "ok"
         except Exception as e:
-            health_status["db"] = "failed"
-            has_error = True
+            healthStatus["db"] = "failed"
+            hasError = True
 
-    if not getattr(app.state, "arq_pool", None):
-        health_status["redis"] = "disconnected"
-        has_error = True
+    if not getattr(app.state, "arqPool", None):
+        healthStatus["redis"] = "disconnected"
+        hasError = True
     else:
         try:
-            await app.state.arq_pool.ping()
-            health_status["redis"] = "ok"
+            await app.state.arqPool.ping()
+            healthStatus["redis"] = "ok"
         except Exception as e:
-            health_status["redis"] = "failed"
-            has_error = True
+            healthStatus["redis"] = "failed"
+            hasError = True
 
-    if getattr(app.state, "kafka_producer", None):
-        health_status["kafka"] = "initialized"
+    if getattr(app.state, "kafkaProducer", None):
+        healthStatus["kafka"] = "initialized"
     else:
-        health_status["kafka"] = "disconnected"
-        has_error = True
+        healthStatus["kafka"] = "disconnected"
+        hasError = True
 
-    if has_error:
+    if hasError:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
                 "status": "error",
-                "components": health_status
+                "components": healthStatus
             }
         )
 
     return {
         "status": "ok",
-        "components": health_status
+        "components": healthStatus
     }
 
 @router.post(

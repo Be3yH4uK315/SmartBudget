@@ -1,5 +1,7 @@
+import json
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from typing import Any, Optional
 from decimal import Decimal
 from datetime import date
 from uuid import UUID
@@ -59,6 +61,25 @@ class TransactionEvent(BaseModel):
     userId: UUID = Field(..., description="ID пользователя")
     amount: Decimal = Field(..., description="Сумма транзакции")
     direction: str = Field(..., pattern="^(income|expense)$")
+
+class DecimalJSONResponse(JSONResponse):
+    def render(self, content: Any) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+            default=self.json_encoder
+        ).encode("utf-8")
+
+    @staticmethod
+    def json_encoder(obj: Any) -> Any:
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if hasattr(obj, "isoformat"): 
+            return obj.isoformat()
+        return str(obj)
 
 BUDGET_EVENTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",

@@ -37,12 +37,12 @@ class GoalRepository:
         )
         return result.scalar_one_or_none()
 
-    async def create(self, goal_model: models.Goal) -> models.Goal:
+    async def create(self, goalModel: models.Goal) -> models.Goal:
         """Создает новую цель."""
         try:
-            self.db.add(goal_model)
+            self.db.add(goalModel)
             await self.db.flush() 
-            return goal_model
+            return goalModel
         except IntegrityError as e:
             logger.error(f"DATABASE INTEGRITY ERROR: {e}")
             await self.db.rollback()
@@ -72,14 +72,14 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
     
-    async def addOutboxEvent(self, topic: str, event_data: dict):
+    async def addOutboxEvent(self, topic: str, eventData: dict):
         """Добавляет событие в Outbox."""
-        eventType = event_data.get("event", "unknown")
-        safe_payload = json.loads(json.dumps(event_data, default=_jsonSerializer))
+        eventType = eventData.get("event", "unknown")
+        safePayload = json.loads(json.dumps(eventData, default=_jsonSerializer))
         outbox_entry = models.OutboxEvent(
             topic=topic,
             eventType=eventType,
-            payload=safe_payload
+            payload=safePayload
         )
         self.db.add(outbox_entry)
 
@@ -100,24 +100,24 @@ class GoalRepository:
             await self.db.rollback()
             return None
 
-        new_value_expr = sa.func.greatest(0, models.Goal.currentValue + amount)
+        newValue = sa.func.greatest(0, models.Goal.currentValue + amount)
 
         query = (
             update(models.Goal)
             .where(models.Goal.goalId == goalId, models.Goal.userId == userId)
-            .values(currentValue=new_value_expr)
+            .values(currentValue=newValue)
             .execution_options(synchronize_session=False)
             .returning(models.Goal)
         )
 
         result = await self.db.execute(query)
-        updated_goal = result.scalar_one_or_none()
+        updatedGoal = result.scalar_one_or_none()
 
-        if not updated_goal:
+        if not updatedGoal:
             await self.db.rollback()
             raise exceptions.GoalNotFoundError(f"Goal {goalId} not found")
 
-        return updated_goal
+        return updatedGoal
 
     async def updateFields(self, userId: UUID, goalId: UUID, changes: dict) -> models.Goal:
         """
@@ -130,10 +130,10 @@ class GoalRepository:
             .returning(models.Goal)
         )
         result = await self.db.execute(stmt)
-        updated_goal = result.scalar_one_or_none()
-        if not updated_goal:
+        updatedGoal = result.scalar_one_or_none()
+        if not updatedGoal:
              raise exceptions.GoalNotFoundError("Goal not found during update")
-        return updated_goal
+        return updatedGoal
     
     async def updateStatus(self, goalId: UUID, new_status: str):
         """Метод для атомарного обновления статуса (для воркера)."""
@@ -180,24 +180,24 @@ class GoalRepository:
         self, 
         today: date, 
         limit: int = 100, 
-        days_notice: int = 7
+        daysNotice: int = 7
     ) -> list[models.Goal]:
         """
         Возвращает пачку целей, у которых скоро дедлайн и которые 
         НЕ проверялись за последние 24 часа.
         """
-        seven_days_from_now = today + timedelta(days=days_notice)
-        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+        sevenDaysFromNow = today + timedelta(days=daysNotice)
+        oneDayAgo = datetime.now(timezone.utc) - timedelta(days=1)
 
         query = (
             select(models.Goal)
             .where(
                 models.Goal.status == models.GoalStatus.ONGOING.value,
-                models.Goal.finishDate <= seven_days_from_now,
+                models.Goal.finishDate <= sevenDaysFromNow,
                 models.Goal.finishDate >= today,
                 or_(
                     models.Goal.lastCheckedDate == None,
-                    models.Goal.lastCheckedDate < one_day_ago
+                    models.Goal.lastCheckedDate < oneDayAgo
                 )
             )
             .limit(limit)
@@ -205,13 +205,13 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def updateLastChecked(self, goals_ids: list[UUID]):
+    async def updateLastChecked(self, goalsIds: list[UUID]):
         """Обновляем дату проверки, чтобы не спамить уведомлениями."""
-        if not goals_ids:
+        if not goalsIds:
             return
         stmt = (
             update(models.Goal)
-            .where(models.Goal.goalId.in_(goals_ids))
+            .where(models.Goal.goalId.in_(goalsIds))
             .values(lastCheckedDate=datetime.now(timezone.utc))
         )
         await self.db.execute(stmt)
@@ -239,11 +239,11 @@ class GoalRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
     
-    async def handleFailedOutboxEvent(self, event_id: UUID, error_msg: str):
+    async def handleFailedOutboxEvent(self, eventId: UUID, errorMsg: str):
         """
         Увеличивает счетчик попыток. Если > 5, помечает как failed.
         """
-        stmt = select(models.OutboxEvent).where(models.OutboxEvent.goalId == event_id)
+        stmt = select(models.OutboxEvent).where(models.OutboxEvent.eventId == eventId)
         result = await self.db.execute(stmt)
         event = result.scalar_one_or_none()
         
@@ -254,9 +254,9 @@ class GoalRepository:
                 
             self.db.add(event)
 
-    async def deleteOutboxEvents(self, event_ids: list[UUID]):
+    async def deleteOutboxEvents(self, eventIds: list[UUID]):
         """Удаляет успешно отправленные события."""
-        if not event_ids:
+        if not eventIds:
             return
-        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.goalId.in_(event_ids))
+        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.eventId.in_(eventIds))
         await self.db.execute(stmt)

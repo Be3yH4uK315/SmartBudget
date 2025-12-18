@@ -1,4 +1,3 @@
-import jwt
 from fastapi import Depends, status, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
@@ -7,17 +6,16 @@ from arq.connections import ArqRedis
 
 from app import (
     repositories, 
-    services,
-    settings
+    services
 )
 
 async def getDb(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """Получает session_maker из app.state и предоставляет сессию."""
-    session_maker = request.app.state.async_session_maker
-    if not session_maker:
+    """Получает dbSessionMaker из app.state и предоставляет сессию."""
+    dbSessionMaker = request.app.state.dbSessionMaker
+    if not dbSessionMaker:
         raise HTTPException(status_code=500, detail="Database session factory not available")
         
-    async with session_maker() as session:
+    async with dbSessionMaker() as session:
         yield session
 
 def getGoalRepository(db: AsyncSession = Depends(getDb)) -> repositories.GoalRepository:
@@ -26,58 +24,33 @@ def getGoalRepository(db: AsyncSession = Depends(getDb)) -> repositories.GoalRep
 
 async def getArqPool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq из app.state."""
-    arq_pool: ArqRedis = request.app.state.arq_pool
+    arqPool: ArqRedis = request.app.state.arqPool
     try:
-        yield arq_pool
+        yield arqPool
     finally:
         pass
 
 def getGoalService(
-    repo: repositories.GoalRepository = Depends(getGoalRepository),
+    repository: repositories.GoalRepository = Depends(getGoalRepository),
 ) -> services.GoalService:
     """Провайдер для GoalService."""
-    return services.GoalService(repo)
+    return services.GoalService(repository)
 
 async def getCurrentUserId(request: Request) -> UUID:
     """
-    Декодирует JWT, валидирует подпись публичным ключом и возвращает userId.
-    Далее перенести в API Gateway.
+    Извлекает userId из заголовка X-User-Id, который устанавливает API Gateway.
     """
-    access_token = request.cookies.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No access token provided")
-
+    userId = request.headers.get("X-User-Id")
+    
+    if not userId:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User ID header missing. Access denied."
+        )
     try:
-        public_key = settings.settings.JWT.JWT_PUBLIC_KEY.replace("\\n", "\n")
-        payload = jwt.decode(
-            access_token,
-            public_key,
-            algorithms=[settings.settings.JWT.JWT_ALGORITHM],
-            audience=settings.settings.JWT.JWT_AUDIENCE,
-        )
-
-        userId_str = payload.get("sub")
-        if not userId_str:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token missing subject (userId)"
-            )
-
-        userId = UUID(userId_str)
-        return userId
-
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Token has expired"
-        )
-    except jwt.PyJWTError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail=f"Could not validate credentials: {e}"
-        )
+        return UUID(userId)
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid user ID format in token"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid User ID format"
         )
