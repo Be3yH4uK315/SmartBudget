@@ -1,8 +1,9 @@
 import { Box, Paper, Stack, Typography } from '@mui/material'
 import { IconButtonItem } from '@shared/types'
+import { noop } from '@shared/utils/noop'
 import { Link } from 'react-router'
 
-export const IconButton = ({ title, subtitle, Icon, path }: IconButtonItem) => {
+export const IconButton = ({ title, subtitle, Icon, path, onClick }: IconButtonItem) => {
   const content = (
     <Stack spacing={2} direction={'row'} sx={{ alignItems: 'center', whiteSpace: 'wrap' }}>
       {Icon && (
@@ -32,9 +33,11 @@ export const IconButton = ({ title, subtitle, Icon, path }: IconButtonItem) => {
   return (
     <Paper
       role="button"
-      sx={{ p: 3, borderRadius: '24px', flex: '1 1 0%', textDecoration: 'none' }}
+      sx={{ p: 3, borderRadius: '24px', flex: '1 1 0%', textDecoration: 'none', cursor: 'pointer' }}
       component={path ? Link : 'div'}
       to={path && path}
+      elevation={2}
+      onClick={onClick ? onClick : noop}
     >
       {content}
     </Paper>

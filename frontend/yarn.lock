@@ -682,6 +682,19 @@
     reselect "^5.1.1"
     use-sync-external-store "^1.6.0"
 
+"@mui/x-date-pickers@^8.22.0":
+  version "8.22.0"
+  resolved "https://registry.yarnpkg.com/@mui/x-date-pickers/-/x-date-pickers-8.22.0.tgz#60bc176a308078002e93cfbf3ee55cae234280d5"
+  integrity sha512-iF4H8EJHcltiwfytTe6M1/iCwBUCB97oVh63nAsL4tre2Ew2jm8bKR4Dw2pbgvSUonB3okpZVuweFBQdnECJCg==
+  dependencies:
+    "@babel/runtime" "^7.28.4"
+    "@mui/utils" "^7.3.5"
+    "@mui/x-internals" "8.22.0"
+    "@types/react-transition-group" "^4.4.12"
+    clsx "^2.1.1"
+    prop-types "^15.8.1"
+    react-transition-group "^4.4.5"
+
 "@mui/x-internal-gestures@0.3.6":
   version "0.3.6"
   resolved "https://registry.yarnpkg.com/@mui/x-internal-gestures/-/x-internal-gestures-0.3.6.tgz#dc106ae2ddb8f360ec6510bec98b34ce05368a1f"
@@ -693,6 +706,16 @@
   version "8.19.0"
   resolved "https://registry.yarnpkg.com/@mui/x-internals/-/x-internals-8.19.0.tgz#256c0abb5abe3c25b7125cbbdaebfc3c5dc3a9ef"
   integrity sha512-mMmiyJAN5fW27srXJjhXhXJa+w2xGO45rwcjws6OQc9rdXGdJqRXhBwJd+OT7J1xwSdFIIUhjZRTz1KAfCSGBg==
+  dependencies:
+    "@babel/runtime" "^7.28.4"
+    "@mui/utils" "^7.3.5"
+    reselect "^5.1.1"
+    use-sync-external-store "^1.6.0"
+
+"@mui/x-internals@8.22.0":
+  version "8.22.0"
+  resolved "https://registry.yarnpkg.com/@mui/x-internals/-/x-internals-8.22.0.tgz#adf47979b3ef1e7c078965756916f6bd57c3c655"
+  integrity sha512-PA7jCKRLbS6aYvTSbGr3Id4CPUdTrUejHm31l8Vje7dw138gBBHrHeGsqWJh/S5foorpK8loiRejKrLlTZokyQ==
   dependencies:
     "@babel/runtime" "^7.28.4"
     "@mui/utils" "^7.3.5"

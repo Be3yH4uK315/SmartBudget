@@ -9,7 +9,7 @@ import { ArrowBackOutlined } from '@mui/icons-material'
 import { Button, IconButton, MenuItem, Select, Stack, Typography } from '@mui/material'
 import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
-import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
+import ModalLayout from '@shared/screens/ModalProvider/ModalLayout'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
 

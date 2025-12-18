@@ -1,5 +1,5 @@
 export * from './auth.api'
-export * from './IconButton'
+export * from './components/IconButton'
 export * from './locale'
 export * from './modal.slice'
 export * from './reduxToolkit'
