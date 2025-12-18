@@ -12,7 +12,13 @@ type Props = {
   centerLabel: CenterLabel
 }
 
-export const PieChartWithCenterLabel = React.memo(function PieChartWithCenterLabel({ pieData, innerRadius = 60, width, height, centerLabel }: Props) {
+export const PieChartWithCenterLabel = React.memo(function PieChartWithCenterLabel({
+  pieData,
+  innerRadius = 60,
+  width,
+  height,
+  centerLabel,
+}: Props) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const data: Omit<PieDataItem, 'lightColor'>[] = pieData.map(({ lightColor, ...rest }) => rest)
 

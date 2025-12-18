@@ -18,6 +18,7 @@ import { formatPercent } from '@shared/utils/formatPercent'
 import { mapGoalTransaction } from '@shared/utils/transactionsBlockAdapters'
 import dayjs from 'dayjs'
 import { useNavigate, useParams } from 'react-router'
+import { CurrentGoalScreenSkeleton } from './CurrentGoalScreenSkeleton'
 
 export default function GoalScreen() {
   const dispatch = useAppDispatch()
@@ -65,7 +66,7 @@ export default function GoalScreen() {
   }, [dispatch])
 
   return (
-    <ScreenContent isLoading={isLoading}>
+    <ScreenContent isLoading={isLoading} ContentSkeleton={CurrentGoalScreenSkeleton}>
       <Box
         sx={{
           position: 'absolute',
