@@ -5,6 +5,7 @@
       "@app/*": ["src/app/*"],
 
       "@features/dashboard/*": ["src/features/dashboard/*"],
+      "@features/goals/*": ["src/features/goals/*"],
       "@features/transactions/*": ["src/features/transactions/*"],
 
       "@shared/api/*": ["src/shared/api/*"],
