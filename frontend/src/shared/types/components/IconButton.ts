@@ -5,4 +5,5 @@ export type IconButtonItem = {
   title?: string
   subtitle?: string
   path?: string
+  onClick?: () => void
 }

@@ -8,4 +8,6 @@ export type CurrentGoalSliceState = {
   isEditLoading: boolean
 }
 
-export type CurrentGoalSliceReducers = SliceCaseReducers<CurrentGoalSliceState>
+export type CurrentGoalSliceReducers = SliceCaseReducers<CurrentGoalSliceState> & {
+  clearCurrentGoalState(state: CurrentGoalSliceState): void
+}

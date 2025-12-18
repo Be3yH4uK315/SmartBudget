@@ -22,7 +22,15 @@ export const ScreenContent = ({
   return (
     <Container
       maxWidth={'lg'}
-      sx={{ display: 'flex', flexDirection: 'column', flex: 1, pt: 4, ...containerSx }}
+      sx={{
+        display: 'flex',
+        position: 'relative',
+        flexDirection: 'column',
+        flex: 1,
+        pt: 4,
+        overflow: 'visible',
+        ...containerSx,
+      }}
     >
       {isLoading ? (
         <ScreenSkeleton>{ContentSkeleton}</ScreenSkeleton>

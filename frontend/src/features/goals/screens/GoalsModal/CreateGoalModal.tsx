@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import 'dayjs/locale/ru'
+import { editGoal } from '@features/goals/store/currentGoal'
+import { createGoal } from '@features/goals/store/goals'
+import { CurrentGoal } from '@features/goals/types'
 import { CloseOutlined } from '@mui/icons-material'
 import { Button, IconButton, Stack, TextField, Typography } from '@mui/material'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
@@ -9,9 +12,6 @@ import { useTranslate } from '@shared/hooks'
 import ModalLayout from '@shared/screens/ModalProvider'
 import { dispatch } from '@shared/store'
 import dayjs, { Dayjs } from 'dayjs'
-import { editGoal } from '../../store/currentGoal'
-import { createGoal } from '../../store/goals'
-import { CurrentGoal } from '../../types'
 
 type Props = {
   goal?: CurrentGoal

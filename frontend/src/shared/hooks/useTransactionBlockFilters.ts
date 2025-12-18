@@ -1,13 +1,18 @@
 import { useCallback, useMemo, useState } from 'react'
-import { DashboardCategory, FilterType, normalizedCategory } from '@features/dashboard/types'
 import { useTheme } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
+import { FilterType, PieDataItem, TransactionBase } from '@shared/types/components'
 
-export function useTransactionFilters(data: DashboardCategory[]) {
+export function useTransactionFilters<T>(
+  data: T[],
+  mapper: (dataItem: T) => TransactionBase,
+  initType: 'expense' | 'income',
+) {
   const translateCategory = useTranslate('Categories')
+  const translateMonth = useTranslate('MonthTransactionBlockLabel')
   const theme = useTheme()
 
-  const [activeType, setActiveType] = useState<FilterType>('expense')
+  const [activeType, setActiveType] = useState<FilterType>(initType)
 
   const toggleFilter = useCallback((type: FilterType) => {
     setActiveType(type)
@@ -45,32 +50,36 @@ export function useTransactionFilters(data: DashboardCategory[]) {
 
   const { normalizedData, total } = useMemo(() => {
     const init = {
-      normalizedData: [] as normalizedCategory[],
+      normalizedData: [] as PieDataItem[],
       total: 0,
       count: 0,
     }
 
     const acc = data.reduce((acc, c) => {
-      const value = Number(c.value)
-      if (value <= 0 || c.type !== activeType) return acc
+      const item = mapper(c)
+      if (item.value <= 0 || item.type !== activeType) return acc
 
       const color = colors[acc.count % colors.length]
 
       acc.normalizedData.push({
-        value,
-        label: translateCategory(String(c.categoryId)),
+        value: item.value,
+        label: item.categoryId
+          ? translateCategory(item.categoryId)
+          : item.month
+            ? translateMonth(item.month)
+            : '',
         color: color.main,
         lightColor: color.light,
       })
 
-      acc.total += value
+      acc.total += item.value
       acc.count++
 
       return acc
     }, init)
 
     return { normalizedData: acc.normalizedData, total: acc.total }
-  }, [data, activeType, translateCategory, colors])
+  }, [data, activeType, colors, translateCategory, translateMonth, mapper])
 
   return { activeType, toggleFilter, normalizedData, total }
 }

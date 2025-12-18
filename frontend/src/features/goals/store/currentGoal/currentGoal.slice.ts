@@ -1,6 +1,6 @@
+import { CurrentGoalSliceReducers, CurrentGoalSliceState } from '@features/goals/types'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
-import { CurrentGoalSliceReducers, CurrentGoalSliceState } from '../../types'
 import { getCurrentGoalInitialState } from './currentGoal.state'
 import { editGoal, getGoal } from './currentGoal.thunks'
 
@@ -12,7 +12,11 @@ export const currentGoalSlice = createSlice<
 >({
   name: 'currentGoal',
   initialState: getCurrentGoalInitialState(),
-  reducers: {},
+  reducers: {
+    clearCurrentGoalState() {
+      return getCurrentGoalInitialState()
+    },
+  },
 
   extraReducers: (builder) => {
     builder
@@ -47,3 +51,4 @@ declare module '@shared/store' {
 }
 
 currentGoalSlice.injectInto(rootReducer)
+export const { clearCurrentGoalState } = currentGoalSlice.actions

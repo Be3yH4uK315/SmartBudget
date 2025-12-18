@@ -1,8 +1,8 @@
+import { goalsApi, goalsMock } from '@features/goals/api'
+import { CurrentGoal, EditGoalPayload } from '@features/goals/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
-import { goalsApi } from '../../api'
-import { CurrentGoal, EditGoalPayload } from '../../types'
 
 export const getGoal = createAsyncThunk<
   CurrentGoal,
@@ -10,7 +10,7 @@ export const getGoal = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('getGoal', async ({ goalId }, { rejectWithValue }) => {
   try {
-    const response = await goalsApi.getGoal(goalId)
+    const response = await goalsMock.getGoal(goalId)
 
     return response
   } catch (e: any) {
@@ -26,7 +26,7 @@ export const editGoal = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('editGoal', async ({ ...payload }, { rejectWithValue }) => {
   try {
-    await goalsApi.editGoal(payload)
+    await goalsMock.editGoal(payload)
 
     showToast({ messageKey: 'categoryChanged', type: 'success' })
 
