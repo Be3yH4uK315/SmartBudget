@@ -1,7 +1,5 @@
-import json
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Any, Optional
+from typing import Optional
 from decimal import Decimal
 from datetime import date
 from uuid import UUID
@@ -24,14 +22,24 @@ class GoalResponse(BaseModel):
     daysLeft: int = Field(..., description="Дней осталось")
     status: models.GoalStatus = Field(..., description="Статус цели")
     
-    model_config = ConfigDict(from_attributes=True) 
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
+            Decimal: float
+        }
+    )
 
 class MainGoalInfo(BaseModel):
     name: str = Field(..., description="Название цели")
     targetValue: Decimal = Field(..., description="Целевая сумма")
     currentValue: Decimal = Field(..., description="Текущая накопленная сумма")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
+            Decimal: float
+        }
+    )
 
 class MainGoalsResponse(BaseModel):
     goals: list[MainGoalInfo]
@@ -44,7 +52,12 @@ class AllGoalsResponse(BaseModel):
     finishDate: date = Field(..., description="Дата достижения")
     status: models.GoalStatus = Field(..., description="Статус цели")
     
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
+            Decimal: float
+        }
+    )
 
 class GoalPatchRequest(BaseModel):
     name: Optional[str] = Field(None, max_length=255, description="Название цели")
@@ -61,25 +74,6 @@ class TransactionEvent(BaseModel):
     userId: UUID = Field(..., description="ID пользователя")
     amount: Decimal = Field(..., description="Сумма транзакции")
     direction: str = Field(..., pattern="^(income|expense)$")
-
-class DecimalJSONResponse(JSONResponse):
-    def render(self, content: Any) -> bytes:
-        return json.dumps(
-            content,
-            ensure_ascii=False,
-            allow_nan=False,
-            indent=None,
-            separators=(",", ":"),
-            default=self.json_encoder
-        ).encode("utf-8")
-
-    @staticmethod
-    def json_encoder(obj: Any) -> Any:
-        if isinstance(obj, Decimal):
-            return float(obj)
-        if hasattr(obj, "isoformat"): 
-            return obj.isoformat()
-        return str(obj)
 
 BUDGET_EVENTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",

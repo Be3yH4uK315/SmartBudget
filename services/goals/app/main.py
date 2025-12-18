@@ -1,6 +1,5 @@
 import logging
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -14,7 +13,6 @@ from app import (
     settings,
     exceptions,
     logging_config,
-    schemas
 )
 from app.kafka_producer import KafkaProducer
 
@@ -70,7 +68,6 @@ app = FastAPI(
     title="Goals Service", 
     version="1.0", 
     lifespan=lifespan,
-    default_response_class=schemas.DecimalJSONResponse,
     docs_url="/api/v1/goals/docs",
     openapi_url="/api/v1/goals/openapi.json"
 )
@@ -90,13 +87,5 @@ async def goalServiceExceptionHandler(request: Request, exc: exceptions.GoalServ
 async def dbErrorMiddleware(request: Request, exc: SQLAlchemyError):
     logger.error(f"DB error: {exc}")
     return JSONResponse(status_code=500, content={"detail": "Database error"})
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.settings.APP.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
 
 app.include_router(goals.router, prefix="/api/v1/goals")
