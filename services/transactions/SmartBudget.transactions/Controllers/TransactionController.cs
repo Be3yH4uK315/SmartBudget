@@ -35,7 +35,7 @@ namespace SmartBudget.Transactions.Controllers
             List<Transaction> list =
                 await _service.GetUserTransactionsAsync(userId, limit, offset, category_id, stoppingToken);
 
-            list.Select(new_transaction => new
+            return Ok(list.Select(new_transaction => new
             {
                 transactionId = new_transaction.TransactionId,
                 value = new_transaction.Value,
@@ -46,9 +46,7 @@ namespace SmartBudget.Transactions.Controllers
                 status = new_transaction.Status.ToString(),
                 date = new_transaction.CreatedAt.ToString("o"),
                 type = new_transaction.Type.ToString()
-            });
-
-            return Ok();
+            }));
         }
 
         /// <summary>

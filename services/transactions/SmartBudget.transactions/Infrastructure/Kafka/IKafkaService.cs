@@ -17,6 +17,7 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
     {
         IKafkaTopicConsumer<TransactionClassifiedMessage> TransactionClassified { get; }
         IKafkaTopicProducer<TransactionNewMessage> TransactionNew { get; }
+        IKafkaTopicProducer<TransactionNewGoalMessage> TransactionNewGoal { get; }
         IKafkaTopicProducer<TransactionImportedMessage> TransactionImported { get; }
         IKafkaTopicProducer<TransactionNeedCategoryMessage> TransactionNeedCategory { get; }
         IKafkaTopicProducer<TransactionUpdatedMessage> TransactionUpdated { get; }

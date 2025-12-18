@@ -39,7 +39,7 @@ namespace SmartBudget.Transactions.Services
         }
 
 
-        public async Task<string> CreateManualTransactionAsync( Transaction transaction, CancellationToken stoppingToken)
+        public async Task<string> CreateManualTransactionAsync(Transaction transaction, CancellationToken stoppingToken)
         {
             using var transactionBD = await _db.Database.BeginTransactionAsync(stoppingToken);
             try
@@ -47,10 +47,13 @@ namespace SmartBudget.Transactions.Services
                 _db.Transactions.Add(transaction);
                 await _db.SaveChangesAsync(stoppingToken);
 
-                await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.AccountId, transaction.CategoryId, transaction.Value), stoppingToken);
+                await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.AccountId, transaction.CategoryId, transaction.Value, transaction.Type), stoppingToken);
 
                 await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId.ToString(), new BudgetEventMessage("transaction.new", transaction.UserId, transaction), stoppingToken);
-
+                if (transaction.CategoryId == 24)
+                {
+                    await _kafka.TransactionNewGoal.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewGoalMessage(transaction.TransactionId, transaction.AccountId, transaction.UserId, transaction.Value, transaction.Type), stoppingToken);
+                }
                 await transactionBD.CommitAsync(stoppingToken);
             }
             catch (Exception except)
@@ -69,19 +72,39 @@ namespace SmartBudget.Transactions.Services
             int count = 0;
             foreach (var current_transaction in transactions)
             {
-                using var transactionBD = await _db.Database.BeginTransactionAsync();
+                if (currentTransaction.AccountId != Guid.Empty)
+                {
+                    currentTransaction.CategoryId = 24;
+                    currentTransaction.Description = currentTransaction.Type switch
+                    {
+                        TransactionType.income => "Пополнение цели",
+                        TransactionType.expense => "Списание с цели",
+                        _ => currentTransaction.Description
+                    };
+                }
+                using var transactionBD = await _db.Database.BeginTransactionAsync(stoppingToken);
                 try
                 {
-                    if (!await _db.Transactions.AnyAsync(x => x.TransactionId == current_transaction.TransactionId))
+                    if (!await _db.Transactions.AnyAsync(x => x.TransactionId == current_transaction.TransactionId, stoppingToken))
                     {
                         _db.Transactions.Add(current_transaction);
-                        await _db.SaveChangesAsync();
+                        await _db.SaveChangesAsync(stoppingToken);
 
                         await _kafka.TransactionImported.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionImportedMessage("transaction.imported", current_transaction.UserId, current_transaction), stoppingToken);
 
-                        await _kafka.TransactionNeedCategory.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNeedCategoryMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.Merchant, current_transaction.Mcc, current_transaction.Description), stoppingToken);
+                        if (current_transaction.CategoryId == 24)
+                        {
+                            await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.AccountId, transaction.CategoryId, transaction.Value, transaction.Type), stoppingToken);
 
-                        await transactionBD.CommitAsync();
+                            await _kafka.TransactionNewGoal.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewGoalMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.UserId, current_transaction.Value, current_transaction.Type), stoppingToken);
+                        }
+                        else
+                        {
+                            await _kafka.TransactionNeedCategory.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNeedCategoryMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.Merchant, current_transaction.Mcc, current_transaction.Description), stoppingToken);
+                        }
+
+
+                        await transactionBD.CommitAsync(stoppingToken);
                         count++;
                     }
                 }
@@ -106,7 +129,7 @@ namespace SmartBudget.Transactions.Services
 
             await _db.SaveChangesAsync();
 
-            await _kafka.TransactionUpdated.ProduceAsync(transaction.TransactionId.ToString(), new TransactionUpdatedMessage(transaction.TransactionId, old, request.CategoryId), stoppingToken);
+            await _kafka.TransactionUpdated.ProduceAsync(transaction.TransactionId.ToString(), new TransactionUpdatedMessage(transaction.TransactionId, old, request.CategoryId, transaction.Value, transaction.Type), stoppingToken);
 
             await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId.ToString(), new BudgetEventMessage("transaction.updated", transaction.UserId, new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = request.CategoryId }), stoppingToken);
 

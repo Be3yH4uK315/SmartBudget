@@ -14,7 +14,7 @@ namespace SmartBudget.Transactions.DTO
 
         public Guid TransactionId { get; set; }
 
-        public Guid AccountId { get; set; }
+        public Guid? AccountId { get; set; }
 
         public DateTime Date { get; set; }
 

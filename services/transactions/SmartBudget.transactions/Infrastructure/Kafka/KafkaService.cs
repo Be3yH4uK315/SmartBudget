@@ -41,6 +41,7 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
     {
         public IKafkaTopicConsumer<TransactionClassifiedMessage> TransactionClassified { get; }
         public IKafkaTopicProducer<TransactionNewMessage> TransactionNew { get; }
+        public IKafkaTopicProducer<TransactionNewGoalMessage> TransactionNewGoal { get; }
         public IKafkaTopicProducer<TransactionImportedMessage> TransactionImported { get; }
         public IKafkaTopicProducer<TransactionNeedCategoryMessage> TransactionNeedCategory { get; }
         public IKafkaTopicProducer<TransactionUpdatedMessage> TransactionUpdated { get; }
@@ -49,7 +50,6 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
         public IKafkaTopicProducer<BudgetEventMessage> BudgetEvents { get; }
 
         private readonly List<IDisposable> _producers = new();
-        
         public KafkaService(IConfiguration cfg, ClassificationHandler handler)
         {
             var config = new ProducerConfig
@@ -67,6 +67,7 @@ namespace SmartBudget.Transactions.Infrastructure.Kafka
 
             TransactionNew = Add(new KafkaTopicProducer<TransactionNewMessage>(config, "transaction.new"));
             TransactionImported = Add(new KafkaTopicProducer<TransactionImportedMessage>(config, "transaction.imported"));
+            TransactionNewGoal = Add(new KafkaTopicProducer<TransactionNewGoalMessage>(config, "transaction.goal"));
             TransactionNeedCategory = Add(new KafkaTopicProducer<TransactionNeedCategoryMessage>(config, "transaction.need_category"));
             TransactionUpdated = Add(new KafkaTopicProducer<TransactionUpdatedMessage>(config, "transaction.updated"));
             TransactionDeleted = new KafkaTopicProducer<TransactionDeletedMessage>(config, "transaction.deleted");
