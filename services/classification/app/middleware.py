@@ -6,10 +6,10 @@ from aiokafka.errors import KafkaError
 
 logger = logging.getLogger(__name__)
 
-async def error_middleware(request: Request, call_next):
+async def errorMiddleware(request: Request, callNext):
     """Промежуточное ПО для обработки ошибок в запросах."""
     try:
-        return await call_next(request)
+        return await callNext(request)
     except SQLAlchemyError as e:
         logger.error(
             f"Database error: {e}",

@@ -12,11 +12,11 @@ from redis.asyncio import Redis
 
 from app import exceptions, schemas, settings, kafka_producer
 from app.services.classification_service import ClassificationService
-from app.services.ml_service import model_manager
+from app.services.ml_service import modelManager
 
 logger = logging.getLogger(__name__)
 
-async def _handle_poison_pill(
+async def _handlePoisonPill(
     producer: AIOKafkaProducer,
     msg: "aiokafka.structs.ConsumerRecord",
     error: Exception
@@ -24,70 +24,70 @@ async def _handle_poison_pill(
     """
     Обрабатывает ошибочное сообщение, отправляя его в DLQ.
     """
-    dlq_topic = settings.settings.kafka.topic_need_category_dlq
+    dlqTopic = settings.settings.KAFKA.TOPIC_NEED_CATEGORY_DLQ
     logger.error(
         f"Failed to process message from {msg.topic} (Offset: {msg.offset}). "
-        f"Error: {error}. Sending to DLQ: {dlq_topic}"
+        f"Error: {error}. Sending to DLQ: {dlqTopic}"
     )
     try:
         try:
-            message_str = msg.value.decode('utf-8')
+            message = msg.value.decode('utf-8')
         except UnicodeDecodeError:
-            message_str = msg.value.hex()
+            message = msg.value.hex()
             
-        dlq_event = schemas.DLQMessage(
-            original_topic=msg.topic,
-            original_message=message_str,
+        dlqEvent = schemas.DLQMessage(
+            originalTopic=msg.topic,
+            originalMessage=message,
             error=f"{type(error).__name__}: {str(error)}",
             timestamp=datetime.now(timezone.utc)
         )
-        await kafka_producer.send_kafka_event(producer, dlq_topic, dlq_event.model_dump())
-    except Exception as dlq_e:
-        logger.critical(f"FAILED TO SEND TO DLQ: {dlq_e}")
+        await kafka_producer.send_kafka_event(producer, dlqTopic, dlqEvent.model_dump())
+    except Exception as e:
+        logger.critical(f"FAILED TO SEND TO DLQ: {e}")
 
-async def consume_need_category(
+async def consumeNeedCategory(
     consumer: AIOKafkaConsumer, 
     producer: AIOKafkaProducer, 
     redis: Redis,
-    session_maker: async_sessionmaker[AsyncSession]
+    dbSessionMaker: async_sessionmaker[AsyncSession]
 ):
     """
     Основной консьюмер: слушает 'transaction.need_category'.
     """
     logger.info("Initializing consumer for 'need_category'...")
     
-    await model_manager.check_for_updates(session_maker)
+    await modelManager.checkForUpdates(dbSessionMaker)
     
-    health_file = Path("/tmp/healthy")
+    healthFile = Path("/tmp/healthy")
         
     try:
         async for msg in consumer:
             try:
-                health_file.touch()
+                healthFile.touch()
             except OSError:
                 pass
 
-            await model_manager.check_for_updates(session_maker)
+            await modelManager.checkForUpdates(dbSessionMaker)
             
-            current_pipeline = model_manager.get_pipeline()
+            currentPipeline = modelManager.getPipeline()
             logger.debug(f"Received message from {msg.topic} offset={msg.offset}")
 
             try:
                 data = json.loads(msg.value.decode('utf-8'))
                 
-                async with session_maker() as session:
-                    service = ClassificationService(session, redis, current_pipeline)
-                    events = await service.process_transaction(data)
+                async with dbSessionMaker() as session:
+                    service = ClassificationService(session, redis, currentPipeline)
+                    events = await service.processTransaction(data)
 
                 if events:
-                    event_classified, event_events = events
-                    await kafka_producer.send_kafka_event(producer, settings.settings.kafka.topic_classified, event_classified)
-                    await kafka_producer.send_kafka_event(producer, settings.settings.kafka.topic_classification_events, event_events)
+                    eventClassified, eventEvents = events
+                    await kafka_producer.send_kafka_event(producer, settings.settings.KAFKA.TOPIC_CLASSIFIED, eventClassified)
+                    await kafka_producer.send_kafka_event(producer, settings.settings.KAFKA.TOPIC_CLASSIFICATION_EVENTS, eventEvents)
                 
                 await consumer.commit() 
                 
             except (json.JSONDecodeError, KeyError, ValueError, exceptions.InvalidKafkaMessageError) as e:
-                await _handle_poison_pill(producer, msg, e)
+                await _handlePoisonPill(producer, msg, e)
                 await consumer.commit() 
             
             except (SQLAlchemyError, KafkaError) as e:
@@ -96,7 +96,7 @@ async def consume_need_category(
             
             except Exception as e:
                 logger.exception(f"Unexpected error processing message: {e}") 
-                await _handle_poison_pill(producer, msg, e)
+                await _handlePoisonPill(producer, msg, e)
                 await consumer.commit()
 
     finally:

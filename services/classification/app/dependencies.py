@@ -7,60 +7,60 @@ from typing import AsyncGenerator
 
 from app import settings
 from app.services.classification_service import ClassificationService
-from app.services.ml_service import model_manager
+from app.services.ml_service import modelManager
 
-async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+async def getDb(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
-    session_maker = request.app.state.async_session_maker
-    if not session_maker:
+    dbSessionMaker = request.app.state.dbSessionMaker
+    if not dbSessionMaker:
         raise HTTPException(status_code=503, detail="Database session factory not available")
-    async with session_maker() as session:
+    async with dbSessionMaker() as session:
         yield session
 
-async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
+async def getRedis(request: Request) -> AsyncGenerator[Redis, None]:
     """Обеспечивает подключение Redis из пула."""
-    pool: ConnectionPool = request.app.state.redis_pool
+    pool: ConnectionPool = request.app.state.redisPool
     redis = Redis(connection_pool=pool, decode_responses=True)
     try:
         yield redis
     finally:
         await redis.aclose()
 
-async def create_redis_pool() -> ConnectionPool:
+async def createRedisPool() -> ConnectionPool:
     """Создает пул подключений Redis."""
-    return ConnectionPool.from_url(settings.settings.redis.redis_url, decode_responses=True)
+    return ConnectionPool.from_url(settings.settings.ARQ.REDIS_URL, decode_responses=True)
 
-async def close_redis_pool(pool: ConnectionPool):
+async def closeRedisPool(pool: ConnectionPool):
     """Закрывает пул подключений Redis."""
     await pool.disconnect()
 
-async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
+async def getArqPool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq."""
-    arq_pool: ArqRedis = request.app.state.arq_pool
+    arqPool: ArqRedis = request.app.state.arqPool
     try:
-        yield arq_pool
+        yield arqPool
     finally:
         pass
 
-async def get_kafka_producer(request: Request) -> AIOKafkaProducer:
+async def getKafkaProducer(request: Request) -> AIOKafkaProducer:
     """Зависимость для получения Kafka-продюсера."""
-    producer: AIOKafkaProducer = request.app.state.kafka_producer
-    if not producer:
+    kafkaProducer: AIOKafkaProducer = request.app.state.kafkaProducer
+    if not kafkaProducer:
         raise HTTPException(status_code=503, detail="Kafka producer not initialized")
-    return producer
+    return kafkaProducer
 
-def get_ml_pipeline(request: Request) -> dict | None:
+def getMlPipeline(request: Request) -> dict | None:
     """
     Извлекает актуальный ML-пайплайн из менеджера.
     """
-    return model_manager.get_pipeline()
+    return modelManager.getPipeline()
 
-async def get_classification_service(
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    ml_pipeline: dict | None = Depends(get_ml_pipeline)
+async def getClassificationService(
+    db: AsyncSession = Depends(getDb),
+    redis: Redis = Depends(getRedis),
+    mlPipeline: dict | None = Depends(getMlPipeline)
 ) -> ClassificationService:
     """
     Фабрика зависимостей.
     """
-    return ClassificationService(db, redis, ml_pipeline)
+    return ClassificationService(db, redis, mlPipeline)

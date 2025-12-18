@@ -13,54 +13,54 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["API"])
 
 @router.get("/health", response_model=schemas.HealthResponse)
-async def health_check(
-    db: AsyncSession = Depends(dependencies.get_db),
-    redis: Redis = Depends(dependencies.get_redis),
-    kafka: AIOKafkaProducer = Depends(dependencies.get_kafka_producer)
+async def healthCheck(
+    db: AsyncSession = Depends(dependencies.getDb),
+    redis: Redis = Depends(dependencies.getRedis),
+    kafka: AIOKafkaProducer = Depends(dependencies.getKafkaProducer)
 ):
-    health_details = {"db": "ok", "redis": "ok", "kafka": "ok"}
+    healthDetails = {"db": "ok", "redis": "ok", "kafka": "ok"}
     status_code = 200
 
     try:
         await db.execute(select(1))
     except Exception as e:
-        health_details["db"] = f"error: {str(e)}"
+        healthDetails["db"] = f"error: {str(e)}"
         status_code = 503
 
     try:
         await redis.ping()
     except Exception as e:
-        health_details["redis"] = f"error: {str(e)}"
+        healthDetails["redis"] = f"error: {str(e)}"
         status_code = 503
 
     try:
-        partitions = await kafka.partitions_for(settings.settings.kafka.topic_need_category)
+        partitions = await kafka.partitions_for(settings.settings.KAFKA.TOPIC_NEED_CATEGORY)
         if not partitions:
-             health_details["kafka"] = "error: no partitions found"
+             healthDetails["kafka"] = "error: no partitions found"
              status_code = 503
     except Exception as e:
-        health_details["kafka"] = f"error: {str(e)}"
+        healthDetails["kafka"] = f"error: {str(e)}"
         status_code = 503
 
     if status_code != 200:
-        raise HTTPException(status_code=status_code, detail={"status": "unhealthy", "details": health_details})
+        raise HTTPException(status_code=status_code, detail={"status": "unhealthy", "details": healthDetails})
 
-    return schemas.HealthResponse(status="healthy", details=health_details)
+    return schemas.HealthResponse(status="healthy", details=healthDetails)
 
 
 @router.get(
-    "/classification/{transaction_id}",
+    "/classification/{transactionId}",
     response_model=schemas.CategorizationResultResponse
 )
-async def get_classification_result(
-    transaction_id: UUID = Path(..., description="ID транзакции"),
-    service: ClassificationService = Depends(dependencies.get_classification_service)
+async def getClassificationResult(
+    transactionId: UUID = Path(..., description="ID транзакции"),
+    service: ClassificationService = Depends(dependencies.getClassificationService)
 ):
     """
     Получает результат классификации по ID транзакции (с кэшированием в Redis).
     """
     try:
-        classification = await service.get_classification(transaction_id)
+        classification = await service.getClassification(transactionId)
         return classification
     except exceptions.ClassificationResultNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -70,22 +70,22 @@ async def get_classification_result(
     "/feedback",
     response_model=schemas.UnifiedSuccessResponse
 )
-async def submit_feedback(
+async def submitFeedback(
     body: schemas.FeedbackRequest = Body(...),
-    service: ClassificationService = Depends(dependencies.get_classification_service),
-    kafka: AIOKafkaProducer = Depends(dependencies.get_kafka_producer)
+    service: ClassificationService = Depends(dependencies.getClassificationService),
+    kafka: AIOKafkaProducer = Depends(dependencies.getKafkaProducer)
 ):
     """
     Принимает обратную связь от пользователя, обновляет результат и 
     отправляет событие для дообучения.
     """
     try:
-        event_data, correct_category = await service.submit_feedback(body)
+        eventData, _correctCategory = await service.submitFeedback(body)
 
-        await kafka_producer.send_kafka_event(
+        await kafka_producer.sendKafkaEvent(
             producer=kafka,
-            topic=settings.settings.kafka.topic_updated,
-            event_data=event_data
+            topic=settings.settings.KAFKA.TOPIC_UPDATED,
+            eventData=eventData
         )
 
         return schemas.UnifiedSuccessResponse(ok=True, detail="Feedback submitted")

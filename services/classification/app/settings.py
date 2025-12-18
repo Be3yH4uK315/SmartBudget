@@ -1,52 +1,43 @@
-from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
-
-ROOT_DIR = Path(__file__).resolve().parent.parent
-env_file_name = os.getenv("ENV_FILE", ".env")
-env_file_path = ROOT_DIR / env_file_name
 
 class DBSettings(BaseSettings):
-    db_url: str
+    DB_URL: str
 
 class KafkaSettings(BaseSettings):
-    kafka_bootstrap_servers: str
-    kafka_group_id: str
-    topic_need_category: str
-    topic_classified: str
-    topic_classification_events: str
-    topic_updated: str
-    topic_need_category_dlq: str
-
-class RedisSettings(BaseSettings):
-    redis_url: str
+    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_GROUP_ID: str
+    TOPIC_NEED_CATEGORY: str
+    TOPIC_CLASSIFIED: str
+    TOPIC_CLASSIFICATION_EVENTS: str
+    TOPIC_UPDATED: str
+    TOPIC_NEED_CATEGORY_DLQ: str
 
 class ArqSettings(BaseSettings):
-    arq_queue_name: str
+    ARQ_QUEUE_NAME: str
+    REDIS_URL: str
 
 class MLSettings(BaseSettings):
-    model_path: str
-    dataset_path: str
-    ml_confidence_threshold_accept: float
-    ml_confidence_threshold_audit: float
+    MODEL_PATH: str
+    DATASET_PATH: str
+    ML_CONFIDENCE_THRESHOLD_ACCEPT: float
+    ML_CONFIDENCE_THRESHOLD_AUDIT: float
 
 class AppSettings(BaseSettings):
-    env: str
-    frontend_url: str
-    prometheus_port: int
-    log_level: str
-    tz: str
+    ENV: str
+    FRONTEND_URL: str
+    PROMETHEUS_PORT: int
+    LOG_LEVEL: str
+    TZ: str
 
 class Settings(BaseSettings):
-    db: DBSettings
-    kafka: KafkaSettings
-    redis: RedisSettings
-    arq: ArqSettings
-    ml: MLSettings
-    app: AppSettings
+    DB: DBSettings
+    KAFKA: KafkaSettings
+    ARQ: ArqSettings
+    ML: MLSettings
+    APP: AppSettings
 
     model_config = SettingsConfigDict(
-        env_file=str(env_file_path),
+        env_file=".env",
         env_file_encoding="utf-8",
         env_nested_delimiter="__"
     )
