@@ -1,5 +1,5 @@
 import { Goal, GoalsSliceReducers, GoalsSliceState } from '@features/goals/types'
-import { pushIntoSorted, sortGoals } from '@features/goals/utils'
+import { pushIntoSorted } from '@features/goals/utils'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getGoalsInitialState } from './goals.state'
@@ -19,7 +19,7 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
       .addCase(getGoals.fulfilled, (state, { payload }) => {
         const { goals, targetValue, currentValue } = payload
 
-        state.goals = sortGoals(goals)
+        state.goals = goals
         state.goalsStats.currentValue = currentValue
         state.goalsStats.targetValue = targetValue
         state.isLoading = false
