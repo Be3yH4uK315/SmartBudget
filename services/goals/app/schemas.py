@@ -1,3 +1,4 @@
+from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from decimal import Decimal
@@ -68,12 +69,16 @@ class GoalPatchRequest(BaseModel):
 class UnifiedErrorResponse(BaseModel):
     detail: str = Field(..., description="Описание ошибки")
 
+class TransactionType(str, Enum):
+    INCOME = "income"
+    EXPENSE = "expense"
+
 class TransactionEvent(BaseModel):
     transactionId: UUID = Field(..., description="ID транзакции")
     accountId: UUID = Field(..., description="В контексте целей это goalId")
     userId: UUID = Field(..., description="ID пользователя")
-    amount: Decimal = Field(..., description="Сумма транзакции")
-    direction: str = Field(..., pattern="^(income|expense)$")
+    value: Decimal = Field(..., description="Сумма транзакции")
+    type: TransactionType = Field(..., pattern="Тип транзакции")
 
 BUDGET_EVENTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",

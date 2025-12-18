@@ -134,12 +134,12 @@ class GoalService:
 
     async def updateGoalBalance(self, event: schemas.TransactionEvent):
         """Логика консьюмера."""
-        amount = event.amount if event.direction == 'income' else -event.amount
+        value = event.value * (1 if event.type is schemas.TransactionType.INCOME else -1)
         
         goal = await self.repository.adjustBalance(
             event.userId, 
             event.accountId, 
-            amount, 
+            value, 
             event.transactionId
         )
 
