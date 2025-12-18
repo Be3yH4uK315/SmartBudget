@@ -10,13 +10,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y postgresql-client curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 ENV PATH=/usr/local/bin:$PATH
 
 COPY ./app /app/app
 COPY alembic.ini /app/alembic.ini
+COPY ./alembic /app/alembic
 
 RUN mkdir /geoip
 ENV GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb

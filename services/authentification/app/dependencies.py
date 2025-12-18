@@ -15,14 +15,14 @@ from app import (
     repositories
 )
 
-async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+async def getDb(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
-    async_session_maker: async_sessionmaker[AsyncSession] = request.app.state.db_session_maker
-    if not async_session_maker:
+    dbSessionMaker: async_sessionmaker[AsyncSession] = request.app.state.dbSessionMaker
+    if not dbSessionMaker:
         middleware.logger.error("DB Session Maker not found in app.state.")
         raise HTTPException(status_code=500, detail="Database connection not available")
 
-    async with async_session_maker() as session:
+    async with dbSessionMaker() as session:
         try:
             yield session
         except Exception:
@@ -31,50 +31,50 @@ async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
         finally:
             await session.close()
 
-def get_user_repository(db: AsyncSession = Depends(get_db)) -> repositories.UserRepository:
+def getUserRepository(db: AsyncSession = Depends(getDb)) -> repositories.UserRepository:
     """Провайдер для UserRepository."""
     return repositories.UserRepository(db)
 
-def get_session_repository(db: AsyncSession = Depends(get_db)) -> repositories.SessionRepository:
+def getSessionRepository(db: AsyncSession = Depends(getDb)) -> repositories.SessionRepository:
     """Провайдер для SessionRepository."""
     return repositories.SessionRepository(db)
 
-async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
+async def getRedis(request: Request) -> AsyncGenerator[Redis, None]:
     """Обеспечивает подключение Redis из пула."""
-    pool: ConnectionPool = request.app.state.redis_pool
+    pool: ConnectionPool = request.app.state.redisPool
     redis = Redis(connection_pool=pool, decode_responses=True)
     try:
         yield redis
     finally:
         await redis.aclose()
 
-async def create_redis_pool() -> ConnectionPool:
+async def createRedisPool() -> ConnectionPool:
     """Создает пул подключений Redis."""
-    return ConnectionPool.from_url(settings.settings.app.redis_url, decode_responses=True)
+    return ConnectionPool.from_url(settings.settings.ARQ.REDIS_URL, decode_responses=True)
 
-async def close_redis_pool(pool: ConnectionPool):
+async def closeRedisPool(pool: ConnectionPool):
     """Закрывает пул подключений Redis."""
     await pool.disconnect()
 
-async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
+async def getArqPool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq."""
-    arq_pool: ArqRedis = request.app.state.arq_pool
+    arqPool: ArqRedis = request.app.state.arqPool
     try:
-        yield arq_pool
+        yield arqPool
     finally:
         pass
 
-def get_geoip_reader(request: Request) -> geoip2.database.Reader:
+def getGeoipReader(request: Request) -> geoip2.database.Reader:
     """Возвращает GeoIP reader, инициализированный при старте."""
     try:
-        return request.app.state.geoip_reader
+        return request.app.state.geoIpReader
     except AttributeError:
         middleware.logger.error(
             "GeoIP reader not found in app.state. Make sure it is initialized in lifespan."
         )
         raise HTTPException(status_code=500, detail="GeoIP service not available")
 
-def get_real_ip(request: Request) -> str:
+def getRealIp(request: Request) -> str:
     """Извлекает реальный IP-адрес из запроса, учитывая цепочку прокси."""
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
@@ -87,34 +87,34 @@ def get_real_ip(request: Request) -> str:
             except ValueError:
                 middleware.logger.warning(f"Invalid IP in x-forwarded-for: {ip}")
         middleware.logger.warning(f"No valid public IP in x-forwarded-for: {forwarded}")
-    client_host = request.client.host if request.client else "127.0.0.1"
-    middleware.logger.debug(f"Falling back to client.host: {client_host}")
-    return client_host
+    clientHost = request.client.host if request.client else "127.0.0.1"
+    middleware.logger.debug(f"Falling back to client.host: {clientHost}")
+    return clientHost
 
-async def get_current_active_user(
-    request: Request, db: AsyncSession = Depends(get_db)
+async def getCurrentActiveUser(
+    request: Request, db: AsyncSession = Depends(getDb)
 ) -> models.User:
     """Извлекает и проверяет текущего активного пользователя из токена."""
-    access_token = request.cookies.get("access_token")
-    if not access_token:
+    accessToken = request.cookies.get("access_token")
+    if not accessToken:
         raise HTTPException(
             status_code=401, 
             detail="Not authenticated (missing token)"
         )
     try:
         payload = decode(
-            access_token,
-            settings.settings.jwt.jwt_public_key,
-            algorithms=[settings.settings.jwt.jwt_algorithm],
+            accessToken,
+            settings.settings.JWT.JWT_PUBLIC_KEY,
+            algorithms=[settings.settings.JWT.JWT_ALGORITHM],
             audience='smart-budget'
         )
-        user_id: str | None = payload.get("sub")
-        if user_id is None:
+        userId: str | None = payload.get("sub")
+        if userId is None:
             raise HTTPException(status_code=401, detail="Invalid token (missing sub)")
         
-        user_repo = repositories.UserRepository(db)
-        user = await user_repo.get_by_id(UUID(user_id))
-        if not user or not user.is_active:
+        UserRepository = repositories.UserRepository(db)
+        user = await UserRepository.getById(UUID(userId))
+        if not user or not user.isActive:
             raise HTTPException(status_code=401, detail="User inactive or not found")
 
         return user    
@@ -127,24 +127,24 @@ async def get_current_active_user(
     except ValueError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token payload")
 
-async def get_user_id_from_expired_token(request: Request) -> str | None:
+async def getUserIdFromExpiredToken(request: Request) -> str | None:
     """
-    Извлекает user_id из access_token, игнорируя срок его действия.
+    Извлекает userId из access_token, игнорируя срок его действия.
     Нужно для эндпоинта /logout.
     """
-    access_token = request.cookies.get("access_token")
-    if not access_token:
+    accessToken = request.cookies.get("access_token")
+    if not accessToken:
         return None
     try:
         payload = decode(
-            access_token,
-            settings.settings.jwt.jwt_public_key,
-            algorithms=[settings.settings.jwt.jwt_algorithm],
+            accessToken,
+            settings.settings.JWT.JWT_PUBLIC_KEY,
+            algorithms=[settings.settings.JWT.JWT_ALGORITHM],
             audience='smart-budget',
             options={"verify_exp": False}
         )
-        user_id: str | None = payload.get("sub")
-        return user_id
+        userId: str | None = payload.get("sub")
+        return userId
     except (PyJWTError, ValueError):
         middleware.logger.warning("Invalid token structure encountered during logout")
         return None

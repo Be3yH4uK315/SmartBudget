@@ -8,10 +8,10 @@ from app import exceptions
 
 logger = getLogger(__name__)
 
-async def error_middleware(request: Request, call_next):
+async def errorMiddleware(request: Request, callNext):
     """Промежуточное программное обеспечение для обработки ошибок в запросах."""
     try:
-        return await call_next(request)
+        return await callNext(request)
     except exceptions.AuthServiceError as e:
         logger.warning(
             f"Handled business logic error: {e}",

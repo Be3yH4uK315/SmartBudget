@@ -19,48 +19,48 @@ class BaseRepository:
 class UserRepository(BaseRepository):
     """Репозиторий для операций с пользователями."""
 
-    async def get_by_email(self, email: str) -> models.User | None:
+    async def getByEmail(self, email: str) -> models.User | None:
         """Получает пользователя по email."""
         result = await self.db.execute(
             select(models.User).where(models.User.email == email)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_id(self, user_id: UUID) -> models.User | None:
+    async def getById(self, userId: UUID) -> models.User | None:
         """Получает пользователя по ID."""
-        return await self.db.get(models.User, user_id)
+        return await self.db.get(models.User, userId)
 
-    async def get_role_by_id(self, user_id: UUID) -> int:
+    async def getRoleById(self, userId: UUID) -> int:
         """Получает только роль пользователя по ID."""
         result = await self.db.execute(
-            select(models.User.role).where(models.User.id == user_id)
+            select(models.User.role).where(models.User.userId == userId)
         )
         return result.scalar() or models.UserRole.USER.value
 
-    async def create(self, user_model: models.User) -> models.User:
+    async def create(self, userModel: models.User) -> models.User:
         """Создает нового пользователя."""
         try:
-            self.db.add(user_model)
+            self.db.add(userModel)
             await self.db.commit()
-            await self.db.refresh(user_model)
-            return user_model
+            await self.db.refresh(userModel)
+            return userModel
         except IntegrityError:
             await self.db.rollback()
-            middleware.logger.warning(f"Registration attempt for existing email: {user_model.email}")
+            middleware.logger.warning(f"Registration attempt for existing email: {userModel.email}")
             raise exceptions.EmailAlreadyExistsError("Email already registered")
 
-    async def update_last_login(self, user_id: UUID):
+    async def updateLastLogin(self, userId: UUID):
         """Обновляет время последнего входа пользователя."""
         await self.db.execute(
             update(models.User)
-            .where(models.User.id == user_id)
-            .values(last_login=datetime.now(timezone.utc))
+            .where(models.User.userId == userId)
+            .values(lastLogin=datetime.now(timezone.utc))
         )
         await self.db.commit()
 
-    async def update_password(self, user: models.User, new_hash: str):
+    async def updatePassword(self, user: models.User, newHash: str):
         """Обновляет хэш пароля пользователя."""
-        user.password_hash = new_hash
+        user.passwordHash = newHash
         self.db.add(user)
         await self.db.commit()
 
@@ -73,70 +73,70 @@ class SessionRepository(BaseRepository):
         await self.db.commit()
         return session
 
-    async def get_by_fingerprint(self, fingerprint: str) -> models.Session | None:
+    async def getByFingerprint(self, fingerprint: str) -> models.Session | None:
         """Находит активную сессию по fingerprint."""
         query = select(models.Session).where(
-            models.Session.refresh_fingerprint == fingerprint,
+            models.Session.refreshFingerprint == fingerprint,
             models.Session.revoked == sa.false(),
-            models.Session.expires_at > datetime.now(timezone.utc)
+            models.Session.expiresAt > datetime.now(timezone.utc)
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def update_fingerprint(
+    async def updateFingerprint(
         self, 
         session: models.Session, 
-        new_fingerprint: str,
-        new_expires_at: datetime
+        newFingerprint: str,
+        newExpiresAt: datetime
     ):
         """Обновляет fingerprint и срок действия сессии (при refresh)."""
-        session.refresh_fingerprint = new_fingerprint
-        session.expires_at = new_expires_at
+        session.refreshFingerprint = newFingerprint
+        session.expiresAt = newExpiresAt
         await self.db.commit()
 
-    async def revoke_by_fingerprint(self, user_id: UUID, fingerprint: str):
+    async def revokeByFingerprint(self, userId: UUID, fingerprint: str):
         """Отзывает сессию по fingerprint (при logout)."""
         await self.db.execute(
             update(models.Session).where(
-                models.Session.user_id == user_id,
-                models.Session.refresh_fingerprint == fingerprint
+                models.Session.userId == userId,
+                models.Session.refreshFingerprint == fingerprint
             ).values(revoked=True)
         )
         await self.db.commit()
 
-    async def get_all_active(self, user_id: UUID) -> list[models.Session]:
+    async def getAllActive(self, userId: UUID) -> list[models.Session]:
         """Получает все активные (не отозванные) сессии пользователя."""
         query = (
             select(models.Session)
             .where(
-                models.Session.user_id == user_id,
+                models.Session.userId == userId,
                 models.Session.revoked == sa.false()
             )
-            .order_by(models.Session.created_at.desc())
+            .order_by(models.Session.createdAt.desc())
         )
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def revoke_by_id(self, user_id: UUID, session_id: UUID):
+    async def revokeById(self, userId: UUID, sessionId: UUID):
         """Отзывает конкретную сессию по ее ID."""
         query = (
             update(models.Session)
             .where(
-                models.Session.id == session_id,
-                models.Session.user_id == user_id
+                models.Session.sessionId == sessionId,
+                models.Session.userId == userId
             )
             .values(revoked=True)
         )
         await self.db.execute(query)
         await self.db.commit()
 
-    async def revoke_all_except(self, user_id: UUID, current_fingerprint: str) -> int:
+    async def revokeAllExcept(self, userId: UUID, currentFingerprint: str) -> int:
         """Отзывает все сессии, кроме текущей."""
         query = (
             update(models.Session)
             .where(
-                models.Session.user_id == user_id,
-                models.Session.refresh_fingerprint != current_fingerprint,
+                models.Session.userId == userId,
+                models.Session.refreshFingerprint != currentFingerprint,
                 models.Session.revoked == sa.false()
             )
             .values(revoked=True)
@@ -145,11 +145,11 @@ class SessionRepository(BaseRepository):
         await self.db.commit()
         return result.rowcount
 
-    async def revoke_all_for_user(self, user_id: UUID):
+    async def revokeAllForUser(self, userId: UUID):
         """Отзывает абсолютно все сессии пользователя (при сбросе пароля)."""
         await self.db.execute(
             update(models.Session)
-            .where(models.Session.user_id == user_id)
+            .where(models.Session.userId == userId)
             .values(revoked=True)
         )
         await self.db.commit()

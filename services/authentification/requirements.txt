@@ -17,7 +17,6 @@ pydantic[email]
 alembic
 prometheus-fastapi-instrumentator
 jsonschema
-python-dotenv
 python-multipart
 fastapi-limiter
 cryptography

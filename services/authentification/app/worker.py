@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from aiosmtplib import SMTP
 from email.message import EmailMessage
 import sqlalchemy as sa
@@ -18,41 +19,49 @@ import ssl
 from app import (
     settings,
     models,
-    kafka,
+    schemas,
     logging_config
 )
 
-logging_config.setup_logging()
+logging_config.setupLogging()
 logger = getLogger(__name__)
 
-async def send_email_async(ctx, to: str, subject: str, body: str):
+async def touchHealthFile():
+    """Обновляет файл статуса здоровья воркера."""
+    try:
+        Path("/tmp/healthy").touch()
+    except Exception as e:
+        logger.error(f"Failed to touch health file: {e}")
+
+async def sendEmail(ctx, to: str, subject: str, body: str):
     """Задача Arq для отправки email. 'ctx' - это словарь контекста воркера."""
-    logger.info(f"send_email_async START", extra={"email_to": to})
+    await touchHealthFile()
+    logger.info(f"sendEmail START", extra={"email_to": to})
     
     message = EmailMessage()
-    message["From"] = settings.settings.smtp.smtp_user or "no-reply@example.com"
+    message["From"] = settings.settings.SMTP.SMTP_USER or "no-reply@example.com"
     message["To"] = to
     message["Subject"] = subject
     message.set_content(body)
 
-    tls_context = ssl.create_default_context()
+    tlsContext = ssl.create_default_context()
 
-    use_implicit_tls = (settings.settings.smtp.smtp_port == 465)
+    useUmplicitTls = (settings.settings.SMTP.SMTP_PORT == 465)
 
     client = SMTP(
-        hostname=settings.settings.smtp.smtp_host,
-        port=settings.settings.smtp.smtp_port,
-        use_tls=use_implicit_tls,
-        tls_context=tls_context,
+        hostname=settings.settings.SMTP.SMTP_HOST,
+        port=settings.settings.SMTP.SMTP_PORT,
+        use_tls=useUmplicitTls,
+        tls_context=tlsContext,
         timeout=60
     )
 
     try:
         await client.connect()
-        if not use_implicit_tls:
+        if not useUmplicitTls:
             await client.starttls() 
 
-        await client.login(settings.settings.smtp.smtp_user, settings.settings.smtp.smtp_pass)
+        await client.login(settings.settings.SMTP.SMTP_USER, settings.settings.SMTP.SMTP_PASS)
         await client.send_message(message)
         logger.info(f"Message sent successfully", extra={"email_to": to})
 
@@ -69,15 +78,16 @@ async def send_email_async(ctx, to: str, subject: str, body: str):
         except:
             pass
 
-async def send_kafka_event_async(ctx, topic: str, event_data: dict, schema_name: str):
+async def sendKafkaEvent(ctx, topic: str, eventData: dict, schemaName: str):
     """Задача Arq для отправки события Kafka."""
-    schema = kafka.SCHEMAS.get(schema_name)
+    await touchHealthFile()
+    schema = schemas.SCHEMAS_MAP.get(schemaName)
     if not schema:
-        logger.error(f"Arq: Invalid schema name: {schema_name}")
+        logger.error(f"Arq: Invalid schema name: {schemaName}")
         return
 
     try:
-        validate(instance=event_data, schema=schema)
+        validate(instance=eventData, schema=schema)
     except jsonschema.ValidationError as e:
         logger.error(f"Arq: Schema validation failed: {e}")
         return
@@ -89,7 +99,7 @@ async def send_kafka_event_async(ctx, topic: str, event_data: dict, schema_name:
 
     for attempt in range(3):
         try:
-            await producer.send_and_wait(topic, json.dumps(event_data).encode())
+            await producer.send_and_wait(topic, json.dumps(eventData).encode())
             logger.info(f"Arq: Kafka event sent to {topic}")
             return
         except KafkaConnectionError as e:
@@ -100,19 +110,20 @@ async def send_kafka_event_async(ctx, topic: str, event_data: dict, schema_name:
             await asyncio.sleep(1)
     raise Exception("Failed to send Kafka event after retries")
 
-async def cleanup_sessions_async(ctx):
+async def cleanupSessions(ctx):
     """Задача Arq (Cron) для очистки старых сессий."""
-    db_maker: async_sessionmaker[AsyncSession] = ctx["db_session_maker"]
-    if not db_maker:
+    await touchHealthFile()
+    dbSessionMaker: async_sessionmaker[AsyncSession] = ctx["db_session_maker"]
+    if not dbSessionMaker:
         logger.error("Arq: DB session maker not available for cleanup task")
         return
 
-    async with db_maker() as session:
+    async with dbSessionMaker() as session:
         try:
             await session.execute(
                 delete(models.Session).where(
                     or_(
-                        models.Session.expires_at < datetime.now(timezone.utc),
+                        models.Session.expiresAt < datetime.now(timezone.utc),
                         models.Session.revoked == sa.true()
                     )
                 )
@@ -124,12 +135,12 @@ async def cleanup_sessions_async(ctx):
             logger.error(f"Arq: Cleanup task failed: {e}")
             raise
 
-async def on_startup(ctx):
+async def onStartup(ctx):
     """Выполняется при старте воркера Arq. Инициализируем пулы соединений."""
-    logger.info(f"Arq worker starting. Redis: {settings.settings.app.redis_url}, Queue: {settings.settings.app.arq_queue_name}")
+    logger.info(f"Arq worker starting. Redis: {settings.settings.ARQ.REDIS_URL}, Queue: {settings.settings.ARQ.ARQ_QUEUE_NAME}")
 
     try:
-        producer = AIOKafkaProducer(bootstrap_servers=settings.settings.app.kafka_bootstrap_servers)
+        producer = AIOKafkaProducer(bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS)
         await producer.start()
         ctx["kafka_producer"] = producer
         logger.info("Arq: Kafka producer started.")
@@ -138,17 +149,19 @@ async def on_startup(ctx):
         ctx["kafka_producer"] = None
 
     try:
-        engine = create_async_engine(settings.settings.db.db_url)
-        db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+        engine = create_async_engine(settings.settings.DB.DB_URL)
+        dbSessionMaker = async_sessionmaker(engine, expire_on_commit=False)
         ctx["db_engine"] = engine
-        ctx["db_session_maker"] = db_session_maker
+        ctx["db_session_maker"] = dbSessionMaker
         logger.info("Arq: DB engine and session maker injected.")
     except Exception as e:
         logger.error(f"Arq: Failed to create DB engine/session maker: {e}")
         ctx["db_engine"] = None
         ctx["db_session_maker"] = None
+    
+    await touchHealthFile()
 
-async def on_shutdown(ctx):
+async def onShutdown(ctx):
     """Выполняется при остановке воркера Arq."""
     logger.info("Shutting down Arq worker...")
     producer: AIOKafkaProducer = ctx.get("kafka_producer")
@@ -164,14 +177,14 @@ async def on_shutdown(ctx):
 class WorkerSettings:
     """Настройки для Arq worker."""
     functions = [
-        send_email_async,
-        send_kafka_event_async,
-        cleanup_sessions_async,
+        sendEmail,
+        sendKafkaEvent,
+        cleanupSessions,
     ]
-    on_startup = on_startup
-    on_shutdown = on_shutdown
-    cron_jobs = [cron(cleanup_sessions_async, hour=3, minute=0)]
-    queue_name = settings.settings.app.arq_queue_name
-    redis_settings = RedisSettings.from_dsn(settings.settings.app.redis_url)
+    on_startup = onStartup
+    on_shutdown = onShutdown
+    cron_jobs = [cron(cleanupSessions, hour=3, minute=0)]
+    queue_name = settings.settings.ARQ.ARQ_QUEUE_NAME
+    redis_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
     max_tries = 5
     max_jobs = 10

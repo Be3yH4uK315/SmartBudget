@@ -1,144 +1,153 @@
-services:
-  # -------------------------
-  # Auth Service
-  # -------------------------
-  auth_service:
-    build: .
-    container_name: auth_service_dev
-    env_file:
-      - .env
-    ports:
-      - "8000:8000"
-    depends_on:
-      auth_postgres_dev:
-        condition: service_healthy
-      auth_redis_dev:
-        condition: service_started
-      auth_kafka_dev:
-        condition: service_started
-    volumes:
-      - .:/app
-      - geoip_data:/geoip
-      - ./certs:/app/certs
-    restart: unless-stopped
-    command: >
-      sh -c "
-        echo 'Applying Alembic migrations...' && alembic upgrade head &&
-        echo 'Starting server...' && gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --forwarded-allow-ips '*' --access-logfile '-'
-      "
+version: '3.8'
 
-  # -------------------------
-  # PostgreSQL
-  # -------------------------
-  auth_postgres_dev:
-    image: postgres:16
-    container_name: auth_postgres_dev
+services:
+  redis_cache:
+    image: redis:7
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_cache:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    env_file:
+      - ../../infra/.env
+    container_name: zookeeper
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: auth_db
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 2181 || exit 1"]
+      interval: 5s
+      retries: 5
+      timeout: 2s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    env_file:
+      - ../../infra/.env
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
+      ALLOW_PLAINTEXT_LISTENER: ${ALLOW_PLAINTEXT_LISTENER}
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      retries: 10
+      timeout: 3s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  auth_postgres:
+    image: postgres:16
+    container_name: auth_postgres
+    environment:
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
     ports:
       - "5433:5432"
     volumes:
       - pg_data_auth:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      retries: 5
+      interval: 5s
+      retries: 10
       timeout: 5s
+    networks:
+      - smartbudget-net
 
-  # -------------------------
-  # Redis (async)
-  # -------------------------
-  auth_redis_dev:
-    image: redis:7
-    container_name: auth_redis_dev
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data_auth:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      retries: 5
-      timeout: 5s
-
-  # -------------------------
-  # Zookeeper (для Kafka)
-  # -------------------------
-  auth_zookeeper_dev:
-    image: confluentinc/cp-zookeeper:7.7.1
-    container_name: auth_zookeeper_dev
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-    healthcheck:
-      test: ["CMD", "zkServer.sh", "status"]
-      interval: 10s
-      retries: 5
-      timeout: 5s
-
-  # -------------------------
-  # Kafka
-  # -------------------------
-  auth_kafka_dev:
-    image: confluentinc/cp-kafka:7.7.1
-    container_name: auth_kafka_dev
-    depends_on:
-      - auth_zookeeper_dev
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: auth_zookeeper_dev:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://auth_kafka_dev:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://auth_kafka_dev:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      ALLOW_PLAINTEXT_LISTENER: "yes"
-    ports:
-      - "9092:9092"
-    healthcheck:
-      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "auth_kafka_dev:9092", "--list"]
-      interval: 10s
-      retries: 5
-      timeout: 5s
-
-  # -------------------------
-  # Mailhog для тестирования почты
-  # -------------------------
-  mailhog:
-    image: mailhog/mailhog
-    container_name: mailhog
-    ports:
-      - "8025:8025" # веб интерфейс
-      - "1025:1025" # SMTP порт
-
-  # -------------------------
-  # Arq worker
-  # -------------------------
-  auth_worker:
-    build: .
-    container_name: auth_worker
+  auth_service:
+    build:
+      context: ../../services/authentification/
     env_file:
-      - .env
-    command: bash /app/wait-for-kafka.sh auth_kafka_dev 9092 arq app.worker.WorkerSettings
+      - ../../services/authentification/.env
+    container_name: auth_service
+    ports:
+      - "8000:8000"
     depends_on:
-      - auth_service
-      - auth_postgres_dev
-      - auth_redis_dev
-      - auth_kafka_dev
+      auth_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     volumes:
-      - .:/app
+      - ../../services/authentification:/app
       - geoip_data:/geoip
-      - ./certs:/app/certs
+      - ../../services/authentification/certs:/app/certs
     restart: unless-stopped
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+      "
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health"]
+    #   interval: 10s
+    #   retries: 3
+    #   timeout: 5s
+    networks:
+      - smartbudget-net
+
+  auth_worker:
+    build:
+      context: ../../services/authentification/
+    env_file:
+      - ../../services/authentification/.env
+    container_name: auth_worker
+    depends_on:
+      # auth_service:
+      #   condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/authentification:/app
+      - geoip_data:/geoip
+      - ../../services/authentification/certs:/app/certs
+    command: arq app.worker.WorkerSettings
+    restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+    #   interval: 20s
+    #   retries: 3
+    networks:
+      - smartbudget-net
 
 volumes:
   pg_data_auth:
-  redis_data_auth:
-  pg_data_auth_test:
-  geoip_data: {}
+  geoip_data:
+  redis_data_cache:
+  kafka_data:
 
-# docker cp ./geoip/GeoLite2-City.mmdb auth_service_dev:/geoip/GeoLite2-City.mmdb
+networks:
+  smartbudget-net:
+    name: smartbudget-net

@@ -1,9 +1,3 @@
-import sys
-import os
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))  # добавляем app в sys.path
-
 import asyncio
 from logging.config import fileConfig
 
@@ -25,7 +19,7 @@ target_metadata = Base.metadata
 
 # ---- Async engine setup ----
 def get_url():
-    return settings.db.db_url
+    return settings.DB.DB_URL
 
 
 def run_migrations_offline() -> None:
