@@ -34,7 +34,7 @@ def upgrade() -> None:
     op.create_index('ix_categories_keywords_gin', 'categories', ['keywords'], unique=False, postgresql_using='gin')
     op.create_index('ix_categories_name', 'categories', ['name'], unique=False)
     op.create_table('models',
-    sa.Column('imodelIdd', sa.UUID(), nullable=False),
+    sa.Column('modelId', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('version', sa.String(length=100), nullable=False),
     sa.Column('path', sa.String(length=1024), nullable=False),
@@ -44,8 +44,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('modelId'),
     sa.UniqueConstraint('version')
     )
-    op.create_index('ix_models_active_unique', 'models', ['isActive'], unique=True, postgresql_where=sa.text('isActive IS true'))
-    op.create_index('ix_models_createdAt', 'models', [sa.literal_column('createdAt DESC')], unique=False)
+    op.create_index('ix_models_active_unique', 'models', ['isActive'], unique=True, postgresql_where=sa.text('"isActive" IS true'))
+    op.create_index('ix_models_createdAt', 'models', [sa.literal_column('"createdAt" DESC')], unique=False)
     op.create_index('ix_models_version', 'models', ['version'], unique=True)
     op.create_table('training_datasets',
     sa.Column('trainingDatasetId', sa.UUID(), nullable=False),
@@ -86,7 +86,7 @@ def upgrade() -> None:
     sa.Column('processed', sa.Boolean(), nullable=False),
     sa.Column('createdAt', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['correctCategoryId'], ['categories.categoryId'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('feedbackId')
     )
     op.create_index('ix_feedback_processed', 'feedback', ['processed'], unique=False)
     op.create_index('ix_feedback_transactionId', 'feedback', ['transactionId'], unique=False)
@@ -125,7 +125,7 @@ def downgrade() -> None:
     op.drop_table('training_datasets')
     op.drop_index('ix_models_version', table_name='models')
     op.drop_index('ix_models_createdAt', table_name='models')
-    op.drop_index('ix_models_active_unique', table_name='models', postgresql_where=sa.text('isActive IS true'))
+    op.drop_index('ix_models_active_unique', table_name='models', postgresql_where=sa.text('"isActive" IS true'))
     op.drop_table('models')
     op.drop_index('ix_categories_name', table_name='categories')
     op.drop_index('ix_categories_keywords_gin', table_name='categories', postgresql_using='gin')
