@@ -11,8 +11,8 @@ services:
     depends_on:
       auth_service:
         condition: service_healthy
-      class_service:
-        condition: service_healthy
+      # class_service:
+      #   condition: service_healthy
       goals_service:
         condition: service_healthy
     networks:
@@ -159,111 +159,111 @@ services:
     networks:
       - smartbudget-net
 
-  class_postgres:
-    image: postgres:16
-    container_name: class_postgres
-    environment:
-      POSTGRES_USER: ${CLASS_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${CLASS_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${CLASS_POSTGRES_DB}
-    ports:
-      - "5434:5432"
-    volumes:
-      - pg_data_class:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      retries: 10
-      timeout: 5s
-    networks:
-      - smartbudget-net
+  # class_postgres:
+  #   image: postgres:16
+  #   container_name: class_postgres
+  #   environment:
+  #     POSTGRES_USER: ${CLASS_POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${CLASS_POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${CLASS_POSTGRES_DB}
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - pg_data_class:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 5s
+  #     retries: 10
+  #     timeout: 5s
+  #   networks:
+  #     - smartbudget-net
 
-  class_service:
-    build:
-      context: ../../services/classification/
-    env_file:
-      - ../../services/classification/.env
-    container_name: class_service
-    ports:
-      - "8001:8000"
-    depends_on:
-      class_postgres:
-        condition: service_healthy
-      redis_cache:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    volumes:
-      - ../../services/classification:/app
-      - models_data:/models
-      - datasets_data:/app/datasets
-    command: >
-      sh -c "
-        alembic upgrade head &&
-        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
-      "
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/class/health"]
-      interval: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - smartbudget-net
+  # class_service:
+  #   build:
+  #     context: ../../services/classification/
+  #   env_file:
+  #     - ../../services/classification/.env
+  #   container_name: class_service
+  #   ports:
+  #     - "8001:8000"
+  #   depends_on:
+  #     class_postgres:
+  #       condition: service_healthy
+  #     redis_cache:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ../../services/classification:/app
+  #     - models_data:/models
+  #     - datasets_data:/app/datasets
+  #   command: >
+  #     sh -c "
+  #       alembic upgrade head &&
+  #       gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+  #     "
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/class/health"]
+  #     interval: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   networks:
+  #     - smartbudget-net
 
-  class_worker:
-    build:
-      context: ../../services/classification/
-    env_file:
-      - ../../services/classification/.env
-    container_name: class_worker
-    depends_on:
-      class_service:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis_cache:
-        condition: service_healthy
-    volumes:
-      - ../../services/classification:/app
-      - models_data:/models
-      - datasets_data:/app/datasets
-    command: arq app.worker.WorkerSettings
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
-      interval: 30s
-      retries: 3
-      start_period: 30s
-    networks:
-      - smartbudget-net
+  # class_worker:
+  #   build:
+  #     context: ../../services/classification/
+  #   env_file:
+  #     - ../../services/classification/.env
+  #   container_name: class_worker
+  #   depends_on:
+  #     class_service:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #     redis_cache:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ../../services/classification:/app
+  #     - models_data:/models
+  #     - datasets_data:/app/datasets
+  #   command: arq app.worker.WorkerSettings
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+  #     interval: 30s
+  #     retries: 3
+  #     start_period: 30s
+  #   networks:
+  #     - smartbudget-net
 
-  class_consumers:
-    build:
-      context: ../../services/classification/
-    env_file:
-      - ../../services/classification/.env
-    container_name: class_consumers
-    depends_on:
-      class_service:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis_cache:
-        condition: service_healthy
-    volumes:
-      - ../../services/classification:/app
-      - models_data:/models
-      - datasets_data:/app/datasets
-    command: python run_consumers.py
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
-      interval: 30s
-      retries: 3
-      start_period: 30s
-    networks:
-      - smartbudget-net
+  # class_consumers:
+  #   build:
+  #     context: ../../services/classification/
+  #   env_file:
+  #     - ../../services/classification/.env
+  #   container_name: class_consumers
+  #   depends_on:
+  #     class_service:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #     redis_cache:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ../../services/classification:/app
+  #     - models_data:/models
+  #     - datasets_data:/app/datasets
+  #   command: python run_consumers.py
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+  #     interval: 30s
+  #     retries: 3
+  #     start_period: 30s
+  #   networks:
+  #     - smartbudget-net
 
   transactions_postgres:
     image: postgres:16
@@ -410,7 +410,7 @@ services:
 
 volumes:
   pg_data_auth:
-  pg_data_class:
+  # pg_data_class:
   pg_data_goals:
   pg_data_transactions:
   geoip_data:
