@@ -1,10 +1,12 @@
 import { SliceCaseReducers } from '@shared/types/reduxToolkit'
-import { CurrentGoal } from './goals'
+import { CurrentGoal, GoalTransaction } from './goals'
 
 export type CurrentGoalSliceState = {
-  goal: CurrentGoal
-  isLoading: boolean
+  goal: Omit<CurrentGoal, 'transactions'>
+  transactions: GoalTransaction[]
 
+  isLoading: boolean
+  isTransactionsLoading: boolean
   isEditLoading: boolean
 }
 

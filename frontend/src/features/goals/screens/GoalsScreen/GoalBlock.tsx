@@ -23,10 +23,9 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
   const { borderColor, statusColor, pieColor } = STATUS_STYLES[status](theme)
 
   const pieData: PieDataItem[] = [
-    { value: targetValue, label: '1', color: pieColor },
+    { value: currentValue, label: '1', color: pieColor },
     { value: targetValue - currentValue, label: '2', color: theme.palette.grayButton.dark },
   ]
-  console.log(pieData)
 
   const centerLabel: CenterLabel = {
     type: 'percent',

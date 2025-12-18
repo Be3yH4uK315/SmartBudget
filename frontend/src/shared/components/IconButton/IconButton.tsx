@@ -1,5 +1,6 @@
 import { Box, Paper, Stack, Typography } from '@mui/material'
 import { IconButtonItem } from '@shared/types'
+import { noop } from '@shared/utils/noop'
 import { Link } from 'react-router'
 
 export const IconButton = ({ title, subtitle, Icon, path, onClick }: IconButtonItem) => {
@@ -36,7 +37,7 @@ export const IconButton = ({ title, subtitle, Icon, path, onClick }: IconButtonI
       component={path ? Link : 'div'}
       to={path && path}
       elevation={2}
-      onClick={onClick ? onClick : () => {}}
+      onClick={onClick ? onClick : noop}
     >
       {content}
     </Paper>

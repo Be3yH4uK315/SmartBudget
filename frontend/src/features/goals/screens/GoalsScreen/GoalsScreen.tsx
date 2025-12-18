@@ -15,6 +15,7 @@ import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
 import { GoalBlock } from './GoalBlock'
+import { GoalsScreenSkeleton } from './GoalsScreenSkeleton'
 
 export default function GoalsScreen() {
   const dispatch = useAppDispatch()
@@ -25,6 +26,7 @@ export default function GoalsScreen() {
 
   useEffect(() => {
     dispatch(getGoals())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -36,7 +38,11 @@ export default function GoalsScreen() {
   const handleOpenModal = () => dispatch(openModal({ id: MODAL_IDS.CREATE_GOAL }))
 
   return (
-    <ScreenContent isLoading={isLoading} title={translate('title')}>
+    <ScreenContent
+      isLoading={isLoading}
+      title={translate('title')}
+      ContentSkeleton={GoalsScreenSkeleton}
+    >
       <Stack spacing={2} sx={{ maxWidth: '800px' }}>
         {goals.length === 0 && (
           <>

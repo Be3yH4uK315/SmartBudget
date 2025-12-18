@@ -12,7 +12,7 @@ export const useVerifyLinkFlow = () => {
   const email = (searchParams.get('email') || '').trim().toLowerCase()
   const token = (searchParams.get('token') || '').trim()
 
-  const token_type: TokenType = location.pathname.includes('reset-password')
+  const tokenType: TokenType = location.pathname.includes('reset-password')
     ? 'reset'
     : 'verification'
 
@@ -32,7 +32,7 @@ export const useVerifyLinkFlow = () => {
     ;(async () => {
       setIsVerifying(true)
       try {
-        const res = await authApi.verifyLink({ email, token, token_type })
+        const res = await authApi.verifyLink({ email, token, tokenType })
         if (!cancelled) setVerified(res.status === 'success')
       } catch {
         if (!cancelled) setVerified(false)
@@ -44,18 +44,18 @@ export const useVerifyLinkFlow = () => {
     return () => {
       cancelled = true
     }
-  }, [email, token, token_type])
+  }, [email, token, tokenType])
 
   const wrapSubmit = useCallback(
     async (fn: () => Promise<AuthResponse>) => {
       setIsSubmitting(true)
       try {
         const res = await fn()
-        if (res.status === 'success' && res.action === 'complete_registration') {
+        if (res.status === 'success' && res.action === 'completeRegistration') {
           navigate(ROUTES.PAGES.DASHBOARD)
           return
         }
-        if (res.status === 'success' && res.action === 'complete_reset') {
+        if (res.status === 'success' && res.action === 'completeReset') {
           navigate(ROUTES.PAGES.LOGIN)
           return
         }
