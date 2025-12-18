@@ -52,7 +52,7 @@ export function useAuthFlow() {
         } else if (res.action === 'sign_up') {
           setVerifyMode('signup')
           pushStep('verifyEmail')
-        } else if (res.action === 'reset_password') {
+        } else if (res.action === 'resetPassword') {
           setVerifyMode('reset')
           pushStep('verifyEmail')
         }
@@ -114,7 +114,7 @@ export function useAuthFlow() {
     try {
       const res = await authApi.verifyEmail({ email: normalizedEmail })
       if (res.action === 'sign_up') setVerifyMode('signup')
-      if (res.action === 'reset_password') setVerifyMode('reset')
+      if (res.action === 'resetPassword') setVerifyMode('reset')
     } finally {
       setIsResending(false)
     }
