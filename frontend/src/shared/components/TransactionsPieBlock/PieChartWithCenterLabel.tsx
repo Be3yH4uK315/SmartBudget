@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import { styled, useTheme } from '@mui/material'
 import { PieChart, useDrawingArea } from '@mui/x-charts'
 import { CenterLabel, PieDataItem } from '@shared/types/components'
@@ -12,18 +12,9 @@ type Props = {
   centerLabel: CenterLabel
 }
 
-export const PieChartWithCenterLabel = React.memo(function PieChartWithCenterLabel({
-  pieData,
-  innerRadius = 60,
-  width,
-  height,
-  centerLabel,
-}: Props) {
-  const data = useMemo<Omit<PieDataItem, 'lightColor'>[]>(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    () => pieData.map(({ lightColor, ...rest }) => rest),
-    [pieData],
-  )
+export const PieChartWithCenterLabel = React.memo(function PieChartWithCenterLabel({ pieData, innerRadius = 60, width, height, centerLabel }: Props) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const data: Omit<PieDataItem, 'lightColor'>[] = pieData.map(({ lightColor, ...rest }) => rest)
 
   return (
     <PieChart
