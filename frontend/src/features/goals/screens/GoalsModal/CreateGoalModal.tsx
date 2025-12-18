@@ -137,12 +137,16 @@ export const GoalModal = ({ onClose, goal }: Props) => {
                     finishDate: newValue ? newValue.format('YYYY-MM-DD') : '',
                   }))
                 }}
+                enableAccessibleFieldDOMStructure={false}
+                slots={{
+                  textField: TextField,
+                }}
                 disablePast
               />
             </LocalizationProvider>
 
             <Stack direction="row" spacing={2} justifyContent="flex-end">
-              <Button type="submit" variant="contained" disabled={!canSubmit()}>
+              <Button type="submit" variant="yellow" disabled={!canSubmit()}>
                 {translate(buttonTitle)}
               </Button>
             </Stack>
