@@ -20,7 +20,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 // Kafka
 builder.Services.AddSingleton<IKafkaService, KafkaService>();
-
+//Background Service
+builder.Services.AddHostedService<TransactionClassifiedBackgroundService>();
+builder.Services.AddScoped<ClassificationHandler>();
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -30,14 +32,15 @@ builder.Services.AddSwaggerGen(c =>
     c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
 });
 
+//CORS Policy
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins("http://127.0.0.1:3000") // обязательно конкретный адрес
+        policy.WithOrigins("http://127.0.0.1:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // ключевое для работы с cookies/auth
+              .AllowCredentials();
     });
 });
 
@@ -47,12 +50,15 @@ app.UseCors("FrontendPolicy");
 app.UseSwagger();
 app.UseSwaggerUI();
 
+//CORS
+app.UseCors("FrontendPolicy");
+
 // Routing
 app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate(); // <-- автоматически применяет все миграции
+    db.Database.Migrate(); 
 }
 
 app.Run();

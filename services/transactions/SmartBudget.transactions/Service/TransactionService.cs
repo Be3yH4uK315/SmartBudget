@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SmartBudget.Transactions.Data;
-using SmartBudget.Transactions.Domain.DTO;
+using SmartBudget.Transactions.DTO;
 using SmartBudget.Transactions.Domain.Entities;
 using SmartBudget.Transactions.Domain.Enums;
-using SmartBudget.Transactions.Services;
 using SmartBudget.Transactions.Infrastructure.Kafka;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace SmartBudget.Transactions.Services
 {
@@ -22,140 +22,90 @@ namespace SmartBudget.Transactions.Services
             _log = log;
         }
 
-        public async Task<IEnumerable<object>> GetUserTransactionsAsync(Guid UserId, int Limit, int Offset)
+        public async Task<List<Transaction>> GetUserTransactionsAsync(Guid userId, int limit, int offset, int category_id, CancellationToken stoppingToken)
         {
-            var list = await _db.Transactions
-                .Where(new_transaction => new_transaction.UserId == UserId)
-                .OrderByDescending(new_transaction => new_transaction.ImportedAt)
-                .Skip(Offset)
-                .Take(Limit)
-                .ToListAsync();
-
-            return list.Select(new_transaction => new {
-                transactionId = new_transaction.TransactionId,
-                value = new_transaction.Value,
-                categoryId = new_transaction.CategoryId,
-                description = new_transaction.Description,
-                name = new_transaction.Merchant,
-                mcc = new_transaction.Mcc,
-                status = new_transaction.Status.ToString(),
-                date = new_transaction.CreatedAt.ToString("o"),
-                type = new_transaction.Type.ToString()
-            });
+            return await _db.Transactions
+                .Where(new_transaction => new_transaction.UserId == userId && (category_id == 0 || new_transaction.CategoryId == category_id))
+                .OrderByDescending(new_transaction => new_transaction.CreatedAt)
+                .Skip(offset)
+                .Take(limit)
+                .ToListAsync(stoppingToken);
         }
 
-        public async Task<object?> GetByTransactionIdAsync(Guid transactionId)
+
+        public async Task<Transaction?> GetByTransactionIdAsync(Guid transactionId, CancellationToken stoppingToken)
         {
-            return await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == transactionId);
+            return await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == transactionId, stoppingToken);
         }
 
-        public async Task<object> CreateManualTransactionAsync(CreateManualTransactionRequest request)
-        {
-            var transaction = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                UserId = request.UserId,
-                TransactionId = Guid.NewGuid(),
-                AccountId = request.AccountId,
-                Value = request.Value,
-                Type = request.Value >= 0 ? TransactionType.income : TransactionType.expense,
-                Status = TransactionStatus.confirmed,
-                Merchant = request.Name,
-                Description = request.Description,
-                CreatedAt = DateTime.UtcNow,
-                ImportedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                CategoryId = request.CategoryId
-            };
 
-            using var transactionBD = await _db.Database.BeginTransactionAsync();
+        public async Task<string> CreateManualTransactionAsync(Transaction transaction, CancellationToken stoppingToken)
+        {
+            using var transactionBD = await _db.Database.BeginTransactionAsync(stoppingToken);
             try
             {
                 _db.Transactions.Add(transaction);
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(stoppingToken);
 
-                var simple = JsonSerializer.Serialize(new
+                await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.AccountId, transaction.CategoryId, transaction.Value, transaction.Type), stoppingToken);
+
+                await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId.ToString(), new BudgetEventMessage("transaction.new", transaction.UserId, transaction), stoppingToken);
+                if (transaction.CategoryId == 24)
                 {
-                    AccountId = transaction.AccountId,
-                    CategoryId = transaction.CategoryId,
-                    Value = transaction.Value
-                });
-
-                await _kafka.ProduceAsync("transaction.new", transaction.TransactionId, simple);
-
-                var evt = JsonSerializer.Serialize(new
-                {
-                    EventType = "transaction.new",
-                    UserId = transaction.UserId,
-                    Details = transaction
-                });
-
-                await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
-
-                await transactionBD.CommitAsync();
+                    await _kafka.TransactionNewGoal.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewGoalMessage(transaction.TransactionId, transaction.AccountId, transaction.UserId, transaction.Value, transaction.Type), stoppingToken);
+                }
+                await transactionBD.CommitAsync(stoppingToken);
             }
-            catch
+            catch (Exception except)
             {
-                await transactionBD.RollbackAsync();
-                throw;
+                await transactionBD.RollbackAsync(stoppingToken);
+                _log.LogError(except, "Creating transaction failed");
             }
 
-            return new { transactionId = transaction.TransactionId };
+            return transaction.TransactionId.ToString();
         }
 
 
-        public async Task<object> ImportMockAsync(JsonElement body)
+
+        public async Task<int> ImportMockAsync(List<Transaction> transactions, CancellationToken stoppingToken)
         {
-            List<ImportTransactionItem> items = body.ValueKind switch
+            int count = 0;
+            foreach (var current_transaction in transactions)
             {
-                JsonValueKind.Array => JsonSerializer.Deserialize<List<ImportTransactionItem>>(body.GetRawText()),
-                JsonValueKind.Object => new List<ImportTransactionItem> { JsonSerializer.Deserialize<ImportTransactionItem>(body.GetRawText()) },
-                _ => null
-            };
-
-            if (items == null) throw new Exception("Invalid body");
-
-            var created = new List<object>();
-
-            foreach (var current_transaction in items)
-            {
-                using var transactionBD = await _db.Database.BeginTransactionAsync();
+                if (current_transaction.AccountId != Guid.Empty)
+                {
+                    current_transaction.CategoryId = 24;
+                    current_transaction.Description = current_transaction.Type switch
+                    {
+                        TransactionType.income => "Пополнение цели",
+                        TransactionType.expense => "Списание с цели",
+                        _ => current_transaction.Description
+                    };
+                }
+                using var transactionBD = await _db.Database.BeginTransactionAsync(stoppingToken);
                 try
                 {
-                    var new_transaction = new Transaction
+                    if (!await _db.Transactions.AnyAsync(x => x.TransactionId == current_transaction.TransactionId, stoppingToken))
                     {
-                        Id = current_transaction.Id == Guid.Empty ? Guid.NewGuid() : current_transaction.Id,
-                        UserId = current_transaction.UserId,
-                        TransactionId = current_transaction.TransactionId == Guid.Empty ? Guid.NewGuid() : current_transaction.TransactionId,
-                        AccountId = current_transaction.AccountId,
-                        Date = current_transaction.Date,
-                        Value = current_transaction.Value ?? 0,
-                        Type = current_transaction.Type ?? TransactionType.expense,
-                        Status = current_transaction.Status ?? TransactionStatus.pending,
-                        Merchant = current_transaction.Merchant,
-                        Mcc = current_transaction.Mcc,
-                        Description = current_transaction.Description,
-                        CreatedAt = current_transaction.Date,
-                        ImportedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow,
-                        CategoryId = null
-                    };
+                        _db.Transactions.Add(current_transaction);
+                        await _db.SaveChangesAsync(stoppingToken);
 
-                    if (new_transaction.UserId == Guid.Empty) continue;
+                        await _kafka.TransactionImported.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionImportedMessage("transaction.imported", current_transaction.UserId, current_transaction), stoppingToken);
 
-                    if (!await _db.Transactions.AnyAsync(x => x.TransactionId == new_transaction.TransactionId))
-                    {
-                        _db.Transactions.Add(new_transaction);
-                        await _db.SaveChangesAsync();
+                        if (current_transaction.CategoryId == 24)
+                        {
+                            await _kafka.TransactionNew.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewMessage(current_transaction.AccountId, current_transaction.CategoryId, current_transaction.Value, current_transaction.Type), stoppingToken);
 
-                        var imported = JsonSerializer.Serialize(new { EventType = "transaction.imported", UserId = new_transaction.UserId, Details = new_transaction });
-                        await _kafka.ProduceAsync("budget.transactions.events", new_transaction.TransactionId, imported);
+                            await _kafka.TransactionNewGoal.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewGoalMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.UserId, current_transaction.Value, current_transaction.Type), stoppingToken);
+                        }
+                        else
+                        {
+                            await _kafka.TransactionNeedCategory.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNeedCategoryMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.Merchant, current_transaction.Mcc, current_transaction.Description), stoppingToken);
+                        }
 
-                        var need = JsonSerializer.Serialize(new { transaction_id = new_transaction.TransactionId, account_id = new_transaction.AccountId, merchant = new_transaction.Merchant, mcc = new_transaction.Mcc, description = new_transaction.Description });
-                        await _kafka.ProduceAsync("transaction.need_category", new_transaction.TransactionId, need);
 
-                        await transactionBD.CommitAsync();
-                        created.Add(new { new_transaction.TransactionId });
+                        await transactionBD.CommitAsync(stoppingToken);
+                        count++;
                     }
                 }
                 catch (Exception except)
@@ -165,10 +115,10 @@ namespace SmartBudget.Transactions.Services
                 }
             }
 
-            return new { created_count = created.Count, created };
+            return count;
         }
 
-        public async Task<object> PatchCategoryAsync(Guid Id, PatchTransactionCategoryRequest request)
+        public async Task<string> PatchCategoryAsync(Guid Id, PatchTransactionCategoryRequest request, CancellationToken stoppingToken)
         {
             var transaction = await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == Id);
             if (transaction == null) throw new Exception("Not found");
@@ -179,25 +129,44 @@ namespace SmartBudget.Transactions.Services
 
             await _db.SaveChangesAsync();
 
-            var evt = JsonSerializer.Serialize(new { EventType = "transaction.updated", UserId = transaction.UserId, Details = new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = request.CategoryId } });
-            await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
+            await _kafka.TransactionUpdated.ProduceAsync(transaction.TransactionId.ToString(), new TransactionUpdatedMessage(transaction.TransactionId, old, request.CategoryId, transaction.Value, transaction.Type), stoppingToken);
 
-            var simple = JsonSerializer.Serialize(new { transaction_id = transaction.TransactionId, old_category = old, new_category = request.CategoryId });
-            await _kafka.ProduceAsync("transaction.updated", transaction.TransactionId, simple);
+            await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId.ToString(), new BudgetEventMessage("transaction.updated", transaction.UserId, new { transaction.TransactionId, OldCategoryId = old, NewCategoryId = request.CategoryId }), stoppingToken);
 
             return "OK";
         }
 
-        public async Task DeleteAsync(Guid Id)
+        public async Task DeleteAsync(Guid Id, CancellationToken stoppingToken)
         {
             var transaction = await _db.Transactions.FirstOrDefaultAsync(new_transaction => new_transaction.TransactionId == Id);
             if (transaction == null) return;
+            using var transactionBD = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                _db.Transactions.Remove(transaction);
+                await _db.SaveChangesAsync();
 
-            _db.Transactions.Remove(transaction);
-            await _db.SaveChangesAsync();
+                await _kafka.TransactionDeleted.ProduceAsync(transaction.TransactionId.ToString(), new TransactionDeletedMessage(transaction.TransactionId, transaction.UserId), stoppingToken);
 
-            var evt = JsonSerializer.Serialize(new { EventType = "transaction.deleted", UserId = transaction.UserId, Details = new { transaction.TransactionId } });
-            await _kafka.ProduceAsync("budget.transactions.events", transaction.TransactionId, evt);
+                await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId.ToString(), new BudgetEventMessage("transaction.deleted", transaction.UserId, new { transaction.TransactionId }), stoppingToken);
+
+                await transactionBD.CommitAsync();
+
+            }
+            catch (Exception except)
+            {
+                await transactionBD.RollbackAsync();
+                _log.LogError(except, "Deleting transaction failed");
+            }
         }
+
+        public async Task<List<Transaction>> GetUserTransactionsGoalsAsync(Guid accountId, CancellationToken stoppingToken)
+        {
+            return await _db.Transactions
+                .Where(new_transaction => new_transaction.AccountId == accountId)
+                .OrderByDescending(new_transaction => new_transaction.CreatedAt)
+                .ToListAsync(stoppingToken);
+        }
+
     }
 }
