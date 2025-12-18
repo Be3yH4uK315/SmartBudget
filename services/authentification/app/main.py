@@ -5,7 +5,6 @@ from redis.asyncio import Redis
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import geoip2.database
 from fastapi_limiter import FastAPILimiter
-from fastapi.middleware.cors import CORSMiddleware
 from arq import create_pool
 from arq.connections import RedisSettings
 from starlette.responses import JSONResponse
@@ -158,13 +157,7 @@ app.add_middleware(
         "*.local",
     ],
 )
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.settings.APP.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+
 Instrumentator().instrument(app).expose(app)
 app.middleware("http")(middleware.errorMiddleware)
 app.include_router(auth.router, prefix="/api/v1/auth")
