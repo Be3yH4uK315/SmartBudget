@@ -62,4 +62,3 @@ declare module '@shared/store' {
 
 goalsSlice.injectInto(rootReducer)
 export const { clearGoalsState } = goalsSlice.actions
-
