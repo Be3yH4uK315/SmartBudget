@@ -6,6 +6,8 @@ import base64
 from functools import lru_cache
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+from jwt import decode
+from redis.asyncio import Redis
 from sqlalchemy import text
 
 from app import (
@@ -83,12 +85,13 @@ async def health_check(request: Request):
             has_error = True
 
     redis_pool = getattr(app.state, "redisPool", None)
-    if not redis_pool:
+    redis = Redis(connection_pool=redis_pool)
+    if not redis:
         health_status["redis"] = "disconnected"
         has_error = True
     else:
         try:
-            await redis_pool.ping()
+            await redis.ping()
             health_status["redis"] = "ok"
         except Exception:
             health_status["redis"] = "failed"
@@ -446,3 +449,31 @@ async def get_jwks():
         ]
     }
     return jwks
+
+@router.get(
+    "/gateway-verify",
+    include_in_schema=False
+)
+async def gateway_verify(request: Request):
+    try:
+        access_token = request.cookies.get("access_token")
+        if not access_token:
+            return Response(status_code=401)
+
+        payload = decode(
+            access_token,
+            settings.settings.JWT.JWT_PUBLIC_KEY,
+            algorithms=[settings.settings.JWT.JWT_ALGORITHM],
+            audience="smart-budget"
+        )
+
+        user_id = payload.get("sub")
+        if not user_id:
+            return Response(status_code=401)
+
+        return Response(
+            status_code=200,
+            headers={"X-User-Id": user_id}
+        )
+    except Exception:
+        return Response(status_code=401)
