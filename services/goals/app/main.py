@@ -1,8 +1,9 @@
 import logging
-from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
+
 from arq import create_pool
 from arq.connections import RedisSettings
+from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from aiokafka.errors import KafkaError
@@ -33,8 +34,8 @@ async def lifespan(app: FastAPI):
         try:
             engine = create_async_engine(
                 settings.settings.DB.DB_URL,
-                pool_size=20,
-                max_overflow=0,
+                pool_size=settings.settings.DB.DB_POOL_SIZE,
+                max_overflow=settings.settings.DB.DB_MAX_OVERFLOW,
                 echo=False
             )
             db_session_maker = async_sessionmaker(
