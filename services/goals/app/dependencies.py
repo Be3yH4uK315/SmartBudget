@@ -1,51 +1,43 @@
 from fastapi import Depends, status, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 from uuid import UUID
 from arq.connections import ArqRedis
 
 from app import (
-    repositories, 
-    services
+    services, 
+    unit_of_work
 )
 
-async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """Получает db_session_maker из app.state и предоставляет сессию."""
+async def get_uow(request: Request) -> AsyncGenerator[unit_of_work.UnitOfWork, None]:
+    """Создает UnitOfWork с фабрикой сессий из app.state."""
     db_session_maker = request.app.state.db_session_maker
     if not db_session_maker:
         raise HTTPException(status_code=500, detail="Database session factory not available")
-        
-    async with db_session_maker() as session:
-        yield session
-
-def get_goal_repository(db: AsyncSession = Depends(get_db)) -> repositories.GoalRepository:
-    """Провайдер для GoalRepository."""
-    return repositories.GoalRepository(db)
+    
+    uow = unit_of_work.UnitOfWork(db_session_maker)
+    yield uow
 
 async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
-    """Предоставляет пул Arq из app.state."""
+    """Предоставляет пул Arq."""
     arq_pool: ArqRedis = request.app.state.arq_pool
-    try:
-        yield arq_pool
-    finally:
-        pass
+    if not arq_pool:
+         raise HTTPException(status_code=500, detail="Redis ARQ pool not available")
+    yield arq_pool
 
 def get_goal_service(
-    repository: repositories.GoalRepository = Depends(get_goal_repository),
+    uow: unit_of_work.UnitOfWork = Depends(get_uow),
 ) -> services.GoalService:
-    """Провайдер для GoalService."""
-    return services.GoalService(repository)
+    return services.GoalService(uow)
 
 async def get_current_user_id(request: Request) -> UUID:
     """
     Извлекает user_id из заголовка X-User-Id, который устанавливает API Gateway.
     """
     user_id = request.headers.get("X-User-Id")
-    
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User ID header missing. Access denied."
+            detail="User ID header missing"
         )
     try:
         return UUID(user_id)

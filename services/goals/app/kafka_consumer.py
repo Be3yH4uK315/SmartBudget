@@ -1,22 +1,23 @@
 import asyncio
 import json
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
+
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker, AsyncSession, create_async_engine, AsyncEngine
 )
 from sqlalchemy.exc import SQLAlchemyError
-from pydantic import ValidationError
 
 from app import (
-    settings, 
-    repositories,
-    services, 
+    settings,
+    services,
     exceptions,
-    schemas
+    schemas,
+    unit_of_work
 )
 from app.kafka_producer import KafkaProducer 
 
@@ -27,7 +28,10 @@ async def consume_transaction_goal(
     consumer: AIOKafkaConsumer, 
     db_session_maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    """Основной цикл обработки сообщений."""
+    """
+    Основной цикл обработки сообщений.
+    Использует UnitOfWork для инкапсуляции работы с БД.
+    """
     logger.info("Starting transaction consumer loop...")
     processed_count = 0
     error_count = 0
@@ -52,11 +56,10 @@ async def consume_transaction_goal(
                     error_count += 1
                     continue
 
-                async with db_session_maker() as session:
-                    repository = repositories.GoalRepository(session)
-                    service = services.GoalService(repository)
-                    await service.update_goal_balance(event)
+                uow = unit_of_work.UnitOfWork(db_session_maker)
+                service = services.GoalService(uow)
 
+                await service.update_goal_balance(event)
                 await consumer.commit()
                 processed_count += 1
 
@@ -68,6 +71,7 @@ async def consume_transaction_goal(
             except SQLAlchemyError as e:
                 logger.error(f"Database error processing message at offset {message.offset}: {e}")
                 error_count += 1
+                await asyncio.sleep(1)
 
             except Exception as e:
                 logger.critical(
@@ -94,7 +98,11 @@ async def start_consumer() -> None:
     consumer: AIOKafkaConsumer | None = None
 
     try:
-        engine = create_async_engine(settings.settings.DB.DB_URL)
+        engine = create_async_engine(
+            settings.settings.DB.DB_URL,
+            pool_size=settings.settings.DB.DB_POOL_SIZE,
+            max_overflow=settings.settings.DB.DB_MAX_OVERFLOW
+        )
         db_session_maker = async_sessionmaker(
             engine, 
             class_=AsyncSession, 
@@ -148,21 +156,18 @@ async def start_consumer() -> None:
         if consumer:
             try:
                 await consumer.stop()
-                logger.info("Consumer stopped")
             except Exception as e:
                 logger.error(f"Error stopping consumer: {e}")
         
         if kafka_producer:
             try:
                 await kafka_producer.stop()
-                logger.info("Kafka producer stopped")
             except Exception as e:
                 logger.error(f"Error stopping Kafka producer: {e}")
         
         if engine:
             try:
                 await engine.dispose()
-                logger.info("Database connections closed")
             except Exception as e:
                 logger.error(f"Error closing database: {e}")
         
