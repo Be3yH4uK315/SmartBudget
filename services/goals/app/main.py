@@ -43,34 +43,33 @@ async def lifespan(app: FastAPI):
                 expire_on_commit=False
             )
             app.state.engine = engine
-            app.state.dbSessionMaker = db_session_maker
+            app.state.db_session_maker = db_session_maker
             logger.info("Database initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             app.state.engine = None
-            app.state.dbSessionMaker = None
+            app.state.db_session_maker = None
             raise
 
         try:
             kafka_producer = KafkaProducer() 
             await kafka_producer.start()
-            app.state.kafkaProducer = kafka_producer
+            app.state.kafka_producer = kafka_producer
             logger.info("Kafka producer initialized successfully")
         except KafkaError as e:
             logger.error(f"Failed to initialize Kafka: {e}")
-            app.state.kafkaProducer = None
-
+            app.state.kafka_producer = None
         try:
             arq_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
             arq_pool = await create_pool(
                 arq_settings, 
                 default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
             )
-            app.state.arqPool = arq_pool
+            app.state.arq_pool = arq_pool
             logger.info("ARQ Redis pool initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize ARQ: {e}")
-            app.state.arqPool = None
+            app.state.arq_pool = None
     
         logger.info("Application startup complete")
         yield

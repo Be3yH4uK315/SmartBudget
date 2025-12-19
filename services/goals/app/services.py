@@ -52,11 +52,11 @@ class GoalService:
         
         event = _create_outbox_event(
             "goal.created",
-            goalId=str(goal.goal_id),
-            userId=str(user_id),
+            goal_id=str(goal.goal_id),
+            user_id=str(user_id),
             name=goal.name,
-            targetValue=float(goal.target_value),
-            finishDate=goal.finish_date.isoformat()
+            target_value=float(goal.target_value),
+            finish_date=goal.finish_date.isoformat()
         )
 
         await self.repository.add_outbox_event(
@@ -133,7 +133,7 @@ class GoalService:
         if changes_for_kafka:
             event = _create_outbox_event(
                 "goal.changed",
-                goalId=str(goal_id),
+                goal_id=str(goal_id),
                 changes=changes_for_kafka
             )
             await self.repository.add_outbox_event(
@@ -164,8 +164,8 @@ class GoalService:
 
         update_event = _create_outbox_event(
             "goal.updated",
-            goalId=str(goal.goal_id),
-            currentValue=float(goal.current_value),
+            goal_id=str(goal.goal_id),
+            current_value=float(goal.current_value),
             status=goal.status
         )
         await self.repository.add_outbox_event(
@@ -187,8 +187,8 @@ class GoalService:
             goal.status = achieved_goal.status
             event = _create_outbox_event(
                 "goal.alert",
-                goalId=str(goal.goal_id),
-                type="achieved"
+                goal_id=str(goal.goal_id),
+                type="expiring"
             )
             await self.repository.add_outbox_event(
                 topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
@@ -237,7 +237,7 @@ class GoalService:
                             settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
                             _create_outbox_event(
                                 "goal.updated",
-                                goalId=str(goal.goal_id),
+                                goal_id=str(goal.goal_id),
                                 status="expired"
                             )
                         )
@@ -246,7 +246,7 @@ class GoalService:
                             settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
                             _create_outbox_event(
                                 "goal.expired",
-                                goalId=str(goal.goal_id),
+                                goal_id=str(goal.goal_id),
                                 type="expired"
                             )
                         )
@@ -276,9 +276,9 @@ class GoalService:
                         days_left = _get_days_left(goal.finish_date)
                         event = _create_outbox_event(
                             "goal.approaching",
-                            goalId=str(goal.goal_id),
+                            goal_id=str(goal.goal_id),
                             type="approaching",
-                            daysLeft=days_left
+                            days_left=days_left
                         )
                         await self.repository.add_outbox_event(
                             settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,

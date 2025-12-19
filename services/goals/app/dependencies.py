@@ -11,7 +11,7 @@ from app import (
 
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Получает db_session_maker из app.state и предоставляет сессию."""
-    db_session_maker = request.app.state.dbSessionMaker
+    db_session_maker = request.app.state.db_session_maker
     if not db_session_maker:
         raise HTTPException(status_code=500, detail="Database session factory not available")
         
@@ -24,7 +24,7 @@ def get_goal_repository(db: AsyncSession = Depends(get_db)) -> repositories.Goal
 
 async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq из app.state."""
-    arq_pool: ArqRedis = request.app.state.arqPool
+    arq_pool: ArqRedis = request.app.state.arq_pool
     try:
         yield arq_pool
     finally:

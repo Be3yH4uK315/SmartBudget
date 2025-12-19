@@ -13,7 +13,7 @@ router = APIRouter(tags=["Goals"])
     status_code=status.HTTP_200_OK,
     summary="Health check сервиса целей"
 )
-async def health_check(request: Request):
+async def health_check(request: Request) -> dict:
     """
     Проверяет доступность DB, Redis (ARQ) и Kafka Producer.
     """
@@ -37,18 +37,18 @@ async def health_check(request: Request):
             health_status["db"] = "failed"
             has_error = True
 
-    if not getattr(app.state, "arqPool", None):
+    if not getattr(app.state, "arq_pool", None):
         health_status["redis"] = "disconnected"
         has_error = True
     else:
         try:
-            await app.state.arqPool.ping()
+            await app.state.arq_pool.ping()
             health_status["redis"] = "ok"
         except Exception:
             health_status["redis"] = "failed"
             has_error = True
 
-    if getattr(app.state, "kafkaProducer", None):
+    if getattr(app.state, "kafka_producer", None):
         health_status["kafka"] = "initialized"
     else:
         health_status["kafka"] = "disconnected"
