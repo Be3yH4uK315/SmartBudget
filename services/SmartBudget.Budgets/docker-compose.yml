@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - smartbudget-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "transaction.classified:1:1"  # <-- топик создается автоматически
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    networks:
+      - smartbudget-net
+
+
+  db:
+    image: postgres:15
+    container_name: db
+    environment:
+      POSTGRES_DB: budgetservice
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - smartbudget_pgdata:/var/lib/postgresql/data
+    networks:
+      - smartbudget-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  budgets:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: budgets
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__Default: "Host=db;Database=budgetservice;Username=postgres;Password=postgres"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_GROUP_ID: "budgets-service"
+      USERS_ACTIVE_TOPIC: "users.active"
+      TRANSACTION_CLASSIFIED_TOPIC: "transaction.classified"
+      BANK_POLL_INTERVAL: "300"
+    ports:
+      - "8082:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - smartbudget-net
+
+networks:
+  smartbudget-net:
+    name: smartbudget-net
+
+volumes:
+  smartbudget_pgdata:

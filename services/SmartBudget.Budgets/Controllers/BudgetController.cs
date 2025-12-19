@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace SmartBudget.Budgets.Controllers
 {
     [ApiController]
-    [Route("api/budget")]
+    [Route("api/v1/budget")]
     public class BudgetController : ControllerBase
     {
         private readonly IBudgetService _service;
@@ -22,12 +22,12 @@ namespace SmartBudget.Budgets.Controllers
         /// GET Budget info
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> List([FromQuery(Name = "userId")] Guid userId, CancellationToken stoppingToken = default)
+        public async Task<IActionResult> List([FromHeader(Name = "X-User-Id")] Guid userId, CancellationToken stoppingToken = default)
         {
             var budget = await _service.GetBudgetWithCategoriesAsync(userId, stoppingToken);
 
             if (budget == null)
-                return Ok(404);
+                return NotFound();
 
             return Ok(new
             {
@@ -46,12 +46,12 @@ namespace SmartBudget.Budgets.Controllers
         /// GET Budget info
         /// </summary>
         [HttpGet("settings")]
-        public async Task<IActionResult> Settings([FromQuery(Name = "userId")] Guid userId, CancellationToken stoppingToken = default)
+        public async Task<IActionResult> Settings([FromHeader(Name = "X-User-Id")] Guid userId, CancellationToken stoppingToken = default)
         {
             var budget = await _service.GetBudgetSettingsAsync(userId, stoppingToken);
 
             if (budget == null)
-                return Ok(404);
+                return NotFound();
 
             return Ok(new
             {
@@ -69,14 +69,14 @@ namespace SmartBudget.Budgets.Controllers
         /// Create Budget 
         /// </summary>
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateBudgetRequest request, CancellationToken stoppingToken)
+        public async Task<IActionResult> Create([FromHeader(Name = "X-User-Id")] Guid userId, [FromBody] CreateBudgetRequest request, CancellationToken stoppingToken)
         {
             var now = DateTime.UtcNow;
 
             var budget = new Budget
             {
                 Id = Guid.NewGuid(),
-                UserId = request.UserId,
+                UserId = userId,
                 Month = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc),
                 Limit = request.TotalLimit ?? 0,
                 IsAutoRenew = request.IsAutoRenew,
@@ -99,11 +99,10 @@ namespace SmartBudget.Budgets.Controllers
         }
 
         [HttpPatch("settings")]
-        public async Task<IActionResult> Patch([FromQuery] Guid userId, [FromBody] PatchBudgetRequest request, CancellationToken stoppingToken)
+        public async Task<IActionResult> Patch([FromHeader(Name = "X-User-Id")] Guid userId, [FromBody] PatchBudgetRequest request, CancellationToken stoppingToken)
         {
             var model = new PatchBudgetRequest
             {
-                UserId = userId,
                 TotalLimit = request.TotalLimit,
                 IsAutoRenew = request.IsAutoRenew,
                 Categories = request.Categories
@@ -115,10 +114,10 @@ namespace SmartBudget.Budgets.Controllers
                     .ToList()
             };
 
-            var budget = await _service.PatchBudgetAsync(model, stoppingToken);
+            var budget = await _service.PatchBudgetAsync(userId, model, stoppingToken);
 
             if (budget == null)
-                return Ok(404);
+                return NotFound();
 
             return Ok();
         }

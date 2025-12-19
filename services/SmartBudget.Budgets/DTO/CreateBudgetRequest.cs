@@ -4,9 +4,6 @@ namespace SmartBudget.Budgets.DTO
 {
     public class CreateBudgetRequest
     {
-        [JsonPropertyName("userId")]
-        public Guid UserId { get; set; }
-
         [JsonPropertyName("categories")]
         public List<CreateCategoryLimitRequest> Categories { get; set; } = new();
 

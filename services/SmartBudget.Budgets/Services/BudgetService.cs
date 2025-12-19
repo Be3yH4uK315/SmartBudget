@@ -56,11 +56,11 @@ namespace SmartBudget.Budgets.Services
             }
             return budget.Id.ToString();
         }
-        public async Task<Budget?> PatchBudgetAsync(PatchBudgetRequest model, CancellationToken stoppingToken)
+        public async Task<Budget?> PatchBudgetAsync(Guid userId, PatchBudgetRequest model, CancellationToken stoppingToken)
         {
             var budget = await _db.Budget
                 .Include(b => b.CategoryLimits)
-                .FirstOrDefaultAsync(b => b.UserId == model.UserId, stoppingToken);
+                .FirstOrDefaultAsync(b => b.UserId == userId, stoppingToken);
 
             if (budget == null)
                 return null;
@@ -111,9 +111,7 @@ namespace SmartBudget.Budgets.Services
             return budget;
 
         }
-        public async Task NewTransactionAsync(
-    TransactionNewMessage message,
-    CancellationToken stoppingToken)
+        public async Task NewTransactionAsync(TransactionNewMessage message, CancellationToken stoppingToken)
         {
             await using var tx = await _db.Database.BeginTransactionAsync(stoppingToken);
 
@@ -122,17 +120,17 @@ namespace SmartBudget.Budgets.Services
                 var budget = await _db.Budget
                     .Include(b => b.CategoryLimits)
                     .FirstOrDefaultAsync(
-                        b => b.UserId == message.AccountId,
+                        b => b.UserId == message.userId,
                         stoppingToken);
 
                 if (budget == null)
                 {
-                    _log.LogWarning("Budget not found for account {AccountId}", message.AccountId);
+                    _log.LogWarning("Budget not found for user {userId}", message.userId);
                     return;
                 }
 
                 if (!message.CategoryId.HasValue)
-                    return; // транзакция без категории — игнорируем
+                    return;
 
                 var category = budget.CategoryLimits
                     .FirstOrDefault(c => c.CategoryId == message.CategoryId.Value);
@@ -175,7 +173,7 @@ namespace SmartBudget.Budgets.Services
                 var budget = await _db.Budget
                     .Include(b => b.CategoryLimits)
                     .FirstOrDefaultAsync(
-                        b => b.UserId == message.TransactionId, // тут уточни: нужен ли AccountId?
+                        b => b.UserId == message.TransactionId,
                         stoppingToken);
 
                 if (budget == null)

@@ -4,9 +4,6 @@ namespace SmartBudget.Budgets.DTO
 {
     public class PatchBudgetRequest
     {
-        [JsonPropertyName("userId")]
-        public Guid UserId { get; init; }
-
         [JsonPropertyName("totalLimit")]
         public decimal? TotalLimit { get; init; }
 

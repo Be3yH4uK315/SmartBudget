@@ -1,26 +1,48 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SmartBudget.Budgets.Infrastructure.Kafka;
 using SmartBudget.Budgets.Services;
 
 public class BudgetKafkaBackgroundService : BackgroundService
 {
     private readonly IKafkaService _kafka;
-    private readonly IBudgetService _budgetService;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public BudgetKafkaBackgroundService(
         IKafkaService kafka,
-        IBudgetService budgetService)
+        IServiceScopeFactory scopeFactory)
     {
         _kafka = kafka;
-        _budgetService = budgetService;
+        _scopeFactory = scopeFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.WhenAll(
-            _kafka.TransactionNew.ConsumeAsync( _budgetService.NewTransactionAsync, stoppingToken),
-
-            _kafka.TransactionUpdated.ConsumeAsync( _budgetService.UpdatedTransactionAsync, stoppingToken)
+            ConsumeNewTransactions(stoppingToken),
+            ConsumeUpdatedTransactions(stoppingToken)
         );
+    }
+
+    private async Task ConsumeNewTransactions(CancellationToken token)
+    {
+        await _kafka.TransactionNew.ConsumeAsync(async (msg, ct) =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var budgetService = scope.ServiceProvider.GetRequiredService<IBudgetService>();
+
+            await budgetService.NewTransactionAsync(msg, ct);
+        }, token);
+    }
+
+    private async Task ConsumeUpdatedTransactions(CancellationToken token)
+    {
+        await _kafka.TransactionUpdated.ConsumeAsync(async (msg, ct) =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var budgetService = scope.ServiceProvider.GetRequiredService<IBudgetService>();
+
+            await budgetService.UpdatedTransactionAsync(msg, ct);
+        }, token);
     }
 }

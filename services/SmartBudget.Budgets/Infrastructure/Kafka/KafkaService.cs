@@ -54,6 +54,7 @@ namespace SmartBudget.Budgets.Infrastructure.Kafka
             var consumerConfig = new ConsumerConfig
             {
                 BootstrapServers = cfg["KAFKA_BOOTSTRAP_SERVERS"] ?? "localhost:9092",
+                GroupId = "budgets-service",
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 EnableAutoCommit = false
             };

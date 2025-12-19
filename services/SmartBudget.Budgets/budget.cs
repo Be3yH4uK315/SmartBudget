@@ -25,7 +25,8 @@ builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddSingleton<IKafkaService, KafkaService>();
 
 //BackgroundService
-builder.Services.AddHostedService<BackgroundService>();
+builder.Services.AddHostedService<BudgetKafkaBackgroundService>();
+
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
