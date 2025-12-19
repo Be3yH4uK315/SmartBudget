@@ -9,61 +9,55 @@ from app import models
 
 class CreateGoalRequest(BaseModel):
     name: str = Field(..., max_length=255, description="Название цели")
-    targetValue: Decimal = Field(..., gt=0, description="Целевая сумма")
-    finishDate: date = Field(..., description="Дата достижения (YYYY-MM-DD)")
+    target_value: Decimal = Field(..., gt=0, description="Целевая сумма")
+    finish_date: date = Field(..., description="Дата достижения (YYYY-MM-DD)")
 
 class CreateGoalResponse(BaseModel):
-    goalId: UUID = Field(..., description="ID созданной цели")
+    goal_id: UUID = Field(..., description="ID созданной цели")
 
 class GoalResponse(BaseModel):
     name: str = Field(..., description="Название цели")
-    targetValue: Decimal = Field(..., description="Целевая сумма")
-    currentValue: Decimal = Field(..., description="Текущая накопленная сумма")
-    finishDate: date = Field(..., description="Дата достижения")
-    daysLeft: int = Field(..., description="Дней осталось")
+    target_value: Decimal = Field(..., description="Целевая сумма")
+    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    finish_date: date = Field(..., description="Дата достижения")
+    days_left: int = Field(..., description="Дней осталось")
     status: models.GoalStatus = Field(..., description="Статус цели")
     
     model_config = ConfigDict(
         from_attributes=True,
-        json_encoders={
-            Decimal: float
-        }
+        json_encoders={Decimal: float}
     )
 
 class MainGoalInfo(BaseModel):
     name: str = Field(..., description="Название цели")
-    targetValue: Decimal = Field(..., description="Целевая сумма")
-    currentValue: Decimal = Field(..., description="Текущая накопленная сумма")
+    target_value: Decimal = Field(..., description="Целевая сумма")
+    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
 
     model_config = ConfigDict(
         from_attributes=True,
-        json_encoders={
-            Decimal: float
-        }
+        json_encoders={Decimal: float}
     )
 
 class MainGoalsResponse(BaseModel):
     goals: list[MainGoalInfo]
 
 class AllGoalsResponse(BaseModel):
-    goalId: UUID = Field(..., description="ID цели")
+    goal_id: UUID = Field(..., description="ID цели")
     name: str = Field(..., description="Название цели")
-    targetValue: Decimal = Field(..., description="Целевая сумма")
-    currentValue: Decimal = Field(..., description="Текущая накопленная сумма")
-    finishDate: date = Field(..., description="Дата достижения")
+    target_value: Decimal = Field(..., description="Целевая сумма")
+    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    finish_date: date = Field(..., description="Дата достижения")
     status: models.GoalStatus = Field(..., description="Статус цели")
     
     model_config = ConfigDict(
         from_attributes=True,
-        json_encoders={
-            Decimal: float
-        }
+        json_encoders={Decimal: float}
     )
 
 class GoalPatchRequest(BaseModel):
     name: Optional[str] = Field(None, max_length=255, description="Название цели")
-    targetValue: Optional[Decimal] = Field(None, gt=0, description="Целевая сумма")
-    finishDate: Optional[date] = Field(None, description="Дата достижения")
+    target_value: Optional[Decimal] = Field(None, gt=0, description="Целевая сумма")
+    finish_date: Optional[date] = Field(None, description="Дата достижения")
     status: Optional[models.GoalStatus] = Field(None, description="Статус цели")
 
 class UnifiedErrorResponse(BaseModel):
@@ -74,11 +68,13 @@ class TransactionType(str, Enum):
     EXPENSE = "expense"
 
 class TransactionEvent(BaseModel):
-    transactionId: UUID = Field(..., description="ID транзакции")
-    accountId: UUID = Field(..., description="В контексте целей это goalId")
-    userId: UUID = Field(..., description="ID пользователя")
-    value: Decimal = Field(..., description="Сумма транзакции")
-    type: TransactionType = Field(..., pattern="Тип транзакции")
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    goal_id: UUID = Field(..., description="ID цели (ранее account_id)")
+    user_id: UUID = Field(..., description="ID пользователя")
+    value: Decimal = Field(..., gt=0, description="Сумма транзакции")
+    type: TransactionType = Field(..., description="Тип транзакции")
+
+    model_config = ConfigDict(from_attributes=True)
 
 BUDGET_EVENTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",

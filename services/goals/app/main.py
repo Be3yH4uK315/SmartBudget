@@ -20,48 +20,86 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Управляет ресурсами (DB, Kafka, Arq) во время жизни приложения."""
-    logging_config.setupLogging()
+    """Управление ресурсами приложения."""
+    logging_config.setup_logging()
+    logger.info("Application startup initiated")
+    
+    engine = None
+    db_session_maker = None
+    kafka_producer = None
+    arq_pool = None
     
     try:
-        engine = create_async_engine(settings.settings.DB.DB_URL)
-        dbSessionMaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        app.state.engine = engine
-        app.state.dbSessionMaker = dbSessionMaker
-        logger.info("Database engine and session maker created.")
-    except Exception as e:
-        logger.error(f"Failed to create DB engine: {e}")
-        app.state.engine = None
-        app.state.dbSessionMaker = None
+        try:
+            engine = create_async_engine(
+                settings.settings.DB.DB_URL,
+                pool_size=20,
+                max_overflow=0,
+                echo=False
+            )
+            db_session_maker = async_sessionmaker(
+                engine, 
+                class_=AsyncSession, 
+                expire_on_commit=False
+            )
+            app.state.engine = engine
+            app.state.dbSessionMaker = db_session_maker
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            app.state.engine = None
+            app.state.dbSessionMaker = None
+            raise
 
-    try:
-        kafkaProducer = KafkaProducer() 
-        await kafkaProducer.start()
-        app.state.kafkaProducer = kafkaProducer
-    except KafkaError as e:
-        logger.error(f"Failed to start Kafka producer: {e}")
-        app.state.kafkaProducer = None
+        try:
+            kafka_producer = KafkaProducer() 
+            await kafka_producer.start()
+            app.state.kafkaProducer = kafka_producer
+            logger.info("Kafka producer initialized successfully")
+        except KafkaError as e:
+            logger.error(f"Failed to initialize Kafka: {e}")
+            app.state.kafkaProducer = None
 
-    arqSettings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
-    arqPool = await create_pool(
-        arqSettings, 
-        default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
-    )
-    app.state.arqPool = arqPool
+        try:
+            arq_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
+            arq_pool = await create_pool(
+                arq_settings, 
+                default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
+            )
+            app.state.arqPool = arq_pool
+            logger.info("ARQ Redis pool initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize ARQ: {e}")
+            app.state.arqPool = None
     
-    logger.info("Application startup complete.")
-    yield
-    
-    if app.state.kafkaProducer:
-        await app.state.kafkaProducer.stop()
-        logger.info("Kafka producer stopped.")
-    if arqPool:
-        await arqPool.close()
-    if app.state.engine:
-        await app.state.engine.dispose()
-        logger.info("Database engine disposed.")
-    
-    logger.info("Application shutdown complete.")
+        logger.info("Application startup complete")
+        yield
+        
+    finally:
+        logger.info("Application shutdown initiated")
+        
+        if kafka_producer:
+            try:
+                await kafka_producer.stop()
+                logger.info("Kafka producer stopped")
+            except Exception as e:
+                logger.error(f"Error stopping Kafka: {e}")
+        
+        if arq_pool:
+            try:
+                await arq_pool.close()
+                logger.info("ARQ pool closed")
+            except Exception as e:
+                logger.error(f"Error closing ARQ pool: {e}")
+        
+        if engine:
+            try:
+                await engine.dispose()
+                logger.info("Database disposed")
+            except Exception as e:
+                logger.error(f"Error disposing database: {e}")
+        
+        logger.info("Application shutdown complete")
 
 
 app = FastAPI(
@@ -73,19 +111,34 @@ app = FastAPI(
 )
 
 @app.exception_handler(exceptions.GoalServiceError)
-async def goalServiceExceptionHandler(request: Request, exc: exceptions.GoalServiceError):
+async def goal_service_exception_handler(request: Request, exc: exceptions.GoalServiceError):
+    """Обработка ошибок сервиса."""
     status_code = 400
     if isinstance(exc, exceptions.GoalNotFoundError):
         status_code = 404
     
+    logger.warning(f"Service error: {type(exc).__name__}: {exc}")
     return JSONResponse(
         status_code=status_code,
         content={"detail": str(exc)},
     )
 
 @app.exception_handler(SQLAlchemyError)
-async def dbErrorMiddleware(request: Request, exc: SQLAlchemyError):
-    logger.error(f"DB error: {exc}")
-    return JSONResponse(status_code=500, content={"detail": "Database error"})
+async def db_error_handler(request: Request, exc: SQLAlchemyError):
+    """Обработка ошибок БД."""
+    logger.error(f"Database error: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500, 
+        content={"detail": "Internal server error"}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Обработка неожиданных ошибок."""
+    logger.critical(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
 
 app.include_router(goals.router, prefix="/api/v1/goals")
