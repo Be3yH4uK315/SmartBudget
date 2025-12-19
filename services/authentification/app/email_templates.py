@@ -2,33 +2,33 @@ from urllib.parse import quote
 
 from app import settings
 
-def getVerificationEmailBody(email: str, token: str) -> str:
+def get_verification_email_body(email: str, token: str) -> str:
     """Генерирует тело письма для верификации аккаунта."""
-    encodedEmail = quote(email)
-    verifyUrl = f"{settings.settings.APP.FRONTEND_URL}/auth/registration?token={token}&email={encodedEmail}"
+    encoded_email = quote(email)
+    verify_url = f"{settings.settings.app.frontend_url}/auth/registration?token={token}&email={encoded_email}"
 
     return f"""
     Здравствуйте!
 
     Чтобы завершить регистрацию в Budget App, пожалуйста, перейдите по ссылке ниже:
-    {verifyUrl}
+    {verify_url}
 
     Ссылка действительна в течение 15 минут.
 
     Если вы не регистрировались, просто проигнорируйте это письмо.
     """
 
-def getPasswordResetBody(email: str, token: str) -> str:
+def get_password_reset_body(email: str, token: str) -> str:
     """Генерирует тело письма для сброса пароля."""
-    encodedEmail = quote(email)
-    resetUrl = f"{settings.settings.APP.FRONTEND_URL}/auth/reset-password?token={token}&email={encodedEmail}"
+    encoded_email = quote(email)
+    reset_url = f"{settings.settings.app.frontend_url}/auth/reset-password?token={token}&email={encoded_email}"
     
     return f"""
     Здравствуйте!
 
     Вы (или кто-то другой) запросили сброс пароля для вашего аккаунта Budget App.
     Перейдите по ссылке ниже, чтобы установить новый пароль:
-    {resetUrl}
+    {reset_url}
 
     Ссылка действительна в течение 15 минут.
 

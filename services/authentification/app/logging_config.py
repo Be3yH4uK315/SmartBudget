@@ -15,14 +15,14 @@ class JsonFormatter(Formatter):
         }
         
         if hasattr(record, 'extra'):
-             log_data.update(record.extra)
+            log_data.update(record.extra)
              
         if record.exc_info:
             log_data['exc_info'] = self.formatException(record.exc_info)
 
         return json.dumps(log_data, default=str, ensure_ascii=False)
 
-def setupLogging():
+def setup_logging():
     """Настраивает ведение журнала с помощью JSON formatter."""
     root_logger = logging.getLogger()
     
