@@ -11,7 +11,7 @@ from app import logging_config, settings, consumers, dependencies
 logger = logging.getLogger(__name__)
 
 async def main():
-    logging_config.setupLogging()
+    logging_config.setup_logging()
     logger.info("Starting Kafka Consumer Service...")
     
     engine = create_async_engine(settings.settings.DB.DB_URL)
@@ -27,16 +27,16 @@ async def main():
         }
     })
     
-    redisPool = None
+    redis_pool = None
     producer = None
-    consumerNeedCategory = None
+    consumer_need_category = None
     
     maxRetries = 5
     retryDelay = 5
     
     try:
-        redisPool = await dependencies.createRedisPool()
-        redis = Redis(connection_pool=redisPool)
+        redis_pool = await dependencies.create_redis_pool()
+        redis = Redis(connection_pool=redis_pool)
         
         for attempt in range(maxRetries):
             try:
@@ -57,14 +57,14 @@ async def main():
         
         for attempt in range(maxRetries):
             try:
-                consumerNeedCategory = AIOKafkaConsumer(
+                consumer_need_category = AIOKafkaConsumer(
                     settings.settings.KAFKA.TOPIC_NEED_CATEGORY,
                     bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
                     group_id=settings.settings.KAFKA.KAFKA_GROUP_ID,
                     auto_offset_reset='latest',
                     enable_auto_commit=False
                 )
-                await consumerNeedCategory.start()
+                await consumer_need_category.start()
                 break
             except Exception as e:
                 logger.error(f"Failed to start Kafka consumers (attempt {attempt+1}): {e}")
@@ -75,29 +75,29 @@ async def main():
                     raise
         
         tasks = [
-            asyncio.create_task(consumers.consumeNeedCategory(
-                consumerNeedCategory, producer, redis, dbSessionMaker
+            asyncio.create_task(consumers.consume_need_category(
+                consumer_need_category, producer, redis, dbSessionMaker
             )),
         ]
         
         loop = asyncio.get_running_loop()
-        shutdownEvent = asyncio.Event()
+        shutdown_event = asyncio.Event()
         
-        def signalHandler():
+        def signal_handler():
             logger.info("Received shutdown signal...")
-            shutdownEvent.set()
+            shutdown_event.set()
         
         for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, signalHandler)
+            loop.add_signal_handler(sig, signal_handler)
         
         logger.info("Consumers running. Awaiting shutdown...")
         
-        await asyncio.wait(
-            tasks + [asyncio.create_task(shutdownEvent.wait())],
+        done, pending = await asyncio.wait(
+            tasks + [asyncio.create_task(shutdown_event.wait())],
             return_when=asyncio.FIRST_COMPLETED
         )
 
-        for task in tasks:
+        for task in pending:
             task.cancel()
         
     except Exception as e:
@@ -106,11 +106,15 @@ async def main():
         logger.info("Shutting down consumer service...")
         if producer:
             await producer.stop()
-        if consumerNeedCategory:
-            await consumerNeedCategory.stop()
-        if redisPool:
-            await dependencies.closeRedisPool(redisPool)
+            logger.info("Kafka producer stopped")
+        if consumer_need_category:
+            await consumer_need_category.stop()
+            logger.info("Kafka consumer stopped")
+        if redis_pool:
+            await dependencies.close_redis_pool(redis_pool)
+            logger.info("Redis pool closed")
         await engine.dispose()
+        logger.info("Consumer service shutdown complete")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -8,20 +8,20 @@ from app.tasks import retrain, promote, build_dataset
 
 logger = logging.getLogger(__name__)
 
-async def onStartup(ctx):
+async def on_startup(ctx):
     """Выполняется при старте воркера Arq."""
-    logging_config.setupLogging()
+    logging_config.setup_logging()
     logger.info(
         f"Arq worker starting. Redis: {settings.settings.ARQ.REDIS_URL}, Queue: {settings.settings.ARQ.ARQ_QUEUE_NAME}"
     )
     engine = create_async_engine(settings.settings.DB.DB_URL)
-    dbSessionMaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    db_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     ctx["db_engine"] = engine
-    ctx["db_session_maker"] = dbSessionMaker
+    ctx["db_session_maker"] = db_session_maker
     logger.info("Arq: DB engine and session maker injected.")
 
-async def onShutdown(ctx):
+async def on_shutdown(ctx):
     """Выполняется при остановке воркера Arq."""
     logger.info("Shutting down Arq worker...")
     engine = ctx.get("db_engine")
@@ -32,29 +32,29 @@ async def onShutdown(ctx):
 class WorkerSettings:
     """Настройки для Arq worker."""
     functions = [
-        retrain.retrainModelTask,
-        promote.validateAndPromoteModel,
-        build_dataset.buildTrainingDatasetTask
+        retrain.retrain_model_task,
+        promote.validate_and_promote_model,
+        build_dataset.build_training_dataset_task
     ]
-    on_startup = onStartup
-    on_shutdown = onShutdown
+    on_startup = on_startup
+    on_shutdown = on_shutdown
     
     cron_jobs = [
         cron(
-            build_dataset.buildTrainingDatasetTask,
+            build_dataset.build_training_dataset_task,
             weekday=6,
             hour=0,
             minute=0,
             run_at_startup=False
         ),
         cron(
-            retrain.retrainModelTask,
+            retrain.retrain_model_task,
             hour=2, 
             minute=0, 
             run_at_startup=False
         ),
         cron(
-            promote.validateAndPromoteModel,
+            promote.validate_and_promote_model,
             hour=3,
             minute=0,
             run_at_startup=False

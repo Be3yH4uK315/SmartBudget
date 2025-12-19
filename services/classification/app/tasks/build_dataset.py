@@ -6,62 +6,62 @@ from app import models, settings, repositories
 
 logger = logging.getLogger(__name__)
 
-async def buildTrainingDatasetTask(ctx):
+async def build_training_dataset_task(ctx):
     """
     ARQ-задача (ETL) для создания "слепка" данных для обучения.
     """
     logger.info("Starting training dataset build task (ETL)...")
-    dbSessionMaker = ctx.get("db_session_maker")
-    if not dbSessionMaker:
+    db_session_maker = ctx.get("db_session_maker")
+    if not db_session_maker:
         logger.error("No db_session_maker in arq context. Aborting.")
         return
 
-    async with dbSessionMaker() as session:
-        feedbackReposity = repositories.FeedbackRepository(session)
-        datasetReposity = repositories.DatasetRepository(session)
+    async with db_session_maker() as session:
+        feedback_repository = repositories.FeedbackRepository(session)
+        dataset_repository = repositories.DatasetRepository(session)
         
-        newVersion = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        datasetEntry = models.TrainingDataset(
-            version=newVersion,
-            file_path=f"{settings.settings.ML.DATASET_PATH}/dataset_{newVersion}.parquet",
+        new_version = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        dataset_entry = models.TrainingDataset(
+            version=new_version,
+            file_path=f"{settings.settings.ML.DATASET_PATH}/dataset_{new_version}.parquet",
             status=models.TrainingDatasetStatus.BUILDING,
         )
-        await datasetReposity.createDatasetEntry(datasetEntry)
+        await dataset_repository.create_dataset_entry(dataset_entry)
         
         try:
             logger.info("Loading feedback data (last 180 days)...")
-            dataForTraining = await feedbackReposity.getAllFeedbackData(days_limit=180)
+            data_for_training = await feedback_repository.get_all_feedback_data(days_limit=180)
             
-            if not dataForTraining:
+            if not data_for_training:
                 logger.info("No valid training data after ETL. Aborting.")
-                await datasetReposity.updateDatasetStatus(
-                    datasetEntry, 
+                await dataset_repository.update_dataset_status(
+                    dataset_entry, 
                     models.TrainingDatasetStatus.FAILED, 
                     {"error": "No valid data after ETL"}
                 )
                 return
 
-            logger.info(f"Converting {len(dataForTraining)} rows to DataFrame...")
-            df = pd.DataFrame(dataForTraining)
+            logger.info(f"Converting {len(data_for_training)} rows to DataFrame...")
+            df = pd.DataFrame(data_for_training)
             
-            logger.info(f"Saving DataFrame to {datasetEntry.filePath}...")
-            df.to_parquet(datasetEntry.filePath, index=False, engine='pyarrow')
+            logger.info(f"Saving DataFrame to {dataset_entry.file_path}...")
+            df.to_parquet(dataset_entry.file_path, index=False, engine='pyarrow')
 
-            await datasetReposity.updateDatasetStatus(
-                datasetEntry, 
+            await dataset_repository.update_dataset_status(
+                dataset_entry, 
                 models.TrainingDatasetStatus.READY, 
                 {
                     "row_count": len(df),
                     "class_distribution": df['label'].value_counts().to_dict()
                 }
             )
-            logger.info(f"SUCCESS: Training dataset {newVersion} is ready.")
+            logger.info(f"SUCCESS: Training dataset {new_version} is ready.")
 
         except Exception as e:
             logger.exception("Training dataset build task failed")
             await session.rollback()
-            await datasetReposity.updateDatasetStatus(
-                datasetEntry, 
+            await dataset_repository.update_dataset_status(
+                dataset_entry, 
                 models.TrainingDatasetStatus.FAILED, 
                 {"error": str(e)}
             )

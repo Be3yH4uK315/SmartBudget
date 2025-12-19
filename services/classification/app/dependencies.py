@@ -9,58 +9,55 @@ from app import settings
 from app.services.classification_service import ClassificationService
 from app.services.ml_service import modelManager
 
-async def getDb(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """Обеспечивает асинхронный сеанс работы с базой данных из пула в app.state."""
-    dbSessionMaker = request.app.state.dbSessionMaker
-    if not dbSessionMaker:
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """Обеспечивает асинхронный сеанс работы с БД."""
+    db_session_maker = request.app.state.db_session_maker
+    if not db_session_maker:
         raise HTTPException(status_code=503, detail="Database session factory not available")
-    async with dbSessionMaker() as session:
+
+    async with db_session_maker() as session:
         yield session
 
-async def getRedis(request: Request) -> AsyncGenerator[Redis, None]:
+async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
     """Обеспечивает подключение Redis из пула."""
-    pool: ConnectionPool = request.app.state.redisPool
+    pool: ConnectionPool = request.app.state.redis_pool
     redis = Redis(connection_pool=pool, decode_responses=True)
     try:
         yield redis
     finally:
         await redis.aclose()
 
-async def createRedisPool() -> ConnectionPool:
+async def create_redis_pool() -> ConnectionPool:
     """Создает пул подключений Redis."""
     return ConnectionPool.from_url(settings.settings.ARQ.REDIS_URL, decode_responses=True)
 
-async def closeRedisPool(pool: ConnectionPool):
+async def close_redis_pool(pool: ConnectionPool) -> None:
     """Закрывает пул подключений Redis."""
     await pool.disconnect()
 
-async def getArqPool(request: Request) -> AsyncGenerator[ArqRedis, None]:
+async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq."""
-    arqPool: ArqRedis = request.app.state.arqPool
+    arq_pool: ArqRedis = request.app.state.arq_pool
     try:
-        yield arqPool
+        yield arq_pool
     finally:
         pass
 
-async def getKafkaProducer(request: Request) -> AIOKafkaProducer:
-    """Зависимость для получения Kafka-продюсера."""
-    kafkaProducer: AIOKafkaProducer = request.app.state.kafkaProducer
-    if not kafkaProducer:
+async def get_kafka_producer(request: Request) -> AIOKafkaProducer:
+    """Получает Kafka-продюсер."""
+    kafka_producer: AIOKafkaProducer = request.app.state.kafka_producer
+    if not kafka_producer:
         raise HTTPException(status_code=503, detail="Kafka producer not initialized")
-    return kafkaProducer
+    return kafka_producer
 
-def getMlPipeline(request: Request) -> dict | None:
-    """
-    Извлекает актуальный ML-пайплайн из менеджера.
-    """
-    return modelManager.getPipeline()
+def get_ml_pipeline(request: Request) -> dict | None:
+    """Получает актуальный ML-пайплайн из менеджера."""
+    return modelManager.get_pipeline()
 
-async def getClassificationService(
-    db: AsyncSession = Depends(getDb),
-    redis: Redis = Depends(getRedis),
-    mlPipeline: dict | None = Depends(getMlPipeline)
+async def get_classification_service(
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    ml_pipeline: dict | None = Depends(get_ml_pipeline)
 ) -> ClassificationService:
-    """
-    Фабрика зависимостей.
-    """
-    return ClassificationService(db, redis, mlPipeline)
+    """Фабрика зависимостей для ClassificationService."""
+    return ClassificationService(db, redis, ml_pipeline)

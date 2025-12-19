@@ -26,5 +26,5 @@ COPY ./alembic /app/alembic
 
 COPY run_consumers.py /app/run_consumers.py
 
-RUN mkdir /models
+RUN mkdir -p /models && chmod 755 /models
 ENV MODEL_PATH=/models

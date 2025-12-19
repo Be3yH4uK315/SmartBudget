@@ -10,6 +10,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score
 from lightgbm import LGBMClassifier
+from typing import Tuple
 
 from app import settings, repositories
 
@@ -51,7 +52,7 @@ def _sanitizeMetrics(metrics: dict) -> dict:
             clean[k] = v
     return clean
 
-def _trainInternalProcess(df_dict: dict) -> tuple[str, dict]:
+def _trainInternalProcess(df_dict: dict) -> Tuple[str | None, dict]:
     try:
         df = pd.DataFrame(df_dict)
         df.fillna({'merchant': '', 'description': '', 'mcc': 0}, inplace=True)
@@ -97,77 +98,89 @@ def _trainInternalProcess(df_dict: dict) -> tuple[str, dict]:
         return None, {"error": str(e)}
 
 class MLService:
-    """
-    Управляет обучением, сохранением и загрузкой ML-моделей.
-    """
+    """Управляет обучением, сохранением и загрузкой ML-моделей."""
+    
     @staticmethod
-    async def trainModel(training_df: pd.DataFrame) -> tuple[str, dict]:
+    async def train_model(training_df: pd.DataFrame) -> Tuple[str, dict]:
         """Асинхронная обертка для обучения."""
         loop = asyncio.get_running_loop()
-        dfData = training_df.to_dict(orient='list')
+        df_data = training_df.to_dict(orient='list')
         
         with ProcessPoolExecutor(max_workers=1) as pool:
-            result = await loop.run_in_executor(pool, _trainInternalProcess, dfData)
+            result = await loop.run_in_executor(pool, _trainInternalProcess, df_data)
         
         if result[0] is None:
             raise ValueError(result[1].get("error"))
             
         version, metrics = result
-        cleanMetrics = _sanitizeMetrics(metrics)
-        return version, cleanMetrics
+        clean_metrics = _sanitizeMetrics(metrics)
+        return version, clean_metrics
 
     @staticmethod
-    def _loadInternal(modelVersion: str):
-        """Синхронная загрузка с диска."""
+    def _loadInternal(model_version: str) -> Tuple[LGBMClassifier | None, TfidfVectorizer | None, list | None]:
+        """Синхронная загрузка модели с диска."""
         try:
-            modelPath = f"{settings.settings.ML.MODEL_PATH}/{modelVersion}_{MODEL_FILE_NAME}"
-            vectorizerPath = f"{settings.settings.ML.MODEL_PATH}/{modelVersion}_{VECTORIZER_FILE_NAME}"
-
-            model = joblib.load(modelPath)
-            vectorizer = joblib.load(vectorizerPath)
-            classLabels = model.classes_
+            model_path = f"{settings.settings.ML.MODEL_PATH}/{model_version}_{MODEL_FILE_NAME}"
+            vectorizer_path = f"{settings.settings.ML.MODEL_PATH}/{model_version}_{VECTORIZER_FILE_NAME}"
             
-            return model, vectorizer, classLabels
-        except FileNotFoundError:
-            logger.error(f"Files not found for version {modelVersion}")
+            model = joblib.load(model_path)
+            vectorizer = joblib.load(vectorizer_path)
+            
+            class_labels = list(range(model.n_classes_)) if hasattr(model, 'n_classes_') else None
+            
+            logger.info(f"Successfully loaded model version {model_version}")
+            return model, vectorizer, class_labels
+        except FileNotFoundError as e:
+            logger.error(f"Model files not found for version {model_version}: {e}")
             return None, None, None
         except Exception as e:
-            logger.error(f"Error loading model pipeline: {e}")
+            logger.error(f"Error loading model {model_version}: {e}")
             return None, None, None
 
     @staticmethod
-    async def loadPredictionPipeline(modelVersion: str):
-        """Асинхронная загрузка модели."""
-        logger.info(f"Loading ML pipeline version {modelVersion} from disk...")
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, MLService._loadInternal, modelVersion)
-
-    @staticmethod
-    def _predictInternal(model, vectorizer, classLabels, transactionData: dict) -> tuple[int | None, float]:
-        if not model or not vectorizer:
-            return None, 0.0
+    def _predictInternal(
+        model: LGBMClassifier, 
+        vectorizer: TfidfVectorizer, 
+        transaction_data: dict
+    ) -> Tuple[int, float]:
+        """Синхронный предсказанный результат ML модели."""
         try:
-            features_str = _createFeaturesFromDict(transactionData)
-            X_tfidf = vectorizer.transform([features_str])
-            probas = model.predict_proba(X_tfidf)[0]
-            best_proba_index = probas.argmax()
-            confidence = float(probas[best_proba_index])
-            category_id = int(classLabels[best_proba_index])
-            return category_id, confidence
+            features_text = _createFeaturesFromDict(transaction_data)
+            features_tfidf = vectorizer.transform([features_text])
+            
+            prediction = model.predict(features_tfidf)[0]
+            probabilities = model.predict_proba(features_tfidf)[0]
+            confidence = float(np.max(probabilities))
+            
+            return int(prediction), confidence
         except Exception as e:
-            logger.error(f"Prediction error: {e}")
-            return None, 0.0
+            logger.error(f"Error during prediction: {e}")
+            raise
 
     @staticmethod
-    async def predict_async(model, vectorizer, classLabels, transactionData: dict) -> tuple[int | None, float]:
+    async def load_prediction_pipeline(model_version: str) -> Tuple[LGBMClassifier | None, TfidfVectorizer | None, list | None]:
+        """Асинхронная загрузка модели."""
+        logger.info(f"Loading ML pipeline version {model_version} from disk...")
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, MLService._loadInternal, model_version)
+
+    @staticmethod
+    async def predict_async(
+        model: LGBMClassifier, 
+        vectorizer: TfidfVectorizer, 
+        class_labels: list, 
+        transaction_data: dict
+    ) -> Tuple[int, float]:
+        """Асинхронное предсказание."""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None, 
             MLService._predictInternal, 
-            model, vectorizer, classLabels, transactionData
+            model, vectorizer, class_labels, transaction_data
         )
 
 class ModelManager:
+    """Singleton для управления моделью в памяти."""
     _instance = None
     
     def __new__(cls):
@@ -175,50 +188,52 @@ class ModelManager:
             cls._instance = super(ModelManager, cls).__new__(cls)
             cls._instance.model = None
             cls._instance.vectorizer = None
-            cls._instance.classLabels = None
-            cls._instance.modelVersion = None
+            cls._instance.class_labels = None
+            cls._instance.model_version = None
             cls._instance.last_check = datetime.min
         return cls._instance
 
-    def getPipeline(self) -> dict | None:
+    def get_pipeline(self):
+        """Получает текущий пайплайн."""
         if not self.model:
             return None
         return {
             "model": self.model,
             "vectorizer": self.vectorizer,
-            "classLabels": self.classLabels,
-            "modelVersion": self.modelVersion
+            "classLabels": self.class_labels,
+            "modelVersion": self.model_version
         }
 
-    async def checkForUpdates(self, dbSessionMaker):
+    async def check_for_updates(self, db_session_maker):
+        """Проверяет наличие новой модели в БД."""
         now = datetime.now()
-        if (now - self.last_check).total_seconds() < 60 and self.modelVersion:
+        if (now - self.last_check).total_seconds() < 60 and self.model_version:
             return 
         
         try:
-            async with dbSessionMaker() as session:
+            async with db_session_maker() as session:
                 repository = repositories.ModelRepository(session)
-                activeModel = await repository.getActiveModel()
+                active_model = await repository.get_active_model()
                 
-                if not activeModel:
-                    if self.modelVersion is not None:
-                        logger.warning("Active model removed from DB. Unloading current model.")
+                if not active_model:
+                    if self.model_version is not None:
+                        logger.warning("Active model removed from DB. Unloading.")
                         self.model = None
-                        self.modelVersion = None
+                        self.model_version = None
                     return
 
-                if activeModel.version != self.modelVersion:
-                    logger.info(f"New active model detected in DB: {activeModel.version} (Current: {self.modelVersion}). Reloading...")
-                    model, vec, labels = await MLService.loadPredictionPipeline(activeModel.version)
+                if active_model.version != self.model_version:
+                    logger.info(f"New active model: {active_model.version}")
+                    model, vec, labels = await MLService.load_prediction_pipeline(active_model.version)
                     
                     if model:
                         self.model = model
                         self.vectorizer = vec
-                        self.classLabels = labels
-                        self.modelVersion = activeModel.version
-                        logger.info(f"Hot Reload Success: Model v{self.modelVersion} is now active.")
+                        self.class_labels = labels
+                        self.model_version = active_model.version
+                        logger.info(f"Hot Reload Success: v{self.model_version}")
                     else:
-                        logger.error(f"Failed to load files for new model v{activeModel.version}. Keeping old model.")
+                        logger.error(f"Failed to load files for v{active_model.version}")
                 
                 self.last_check = now
         except Exception as e:

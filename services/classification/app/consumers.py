@@ -41,48 +41,54 @@ async def _handlePoisonPill(
             error=f"{type(error).__name__}: {str(error)}",
             timestamp=datetime.now(timezone.utc)
         )
-        await kafka_producer.sendKafkaEvent(producer, dlqTopic, dlqEvent.model_dump())
+        await kafka_producer.send_kafka_event(producer, dlqTopic, dlqEvent.model_dump())
     except Exception as e:
         logger.critical(f"FAILED TO SEND TO DLQ: {e}")
 
-async def consumeNeedCategory(
+async def consume_need_category(
     consumer: AIOKafkaConsumer, 
     producer: AIOKafkaProducer, 
     redis: Redis,
-    dbSessionMaker: async_sessionmaker[AsyncSession]
+    db_session_maker: async_sessionmaker[AsyncSession]
 ):
-    """
-    Основной консьюмер: слушает 'transaction.need_category'.
-    """
+    """Основной консьюмер: слушает 'transaction.need_category'."""
     logger.info("Initializing consumer for 'need_category'...")
     
-    await modelManager.checkForUpdates(dbSessionMaker)
+    await modelManager.check_for_updates(db_session_maker)
     
-    healthFile = Path("/tmp/healthy")
+    health_file = Path("/tmp/healthy")
         
     try:
         async for msg in consumer:
             try:
-                healthFile.touch()
+                health_file.touch()
             except OSError:
                 pass
 
-            await modelManager.checkForUpdates(dbSessionMaker)
+            await modelManager.check_for_updates(db_session_maker)
             
-            currentPipeline = modelManager.getPipeline()
+            current_pipeline = modelManager.get_pipeline()
             logger.debug(f"Received message from {msg.topic} offset={msg.offset}")
 
             try:
                 data = json.loads(msg.value.decode('utf-8'))
                 
-                async with dbSessionMaker() as session:
-                    service = ClassificationService(session, redis, currentPipeline)
-                    events = await service.processTransaction(data)
+                async with db_session_maker() as session:
+                    service = ClassificationService(session, redis, current_pipeline)
+                    events = await service.process_transaction(data)
 
                 if events:
-                    eventClassified, eventEvents = events
-                    await kafka_producer.sendKafkaEvent(producer, settings.settings.KAFKA.TOPIC_CLASSIFIED, eventClassified)
-                    await kafka_producer.sendKafkaEvent(producer, settings.settings.KAFKA.TOPIC_CLASSIFICATION_EVENTS, eventEvents)
+                    event_classified, event_events = events
+                    await kafka_producer.send_kafka_event(
+                        producer, 
+                        settings.settings.KAFKA.TOPIC_CLASSIFIED, 
+                        event_classified
+                    )
+                    await kafka_producer.send_kafka_event(
+                        producer, 
+                        settings.settings.KAFKA.TOPIC_CLASSIFICATION_EVENTS, 
+                        event_events
+                    )
                 
                 await consumer.commit() 
                 

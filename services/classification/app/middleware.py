@@ -6,7 +6,7 @@ from aiokafka.errors import KafkaError
 
 logger = logging.getLogger(__name__)
 
-async def errorMiddleware(request: Request, callNext):
+async def error_middleware(request: Request, callNext):
     """Промежуточное ПО для обработки ошибок в запросах."""
     try:
         return await callNext(request)

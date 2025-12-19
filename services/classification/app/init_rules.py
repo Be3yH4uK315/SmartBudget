@@ -96,34 +96,35 @@ MCC_GENERIC = {
     2: [5499], # Misc Food
 }
 
-async def initAllRules():
-    engine = create_async_engine(settings.settings.db.db_url)
-    dbSessionMaker = async_sessionmaker(engine, expire_on_commit=False)
+async def init_all_rules():
+    """Инициализирует все правила в БД."""
+    engine = create_async_engine(settings.settings.DB.DB_URL)
+    db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
-    async with dbSessionMaker() as session:
+    async with db_session_maker() as session:
         logger.info("--- STARTING RULES RE-INITIALIZATION ---")
 
         logger.info("Cleaning existing rules...")
         await session.execute(delete(models.Rule))
         await session.commit()
 
-        totalRules = 0
+        total_rules = 0
 
         # -----------------------------------------------------
         # СЛОЙ 1: REGEX (Самый высокий приоритет: 5-15)
         # -----------------------------------------------------
         logger.info("Generating Regex Rules...")
-        for categoryId, pattern in REGEX_RULES_LIST:
+        for category_id, pattern in REGEX_RULES_LIST:
             rule = models.Rule(
-                categoryId=categoryId,
+                category_id=category_id,
                 name=f"RX: {pattern[:20]}",
                 pattern=pattern,
-                patternType=models.RulePatternType.REGEX,
+                pattern_type=models.RulePatternType.REGEX,
                 priority=10,
                 mcc=None
             )
             session.add(rule)
-            totalRules += 1
+            total_rules += 1
 
         # -----------------------------------------------------
         # СЛОЙ 2: BRAND KEYWORDS (Средний приоритет: 40)
@@ -137,63 +138,63 @@ async def initAllRules():
                 continue
             
             for keyword in category.keywords:
-                keywordClean = keyword.lower().strip()
+                keyword_clean = keyword.lower().strip()
 
-                if len(keywordClean) < 3: 
+                if len(keyword_clean) < 3: 
                     continue
-                if keywordClean in DANGEROUS_KEYWORDS:
-                    logger.warning(f"Skipping dangerous keyword: {keywordClean}")
+                if keyword_clean in DANGEROUS_KEYWORDS:
+                    logger.warning(f"Skipping dangerous keyword: {keyword_clean}")
                     continue
 
                 rule = models.Rule(
-                    categoryId=category.categoryId,
-                    name=f"KW: {keywordClean}",
-                    pattern=keywordClean,
-                    patternType=models.RulePatternType.CONTAINS,
+                    category_id=category.category_id,
+                    name=f"KW: {keyword_clean}",
+                    pattern=keyword_clean,
+                    pattern_type=models.RulePatternType.CONTAINS,
                     priority=40,
                     mcc=None
                 )
                 session.add(rule)
-                totalRules += 1
+                total_rules += 1
 
         # -----------------------------------------------------
         # СЛОЙ 3: SPECIFIC MCC (Приоритет: 60)
         # -----------------------------------------------------
         logger.info("Generating Specific MCC Rules...")
-        for categoryId, codes in MCC_SPECIFIC.items():
+        for category_id, codes in MCC_SPECIFIC.items():
             for code in codes:
                 rule = models.Rule(
-                    categoryId=categoryId,
+                    category_id=category_id,
                     name=f"MCC (Spec): {code}",
                     pattern=str(code),
-                    patternType=models.RulePatternType.MCC,
+                    pattern_type=models.RulePatternType.MCC,
                     priority=60, 
                     mcc=code
                 )
                 session.add(rule)
-                totalRules += 1
+                total_rules += 1
 
         # -----------------------------------------------------
         # СЛОЙ 4: GENERIC MCC (Приоритет: 100)
         # -----------------------------------------------------
         logger.info("Generating Generic MCC Rules...")
-        for categoryId, codes in MCC_GENERIC.items():
+        for category_id, codes in MCC_GENERIC.items():
             for code in codes:
                 rule = models.Rule(
-                    categoryId=categoryId,
+                    category_id=category_id,
                     name=f"MCC (Gen): {code}",
                     pattern=str(code),
-                    patternType=models.RulePatternType.MCC,
+                    pattern_type=models.RulePatternType.MCC,
                     priority=100,
                     mcc=code
                 )
                 session.add(rule)
-                totalRules += 1
+                total_rules += 1
 
         await session.commit()
-        logger.info(f"--- SUCCESS: Created {totalRules} high-quality rules. ---")
+        logger.info(f"--- SUCCESS: Created {total_rules} high-quality rules. ---")
 
     await engine.dispose()
 
 if __name__ == "__main__":
-    asyncio.run(initAllRules())
+    asyncio.run(init_all_rules())
