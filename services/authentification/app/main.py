@@ -24,8 +24,8 @@ async def lifespan(app: FastAPI):
     logging_config.setupLogging()
 
     try:
-        geoIpReader = geoip2.database.Reader(settings.settings.APP.GEOIP_DB_PATH)
-        app.state.geoIpReader = geoIpReader
+        geoip_reader = geoip2.database.Reader(settings.settings.APP.GEOIP_DB_PATH)
+        app.state.geoip_reader = geoip_reader
         middleware.logger.info(
             f"GeoIP DB loaded: {settings.settings.APP.GEOIP_DB_PATH}"
         )
@@ -34,16 +34,16 @@ async def lifespan(app: FastAPI):
             f"GeoIP DB not found: {settings.settings.APP.GEOIP_DB_PATH}. "
             f"Geolocation service disabled."
         )
-        app.state.geoIpReader = None
+        app.state.geoip_reader = None
     except Exception as e:
         middleware.logger.error(f"GeoIP init error: {e}")
-        app.state.geoIpReader = None
+        app.state.geoip_reader = None
 
     try:
         engine: AsyncEngine = create_async_engine(settings.settings.DB.DB_URL)
-        dbSessionMaker = async_sessionmaker(engine, expire_on_commit=False)
+        db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
         app.state.engine = engine
-        app.state.dbSessionMaker = dbSessionMaker
+        app.state.db_session_maker = db_session_maker
         middleware.logger.info("DB Engine & Session Maker initialized")
 
     except Exception as e:
@@ -51,11 +51,11 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Database initialization failed") from e
 
     try:
-        redisPool = await dependencies.createRedisPool()
-        app.state.redisPool = redisPool
+        redis_pool = await dependencies.create_redis_pool()
+        app.state.redis_pool = redis_pool
 
-        redisLimiter = Redis(connection_pool=redisPool)
-        await FastAPILimiter.init(redisLimiter)
+        redis_limiter = Redis(connection_pool=redis_pool)
+        await FastAPILimiter.init(redis_limiter)
 
         middleware.logger.info("Redis pool & rate limiter initialized")
     except Exception as e:
@@ -63,12 +63,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Redis initialization failed") from e
     
     try:
-        arqSettings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
-        arqPool = await create_pool(
-            arqSettings,
+        arq_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
+        arq_pool = await create_pool(
+            arq_settings,
             default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
         )
-        app.state.arqPool = arqPool
+        app.state.arq_pool = arq_pool
         middleware.logger.info("ARQ Pool initialized")
     except Exception as e:
         middleware.logger.critical(f"ARQ initialization failed: {e}")
@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
 
     finally:
         try:
-            geo = app.state.geoIpReader
+            geo = app.state.geoip_reader
             if geo is not None:
                 geo.close()
                 middleware.logger.info("GeoIP DB closed")
@@ -99,20 +99,20 @@ async def lifespan(app: FastAPI):
             middleware.logger.error(f"Error closing FastAPILimiter: {e}")
 
         try:
-            redisPool = app.state.redisPool
-            await dependencies.closeRedisPool(redisPool)
+            redis_pool = app.state.redis_pool
+            await dependencies.close_redis_pool(redis_pool)
             middleware.logger.info("Redis pool closed")
         except Exception as e:
             middleware.logger.error(f"Error closing redis pool: {e}")
 
         try:
-            if app.state.arqPool:
-                await app.state.arqPool.close()
+            if app.state.arq_pool:
+                await app.state.arq_pool.close()
                 middleware.logger.info("ARQ pool closed")
         except Exception as e:
             middleware.logger.error(f"Error closing ARQ pool: {e}")
-        del app.state.redisPool
-        del app.state.arqPool
+        del app.state.redis_pool
+        del app.state.arq_pool
 
 app = FastAPI(
     title="Auth Service", 
@@ -123,7 +123,7 @@ app = FastAPI(
 )
 
 @app.exception_handler(exceptions.AuthServiceError)
-async def authServiceExceptionHandler(request: Request, exc: exceptions.AuthServiceError):
+async def auth_service_exception_handler(request: Request, exc: exceptions.AuthServiceError):
     status_code = 400
     detail = str(exc)
     
@@ -159,5 +159,5 @@ app.add_middleware(
 )
 
 Instrumentator().instrument(app).expose(app)
-app.middleware("http")(middleware.errorMiddleware)
+app.middleware("http")(middleware.error_middleware)
 app.include_router(auth.router, prefix="/api/v1/auth")

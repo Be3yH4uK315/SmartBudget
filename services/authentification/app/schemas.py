@@ -82,7 +82,7 @@ class CompleteResetRequest(BaseModel):
         title="Reset Token",
         description="Токен подтверждения восстановления пароля"
     )
-    newPassword: str = Field(
+    new_password: str = Field(
         ...,
         min_length=8,
         title="New Password",
@@ -96,7 +96,7 @@ class ChangePasswordRequest(BaseModel):
         title="Current Password",
         description="Текущий пароль пользователя"
     )
-    newPassword: str = Field(
+    new_password: str = Field(
         ...,
         min_length=8,
         title="New Password",
@@ -131,7 +131,7 @@ class UnifiedResponse(BaseModel):
 
 class UserInfo(BaseModel):
     """Безопасная информация о пользователе."""
-    userId: UUID = Field(
+    user_id: UUID = Field(
         ...,
         title="User ID",
         description="Уникальный идентификатор пользователя"
@@ -156,12 +156,12 @@ class UserInfo(BaseModel):
         title="Role",
         description="Роль пользователя в системе"
     )
-    lastLogin: Optional[datetime] = Field(
+    last_login: Optional[datetime] = Field(
         None,
         title="Last Login",
         description="Дата последнего входа пользователя"
     )
-    createdAt: datetime = Field(
+    created_at: datetime = Field(
         ...,
         title="Created At",
         description="Дата создания учетной записи"
@@ -171,12 +171,12 @@ class UserInfo(BaseModel):
 
 class SessionInfo(BaseModel):
     """Безопасная информация о сессии, передаваемая на фронтенд."""
-    sessionId: UUID = Field(
+    session_id: UUID = Field(
         ...,
         title="Session ID",
         description="Уникальный идентификатор сессии"
     )
-    deviceName: str = Field(
+    device_name: str = Field(
         ...,
         title="Device Name",
         description="Название или тип устройства"
@@ -191,12 +191,12 @@ class SessionInfo(BaseModel):
         title="IP Address",
         description="IP-адрес сессии"
     )
-    createdAt: datetime = Field(
+    created_at: datetime = Field(
         ...,
         title="Created At",
         description="Дата создания сессии"
     )
-    isCurrentSession: bool = Field(
+    is_current_session: bool = Field(
         False,
         title="Is Current Session",
         description="Является ли сессия текущей"
