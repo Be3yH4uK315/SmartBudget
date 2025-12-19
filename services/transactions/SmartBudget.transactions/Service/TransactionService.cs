@@ -160,13 +160,35 @@ namespace SmartBudget.Transactions.Services
             }
         }
 
-        public async Task<List<Transaction>> GetUserTransactionsGoalsAsync(Guid accountId, CancellationToken stoppingToken)
+        public async Task<List<TransactionsByMonth>> GetUserTransactionsGoalsAsync(Guid accountId, CancellationToken stoppingToken)
         {
             return await _db.Transactions
-                .Where(new_transaction => new_transaction.AccountId == accountId)
-                .OrderByDescending(new_transaction => new_transaction.CreatedAt)
-                .ToListAsync(stoppingToken);
-        }
+        .Where(t => t.AccountId == accountId)
+        .GroupBy(t => new
+        {
+            t.CreatedAt.Year,
+            t.CreatedAt.Month,
+            t.Type
+        })
+        .Select(g => new TransactionsByMonth
+        {
+            Value = g.Sum(x => x.Value),
 
+            Date = new DateTime(
+                g.Key.Year,
+                g.Key.Month,
+                1,
+                0, 0, 0,
+                DateTimeKind.Utc),
+
+            Type = g.Key.Type
+        })
+        .OrderByDescending(x => x.Date)
+        .ThenBy(x => x.Type)
+        .ToListAsync(stoppingToken);
+
+        }
     }
+
 }
+

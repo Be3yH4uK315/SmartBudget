@@ -29,5 +29,7 @@ namespace SmartBudget.Transactions.DTO
         public int? Mcc { get; set; }
 
         public string Description { get; set; }
+
+        public int? CategoryId {get; set;}
     }
 }

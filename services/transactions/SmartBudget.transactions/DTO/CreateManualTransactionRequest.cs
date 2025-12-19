@@ -8,8 +8,6 @@ namespace SmartBudget.Transactions.DTO
     /// </summary>
     public class CreateManualTransactionRequest
     {
-        [JsonPropertyName("userId")]
-        public Guid UserId { get; set; }
 
         [JsonPropertyName("accountId")]
         public Guid AccountId { get; set; }

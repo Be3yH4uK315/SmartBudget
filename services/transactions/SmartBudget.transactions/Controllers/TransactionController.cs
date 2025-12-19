@@ -27,10 +27,10 @@ namespace SmartBudget.Transactions.Controllers
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> List(
-            [FromQuery(Name = "userId")] Guid userId,
+            [FromHeader(Name = "X-User-Id")] Guid userId,
             [FromQuery(Name = "limit")] int limit = 50,
             [FromQuery(Name = "offset")] int offset = 0,
-            [FromQuery(Name = "category_id")] int category_id = 0,
+            [FromQuery(Name = "categoryId")] int category_id = 0,
             CancellationToken stoppingToken = default)
         {
             List<Transaction> list =
@@ -65,13 +65,14 @@ namespace SmartBudget.Transactions.Controllers
         /// </summary>
         [HttpPost("manual")]
         public async Task<IActionResult> CreateManual(
+            [FromHeader(Name = "X-User-Id")] Guid userId,
             [FromBody] CreateManualTransactionRequest request,
             CancellationToken stoppingToken = default)
         {
             Transaction transaction = new Transaction
             {
                 Id = Guid.NewGuid(),
-                UserId = request.UserId,
+                UserId = userId,
                 TransactionId = Guid.NewGuid(),
                 AccountId = request.AccountId,
                 Value = request.Value,
@@ -141,7 +142,7 @@ namespace SmartBudget.Transactions.Controllers
                     CreatedAt = transactionDateUtc,
                     ImportedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
-                    CategoryId = null
+                    CategoryId = current_transaction.CategoryId,
                 };
 
                 imported.Add(imported_transaction);
@@ -153,7 +154,7 @@ namespace SmartBudget.Transactions.Controllers
         /// <summary>
         /// PATCH: change category
         /// </summary>
-        [HttpPatch("{id}")]
+        [HttpPatch("edit/{id}")]
         public async Task<IActionResult> PatchCategory(
             Guid id,
             [FromBody] PatchTransactionCategoryRequest request,
@@ -165,7 +166,7 @@ namespace SmartBudget.Transactions.Controllers
         /// <summary>
         /// DELETE transaction
         /// </summary>
-        [HttpDelete("{id}")]
+        [HttpDelete("edit/{id}")]
         public async Task<IActionResult> Delete(Guid id, CancellationToken stoppingToken = default)
         {
             await _service.DeleteAsync(id, stoppingToken);
@@ -178,20 +179,12 @@ namespace SmartBudget.Transactions.Controllers
         [HttpGet("goals/{accountId}")]
         public async Task<IActionResult> Goals( Guid accountId,CancellationToken stoppingToken = default)
         {
-            List<Transaction> list =
-                await _service.GetUserTransactionsGoalsAsync(accountId, stoppingToken);
-
-            return Ok(list.Select(new_transaction => new
-            {
-                value = new_transaction.Value,
-                date = new_transaction.CreatedAt.ToString("o"),
-                type = new_transaction.Type.ToString()
-            }));
+            return Ok(await _service.GetUserTransactionsGoalsAsync(accountId, stoppingToken));
         }
         /// <summary>
         /// Health check endpoint
         /// </summary>
-        [HttpGet("/health")]
+        [HttpGet("health")]
         public IActionResult Health()
         {
             return Ok(new { status = "Healthy" });
