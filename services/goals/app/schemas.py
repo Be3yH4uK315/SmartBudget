@@ -69,7 +69,7 @@ class TransactionType(str, Enum):
 
 class TransactionEvent(BaseModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
-    goal_id: UUID = Field(..., description="ID цели (ранее account_id)")
+    goal_id: UUID = Field(..., description="ID цели")
     user_id: UUID = Field(..., description="ID пользователя")
     value: Decimal = Field(..., gt=0, description="Сумма транзакции")
     type: TransactionType = Field(..., description="Тип транзакции")

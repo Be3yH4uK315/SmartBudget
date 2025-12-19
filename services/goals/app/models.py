@@ -1,12 +1,13 @@
+import enum
+from decimal import Decimal
 from uuid import uuid4
+
 from sqlalchemy import (
-    Column, ForeignKey, String, DateTime,
-    Index, Date, DECIMAL, func, Integer, JSON, CheckConstraint
+    Column, String, DateTime, Index, Date, DECIMAL, 
+    func, Integer, JSON, CheckConstraint, ForeignKey
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import validates
-import enum
-from decimal import Decimal
 
 from app import base
 
