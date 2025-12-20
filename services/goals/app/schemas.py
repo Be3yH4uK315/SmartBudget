@@ -1,11 +1,24 @@
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional
 from decimal import Decimal
 from datetime import date
 from uuid import UUID
 
-from app import models
+class GoalStatus(Enum):
+    ONGOING = 'ongoing'
+    ACHIEVED = 'achieved'
+    EXPIRED = 'expired'
+    CLOSED = 'closed'
+
+class GoalEventType(str, Enum):
+    CREATED = "goal.created"
+    CHANGED = "goal.changed"
+    UPDATED = "goal.updated"
+    ACHIEVED = "goal.achieved"
+    EXPIRED = "goal.expired"
+    APPROACHING = "goal.approaching"
+    ALERT = "goal.alert"
 
 class CreateGoalRequest(BaseModel):
     name: str = Field(..., max_length=255, description="Название цели")
@@ -21,7 +34,7 @@ class GoalResponse(BaseModel):
     current_value: Decimal = Field(..., description="Текущая накопленная сумма")
     finish_date: date = Field(..., description="Дата достижения")
     days_left: int = Field(..., description="Дней осталось")
-    status: models.GoalStatus = Field(..., description="Статус цели")
+    status: GoalStatus = Field(..., description="Статус цели")
     
     model_config = ConfigDict(
         from_attributes=True,
@@ -47,7 +60,7 @@ class AllGoalsResponse(BaseModel):
     target_value: Decimal = Field(..., description="Целевая сумма")
     current_value: Decimal = Field(..., description="Текущая накопленная сумма")
     finish_date: date = Field(..., description="Дата достижения")
-    status: models.GoalStatus = Field(..., description="Статус цели")
+    status: GoalStatus = Field(..., description="Статус цели")
     
     model_config = ConfigDict(
         from_attributes=True,
@@ -58,7 +71,19 @@ class GoalPatchRequest(BaseModel):
     name: Optional[str] = Field(None, max_length=255, description="Название цели")
     target_value: Optional[Decimal] = Field(None, gt=0, description="Целевая сумма")
     finish_date: Optional[date] = Field(None, description="Дата достижения")
-    status: Optional[models.GoalStatus] = Field(None, description="Статус цели")
+    status: Optional[GoalStatus] = Field(
+        None,
+        description="Разрешено только значение CLOSED"
+    )
+
+    @field_validator("status")
+    @classmethod
+    def allow_only_closed(cls, v):
+        if v is None:
+            return v
+        if v != GoalStatus.CLOSED:
+            raise ValueError("Only CLOSED status is allowed")
+        return v
 
 class UnifiedErrorResponse(BaseModel):
     detail: str = Field(..., description="Описание ошибки")
@@ -75,90 +100,3 @@ class TransactionEvent(BaseModel):
     type: TransactionType = Field(..., description="Тип транзакции")
 
     model_config = ConfigDict(from_attributes=True)
-
-BUDGET_EVENTS_SCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Budget Events Schema",
-    "description": "События, связанные с целями пользователя",
-    "type": "object",
-    "properties": {
-        "event": {
-            "type": "string",
-            "description": "Тип события",
-            "enum": ["goal.created", "goal.updated", "goal.changed"]
-        },
-        "goalId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "ID цели"
-        },
-        "userId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "ID пользователя"
-        },
-        "name": {
-            "type": "string",
-            "maxLength": 255,
-            "description": "Название цели"
-        },
-        "targetValue": {
-            "type": "number",
-            "minimum": 0,
-            "description": "Целевая сумма"
-        },
-        "currentValue": {
-            "type": "number",
-            "minimum": 0,
-            "description": "Текущая накопленная сумма"
-        },
-        "finishDate": {
-            "type": "string",
-            "format": "date",
-            "description": "Дата достижения цели (YYYY-MM-DD)"
-        },
-        "status": {
-            "type": "string",
-            "description": "Статус цели",
-            "enum": ["ongoing", "achieved", "expired", "closed"]
-        },
-        "changes": {
-            "type": "object",
-            "description": "Изменённые поля цели",
-            "additionalProperties": True
-        }
-    },
-    "required": ["event", "goalId"],
-    "additionalProperties": False
-}
-
-BUDGET_NOTIFICATIONS_SCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Budget Notifications Schema",
-    "description": "Уведомления, связанные с целями пользователя",
-    "type": "object",
-    "properties": {
-        "event": {
-            "type": "string",
-            "description": "Тип уведомления",
-            "enum": ["goal.alert", "goal.approaching", "goal.expired"]
-        },
-        "goalId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "ID цели"
-        },
-        "type": {
-            "type": "string",
-            "description": "Категория уведомления",
-            "enum": ["achieved", "approaching", "expired"]
-        },
-        "daysLeft": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Количество дней до даты достижения цели"
-        }
-    },
-    "required": ["event", "goalId", "type"],
-    "additionalProperties": False
-}

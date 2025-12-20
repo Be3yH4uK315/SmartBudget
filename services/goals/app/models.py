@@ -1,21 +1,14 @@
-import enum
 from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, DateTime, Index, Date, DECIMAL, 
-    func, Integer, JSON, CheckConstraint, ForeignKey
+    func, Integer, CheckConstraint, ForeignKey
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import validates
 
-from app import base
-
-class GoalStatus(enum.Enum):
-    ONGOING = 'ongoing'
-    ACHIEVED = 'achieved'
-    EXPIRED = 'expired'
-    CLOSED = 'closed'
+from app import base, schemas
 
 class Goal(base.Base):
     __tablename__ = "goals"
@@ -29,7 +22,7 @@ class Goal(base.Base):
     status = Column(
         String(50), 
         nullable=False, 
-        default=GoalStatus.ONGOING.value
+        default=schemas.GoalStatus.ONGOING.value
     )
     created_at = Column(
         DateTime(timezone=True),
@@ -51,6 +44,13 @@ class Goal(base.Base):
         CheckConstraint('current_value >= 0', name='ck_goal_current_value_non_negative'),
     )
 
+    @validates("status")
+    def validate_status(self, _, value):
+        allowed = {s.value for s in schemas.GoalStatus}
+        if value not in allowed:
+            raise ValueError("Invalid goal status")
+        return value
+    
     @validates('target_value', 'current_value')
     def validate_decimal_values(self, key, value):
         """Валидирует значения перед сохранением."""
@@ -84,11 +84,10 @@ class OutboxEvent(base.Base):
     event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
     topic = Column(String(255), nullable=False)
     event_type = Column(String(255), nullable=False)
-    payload = Column(JSON, nullable=False)
+    payload = Column(JSONB, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     retry_count = Column(Integer, default=0, nullable=False)
     status = Column(String(50), default='pending', nullable=False)
-    last_error = Column(String(512), nullable=True)
 
     __table_args__ = (
         Index('ix_outbox_status_created_at', 'status', 'created_at'),
