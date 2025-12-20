@@ -14,15 +14,8 @@ router = APIRouter(tags=["Goals"])
     summary="Health check сервиса целей"
 )
 async def health_check(request: Request) -> dict:
-    """
-    Проверяет доступность DB, Redis (ARQ) и Kafka Producer.
-    """
     app = request.app
-    health_status = {
-        "db": "unknown",
-        "redis": "unknown",
-        "kafka": "unknown"
-    }
+    health_status = {"db": "unknown", "redis": "unknown"}
     has_error = False
 
     if not getattr(app.state, "engine", None):
@@ -48,25 +41,13 @@ async def health_check(request: Request) -> dict:
             health_status["redis"] = "failed"
             has_error = True
 
-    if getattr(app.state, "kafka_producer", None):
-        health_status["kafka"] = "initialized"
-    else:
-        health_status["kafka"] = "disconnected"
-        has_error = True
-
     if has_error:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "status": "error",
-                "components": health_status
-            }
+            content={"status": "error", "components": health_status}
         )
 
-    return {
-        "status": "ok",
-        "components": health_status
-    }
+    return {"status": "ok", "components": health_status}
 
 @router.post(
     "/",
@@ -116,8 +97,14 @@ async def get_goal(
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
     goal, days_left = await service.get_goal_details(user_id, goal_id)
-    response = schemas.GoalResponse.model_validate(goal)
-    response.days_left = days_left
+    response = schemas.GoalResponse(
+        name=goal.name,
+        target_value=goal.target_value,
+        current_value=goal.current_value,
+        finish_date=goal.finish_date,
+        status=goal.status,
+        days_left=days_left
+    )
     return response
 
 @router.patch(
@@ -132,6 +119,12 @@ async def update_goal(
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
     goal, days_left = await service.update_goal(user_id, goal_id, request)
-    response = schemas.GoalResponse.model_validate(goal)
-    response.days_left = days_left
+    response = schemas.GoalResponse(
+        name=goal.name,
+        target_value=goal.target_value,
+        current_value=goal.current_value,
+        finish_date=goal.finish_date,
+        status=goal.status,
+        days_left=days_left
+    )
     return response

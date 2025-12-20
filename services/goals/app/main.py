@@ -15,7 +15,6 @@ from app import (
     exceptions,
     logging_config,
 )
-from app.kafka_producer import KafkaProducer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,6 @@ async def lifespan(app: FastAPI):
     
     engine = None
     db_session_maker = None
-    kafka_producer = None
     arq_pool = None
     
     try:
@@ -48,18 +46,8 @@ async def lifespan(app: FastAPI):
             logger.info("Database initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
-            app.state.engine = None
-            app.state.db_session_maker = None
             raise
 
-        try:
-            kafka_producer = KafkaProducer() 
-            await kafka_producer.start()
-            app.state.kafka_producer = kafka_producer
-            logger.info("Kafka producer initialized successfully")
-        except KafkaError as e:
-            logger.error(f"Failed to initialize Kafka: {e}")
-            app.state.kafka_producer = None
         try:
             arq_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
             arq_pool = await create_pool(
@@ -70,20 +58,12 @@ async def lifespan(app: FastAPI):
             logger.info("ARQ Redis pool initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize ARQ: {e}")
-            app.state.arq_pool = None
     
         logger.info("Application startup complete")
         yield
         
     finally:
         logger.info("Application shutdown initiated")
-        
-        if kafka_producer:
-            try:
-                await kafka_producer.stop()
-                logger.info("Kafka producer stopped")
-            except Exception as e:
-                logger.error(f"Error stopping Kafka: {e}")
         
         if arq_pool:
             try:
