@@ -1,27 +1,13 @@
-from decimal import Decimal
-from datetime import date, datetime
-import json
-import logging
 import asyncio
+import logging
 from aiokafka import AIOKafkaProducer
-from aiokafka.errors import KafkaError, KafkaTimeoutError
-from jsonschema import validate
-from jsonschema.exceptions import ValidationError
 
-from app import settings, schemas
+from app import settings
+from app.utils import serialization
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES = 3
-RETRY_DELAY = 1
-
-def json_default(obj):
-    """Расширенная сериализация."""
-    if isinstance(obj, Decimal):
-        return str(obj)
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
-    raise TypeError(f"Type {type(obj)} not serializable")
+SEND_TIMEOUT = 10
 
 class KafkaProducer:
     """Kafka producer с валидацией и повторными попытками."""
@@ -30,89 +16,49 @@ class KafkaProducer:
         self.producer = AIOKafkaProducer(
             bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
             acks='all',
-            retries=3,
-            request_timeout_ms=10000
+            linger_ms=50,
+            request_timeout_ms=SEND_TIMEOUT * 1000
         )
-        self._schemas = {
-            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS: schemas.BUDGET_EVENTS_SCHEMA,
-            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION: schemas.BUDGET_NOTIFICATIONS_SCHEMA,
-        }
         self._is_running = False
 
     async def start(self) -> None:
         """Запуск producer."""
-        try:
-            await self.producer.start()
-            self._is_running = True
-            logger.info("KafkaProducer started successfully")
-        except KafkaError as e:
-            logger.error(f"Failed to start KafkaProducer: {e}")
-            raise
+        await self.producer.start()
+        self._is_running = True
+        logger.info("Kafka producer started")
 
     async def stop(self) -> None:
         """Остановка producer."""
-        if self._is_running:
-            try:
-                await self.producer.stop()
-                self._is_running = False
-                logger.info("KafkaProducer stopped")
-            except Exception as e:
-                logger.error(f"Error stopping KafkaProducer: {e}")
+        if self._is_running and self.producer:
+            await self.producer.stop()
+            self._is_running = False
+            logger.info("Kafka producer stopped")
 
     async def send_event(
-        self, 
-        topic: str, 
-        event_data: dict, 
-        schema: dict = None
+        self,
+        topic: str,
+        event_data: dict
     ) -> bool:
         """Отправляет событие с повторными попытками."""
-        if not self._is_running:
-            logger.warning("Producer is not running, cannot send event")
+        if not self._is_running or not self.producer:
+            logger.error("Kafka producer not running")
             return False
 
         try:
-            dumped = json.dumps(event_data, default=json_default)
+            payload = serialization.to_json_str(event_data)
 
-            if schema:
-                try:
-                    validate_data = json.loads(dumped)
-                    validate(instance=validate_data, schema=schema)
-                except ValidationError as e:
-                    logger.error(f"Event validation failed for {topic}: {e.message}")
-                    return False
+            key = event_data.get("goal_id") or event_data.get("event_id")
 
-            value_bytes = dumped.encode('utf-8')
+            await asyncio.wait_for(
+                self.producer.send_and_wait(
+                    topic=topic,
+                    key=str(key).encode() if key else None,
+                    value=payload.encode(),
+                ),
+                timeout=SEND_TIMEOUT,
+            )
+            return True
 
-            for attempt in range(MAX_RETRIES):
-                try:
-                    await self.producer.send_and_wait(topic, value=value_bytes)
-                    logger.info(f"Event sent to {topic}: {event_data.get('event', 'unknown')}")
-                    return True
-                except KafkaTimeoutError as e:
-                    if attempt < MAX_RETRIES - 1:
-                        wait_time = RETRY_DELAY * (2 ** attempt)
-                        logger.warning(
-                            f"Kafka timeout (attempt {attempt + 1}/{MAX_RETRIES}), "
-                            f"retrying in {wait_time}s: {e}"
-                        )
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error(f"Failed to send event after {MAX_RETRIES} attempts: {e}")
-                        return False
-                except KafkaError as e:
-                    logger.error(f"Kafka error sending event: {e}")
-                    return False
-            
         except Exception as e:
-            logger.error(f"Unexpected error in send_event: {e}")
+            logger.error(f"Kafka send error: {e}")
             return False
-
-    async def send_budget_event(self, event_data: dict) -> bool:
-        """Отправляет событие в топик бюджета."""
-        topic = settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS
-        return await self.send_event(topic, event_data, self._schemas.get(topic))
-
-    async def send_notification(self, event_data: dict) -> bool:
-        """Отправляет уведомление."""
-        topic = settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION
-        return await self.send_event(topic, event_data, self._schemas.get(topic))
