@@ -1,5 +1,4 @@
 from typing import Self
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import repositories
 
@@ -9,10 +8,10 @@ class UnitOfWork:
     Обеспечивает атомарность операций и инкапсулирует работу с транзакциями.
     """
     
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
+    def __init__(self, session_factory):
         self.session_factory = session_factory
-        self._session: AsyncSession | None = None
-        self._goal_repo: repositories.GoalRepository | None = None
+        self._session = None
+        self._repositories = {}
 
     async def __aenter__(self) -> Self:
         self._session = self.session_factory()
@@ -21,7 +20,6 @@ class UnitOfWork:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if not self._session:
             return
-            
         try:
             if exc_type:
                 await self._session.rollback()
@@ -30,22 +28,16 @@ class UnitOfWork:
         finally:
             await self._session.close()
 
-    @property
-    def goal_repository(self) -> repositories.GoalRepository:
+    def _get_repository(self, repo_cls):
         """Инициализация репозитория."""
         if self._session is None:
-            raise RuntimeError("UnitOfWork context has not been entered")
-            
-        if self._goal_repo is None:
-            self._goal_repo = repositories.GoalRepository(self._session)
-        return self._goal_repo
+            raise RuntimeError("UoW not started")
+        
+        if repo_cls not in self._repositories:
+            self._repositories[repo_cls] = repo_cls(self._session)
+        return self._repositories[repo_cls]
 
-    async def commit(self):
-        """Явный коммит."""
-        if self._session:
-            await self._session.commit()
-
-    async def rollback(self):
-        """Явный откат."""
-        if self._session:
-            await self._session.rollback()
+    @property
+    def goals(self) -> repositories.GoalRepository:
+        """Удобный алиас, но внутри используется generic механизм."""
+        return self._get_repository(repositories.GoalRepository)

@@ -9,21 +9,10 @@ from sqlalchemy import delete, insert, or_, select, update, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import models, exceptions
+from app import models, exceptions, schemas
+from app.utils import serialization
 
 logger = logging.getLogger(__name__)
-
-MAX_RETRIES = 5
-
-def _json_serializer(obj):
-    """Преобразует сложные типы в строки для сохранения в JSON column."""
-    if isinstance(obj, Decimal):
-        return str(obj)
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
-    if isinstance(obj, UUID):
-        return str(obj)
-    raise TypeError(f"Type {type(obj)} not serializable")
 
 class GoalRepository:
     """Репозиторий для операций с целями. Не управляет транзакциями."""
@@ -53,7 +42,7 @@ class GoalRepository:
             select(models.Goal)
             .where(
                 models.Goal.user_id == user_id,
-                models.Goal.status == models.GoalStatus.ONGOING.value
+                models.Goal.status == schemas.GoalStatus.ONGOING.value
             )
             .order_by(remaining_amount.asc())
             .limit(10)
@@ -64,10 +53,10 @@ class GoalRepository:
     async def get_all_goals(self, user_id: UUID) -> list[models.Goal]:
         """Получает все цели пользователя."""
         status_priority = case(
-            (models.Goal.status == models.GoalStatus.ONGOING.value, 1),
-            (models.Goal.status == models.GoalStatus.EXPIRED.value, 2),
-            (models.Goal.status == models.GoalStatus.ACHIEVED.value, 3),
-            (models.Goal.status == models.GoalStatus.CLOSED.value, 4),
+            (models.Goal.status == schemas.GoalStatus.ONGOING.value, 1),
+            (models.Goal.status == schemas.GoalStatus.EXPIRED.value, 2),
+            (models.Goal.status == schemas.GoalStatus.ACHIEVED.value, 3),
+            (models.Goal.status == schemas.GoalStatus.CLOSED.value, 4),
             else_=5
         )
         completion_percentage = case(
@@ -89,12 +78,12 @@ class GoalRepository:
     def add_outbox_event(self, topic: str, event_data: dict) -> None:
         """Добавляет событие в Outbox."""
         try:
-            event_type = event_data.get("event", "unknown")
-            safe_payload = json.loads(json.dumps(event_data, default=_json_serializer))
+            event_type = event_data.get("event_type", "unknown")
+            clean_payload = serialization.recursive_normalize(event_data)
             outbox_entry = models.OutboxEvent(
                 topic=topic,
                 event_type=event_type,
-                payload=safe_payload,
+                payload=clean_payload,
                 status='pending'
             )
             self.db.add(outbox_entry)
@@ -129,19 +118,28 @@ class GoalRepository:
         )
 
         result = await self.db.execute(query)
-        updated_goal = result.scalar_one_or_none()
-        return updated_goal
+        return result.scalar_one_or_none()
 
-    async def update_fields(self, user_id: UUID, goal_id: UUID, changes: dict) -> models.Goal:
-        """Обновляет переданные поля."""
+    async def update_fields(
+        self,
+        user_id: UUID,
+        goal_id: UUID,
+        changes: dict
+    ) -> models.Goal:
         stmt = (
             update(models.Goal)
-            .where(models.Goal.goal_id == goal_id, models.Goal.user_id == user_id)
+            .where(
+                models.Goal.goal_id == goal_id,
+                models.Goal.user_id == user_id
+            )
             .values(**changes)
             .returning(models.Goal)
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+        goal = result.scalar_one_or_none()
+        if goal is None:
+            raise exceptions.GoalNotFoundError("Goal not found")
+        return goal
     
     async def update_status(self, goal_id: UUID, new_status: str) -> None:
         """Атомарно обновляет статус цели."""
@@ -152,17 +150,24 @@ class GoalRepository:
         )
         await self.db.execute(stmt)
 
-    async def get_expired_goals_batch(self, today: date, limit: int = 100) -> list[models.Goal]:
+    async def get_expired_goals_batch(
+        self,
+        today: date,
+        limit: int = 100,
+        last_id: UUID | None = None
+    ) -> list[models.Goal]:
         """Возвращает просроченные цели."""
         query = (
             select(models.Goal)
             .where(
-                models.Goal.status == models.GoalStatus.ONGOING.value,
+                models.Goal.status == schemas.GoalStatus.ONGOING.value,
                 models.Goal.finish_date < today
             )
-            .order_by(models.Goal.created_at.asc())
+            .order_by(models.Goal.goal_id.asc())
             .limit(limit)
         )
+        if last_id:
+            query = query.where(models.Goal.goal_id > last_id)
         result = await self.db.execute(query)
         return result.scalars().all()
 
@@ -173,10 +178,10 @@ class GoalRepository:
             .where(
                 models.Goal.goal_id == goal_id,
                 models.Goal.user_id == user_id,
-                models.Goal.status == models.GoalStatus.ONGOING.value,
+                models.Goal.status == schemas.GoalStatus.ONGOING.value,
                 models.Goal.current_value >= models.Goal.target_value
             )
-            .values(status=models.GoalStatus.ACHIEVED.value, updated_at=datetime.now(timezone.utc))
+            .values(status=schemas.GoalStatus.ACHIEVED.value, updated_at=datetime.now(timezone.utc))
             .returning(models.Goal)
         )
         result = await self.db.execute(stmt)
@@ -188,11 +193,10 @@ class GoalRepository:
         """Возвращает приближающиеся цели, не проверявшиеся 24 часа."""
         seven_days_from_now = today + timedelta(days=days_notice)
         one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
-
         query = (
             select(models.Goal)
             .where(
-                models.Goal.status == models.GoalStatus.ONGOING.value,
+                models.Goal.status == schemas.GoalStatus.ONGOING.value,
                 models.Goal.finish_date <= seven_days_from_now,
                 models.Goal.finish_date >= today,
                 or_(
@@ -228,19 +232,6 @@ class GoalRepository:
         )
         result = await self.db.execute(query)
         return result.scalars().all()
-    
-    async def handle_failed_outbox_event(self, event_id: UUID, error_msg: str) -> None:
-        """Обрабатывает неудачу отправки события."""
-        stmt = select(models.OutboxEvent).where(models.OutboxEvent.event_id == event_id)
-        result = await self.db.execute(stmt)
-        event = result.scalar_one_or_none()
-        
-        if event:
-            event.retry_count += 1
-            event.last_error = error_msg[:512]
-            if event.retry_count >= MAX_RETRIES:
-                event.status = 'failed'
-            self.db.add(event)
 
     async def delete_outbox_events(self, event_ids: list[UUID]) -> None:
         """Удаляет отправленные события."""
