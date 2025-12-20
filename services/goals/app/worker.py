@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from arq.connections import RedisSettings
@@ -12,12 +13,16 @@ from app import (
     logging_config, 
     repositories, 
     services,
-    exceptions
+    exceptions,
+    unit_of_work
 )
 from app.kafka_producer import KafkaProducer 
 
 logger = logging.getLogger(__name__)
 HEALTH_FILE = Path("/tmp/healthy")
+
+MAX_OUTBOX_RETRIES = 5
+RETRY_BACKOFF_SECONDS = 2
 
 async def touch_health_file() -> None:
     """Обновляет файл статуса здоровья для мониторинга."""
@@ -30,47 +35,52 @@ async def process_outbox_task(ctx) -> None:
     """Обработка событий из Outbox и отправка в Kafka."""
     db_session_maker = ctx["db_session_maker"]
     kafka: KafkaProducer = ctx["kafka_producer"]
-    
+
     await touch_health_file()
-    
-    try:
-        async with db_session_maker() as session:
-            repository = repositories.GoalRepository(session)
-            events = await repository.get_pending_outbox_events(limit=50)
-            
-            if not events:
-                logger.debug("No pending outbox events")
-                return
 
-            sent_count = 0
-            failed_count = 0
-            errors = []
+    async with db_session_maker() as session:
+        repository = repositories.GoalRepository(session)
 
-            for event in events:
-                try:
-                    success = await kafka.send_event(event.topic, event.payload)
-                    if success:
-                        await repository.delete_outbox_events([event.event_id])
-                        sent_count += 1
-                    else:
-                        await repository.handle_failed_outbox_event(event.event_id, "Send failed")
-                        failed_count += 1
-                except Exception as e:
-                    logger.error(f"Failed to process outbox event {event.event_id}: {e}")
-                    await repository.handle_failed_outbox_event(event.event_id, str(e)[:500])
-                    failed_count += 1
-                    errors.append(str(e))
+        events = await repository.get_pending_outbox_events(limit=50)
+        if not events:
+            logger.debug("No pending outbox events")
+            return
+        
+        sent_ids: list[str] = []
 
-            await repository.db.commit()
-            
-            if sent_count > 0:
-                logger.info(f"Processed {sent_count} outbox events")
-            if failed_count > 0:
-                logger.warning(f"Failed to send {failed_count} events. Errors: {errors[:3]}")
-    except SQLAlchemyError as e:
-        logger.error(f"Database error in outbox task: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error in process_outbox_task: {e}", exc_info=True)
+        for event in events:
+            try:
+                success = await kafka.send_event(
+                    topic=event.topic,
+                    event_data=event.payload,
+                )
+
+                if success:
+                    sent_ids.append(event.event_id)
+                else:
+                    raise RuntimeError("Kafka send failed")
+
+            except Exception as e:
+                event.retry_count += 1
+
+                logger.error(
+                    "Outbox event send failed",
+                    extra={
+                        "event_id": str(event.event_id),
+                        "retry_count": event.retry_count,
+                    },
+                )
+
+                if event.retry_count >= MAX_OUTBOX_RETRIES:
+                    event.status = "failed"
+
+                await asyncio.sleep(
+                    RETRY_BACKOFF_SECONDS ** event.retry_count
+                )
+
+        if sent_ids:
+            await repository.delete_outbox_events(sent_ids)
+            await session.commit()
 
 async def check_goals_deadlines_task(ctx) -> None:
     """Проверка сроков целей (выполняется ежедневно в 00:00)."""
@@ -79,9 +89,8 @@ async def check_goals_deadlines_task(ctx) -> None:
     await touch_health_file()
     
     try:
-        async with db_session_maker() as session:
-            repository = repositories.GoalRepository(session)
-            service = services.GoalService(repository)
+        async with unit_of_work.UnitOfWork(db_session_maker) as uow:
+            service = services.GoalService(uow)
             await service.check_deadlines()
     except exceptions.GoalServiceError as e:
         logger.error(f"Service error in deadline check: {e}")
