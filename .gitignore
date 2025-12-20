@@ -1,0 +1,7 @@
+
+services/transactions/SmartBudget.transactions/
+frontend/
+/services/authentification/
+/services/classification/
+services/SmartBudget.Budgets/obj
+services/SmartBudget.Budgets/bin

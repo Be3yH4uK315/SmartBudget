@@ -14,7 +14,7 @@ namespace SmartBudget.Budgets.Domain.Entities
         [Required]
         public Guid UserId { get; set; }
 
-        public DateTime? Month { get; set; }
+        public DateTime Month { get; set; }
 
         public decimal TotalIncome { get; set; }
 
@@ -22,9 +22,9 @@ namespace SmartBudget.Budgets.Domain.Entities
 
         public bool IsAutoRenew { get; set; }
 
-        public DateTime? CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; }
 
-        public DateTime? UpdatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
         public ICollection<CategoryLimit> CategoryLimits { get; set; } = new List<CategoryLimit>();
     }
 }

@@ -12,7 +12,7 @@ using SmartBudget.Budgets.Data;
 namespace budget.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251217102803_InitialCreate")]
+    [Migration("20251219201953_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

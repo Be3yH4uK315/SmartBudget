@@ -64,50 +64,55 @@ namespace SmartBudget.Budgets.Services
 
             if (budget == null)
                 return null;
-            await using var transaction = await _db.Database.BeginTransactionAsync(stoppingToken);
-            try
+            var now = DateTime.UtcNow;
+
+            if (model.TotalLimit.HasValue)
+                budget.Limit = model.TotalLimit.Value;
+
+            if (model.IsAutoRenew.HasValue)
+                budget.IsAutoRenew = model.IsAutoRenew.Value;
+
+            budget.UpdatedAt = now;
+
+            var incomingByCategory = model.Categories.ToDictionary(c => c.CategoryId, c => c);
+
+            foreach (var existing in budget.CategoryLimits)
             {
-                var now = DateTime.UtcNow;
-
-                if (model.TotalLimit.HasValue)
-                    budget.Limit = model.TotalLimit.Value;
-
-                if (model.IsAutoRenew.HasValue)
-                    budget.IsAutoRenew = model.IsAutoRenew.Value;
-
-                budget.UpdatedAt = now;
-
-                foreach (var incoming in model.Categories)
+                if (incomingByCategory.TryGetValue(existing.CategoryId, out var incoming))
                 {
-                    var existing = budget.CategoryLimits
-                        .FirstOrDefault(c => c.CategoryId == incoming.CategoryId);
-
-                    if (existing != null)
-                    {
-                        existing.Limit = incoming.Limit;
-                        existing.UpdatedAt = now;
-                    }
-                    else
-                    {
-                        budget.CategoryLimits.Add(new CategoryLimit
-                        {
-                            Id = Guid.NewGuid(),
-                            BudgetId = budget.Id,
-                            CategoryId = incoming.CategoryId,
-                            Limit = incoming.Limit,
-                            Spent = 0,
-                            CreatedAt = now,
-                            UpdatedAt = now
-                        });
-                    }
+                    existing.Limit = incoming.Limit;
                 }
-                await _db.SaveChangesAsync(stoppingToken);
+                else
+                {
+                    existing.Limit = 0;
+                }
+
+                existing.UpdatedAt = now;
             }
-            catch (Exception except)
+
+            var existingCategoryIds = budget.CategoryLimits
+                .Select(c => c.CategoryId)
+                .ToHashSet();
+
+            foreach (var incoming in model.Categories)
             {
-                await transaction.RollbackAsync(stoppingToken);
-                _log.LogError(except, "Patch settings failed");
+                if (!existingCategoryIds.Contains(incoming.CategoryId))
+                {
+                    budget.CategoryLimits.Add(new CategoryLimit
+                    {
+                        Id = Guid.NewGuid(),
+                        BudgetId = budget.Id,
+                        CategoryId = incoming.CategoryId,
+                        Limit = incoming.Limit,
+                        Spent = 0,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    });
+                }
             }
+
+            await _db.SaveChangesAsync(stoppingToken);
+
             return budget;
 
         }

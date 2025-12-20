@@ -73,9 +73,10 @@ namespace SmartBudget.Budgets.Controllers
         {
             var now = DateTime.UtcNow;
 
+            var budgetId = Guid.NewGuid();
             var budget = new Budget
             {
-                Id = Guid.NewGuid(),
+                Id = budgetId,
                 UserId = userId,
                 Month = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc),
                 Limit = request.TotalLimit ?? 0,
@@ -85,6 +86,7 @@ namespace SmartBudget.Budgets.Controllers
                 CategoryLimits = request.Categories.Select(c => new CategoryLimit
                 {
                     Id = Guid.NewGuid(),
+                    BudgetId = budgetId, 
                     CategoryId = c.CategoryId,
                     Limit = c.Limit,
                     Spent = 0,
@@ -113,6 +115,10 @@ namespace SmartBudget.Budgets.Controllers
                     })
                     .ToList()
             };
+            if (userId == Guid.Empty)
+            {
+                return BadRequest("X-User-Id header is missing or invalid");
+            }
 
             var budget = await _service.PatchBudgetAsync(userId, model, stoppingToken);
 
@@ -121,6 +127,13 @@ namespace SmartBudget.Budgets.Controllers
 
             return Ok();
         }
-
+        /// <summary>
+        /// Health check endpoint
+        /// </summary>
+        [HttpGet("health")]
+        public IActionResult Health()
+        {
+            return Ok(new { status = "Healthy" });
+        }
     }
 }

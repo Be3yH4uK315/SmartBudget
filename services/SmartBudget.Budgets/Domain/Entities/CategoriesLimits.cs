@@ -23,8 +23,8 @@ namespace SmartBudget.Budgets.Domain.Entities
 
         public decimal Spent { get; set; }
 
-        public DateTime? CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; }
 
-        public DateTime? UpdatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

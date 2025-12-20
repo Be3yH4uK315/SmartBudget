@@ -9,7 +9,7 @@ namespace SmartBudget.Budgets.Services
         Task<Budget?> GetBudgetWithCategoriesAsync(Guid userId, CancellationToken stoppingToken);
         Task<Budget?> GetBudgetSettingsAsync(Guid userId, CancellationToken stoppingToken);
         Task<string> CreateBudgetAsync(Budget budget, CancellationToken stoppingToken);
-        Task<Budget?> PatchBudgetAsync(PatchBudgetRequest model, CancellationToken stoppingToken);
+        Task<Budget?> PatchBudgetAsync(Guid userId, PatchBudgetRequest model, CancellationToken stoppingToken);
         Task NewTransactionAsync(TransactionNewMessage message, CancellationToken stoppingToken);
         Task UpdatedTransactionAsync(TransactionUpdatedMessage message, CancellationToken stoppingToken);
 
