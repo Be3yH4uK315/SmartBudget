@@ -118,19 +118,15 @@ namespace SmartBudget.Budgets.Services
         }
         public async Task NewTransactionAsync(TransactionNewMessage message, CancellationToken stoppingToken)
         {
-            await using var tx = await _db.Database.BeginTransactionAsync(stoppingToken);
-
-            try
-            {
                 var budget = await _db.Budget
                     .Include(b => b.CategoryLimits)
                     .FirstOrDefaultAsync(
-                        b => b.UserId == message.userId,
+                        b => b.UserId == message.UserId,
                         stoppingToken);
 
                 if (budget == null)
                 {
-                    _log.LogWarning("Budget not found for user {userId}", message.userId);
+                    _log.LogWarning("Budget not found for user {userId}", message.UserId);
                     return;
                 }
 
@@ -160,14 +156,6 @@ namespace SmartBudget.Budgets.Services
                 budget.UpdatedAt = DateTime.UtcNow;
 
                 await _db.SaveChangesAsync(stoppingToken);
-                await tx.CommitAsync(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                await tx.RollbackAsync(stoppingToken);
-                _log.LogError(ex, "Failed to apply new transaction");
-                throw;
-            }
         }
         public async Task UpdatedTransactionAsync(TransactionUpdatedMessage message, CancellationToken stoppingToken)
         {
