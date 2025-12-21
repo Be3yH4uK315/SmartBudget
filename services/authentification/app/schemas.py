@@ -1,7 +1,33 @@
 from datetime import datetime
+import enum
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
-from typing import Optional
+from typing import Literal, Optional
+
+class UserRole(enum.IntEnum):
+    """Роли пользователей в системе."""
+    USER = 0
+    ADMIN = 1
+    MODERATOR = 2
+
+class KafkaTopics(str, enum.Enum):
+    AUTH_EVENTS = "auth.events"
+
+class AuthEventTypes(str, enum.Enum):
+    USER_REGISTERED = "user.registered"
+    USER_LOGIN = "user.login"
+    USER_LOGOUT = "user.logout"
+    USER_LOGIN_FAILED = "user.login_failed"
+    PASSWORD_RESET_STARTED = "user.password_reset_started"
+    PASSWORD_RESET_VALIDATED = "user.password_reset_validated"
+    PASSWORD_RESET_COMPLETED = "user.password_reset"
+    PASSWORD_CHANGED = "user.password_changed"
+    VERIFICATION_STARTED = "user.verification_started"
+    VERIFICATION_VALIDATED = "user.verification_validated"
+    TOKEN_REFRESHED = "user.token_refreshed"
+    SESSION_REVOKED = "user.session_revoked"
+
+# --- API Request Models ---
 
 class VerifyEmailRequest(BaseModel):
     """Запрос для инициирования проверки электронной почты."""
@@ -111,6 +137,8 @@ class TokenValidateRequest(BaseModel):
         description="JWT токен, который необходимо проверить"
     )
 
+# --- API Response Models ---
+
 class UnifiedResponse(BaseModel):
     """Единая модель ответа для всех endpoints."""
     status: str = Field(
@@ -151,7 +179,7 @@ class UserInfo(BaseModel):
         title="Country",
         description="Страна пользователя"
     )
-    role: int = Field(
+    role: UserRole = Field(
         ...,
         title="Role",
         description="Роль пользователя в системе"
@@ -212,57 +240,28 @@ class AllSessionsResponse(BaseModel):
         description="Список активных и прошедших сессий пользователя"
     )
 
-AUTH_EVENTS_SCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Auth Events Schema",
-    "type": "object",
-    "properties": {
-        "event": {
-            "type": "string",
-            "enum": [
-                "user.registered", "user.login", "user.logout", "user.sessionMismatchDetected",
-                "user.passwordReset", "user.tokenInvalid", "user.verificationStarted",
-                "user.verificationValidated", "user.tokenRefreshed", "user.passwordChanged",
-                "user.loginFailed", "user.passwordResetStarted", "user.passwordResetValidated"
-            ],
-            "description": "Type of authentication event"
-        },
-        "userId": {"type": "string", "format": "uuid", "description": "User UUID"},
-        "email": {"type": "string", "description": "User email"},
-        "ip": {"type": "string", "description": "IP address"},
-        "location": {"type": "string", "description": "Geolocation"}
-    },
-    "required": ["event"],
-    "if": {
-        "properties": { 
-            "event": { 
-                "enum": [
-                    "user.registered", "user.login", "user.logout", "user.sessionMismatchDetected",
-                    "user.passwordReset", "user.tokenRefreshed", "user.passwordChanged"
-                ] 
-            } 
+# --- Kafka Event Models ---
+
+class BaseAuthEvent(BaseModel):
+    event: AuthEventTypes
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_encoders={
+            UUID: str,
+            datetime: lambda v: v.isoformat()
         }
-    },
-    "then": {
-        "required": ["userId"]
-    }
-}
+    )
 
-USERS_ACTIVE_SCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-        "userId": {"type": "string", "format": "uuid", "description": "User UUID"},
-        "email": {"type": "string", "description": "User email"},
-        "name": {"type": "string", "description": "User name"},
-        "country": {"type": "string", "description": "User country"},
-        "role": {"type": "integer", "description": "User role"},
-        "isActive": {"type": "boolean", "description": "Active status"}
-    },
-    "required": ["userId", "email"]
-}
+class UserEvent(BaseAuthEvent):
+    user_id: Optional[UUID] = None
+    email: Optional[EmailStr] = None
+    ip: Optional[str] = None
+    location: Optional[str] = None
 
-SCHEMAS_MAP = {
-    "AUTH_EVENTS_SCHEMA": AUTH_EVENTS_SCHEMA,
-    "USERS_ACTIVE_SCHEMA": USERS_ACTIVE_SCHEMA
-}
+class UserRegisteredEvent(UserEvent):
+    event: Literal[AuthEventTypes.USER_REGISTERED]
+    user_id: UUID
+    email: EmailStr
+    name: str
