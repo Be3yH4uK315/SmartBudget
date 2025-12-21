@@ -21,20 +21,9 @@ def _get_utc_today() -> date:
 def _get_days_left(finish_date: date) -> int:
     return max((finish_date - _get_utc_today()).days, 0)
 
-def create_goal_event(
-    event_type: schemas.GoalEventType,
-    goal_id: str,
-    payload: dict[str, Any] | None = None,
-) -> dict:
-    return {
-        "event": event_type.value,
-        "goal_id": goal_id,
-        "payload": payload or {},
-    }
-
 def _create_outbox_event(event_type: schemas.GoalEventType, **kwargs) -> dict:
     """Фабрика для создания событий Outbox."""
-    return {"event_type": event_type, **kwargs}
+    return {"event_type": event_type.value, **kwargs}
 
 class GoalService:
     """Сервис для управления целями используя Unit of Work."""
@@ -42,7 +31,7 @@ class GoalService:
     def __init__(self, uow: unit_of_work.UnitOfWork):
         self.uow = uow
 
-    async def create_goal(self, user_id: UUID, request: schemas.CreateGoalRequest) -> models.Goal:
+    async def create_goal(self, user_id: UUID, request: schemas.CreateGoalRequest) -> schemas.CreateGoalResponse:
         """Создание новой цели."""
         if request.finish_date <= _get_utc_today():
             raise exceptions.InvalidGoalDataError("Finish date must be in the future")
@@ -61,7 +50,7 @@ class GoalService:
             self.uow.goals.create(goal)
             
             event_data = _create_outbox_event(
-                schemas.GoalEventType.CREATED.value,
+                schemas.GoalEventType.CREATED,
                 goal_id=str(goal.goal_id),
                 user_id=str(user_id),
                 name=goal.name,
@@ -74,30 +63,48 @@ class GoalService:
                 event_data=event_data,
             )
 
-            return goal
-        
-    async def get_goal_details(self, user_id: UUID, goal_id: UUID) -> tuple[models.Goal, int]:
+            return schemas.CreateGoalResponse(
+                goal_id=goal.goal_id
+            )
+
+    async def get_goal_details(self, user_id: UUID, goal_id: UUID) -> schemas.GoalResponse:
         """Получение детальной информации о цели."""
         async with self.uow:
             goal = await self.uow.goals.get_by_id(user_id, goal_id)
             if not goal:
                 raise exceptions.GoalNotFoundError("Goal not found")
-            days_left = _get_days_left(goal.finish_date)
-            return goal, days_left
 
-    async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
+            return schemas.GoalResponse.model_validate(
+                goal,
+                update={"days_left": _get_days_left(goal.finish_date)}
+            )
+
+    async def get_main_goals(self, user_id: UUID) -> schemas.MainGoalsResponse:
         """Получение целей для главного экрана."""
         async with self.uow:
-            return await self.uow.goals.get_main_goals(user_id)
+            goals = await self.uow.goals.get_main_goals(user_id)
+            return schemas.MainGoalsResponse(
+                goals=[
+                    schemas.MainGoalInfo.model_validate(goal)
+                    for goal in goals
+                ]
+            )
 
-    async def get_all_goals(self, user_id: UUID) -> list[models.Goal]:
-        """Получение всех целей пользователя."""
+    async def get_all_goals(
+        self,
+        user_id: UUID
+    ) -> list[schemas.AllGoalsResponse]:
         async with self.uow:
-            return await self.uow.goals.get_all_goals(user_id)
+            goals = await self.uow.goals.get_all_goals(user_id)
+
+            return [
+                schemas.AllGoalsResponse.model_validate(goal)
+                for goal in goals
+            ]
 
     async def update_goal(
         self, user_id: UUID, goal_id: UUID, request: schemas.GoalPatchRequest
-    ) -> tuple[models.Goal, int]:
+    ) -> schemas.GoalResponse:
         """Обновление цели."""
         async with self.uow:
             goal = await self.uow.goals.get_by_id(user_id, goal_id)
@@ -106,7 +113,10 @@ class GoalService:
 
             update_data = request.model_dump(exclude_unset=True)
             if not update_data:
-                return goal, _get_days_left(goal.finish_date)
+                return schemas.GoalResponse.model_validate(
+                    goal,
+                    update={"days_left": _get_days_left(goal.finish_date)}
+                )
 
             if "finish_date" in update_data and update_data["finish_date"]:
                 if update_data["finish_date"] <= _get_utc_today():
@@ -123,14 +133,17 @@ class GoalService:
                 changes_for_kafka[field] = db_value
             
             if not changes_for_db:
-                return goal, _get_days_left(goal.finish_date)
+                return schemas.GoalResponse.model_validate(
+                    goal,
+                    update={"days_left": _get_days_left(goal.finish_date)}
+                )
 
             goal = await self.uow.goals.update_fields(user_id, goal_id, changes_for_db)
             await self._check_and_process_achievement_in_uow(goal)
 
             if changes_for_kafka:
                 event = _create_outbox_event(
-                    schemas.GoalEventType.CHANGED.value,
+                    schemas.GoalEventType.CHANGED,
                     goal_id=str(goal_id),
                     changes=changes_for_kafka
                 )
@@ -138,7 +151,10 @@ class GoalService:
                     topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
                     event_data=event
                 )
-            return goal, _get_days_left(goal.finish_date)
+            return schemas.GoalResponse.model_validate(
+                goal,
+                update={"days_left": _get_days_left(goal.finish_date)}
+            )
 
     async def update_goal_balance(self, event: schemas.TransactionEvent) -> None:
         """Обработка события изменения баланса из Kafka (идемпотентная)."""
@@ -155,7 +171,7 @@ class GoalService:
                 return
 
             update_event = _create_outbox_event(
-                schemas.GoalEventType.UPDATED.value,
+                schemas.GoalEventType.UPDATED,
                 goal_id=str(goal.goal_id),
                 current_value=goal.current_value,
                 status=goal.status
@@ -176,7 +192,7 @@ class GoalService:
         if achieved_goal:
             goal.status = achieved_goal.status
             event = _create_outbox_event(
-                schemas.GoalEventType.ALERT.value,
+                schemas.GoalEventType.ALERT,
                 goal_id=str(goal.goal_id),
                 days_left=0
             )
@@ -224,7 +240,7 @@ class GoalService:
                         self.uow.goals.add_outbox_event(
                             settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
                             _create_outbox_event(
-                                schemas.GoalEventType.UPDATED.value,
+                                schemas.GoalEventType.UPDATED,
                                 goal_id=str(goal.goal_id),
                                 status=schemas.GoalStatus.EXPIRED.value
                             )
@@ -232,7 +248,7 @@ class GoalService:
                         self.uow.goals.add_outbox_event(
                             settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
                             _create_outbox_event(
-                                schemas.GoalEventType.EXPIRED.value,
+                                schemas.GoalEventType.EXPIRED,
                                 goal_id=str(goal.goal_id),
                                 days_left=0
                             )
@@ -261,7 +277,7 @@ class GoalService:
                     try:
                         days_left = _get_days_left(goal.finish_date)
                         event = _create_outbox_event(
-                            schemas.GoalEventType.APPROACHING.value, 
+                            schemas.GoalEventType.APPROACHING, 
                             goal_id=str(goal.goal_id), 
                             type="approaching", 
                             days_left=days_left
