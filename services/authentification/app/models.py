@@ -5,26 +5,19 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import validates
-import enum
 
-from app import base
-
-class UserRole(enum.IntEnum):
-    """Роли пользователей в системе."""
-    USER = 0
-    ADMIN = 1
-    MODERATOR = 2
+from app import base, schemas
 
 class User(base.Base):
     """Модель пользователя."""
     __tablename__ = "users"
 
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
-    role = Column(Integer, default=UserRole.USER, nullable=False)
+    role = Column(Integer, default=schemas.UserRole.USER.value, nullable=False)
     email = Column(String(255), nullable=False)
     password_hash = Column(String, nullable=False)
     name = Column(String(255), nullable=False)
-    country = Column(String, nullable=False)
+    country = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
     last_login = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
@@ -40,24 +33,35 @@ class User(base.Base):
     )
 
     __table_args__ = (
-        UniqueConstraint('email', name='uq_users_email'),
-        Index('ix_users_email', 'email'),
-        Index('ix_users_is_active', 'is_active'),
-        CheckConstraint("email ~ '^[^@]+@[^@]+$'", name='ck_email_format'),
+        UniqueConstraint("email", name="uq_users_email"),
+        Index("ix_users_email", "email"),
+        Index("ix_users_is_active", "is_active"),
+        CheckConstraint(
+            "email ~ '^[^@]+@[^@]+$'",
+            name="ck_users_email_format",
+        ),
+        CheckConstraint(
+            f"role IN ({', '.join(str(r.value) for r in schemas.UserRole)})",
+            name="ck_users_role_allowed",
+        ),
     )
 
-    @validates('email')
-    def validate_email(self, key, value):
-        """Валидирует email."""
-        if not value or '@' not in value:
+    @validates("email")
+    def validate_email(self, _, value: str) -> str:
+        if not value or "@" not in value:
             raise ValueError("Invalid email format")
         return value.lower().strip()
 
-    @validates('name')
-    def validate_name(self, key, value):
-        """Валидирует имя."""
-        if not value or len(value) < 2:
+    @validates("name")
+    def validate_name(self, _, value: str) -> str:
+        if not value or len(value.strip()) < 2:
             raise ValueError("Name must be at least 2 characters")
+        return value.strip()
+
+    @validates("country")
+    def validate_country(self, _, value: str) -> str:
+        if not value:
+            raise ValueError("Country is required")
         return value.strip()
 
 class Session(base.Base):
@@ -66,9 +70,10 @@ class Session(base.Base):
 
     session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
     user_id = Column(
-        UUID(as_uuid=True), 
-        ForeignKey("users.user_id", ondelete="CASCADE"), 
-        nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     user_agent = Column(String, nullable=False)
     device_name = Column(String, nullable=False)
@@ -84,9 +89,10 @@ class Session(base.Base):
     )
 
     __table_args__ = (
-        Index('ix_sessions_user_id', 'user_id'),
-        Index('ix_sessions_expires_at', 'expires_at'),
-        Index('ix_sessions_fingerprint', 'refresh_fingerprint'),
-        Index('ix_sessions_revoked', 'revoked'),
-        CheckConstraint('refresh_fingerprint != \'\'', name='ck_fingerprint_not_empty'),
+        Index("ix_sessions_expires_at", "expires_at"),
+        Index("ix_sessions_revoked", "revoked"),
+        CheckConstraint(
+            "refresh_fingerprint <> ''",
+            name="ck_sessions_fingerprint_not_empty",
+        ),
     )
