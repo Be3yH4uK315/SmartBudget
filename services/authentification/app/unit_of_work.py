@@ -28,6 +28,11 @@ class UnitOfWork:
                 await self._session.commit()
         finally:
             await self._session.close()
+    
+    async def flush(self) -> None:
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.flush()
 
     def _get_repository(self, repo_cls):
         """Инициализация репозитория."""
