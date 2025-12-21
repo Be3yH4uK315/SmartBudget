@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 from aiosmtplib import SMTP
 from email.message import EmailMessage
@@ -9,19 +8,10 @@ from datetime import datetime, timezone
 from arq.connections import RedisSettings
 from logging import getLogger
 from arq.cron import cron
-from aiokafka import AIOKafkaProducer
-from aiokafka.errors import KafkaError
-from jsonschema import validate
-import jsonschema
-import json
 import ssl
 
-from app import (
-    settings,
-    models,
-    schemas,
-    logging_config
-)
+from app import settings, models, logging_config, unit_of_work
+from app.kafka_producer import KafkaProducer
 
 logging_config.setup_logging()
 logger = getLogger(__name__)
@@ -61,11 +51,9 @@ async def send_email(ctx, to: str, subject: str, body: str):
         await client.connect()
         if not use_implicit_tls:
             await client.starttls()
-
         await client.login(settings.settings.SMTP.SMTP_USER, settings.settings.SMTP.SMTP_PASS)
         await client.send_message(message)
         logger.info(f"Email sent successfully to {to}")
-
     except Exception as e:
         logger.error(f"Failed to send email to {to}: {e}", exc_info=True)
         raise
@@ -75,64 +63,36 @@ async def send_email(ctx, to: str, subject: str, body: str):
         except Exception:
             pass
 
-async def send_kafka_event(ctx, topic: str, event_data: dict, schema_name: str):
+async def send_kafka_event(ctx, topic: str, event_data: dict):
     """Задача Arq для отправки события Kafka."""
     await touch_health_file()
     
-    schema = schemas.SCHEMAS_MAP.get(schema_name)
-    if not schema:
-        logger.error(f"Invalid schema name: {schema_name}")
-        return
-
-    try:
-        validate(instance=event_data, schema=schema)
-    except jsonschema.ValidationError as e:
-        logger.error(f"Schema validation failed: {e}")
-        return
-
-    producer: AIOKafkaProducer = ctx.get("kafka_producer")
+    producer: KafkaProducer = ctx.get("kafka_producer")
     if not producer:
-        logger.error("Kafka producer not available")
+        logger.error("Kafka producer not available in context")
         return
 
-    for attempt in range(3):
-        try:
-            await producer.send_and_wait(topic, json.dumps(event_data).encode())
-            logger.info(f"Kafka event sent to {topic}")
-            return
-        except KafkaError as e:
-            logger.warning(f"Kafka connection error (attempt {attempt+1}/3): {e}")
-            await asyncio.sleep(1)
-        except Exception as e:
-            logger.error(f"Error sending Kafka event (attempt {attempt+1}/3): {e}")
-            await asyncio.sleep(1)
+    success = await producer.send_event(topic, event_data)
+    if not success:
+        logger.error(f"Failed to send event to {topic}")
+        raise Exception("Kafka send failed")
     
-    logger.error("Failed to send Kafka event after retries")
+    logger.info(f"Kafka event sent to {topic}")
 
 async def cleanup_sessions(ctx):
     """Задача Arq (Cron) для очистки старых сессий."""
     await touch_health_file()
     
-    db_maker: async_sessionmaker[AsyncSession] = ctx.get("db_session_maker")
-    if not db_maker:
-        logger.error("DB session maker not available for cleanup task")
+    db_session_maker: async_sessionmaker[AsyncSession] = ctx.get("db_session_maker")
+    if not db_session_maker:
+        logger.error("DB session maker not available")
         return
 
-    async with db_maker() as session:
+    async with unit_of_work.UnitOfWork(db_session_maker) as uow:
         try:
-            result = await session.execute(
-                delete(models.Session).where(
-                    or_(
-                        models.Session.expires_at < datetime.now(timezone.utc),
-                        models.Session.revoked == sa.true()
-                    )
-                )
-            )
-            await session.commit()
-            count = result.rowcount
-            logger.info(f"Cleaned up {count} expired/revoked sessions")
+            deleted_count = await uow.sessions.delete_expired_or_revoked()
+            logger.info(f"Cleaned up {deleted_count} expired/revoked sessions")
         except Exception as e:
-            await session.rollback()
             logger.error(f"Cleanup task failed: {e}", exc_info=True)
             raise
 
@@ -141,11 +101,9 @@ async def on_startup(ctx):
     logger.info(f"Arq worker starting. Redis: {settings.settings.ARQ.REDIS_URL}")
 
     try:
-        producer = AIOKafkaProducer(
-            bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS
-        )
-        await producer.start()
-        ctx["kafka_producer"] = producer
+        kafka_producer = KafkaProducer()
+        await kafka_producer.start()
+        ctx["kafka_producer"] = kafka_producer
         logger.info("Kafka producer started")
     except Exception as e:
         logger.error(f"Failed to start Kafka producer: {e}")
@@ -153,12 +111,12 @@ async def on_startup(ctx):
 
     try:
         engine = create_async_engine(settings.settings.DB.DB_URL)
-        db_maker = async_sessionmaker(engine, expire_on_commit=False)
+        db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
         ctx["db_engine"] = engine
-        ctx["db_session_maker"] = db_maker
+        ctx["db_session_maker"] = db_session_maker
         logger.info("DB engine and session maker injected")
     except Exception as e:
-        logger.error(f"Failed to create DB engine/session maker: {e}")
+        logger.error(f"Failed to create DB engine: {e}")
         ctx["db_engine"] = None
         ctx["db_session_maker"] = None
     
@@ -168,7 +126,7 @@ async def on_shutdown(ctx):
     """Выполняется при остановке воркера Arq."""
     logger.info("Shutting down Arq worker...")
     
-    producer: AIOKafkaProducer = ctx.get("kafka_producer")
+    producer: KafkaProducer = ctx.get("kafka_producer")
     if producer:
         try:
             await producer.stop()
