@@ -47,7 +47,7 @@ namespace SmartBudget.Transactions.Services
                 _db.Transactions.Add(transaction);
                 await _db.SaveChangesAsync(stoppingToken);
 
-                await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.AccountId, transaction.CategoryId, transaction.Value, transaction.Type), stoppingToken);
+                await _kafka.TransactionNew.ProduceAsync(transaction.TransactionId.ToString(), new TransactionNewMessage(transaction.UserId, transaction.CategoryId, transaction.Value, transaction.Type), stoppingToken);
 
                 await _kafka.BudgetEvents.ProduceAsync(transaction.TransactionId.ToString(), new BudgetEventMessage("transaction.new", transaction.UserId, transaction), stoppingToken);
                 if (transaction.CategoryId == 24)
@@ -94,7 +94,7 @@ namespace SmartBudget.Transactions.Services
 
                         if (current_transaction.CategoryId == 24)
                         {
-                            await _kafka.TransactionNew.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewMessage(current_transaction.AccountId, current_transaction.CategoryId, current_transaction.Value, current_transaction.Type), stoppingToken);
+                            await _kafka.TransactionNew.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewMessage(current_transaction.UserId, current_transaction.CategoryId, current_transaction.Value, current_transaction.Type), stoppingToken);
 
                             await _kafka.TransactionNewGoal.ProduceAsync(current_transaction.TransactionId.ToString(), new TransactionNewGoalMessage(current_transaction.TransactionId, current_transaction.AccountId, current_transaction.UserId, current_transaction.Value, current_transaction.Type), stoppingToken);
                         }
