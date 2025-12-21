@@ -6,7 +6,7 @@ export type CenterLabel =
   | {
       type: 'amount'
       total: number
-      label: string
+      label?: string
     }
 
 export type PieDataItem = {
