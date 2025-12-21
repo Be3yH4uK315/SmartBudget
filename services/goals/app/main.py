@@ -6,7 +6,6 @@ from arq.connections import RedisSettings
 from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
-from aiokafka.errors import KafkaError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.routers import goals
