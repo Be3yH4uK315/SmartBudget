@@ -5,6 +5,17 @@ from decimal import Decimal
 from datetime import date
 from uuid import UUID
 
+def to_camel(string: str) -> str:
+    parts = string.split("_")
+    return parts[0] + "".join(word.capitalize() for word in parts[1:])
+
+class CamelModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        json_encoders={Decimal: float}
+    )
+
 class GoalStatus(Enum):
     ONGOING = 'ongoing'
     ACHIEVED = 'achieved'
@@ -20,15 +31,15 @@ class GoalEventType(str, Enum):
     APPROACHING = "goal.approaching"
     ALERT = "goal.alert"
 
-class CreateGoalRequest(BaseModel):
+class CreateGoalRequest(CamelModel):
     name: str = Field(..., max_length=255, description="Название цели")
     target_value: Decimal = Field(..., gt=0, description="Целевая сумма")
     finish_date: date = Field(..., description="Дата достижения (YYYY-MM-DD)")
 
-class CreateGoalResponse(BaseModel):
+class CreateGoalResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID созданной цели")
 
-class GoalResponse(BaseModel):
+class GoalResponse(CamelModel):
     name: str = Field(..., description="Название цели")
     target_value: Decimal = Field(..., description="Целевая сумма")
     current_value: Decimal = Field(..., description="Текущая накопленная сумма")
@@ -41,7 +52,7 @@ class GoalResponse(BaseModel):
         json_encoders={Decimal: float}
     )
 
-class MainGoalInfo(BaseModel):
+class MainGoalInfo(CamelModel):
     name: str = Field(..., description="Название цели")
     target_value: Decimal = Field(..., description="Целевая сумма")
     current_value: Decimal = Field(..., description="Текущая накопленная сумма")
@@ -51,10 +62,10 @@ class MainGoalInfo(BaseModel):
         json_encoders={Decimal: float}
     )
 
-class MainGoalsResponse(BaseModel):
+class MainGoalsResponse(CamelModel):
     goals: list[MainGoalInfo]
 
-class AllGoalsResponse(BaseModel):
+class AllGoalsResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID цели")
     name: str = Field(..., description="Название цели")
     target_value: Decimal = Field(..., description="Целевая сумма")
@@ -67,7 +78,7 @@ class AllGoalsResponse(BaseModel):
         json_encoders={Decimal: float}
     )
 
-class GoalPatchRequest(BaseModel):
+class GoalPatchRequest(CamelModel):
     name: Optional[str] = Field(None, max_length=255, description="Название цели")
     target_value: Optional[Decimal] = Field(None, gt=0, description="Целевая сумма")
     finish_date: Optional[date] = Field(None, description="Дата достижения")
@@ -85,14 +96,14 @@ class GoalPatchRequest(BaseModel):
             raise ValueError("Only CLOSED status is allowed")
         return v
 
-class UnifiedErrorResponse(BaseModel):
+class UnifiedErrorResponse(CamelModel):
     detail: str = Field(..., description="Описание ошибки")
 
 class TransactionType(str, Enum):
     INCOME = "income"
     EXPENSE = "expense"
 
-class TransactionEvent(BaseModel):
+class TransactionEvent(CamelModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
     goal_id: UUID = Field(..., description="ID цели")
     user_id: UUID = Field(..., description="ID пользователя")

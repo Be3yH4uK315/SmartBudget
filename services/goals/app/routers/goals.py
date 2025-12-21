@@ -60,8 +60,8 @@ async def create_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
-    goal = await service.create_goal(user_id, request)
-    return schemas.CreateGoalResponse(goal_id=goal.goal_id)
+    response = await service.create_goal(user_id, request)
+    return response
 
 @router.get(
     "/main",
@@ -72,8 +72,8 @@ async def get_main_goals(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
-    goals = await service.get_main_goals(user_id)
-    return schemas.MainGoalsResponse(goals=goals)
+    response = await service.get_main_goals(user_id)
+    return response
 
 @router.get(
     "/",
@@ -84,7 +84,8 @@ async def get_goals(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
-    return await service.get_all_goals(user_id)
+    response = await service.get_all_goals(user_id)
+    return response
 
 @router.get(
     "/{goal_id}",
@@ -96,15 +97,7 @@ async def get_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
-    goal, days_left = await service.get_goal_details(user_id, goal_id)
-    response = schemas.GoalResponse(
-        name=goal.name,
-        target_value=goal.target_value,
-        current_value=goal.current_value,
-        finish_date=goal.finish_date,
-        status=goal.status,
-        days_left=days_left
-    )
+    response = await service.get_goal_details(user_id, goal_id)
     return response
 
 @router.patch(
@@ -118,13 +111,5 @@ async def update_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: services.GoalService = Depends(dependencies.get_goal_service)
 ):
-    goal, days_left = await service.update_goal(user_id, goal_id, request)
-    response = schemas.GoalResponse(
-        name=goal.name,
-        target_value=goal.target_value,
-        current_value=goal.current_value,
-        finish_date=goal.finish_date,
-        status=goal.status,
-        days_left=days_left
-    )
+    response = await service.update_goal(user_id, goal_id, request)
     return response
