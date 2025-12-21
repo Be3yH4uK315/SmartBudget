@@ -1,8 +1,6 @@
-from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
-import base64
 from functools import lru_cache
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -17,7 +15,8 @@ from app import (
     models,
     schemas,
     settings,
-    services
+    services,
+    utils
 )
 
 router = APIRouter(tags=["auth"])
@@ -137,7 +136,7 @@ async def health_check(request: Request) -> dict:
 )
 async def verify_email(
     body: schemas.VerifyEmailRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService)
+    service: services.AuthService = Depends(dependencies.get_auth_service)
 ):
     """Инициирует процесс проверки электронной почты."""
     action = await service.start_email_verification(body.email)
@@ -153,7 +152,7 @@ async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
     token_type: str = Query(...),
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
 ):
     """Проверяет токен подтверждения по ссылке электронной почты."""
     if token_type == 'verification':
@@ -178,7 +177,7 @@ async def verify_link(
 async def complete_registration(
     response: Response,
     body: schemas.CompleteRegistrationRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     ip: str = Depends(dependencies.get_real_ip),
     user_agent: str | None = Header(None, alias="User-Agent")
 ):
@@ -206,7 +205,7 @@ async def complete_registration(
 async def login(
     response: Response,
     body: schemas.LoginRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     ip: str = Depends(dependencies.get_real_ip),
     user_agent: str | None = Header(None, alias="User-Agent")
 ):
@@ -233,7 +232,7 @@ async def login(
 async def logout(
     response: Response,
     request: Request,
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     user_id: str | None = Depends(dependencies.get_user_id_from_expired_token)
 ):
     """Обрабатывает выход пользователя из системы и отменяет сеанс."""
@@ -260,7 +259,7 @@ async def logout(
 )
 async def reset_password(
     body: schemas.ResetPasswordRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService)
+    service: services.AuthService = Depends(dependencies.get_auth_service)
 ):
     """Инициирует процесс сброса пароля."""
     await service.start_password_reset(body.email)
@@ -278,7 +277,7 @@ async def reset_password(
 )
 async def complete_reset(
     body: schemas.CompleteResetRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService)
+    service: services.AuthService = Depends(dependencies.get_auth_service)
 ):
     """Завершает сброс пароля с помощью нового пароля."""
     await service.complete_password_reset(body)
@@ -296,7 +295,7 @@ async def complete_reset(
 )
 async def change_password(
     body: schemas.ChangePasswordRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Изменяет пароль пользователя после проверки подлинности."""
@@ -322,7 +321,7 @@ async def get_current_user_info(
 )
 async def get_all_user_sessions(
     request: Request,
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Получает список всех активных сессий для текущего пользователя."""
@@ -337,8 +336,8 @@ async def get_all_user_sessions(
     response_model=schemas.UnifiedResponse
 )
 async def revoke_session(
-    session_id: UUID,
-    service: services.AuthService = Depends(services.AuthService),
+    session_id: str,
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Отзывает одну конкретную сессию по ее ID."""
@@ -359,7 +358,7 @@ async def revoke_session(
 )
 async def revoke_other_sessions(
     request: Request,
-    service: services.AuthService = Depends(services.AuthService),
+    service: services.AuthService = Depends(dependencies.get_auth_service),
     user: models.User = Depends(dependencies.get_current_active_user)
 ):
     """Отзывает все сессии, кроме текущей."""
@@ -382,7 +381,7 @@ async def revoke_other_sessions(
 )
 async def validate_token(
     body: schemas.TokenValidateRequest = Body(...),
-    service: services.AuthService = Depends(services.AuthService)
+    service: services.AuthService = Depends(dependencies.get_auth_service)
 ):
     """Проверяет access_token."""
     await service.validate_access_token(body.token)
@@ -402,7 +401,7 @@ async def validate_token(
 async def refresh(
     response: Response,
     request: Request,
-    service: services.AuthService = Depends(services.AuthService)
+    service: services.AuthService = Depends(dependencies.get_auth_service)
 ):
     """Обновляет access_token с помощью refresh_token"""
     refresh_token = request.cookies.get("refresh_token")
@@ -417,14 +416,6 @@ async def refresh(
         action="refresh",
         detail="Tokens refreshed.",
     )
-
-def _int_to_base64url(value: int) -> str:
-    """Преобразует целое число в строку base64url."""
-    byte_len = (value.bit_length() + 7) // 8
-    if byte_len == 0:
-        byte_len = 1
-    bytes_val = value.to_bytes(byte_len, "big", signed=False)
-    return base64.urlsafe_b64encode(bytes_val).decode("utf-8").rstrip("=")
 
 @lru_cache(maxsize=1)
 @router.get("/.well-known/jwks.json")
@@ -443,8 +434,8 @@ async def get_jwks() -> dict:
                 "use": "sig",
                 "kid": "sig-1",
                 "alg": "RS256",
-                "n": _int_to_base64url(public_numbers.n),
-                "e": _int_to_base64url(public_numbers.e),
+                "n": utils.int_to_base64url(public_numbers.n),
+                "e": utils.int_to_base64url(public_numbers.e),
             }
         ]
     }
@@ -455,6 +446,7 @@ async def get_jwks() -> dict:
     include_in_schema=False
 )
 async def gateway_verify(request: Request):
+    """Легковесный эндпоинт для API Gateway."""
     try:
         access_token = request.cookies.get("access_token")
         if not access_token:
