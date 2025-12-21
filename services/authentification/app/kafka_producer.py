@@ -12,7 +12,6 @@ class KafkaProducer:
         self.producer = AIOKafkaProducer(
             bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
             acks='all',
-            retries=3
         )
         self._is_running = False
 

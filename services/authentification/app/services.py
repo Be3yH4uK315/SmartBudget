@@ -2,7 +2,6 @@ import asyncio
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends
 from redis.asyncio import Redis
 from jwt import encode, decode, PyJWTError
 import geoip2.database
@@ -10,7 +9,6 @@ from arq.connections import ArqRedis
 
 from app import (
     email_templates,
-    dependencies,
     redis_keys,
     schemas,
     models,
@@ -24,10 +22,10 @@ class AuthService:
     """Сервис, инкапсулирующий всю бизнес-логику аутентификации."""
     def __init__(
         self,
-        uow: unit_of_work.UnitOfWork = Depends(dependencies.get_uow),
-        redis: Redis = Depends(dependencies.get_redis),
-        arq_pool: ArqRedis = Depends(dependencies.get_arq_pool),
-        geoip_reader: geoip2.database.Reader = Depends(dependencies.get_geoip_reader),
+        uow: unit_of_work.UnitOfWork,
+        redis: Redis,
+        arq_pool: ArqRedis,
+        geoip_reader: geoip2.database.Reader,
     ):
         self.uow = uow
         self.redis = redis
