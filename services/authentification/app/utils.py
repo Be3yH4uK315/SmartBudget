@@ -1,3 +1,4 @@
+import base64
 from user_agents import parse as ua_parse
 import ipaddress
 import geoip2.database
@@ -5,6 +6,12 @@ from geoip2.errors import AddressNotFoundError
 from hashlib import sha256
 from bcrypt import hashpw, gensalt, checkpw
 from logging import getLogger
+import json
+from decimal import Decimal
+from datetime import date, datetime
+from uuid import UUID
+from enum import Enum
+from typing import Any
 
 from app import exceptions
 
@@ -99,3 +106,37 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
         return False, "Password must contain at least one special character"
     
     return True, ""
+
+def int_to_base64url(value: int) -> str:
+    """Преобразует целое число в строку base64url. Используется для JWKS."""
+    byte_len = (value.bit_length() + 7) // 8
+    if byte_len == 0:
+        byte_len = 1
+    bytes_val = value.to_bytes(byte_len, "big", signed=False)
+    return base64.urlsafe_b64encode(bytes_val).decode("utf-8").rstrip("=")
+
+def app_json_serializer(obj: Any) -> Any:
+    """Универсальный сериализатор для всего проекта."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, Enum):
+        return obj.value
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+def to_json_str(data: Any) -> str:
+    """Сериализует объект в JSON строку."""
+    return json.dumps(data, default=app_json_serializer, ensure_ascii=False)
+
+def recursive_normalize(obj: Any) -> Any:
+    """Рекурсивно приводит типы к примитивам (для сохранения в Redis/DB)."""
+    if isinstance(obj, dict):
+        return {k: recursive_normalize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [recursive_normalize(v) for v in obj]
+    if isinstance(obj, (Decimal, date, datetime, UUID, Enum)):
+        return app_json_serializer(obj)
+    return obj
