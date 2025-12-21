@@ -1,242 +1,279 @@
 import logging
+from typing import Any
 from uuid import UUID, uuid4
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from app import (
     models, 
-    repositories, 
     exceptions, 
     schemas,
-    settings
+    settings,
+    unit_of_work
 )
 
 logger = logging.getLogger(__name__)
 
+def _get_utc_today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
+def _get_days_left(finish_date: date) -> int:
+    return max((finish_date - _get_utc_today()).days, 0)
+
+def create_goal_event(
+    event_type: schemas.GoalEventType,
+    goal_id: str,
+    payload: dict[str, Any] | None = None,
+) -> dict:
+    return {
+        "event": event_type.value,
+        "goal_id": goal_id,
+        "payload": payload or {},
+    }
+
+def _create_outbox_event(event_type: schemas.GoalEventType, **kwargs) -> dict:
+    """Фабрика для создания событий Outbox."""
+    return {"event_type": event_type, **kwargs}
+
 class GoalService:
-    def __init__(
-        self,
-        repository: repositories.GoalRepository,
-    ):
-        self.repository = repository
+    """Сервис для управления целями используя Unit of Work."""
+    
+    def __init__(self, uow: unit_of_work.UnitOfWork):
+        self.uow = uow
 
-    async def createGoal(
-        self, 
-        userId: UUID, 
-        request: schemas.CreateGoalRequest
-    ) -> models.Goal:
-        """Создание цели с использованием Outbox."""
-        goalId = uuid4()
-        newGoal = models.Goal(
-            goalId=goalId,
-            userId=userId,
-            name=request.name,
-            targetValue=request.targetValue,
-            currentValue=Decimal(0),
-            finishDate=request.finishDate,
-            status=models.GoalStatus.ONGOING.value
+    async def create_goal(self, user_id: UUID, request: schemas.CreateGoalRequest) -> models.Goal:
+        """Создание новой цели."""
+        if request.finish_date <= _get_utc_today():
+            raise exceptions.InvalidGoalDataError("Finish date must be in the future")
+        
+        goal = models.Goal(
+            goal_id=uuid4(),
+            user_id=user_id,
+            name=request.name.strip(),
+            target_value=request.target_value,
+            current_value=Decimal("0"),
+            finish_date=request.finish_date,
+            status=schemas.GoalStatus.ONGOING.value,
         )
         
-        goal = await self.repository.create(newGoal)
-        
-        event = {
-            "event": "goal.created",
-            "goalId": str(goal.goalId),
-            "userId": str(userId),
-            "name": goal.name,
-            "targetValue": goal.targetValue,
-            "finishDate": goal.finishDate
-        }
-
-        await self.repository.addOutboxEvent(
-            topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            eventData=event
-        )
-        await self.repository.db.commit()
-        await self.repository.db.refresh(goal)
-        
-        return goal
-
-    async def getGoalDetails(
-        self, 
-        userId: UUID, 
-        goalId: UUID
-    ) -> tuple[models.Goal, int]:
-        """Логика получения 1 цели."""
-        goal = await self.repository.getById(userId, goalId)
-        if not goal:
-            raise exceptions.GoalNotFoundError("Goal not found")
-
-        today = datetime.now(timezone.utc).date()
-        daysLeft = max((goal.finishDate - today).days, 0)
-        return goal, daysLeft
-
-    async def getMainGoals(self, userId: UUID) -> list[models.Goal]:
-        """Логика получения целей для гл. экрана."""
-        return await self.repository.getMainGoals(userId)
-
-    async def getAllGoals(self, userId: UUID) -> list[models.Goal]:
-        """Логика получения всех целей."""
-        return await self.repository.getAllGoals(userId)
-
-    async def updateGoal(
-        self, 
-        userId: UUID, 
-        goalId: UUID, 
-        request: schemas.GoalPatchRequest
-    ) -> tuple[models.Goal, int]:
-        """Логика обновления цели."""
-        goal = await self.repository.getById(userId, goalId)
-        if not goal:
-            raise exceptions.GoalNotFoundError("Goal not found")
-
-        changesForDb = {}
-        changesForKafka = {}
-        updateData = request.model_dump(exclude_unset=True)
-
-        for field, value in updateData.items():
-            if value is None:
-                continue
+        async with self.uow:
+            self.uow.goals.create(goal)
             
-            if field == 'status':
-                changesForDb[field] = value.value if isinstance(value, models.GoalStatus) else value
-            else:
-                changesForDb[field] = value
+            event_data = _create_outbox_event(
+                schemas.GoalEventType.CREATED.value,
+                goal_id=str(goal.goal_id),
+                user_id=str(user_id),
+                name=goal.name,
+                target_value=goal.target_value,
+                finish_date=goal.finish_date
+            )
 
-            valueKafka = value.value if isinstance(value, models.GoalStatus) else value
-            changesForKafka[field] = valueKafka
-        
-        if not changesForDb:
-             today = datetime.now(timezone.utc).date()
-             daysLeft = max((goal.finishDate - today).days, 0)
-             return goal, daysLeft
-
-        goal = await self.repository.updateFields(userId, goalId, changesForDb)
-
-        await self._checkAndProcessAchievement(goal)
-
-        if changesForKafka:
-            eventChanged = {
-                "event": "goal.changed", 
-                "goalId": str(goalId), 
-                "changes": changesForKafka
-            }
-            await self.repository.addOutboxEvent(
+            self.uow.goals.add_outbox_event(
                 topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                eventData=eventChanged
+                event_data=event_data,
             )
 
-        await self.repository.db.commit()
-
-        today = datetime.now(timezone.utc).date()
-        daysLeft = max((goal.finishDate - today).days, 0)
-        return goal, daysLeft
-
-    async def updateGoalBalance(self, event: schemas.TransactionEvent):
-        """Логика консьюмера."""
-        amount = event.amount if event.direction == 'income' else -event.amount
+            return goal
         
-        goal = await self.repository.adjustBalance(
-            event.userId, 
-            event.accountId, 
-            amount, 
-            event.transactionId
-        )
-
-        if goal is None:
-            logger.info(f"Transaction {event.transactionId} duplicate. Checking state.")
-            goal = await self.repository.getGoalByTransactionId(event.transactionId)
+    async def get_goal_details(self, user_id: UUID, goal_id: UUID) -> tuple[models.Goal, int]:
+        """Получение детальной информации о цели."""
+        async with self.uow:
+            goal = await self.uow.goals.get_by_id(user_id, goal_id)
             if not goal:
-                return
-            return
+                raise exceptions.GoalNotFoundError("Goal not found")
+            days_left = _get_days_left(goal.finish_date)
+            return goal, days_left
 
-        eventUpdated = {
-            "event": "goal.updated", 
-            "goalId": str(goal.goalId), 
-            "currentValue": goal.currentValue,
-            "status": goal.status
-        }
-        await self.repository.addOutboxEvent(
-            topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            eventData=eventUpdated
+    async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
+        """Получение целей для главного экрана."""
+        async with self.uow:
+            return await self.uow.goals.get_main_goals(user_id)
+
+    async def get_all_goals(self, user_id: UUID) -> list[models.Goal]:
+        """Получение всех целей пользователя."""
+        async with self.uow:
+            return await self.uow.goals.get_all_goals(user_id)
+
+    async def update_goal(
+        self, user_id: UUID, goal_id: UUID, request: schemas.GoalPatchRequest
+    ) -> tuple[models.Goal, int]:
+        """Обновление цели."""
+        async with self.uow:
+            goal = await self.uow.goals.get_by_id(user_id, goal_id)
+            if not goal:
+                raise exceptions.GoalNotFoundError("Goal not found")
+
+            update_data = request.model_dump(exclude_unset=True)
+            if not update_data:
+                return goal, _get_days_left(goal.finish_date)
+
+            if "finish_date" in update_data and update_data["finish_date"]:
+                if update_data["finish_date"] <= _get_utc_today():
+                    raise exceptions.InvalidGoalDataError("Finish date must be in the future")
+
+            changes_for_db = {}
+            changes_for_kafka = {}
+
+            for field, value in update_data.items():
+                if value is None: continue
+                db_value = value.value if isinstance(value, schemas.GoalStatus) else value
+                if isinstance(db_value, str): db_value = db_value.strip()
+                changes_for_db[field] = db_value
+                changes_for_kafka[field] = db_value
+            
+            if not changes_for_db:
+                return goal, _get_days_left(goal.finish_date)
+
+            goal = await self.uow.goals.update_fields(user_id, goal_id, changes_for_db)
+            await self._check_and_process_achievement_in_uow(goal)
+
+            if changes_for_kafka:
+                event = _create_outbox_event(
+                    schemas.GoalEventType.CHANGED.value,
+                    goal_id=str(goal_id),
+                    changes=changes_for_kafka
+                )
+                self.uow.goals.add_outbox_event(
+                    topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                    event_data=event
+                )
+            return goal, _get_days_left(goal.finish_date)
+
+    async def update_goal_balance(self, event: schemas.TransactionEvent) -> None:
+        """Обработка события изменения баланса из Kafka (идемпотентная)."""
+        value_change = event.value * (
+            Decimal(1) if event.type == schemas.TransactionType.INCOME else Decimal(-1)
         )
-
-        await self._checkAndProcessAchievement(goal)
-        await self.repository.db.commit()
-
-    async def _checkAndProcessAchievement(self, goal: models.Goal) -> bool:
-        """Внутренний метод, не делает коммит сам, только добавляет в сессию."""
-        achievedGoal = await self.repository.markAchievedIfEligible(goal.userId, goal.goalId)
         
-        if achievedGoal:
-            goal.status = achievedGoal.status
-            eventNotif = {
-                "event": "goal.alert", 
-                "goalId": str(goal.goalId), 
-                "type": "achieved"
-            }
-            await self.repository.addOutboxEvent(
-                topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                eventData=eventNotif
+        async with self.uow:
+            goal = await self.uow.goals.adjust_balance(
+                event.user_id, event.goal_id, value_change, event.transaction_id
             )
+            if goal is None:
+                logger.info(f"Transaction {event.transaction_id} duplicate. Skipping.")
+                return
+
+            update_event = _create_outbox_event(
+                schemas.GoalEventType.UPDATED.value,
+                goal_id=str(goal.goal_id),
+                current_value=goal.current_value,
+                status=goal.status
+            )
+            self.uow.goals.add_outbox_event(
+                topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                event_data=update_event
+            )
+
+            await self._check_and_process_achievement_in_uow(goal)
+
+    async def _check_and_process_achievement_in_uow(self, goal: models.Goal) -> bool:
+        """Внутренний метод, работает в контексте текущего UoW."""
+        achieved_goal = await self.uow.goals.mark_achieved_if_eligible(
+            goal.user_id, goal.goal_id
+        )
+        
+        if achieved_goal:
+            goal.status = achieved_goal.status
+            event = _create_outbox_event(
+                schemas.GoalEventType.ALERT.value,
+                goal_id=str(goal.goal_id),
+                days_left=0
+            )
+            self.uow.goals.add_outbox_event(
+                topic=settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                event_data=event
+            )
+            logger.info(f"Goal {goal.goal_id} achieved")
             return True
 
         elif (
-            goal.currentValue < goal.targetValue
-            and goal.status == models.GoalStatus.ACHIEVED.value
+            goal.current_value < goal.target_value
+            and goal.status == schemas.GoalStatus.ACHIEVED.value
         ):
-            newStatus = models.GoalStatus.ONGOING.value
-            await self.repository.updateFields(
-                userId=goal.userId, 
-                goalId=goal.goalId, 
-                changes={"status": newStatus}
+            new_status = schemas.GoalStatus.ONGOING.value
+            await self.uow.goals.update_fields(
+                user_id=goal.user_id, 
+                goal_id=goal.goal_id, 
+                changes={"status": new_status}
             )
-            goal.status = newStatus
+            goal.status = new_status
+            logger.info(f"Goal {goal.goal_id} reverted to ONGOING")
             return True
-            
         return False
 
-    async def check_deadlines(self):
-        """Логика крона. Переводим на Outbox."""
-        logger.info("Starting daily check_goals_deadlines task...")
-        today = datetime.now(timezone.utc).date()
-        BATCH_SIZE = 100
+    async def check_deadlines(self) -> None:
+        """Крон-задача для проверки сроков целей (запускается ежедневно)."""
+        logger.info("Starting daily deadline check task...")
+        today = _get_utc_today()
+        batch_size = 100
+        last_id: UUID | None = None
 
         while True:
-            expiredBatch = await self.repository.getExpiredGoalsBatch(today, limit=BATCH_SIZE)
-            if not expiredBatch:
-                break
-            
-            for goal in expiredBatch:
-                try:
-                    eventUpdated = {"event": "goal.updated", "goalId": str(goal.goalId), "status": "expired"}
-                    await self.repository.addOutboxEvent(settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS, eventUpdated)
-                    
-                    eventNotif = {"event": "goal.expired", "goalId": str(goal.goalId), "type": "expired"}
-                    await self.repository.addOutboxEvent(settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION, eventNotif)
+            async with self.uow:
+                batch = await self.uow.goals.get_expired_goals_batch(
+                    today=today, limit=batch_size, last_id=last_id
+                )
+                if not batch:
+                    break
+                
+                last_id_in_batch = batch[-1].goal_id
 
-                    await self.repository.updateStatus(goal.goalId, models.GoalStatus.EXPIRED.value)
-                except Exception as e:
-                    logger.error(f"Error processing expired {goal.goalId}: {e}")
-            
-            await self.repository.db.commit()
+                for goal in batch:
+                    try:
+                        self.uow.goals.add_outbox_event(
+                            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                            _create_outbox_event(
+                                schemas.GoalEventType.UPDATED.value,
+                                goal_id=str(goal.goal_id),
+                                status=schemas.GoalStatus.EXPIRED.value
+                            )
+                        )
+                        self.uow.goals.add_outbox_event(
+                            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                            _create_outbox_event(
+                                schemas.GoalEventType.EXPIRED.value,
+                                goal_id=str(goal.goal_id),
+                                days_left=0
+                            )
+                        )
+
+                        await self.uow.goals.update_status(
+                            goal.goal_id,
+                            schemas.GoalStatus.EXPIRED.value
+                        )
+                    except Exception as e:
+                        logger.error(f"Error processing expired goal {goal.goal_id}: {e}")
+                        continue
+
+                last_id = last_id_in_batch
 
         while True:
-            approachingBatch = await self.repository.getApproachingGoalsBatch(today, limit=BATCH_SIZE)
-            if not approachingBatch:
-                break
-            
-            processedIds = []
-            for goal in approachingBatch:
-                daysLeft = (goal.finishDate - today).days
-                eventNotif = {
-                    "event": "goal.approaching", 
-                    "goalId": str(goal.goalId), 
-                    "type": "approaching",
-                    "daysLeft": daysLeft
-                }
-                await self.repository.addOutboxEvent(settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION, eventNotif)
-                processedIds.append(goal.goalId)
+            async with self.uow:
+                approaching_batch = await self.uow.goals.get_approaching_goals_batch(
+                    today, limit=batch_size
+                )
+                if not approaching_batch:
+                    break
+                
+                processed_ids = []
+                for goal in approaching_batch:
+                    try:
+                        days_left = _get_days_left(goal.finish_date)
+                        event = _create_outbox_event(
+                            schemas.GoalEventType.APPROACHING.value, 
+                            goal_id=str(goal.goal_id), 
+                            type="approaching", 
+                            days_left=days_left
+                        )
+                        self.uow.goals.add_outbox_event(
+                            settings.settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION, 
+                            event_data=event
+                        )
+                        processed_ids.append(goal.goal_id)
+                    except Exception as e:
+                        logger.error(f"Error processing approaching goal {goal.goal_id}: {e}")
+                        continue
 
-            if processedIds:
-                await self.repository.updateLastChecked(processedIds)
+                if processed_ids:
+                    await self.uow.goals.update_last_checked(processed_ids)

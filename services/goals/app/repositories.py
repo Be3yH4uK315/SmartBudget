@@ -1,262 +1,241 @@
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
 import json
 import logging
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from uuid import UUID
-import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete, insert, or_, select, update
-from sqlalchemy.exc import IntegrityError
 
-from app import models, exceptions
+import sqlalchemy as sa
+from sqlalchemy import delete, insert, or_, select, update, case
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import models, exceptions, schemas
+from app.utils import serialization
 
 logger = logging.getLogger(__name__)
 
-def _jsonSerializer(obj):
-    """Преобразует сложные типы в строки для сохранения в JSON column."""
-    if isinstance(obj, Decimal):
-        return str(obj)
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
-    if isinstance(obj, UUID):
-        return str(obj)
-    raise TypeError(f"Type {type(obj)} not serializable")
-
 class GoalRepository:
-    """Репозиторий для операций с целями."""
+    """Репозиторий для операций с целями. Не управляет транзакциями."""
+    
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def getById(self, userId: UUID, goalId: UUID) -> models.Goal | None:
+    async def get_by_id(self, user_id: UUID, goal_id: UUID) -> models.Goal | None:
         """Получает цель по ID и ID пользователя."""
         result = await self.db.execute(
             select(models.Goal).where(
-                models.Goal.goalId == goalId,
-                models.Goal.userId == userId
+                models.Goal.goal_id == goal_id,
+                models.Goal.user_id == user_id
             )
         )
         return result.scalar_one_or_none()
 
-    async def create(self, goalModel: models.Goal) -> models.Goal:
+    def create(self, goal_model: models.Goal) -> models.Goal:
         """Создает новую цель."""
-        try:
-            self.db.add(goalModel)
-            await self.db.flush() 
-            return goalModel
-        except IntegrityError as e:
-            logger.error(f"DATABASE INTEGRITY ERROR: {e}")
-            await self.db.rollback()
-            raise exceptions.InvalidGoalDataError(f"Goal creation failed: {e.orig}")
+        self.db.add(goal_model)
+        return goal_model
 
-    async def getMainGoals(self, userId: UUID) -> list[models.Goal]:
-        """Получает цели для главного экрана."""
+    async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
+        """Получает цели для главного экрана (топ 10 активных)."""
+        remaining_amount = models.Goal.target_value - models.Goal.current_value
         query = (
             select(models.Goal)
             .where(
-                models.Goal.userId == userId,
-                models.Goal.status == models.GoalStatus.ONGOING.value
+                models.Goal.user_id == user_id,
+                models.Goal.status == schemas.GoalStatus.ONGOING.value
             )
-            .order_by((models.Goal.targetValue - models.Goal.currentValue).asc())
+            .order_by(remaining_amount.asc())
             .limit(10)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def getAllGoals(self, userId: UUID) -> list[models.Goal]:
+    async def get_all_goals(self, user_id: UUID) -> list[models.Goal]:
         """Получает все цели пользователя."""
+        status_priority = case(
+            (models.Goal.status == schemas.GoalStatus.ONGOING.value, 1),
+            (models.Goal.status == schemas.GoalStatus.EXPIRED.value, 2),
+            (models.Goal.status == schemas.GoalStatus.ACHIEVED.value, 3),
+            (models.Goal.status == schemas.GoalStatus.CLOSED.value, 4),
+            else_=5
+        )
+        completion_percentage = case(
+            (models.Goal.target_value > 0, models.Goal.current_value / models.Goal.target_value),
+            else_=0
+        )
+
         query = (
             select(models.Goal)
-            .where(models.Goal.userId == userId)
-            .order_by(models.Goal.finishDate.asc())
+            .where(models.Goal.user_id == user_id)
+            .order_by(
+                status_priority.asc(),
+                completion_percentage.desc()
+            )
         )
         result = await self.db.execute(query)
         return result.scalars().all()
     
-    async def addOutboxEvent(self, topic: str, eventData: dict):
+    def add_outbox_event(self, topic: str, event_data: dict) -> None:
         """Добавляет событие в Outbox."""
-        eventType = eventData.get("event", "unknown")
-        safePayload = json.loads(json.dumps(eventData, default=_jsonSerializer))
-        outbox_entry = models.OutboxEvent(
-            topic=topic,
-            eventType=eventType,
-            payload=safePayload
-        )
-        self.db.add(outbox_entry)
-
-    async def adjustBalance(
-        self, userId: UUID, 
-        goalId: UUID, 
-        amount: Decimal, 
-        transactionId: UUID
-    ) -> models.Goal | None:
-        """Атомарно изменяет баланс цели."""
         try:
-            stmt = insert(models.ProcessedTransaction).values(
-                transactionId=transactionId,
-                goalId=goalId
+            event_type = event_data.get("event_type", "unknown")
+            clean_payload = serialization.recursive_normalize(event_data)
+            outbox_entry = models.OutboxEvent(
+                topic=topic,
+                event_type=event_type,
+                payload=clean_payload,
+                status='pending'
             )
-            await self.db.execute(stmt)
-        except IntegrityError:
-            await self.db.rollback()
-            return None
+            self.db.add(outbox_entry)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Failed to serialize outbox event: {e}")
+            raise exceptions.InvalidGoalDataError("Event serialization failed")
 
-        newValue = sa.func.greatest(0, models.Goal.currentValue + amount)
+    async def adjust_balance(
+        self, user_id: UUID, 
+        goal_id: UUID, 
+        amount: Decimal, 
+        transaction_id: UUID
+    ) -> models.Goal | None:
+        """Атомарно изменяет баланс цели с защитой от дублей."""
+        stmt_check = insert(models.ProcessedTransaction).values(
+            transaction_id=transaction_id,
+            goal_id=goal_id
+        )
+        try:
+            await self.db.execute(stmt_check)
+        except IntegrityError:
+            return None 
+
+        new_value = sa.func.greatest(Decimal(0), models.Goal.current_value + amount)
 
         query = (
             update(models.Goal)
-            .where(models.Goal.goalId == goalId, models.Goal.userId == userId)
-            .values(currentValue=newValue)
+            .where(models.Goal.goal_id == goal_id, models.Goal.user_id == user_id)
+            .values(current_value=new_value)
             .execution_options(synchronize_session=False)
             .returning(models.Goal)
         )
 
         result = await self.db.execute(query)
-        updatedGoal = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
 
-        if not updatedGoal:
-            await self.db.rollback()
-            raise exceptions.GoalNotFoundError(f"Goal {goalId} not found")
-
-        return updatedGoal
-
-    async def updateFields(self, userId: UUID, goalId: UUID, changes: dict) -> models.Goal:
-        """
-        Обновляет переданные поля, чтобы не затереть баланс.
-        """
+    async def update_fields(
+        self,
+        user_id: UUID,
+        goal_id: UUID,
+        changes: dict
+    ) -> models.Goal:
         stmt = (
             update(models.Goal)
-            .where(models.Goal.goalId == goalId, models.Goal.userId == userId)
+            .where(
+                models.Goal.goal_id == goal_id,
+                models.Goal.user_id == user_id
+            )
             .values(**changes)
             .returning(models.Goal)
         )
         result = await self.db.execute(stmt)
-        updatedGoal = result.scalar_one_or_none()
-        if not updatedGoal:
-             raise exceptions.GoalNotFoundError("Goal not found during update")
-        return updatedGoal
+        goal = result.scalar_one_or_none()
+        if goal is None:
+            raise exceptions.GoalNotFoundError("Goal not found")
+        return goal
     
-    async def updateStatus(self, goalId: UUID, new_status: str):
-        """Метод для атомарного обновления статуса (для воркера)."""
+    async def update_status(self, goal_id: UUID, new_status: str) -> None:
+        """Атомарно обновляет статус цели."""
         stmt = (
             update(models.Goal)
-            .where(models.Goal.goalId == goalId)
-            .values(status=new_status)
+            .where(models.Goal.goal_id == goal_id)
+            .values(status=new_status, updated_at=datetime.now(timezone.utc))
         )
         await self.db.execute(stmt)
 
-    async def getExpiredGoalsBatch(self, today: date, limit: int = 100) -> list[models.Goal]:
-        """Возвращает пачку целей, которые просрочены и все еще ONGOING."""
+    async def get_expired_goals_batch(
+        self,
+        today: date,
+        limit: int = 100,
+        last_id: UUID | None = None
+    ) -> list[models.Goal]:
+        """Возвращает просроченные цели."""
         query = (
             select(models.Goal)
             .where(
-                models.Goal.status == models.GoalStatus.ONGOING.value,
-                models.Goal.finishDate < today
+                models.Goal.status == schemas.GoalStatus.ONGOING.value,
+                models.Goal.finish_date < today
             )
+            .order_by(models.Goal.goal_id.asc())
             .limit(limit)
         )
+        if last_id:
+            query = query.where(models.Goal.goal_id > last_id)
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def markAchievedIfEligible(self, userId: UUID, goalId: UUID) -> models.Goal | None:
-        """
-        Атомарно переводит цель в ACHIEVED, только если она выполнена 
-        и еще находится в ONGOING.
-        """
+    async def mark_achieved_if_eligible(self, user_id: UUID, goal_id: UUID) -> models.Goal | None:
+        """Атомарно переводит цель в ACHIEVED."""
         stmt = (
             update(models.Goal)
             .where(
-                models.Goal.goalId == goalId,
-                models.Goal.userId == userId,
-                models.Goal.status == models.GoalStatus.ONGOING.value,
-                models.Goal.currentValue >= models.Goal.targetValue
+                models.Goal.goal_id == goal_id,
+                models.Goal.user_id == user_id,
+                models.Goal.status == schemas.GoalStatus.ONGOING.value,
+                models.Goal.current_value >= models.Goal.target_value
             )
-            .values(status=models.GoalStatus.ACHIEVED.value)
+            .values(status=schemas.GoalStatus.ACHIEVED.value, updated_at=datetime.now(timezone.utc))
             .returning(models.Goal)
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def getApproachingGoalsBatch(
-        self, 
-        today: date, 
-        limit: int = 100, 
-        daysNotice: int = 7
+    async def get_approaching_goals_batch(
+        self, today: date, limit: int = 100, days_notice: int = 7
     ) -> list[models.Goal]:
-        """
-        Возвращает пачку целей, у которых скоро дедлайн и которые 
-        НЕ проверялись за последние 24 часа.
-        """
-        sevenDaysFromNow = today + timedelta(days=daysNotice)
-        oneDayAgo = datetime.now(timezone.utc) - timedelta(days=1)
-
+        """Возвращает приближающиеся цели, не проверявшиеся 24 часа."""
+        seven_days_from_now = today + timedelta(days=days_notice)
+        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
         query = (
             select(models.Goal)
             .where(
-                models.Goal.status == models.GoalStatus.ONGOING.value,
-                models.Goal.finishDate <= sevenDaysFromNow,
-                models.Goal.finishDate >= today,
+                models.Goal.status == schemas.GoalStatus.ONGOING.value,
+                models.Goal.finish_date <= seven_days_from_now,
+                models.Goal.finish_date >= today,
                 or_(
-                    models.Goal.lastCheckedDate == None,
-                    models.Goal.lastCheckedDate < oneDayAgo
+                    models.Goal.last_checked_date == None,
+                    models.Goal.last_checked_date < one_day_ago
                 )
             )
+            .order_by(models.Goal.finish_date.asc())
             .limit(limit)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def updateLastChecked(self, goalsIds: list[UUID]):
-        """Обновляем дату проверки, чтобы не спамить уведомлениями."""
-        if not goalsIds:
+    async def update_last_checked(self, goals_ids: list[UUID]) -> None:
+        """Обновляет дату последней проверки."""
+        if not goals_ids:
             return
         stmt = (
             update(models.Goal)
-            .where(models.Goal.goalId.in_(goalsIds))
-            .values(lastCheckedDate=datetime.now(timezone.utc))
+            .where(models.Goal.goal_id.in_(goals_ids))
+            .values(last_checked_date=datetime.now(timezone.utc))
         )
         await self.db.execute(stmt)
-        await self.db.commit()
-    
-    async def getGoalByTransactionId(self, transactionId: UUID) -> models.Goal | None:
-        """Находит цель, связанную с уже обработанной транзакцией."""
-        query = (
-            select(models.Goal)
-            .join(models.ProcessedTransaction, models.Goal.goalId == models.ProcessedTransaction.goalId)
-            .where(models.ProcessedTransaction.transactionId == transactionId)
-        )
-        result = await self.db.execute(query)
-        return result.scalar_one_or_none()
 
-    async def getPendingOutboxEvents(self, limit: int = 100) -> list[models.OutboxEvent]:
-        """Получает пачку событий для отправки с блокировкой строк."""
+    async def get_pending_outbox_events(self, limit: int = 100) -> list[models.OutboxEvent]:
+        """Получает события для отправки с блокировкой."""
         query = (
             select(models.OutboxEvent)
             .where(models.OutboxEvent.status == 'pending')
-            .order_by(models.OutboxEvent.createdAt.asc())
+            .order_by(models.OutboxEvent.created_at.asc())
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
-    
-    async def handleFailedOutboxEvent(self, eventId: UUID, errorMsg: str):
-        """
-        Увеличивает счетчик попыток. Если > 5, помечает как failed.
-        """
-        stmt = select(models.OutboxEvent).where(models.OutboxEvent.eventId == eventId)
-        result = await self.db.execute(stmt)
-        event = result.scalar_one_or_none()
-        
-        if event:
-            event.retryСount += 1
-            if event.retryСount >= 5:
-                event.status = 'failed'
-                
-            self.db.add(event)
 
-    async def deleteOutboxEvents(self, eventIds: list[UUID]):
-        """Удаляет успешно отправленные события."""
-        if not eventIds:
+    async def delete_outbox_events(self, event_ids: list[UUID]) -> None:
+        """Удаляет отправленные события."""
+        if not event_ids:
             return
-        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.eventId.in_(eventIds))
+        stmt = delete(models.OutboxEvent).where(models.OutboxEvent.event_id.in_(event_ids))
         await self.db.execute(stmt)
