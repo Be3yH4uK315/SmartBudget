@@ -342,7 +342,7 @@ class AuthService:
         payload = {
             "sub": user_id,
             "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
-            "role": schemas.UserRole(role).name,
+            "role": schemas.UserRole(role).value,
             "iss": "auth-service",
             "aud": "smart-budget",
         }

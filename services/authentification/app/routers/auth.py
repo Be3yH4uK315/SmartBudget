@@ -84,11 +84,11 @@ async def health_check(request: Request) -> dict:
             has_error = True
 
     redis_pool = getattr(app.state, "redis_pool", None)
-    redis = Redis(connection_pool=redis_pool)
-    if not redis:
+    if not redis_pool:
         health_status["redis"] = "disconnected"
         has_error = True
     else:
+        redis = Redis(connection_pool=redis_pool)
         try:
             await redis.ping()
             health_status["redis"] = "ok"
@@ -418,28 +418,26 @@ async def refresh(
     )
 
 @lru_cache(maxsize=1)
-@router.get("/.well-known/jwks.json")
-async def get_jwks() -> dict:
-    """Предоставляет JWKS для проверки токенов."""
+def _build_jwks() -> dict:
     public_key_obj = serialization.load_pem_public_key(
         settings.settings.JWT.JWT_PUBLIC_KEY.encode(),
         backend=default_backend()
     )
-    public_numbers = public_key_obj.public_numbers()
-
-    jwks = {
-        "keys": [
-            {
-                "kty": "RSA",
-                "use": "sig",
-                "kid": "sig-1",
-                "alg": "RS256",
-                "n": utils.int_to_base64url(public_numbers.n),
-                "e": utils.int_to_base64url(public_numbers.e),
-            }
-        ]
+    numbers = public_key_obj.public_numbers()
+    return {
+        "keys": [{
+            "kty": "RSA",
+            "use": "sig",
+            "kid": "sig-1",
+            "alg": "RS256",
+            "n": utils.int_to_base64url(numbers.n),
+            "e": utils.int_to_base64url(numbers.e),
+        }]
     }
-    return jwks
+
+@router.get("/.well-known/jwks.json")
+async def get_jwks():
+    return _build_jwks()
 
 @router.get(
     "/gateway-verify",
@@ -456,7 +454,9 @@ async def gateway_verify(request: Request):
             access_token,
             settings.settings.JWT.JWT_PUBLIC_KEY,
             algorithms=[settings.settings.JWT.JWT_ALGORITHM],
-            audience="smart-budget"
+            issuer="auth-service",
+            audience="smart-budget",
+            options={"require": ["exp", "sub"]}
         )
 
         user_id = payload.get("sub")
