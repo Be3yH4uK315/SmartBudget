@@ -121,6 +121,8 @@ class AuthService:
             )
             self.uow.users.create(user)
 
+            await self.uow.flush()
+
             access_token, refresh_token, session = self._create_session_and_tokens(
                 self.uow, user, user_agent, device_name, ip, location
             )
