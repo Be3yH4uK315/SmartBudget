@@ -8,10 +8,10 @@ from app import exceptions
 
 logger = getLogger(__name__)
 
-async def errorMiddleware(request: Request, callNext):
-    """Промежуточное программное обеспечение для обработки ошибок в запросах."""
+async def error_middleware(request: Request, call_next):
+    """Промежуточное ПО для обработки ошибок в запросах."""
     try:
-        return await callNext(request)
+        return await call_next(request)
     except exceptions.AuthServiceError as e:
         logger.warning(
             f"Handled business logic error: {e}",
@@ -39,6 +39,10 @@ async def errorMiddleware(request: Request, callNext):
     except Exception as e:
         logger.error(
             f"Unexpected error: {e}", 
-            extra={"path": request.url.path, "method": request.method, "error_type": type(e).__name__}
+            extra={
+                "path": request.url.path, 
+                "method": request.method, 
+                "error_type": type(e).__name__
+            }
         )
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
