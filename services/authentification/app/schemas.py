@@ -4,6 +4,16 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from typing import Literal, Optional
 
+def to_camel(string: str) -> str:
+    parts = string.split("_")
+    return parts[0] + "".join(word.capitalize() for word in parts[1:])
+
+class CamelModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True
+    )
+
 class UserRole(enum.IntEnum):
     """Роли пользователей в системе."""
     USER = 0
@@ -29,7 +39,7 @@ class AuthEventTypes(str, enum.Enum):
 
 # --- API Request Models ---
 
-class VerifyEmailRequest(BaseModel):
+class VerifyEmailRequest(CamelModel):
     """Запрос для инициирования проверки электронной почты."""
     email: EmailStr = Field(
         ...,
@@ -37,7 +47,7 @@ class VerifyEmailRequest(BaseModel):
         description="Email, на который будет отправлена верификационная ссылка"
     )
 
-class VerifyLinkRequest(BaseModel):
+class VerifyLinkRequest(CamelModel):
     """Модель запроса для проверки токена ссылки."""
     token: str = Field(
         ...,
@@ -45,7 +55,7 @@ class VerifyLinkRequest(BaseModel):
         description="Токен, полученный пользователем из email"
     )
 
-class CompleteRegistrationRequest(BaseModel):
+class CompleteRegistrationRequest(CamelModel):
     """Модель запроса для завершения регистрации."""
     email: EmailStr = Field(
         ...,
@@ -75,7 +85,7 @@ class CompleteRegistrationRequest(BaseModel):
         description="Пароль пользователя (не менее 8 символов)"
     )
 
-class LoginRequest(BaseModel):
+class LoginRequest(CamelModel):
     """Модель запроса для входа в систему."""
     email: EmailStr = Field(
         ...,
@@ -88,7 +98,7 @@ class LoginRequest(BaseModel):
         description="Пароль пользователя"
     )
 
-class ResetPasswordRequest(BaseModel):
+class ResetPasswordRequest(CamelModel):
     """Модель запроса для инициирования сброса пароля."""
     email: EmailStr = Field(
         ...,
@@ -96,7 +106,7 @@ class ResetPasswordRequest(BaseModel):
         description="Email, на который отправить ссылку восстановления"
     )
 
-class CompleteResetRequest(BaseModel):
+class CompleteResetRequest(CamelModel):
     """Модель запроса для завершения сброса пароля."""
     email: EmailStr = Field(
         ...,
@@ -115,7 +125,7 @@ class CompleteResetRequest(BaseModel):
         description="Новый пароль (не менее 8 символов)"
     )
 
-class ChangePasswordRequest(BaseModel):
+class ChangePasswordRequest(CamelModel):
     """Модель запроса на смену пароля."""
     password: str = Field(
         ...,
@@ -129,7 +139,7 @@ class ChangePasswordRequest(BaseModel):
         description="Новый пароль (не менее 8 символов)"
     )
 
-class TokenValidateRequest(BaseModel):
+class TokenValidateRequest(CamelModel):
     """Модель запроса для проверки токена."""
     token: str = Field(
         ...,
@@ -139,7 +149,7 @@ class TokenValidateRequest(BaseModel):
 
 # --- API Response Models ---
 
-class UnifiedResponse(BaseModel):
+class UnifiedResponse(CamelModel):
     """Единая модель ответа для всех endpoints."""
     status: str = Field(
         ...,
@@ -157,7 +167,7 @@ class UnifiedResponse(BaseModel):
         description="Дополнительная информация или сообщение"
     )
 
-class UserInfo(BaseModel):
+class UserInfo(CamelModel):
     """Безопасная информация о пользователе."""
     user_id: UUID = Field(
         ...,
@@ -197,7 +207,7 @@ class UserInfo(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class SessionInfo(BaseModel):
+class SessionInfo(CamelModel):
     """Безопасная информация о сессии, передаваемая на фронтенд."""
     session_id: UUID = Field(
         ...,
@@ -232,7 +242,7 @@ class SessionInfo(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class AllSessionsResponse(BaseModel):
+class AllSessionsResponse(CamelModel):
     """Модель ответа для списка всех сессий пользователя."""
     sessions: list[SessionInfo] = Field(
         ...,
@@ -242,7 +252,7 @@ class AllSessionsResponse(BaseModel):
 
 # --- Kafka Event Models ---
 
-class BaseAuthEvent(BaseModel):
+class BaseAuthEvent(CamelModel):
     event: AuthEventTypes
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
