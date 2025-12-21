@@ -4,6 +4,8 @@ from functools import cached_property
 
 class DBSettings(BaseSettings):
     DB_URL: str
+    DB_POOL_SIZE: int
+    DB_MAX_OVERFLOW: int
 
 class SMTPSettings(BaseSettings):
     SMTP_HOST: str
