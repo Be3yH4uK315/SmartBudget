@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { authApi } from '@shared/api/auth'
+import { MODAL_IDS } from '@shared/constants/modals'
 import { ROUTES } from '@shared/constants/routes'
+import { useAppDispatch } from '@shared/store'
+import { openModal } from '@shared/store/modal'
 import { AuthResponse, TokenType } from '@shared/types'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 
 export const useVerifyLinkFlow = () => {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const [searchParams] = useSearchParams()
   const location = useLocation()
 
@@ -52,7 +56,8 @@ export const useVerifyLinkFlow = () => {
       try {
         const res = await fn()
         if (res.status === 'success' && res.action === 'completeRegistration') {
-          navigate(ROUTES.PAGES.DASHBOARD)
+          navigate(ROUTES.PAGES.BUDGET)
+          dispatch(openModal({ id: MODAL_IDS.CREATE_BUDGET }))
           return
         }
         if (res.status === 'success' && res.action === 'completeReset') {
@@ -63,7 +68,7 @@ export const useVerifyLinkFlow = () => {
         setIsSubmitting(false)
       }
     },
-    [navigate],
+    [navigate, dispatch],
   )
 
   return {

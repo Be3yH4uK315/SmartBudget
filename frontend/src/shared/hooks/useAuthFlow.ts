@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { authApi } from '@shared/api/auth'
 import { ROUTES } from '@shared/constants/routes'
+import { dispatch, getUserInfo } from '@shared/store'
 import { AuthStep, ErrorCode, VerifyMode } from '@shared/types'
 import { useNavigate } from 'react-router'
 
@@ -68,6 +69,7 @@ export function useAuthFlow() {
       try {
         const res = await authApi.login({ email: normalizedEmail, password })
         if (res) {
+          await dispatch(getUserInfo())
           navigate(ROUTES.PAGES.DASHBOARD)
           return
         }
