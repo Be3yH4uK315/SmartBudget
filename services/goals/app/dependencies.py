@@ -13,9 +13,9 @@ async def get_uow(request: Request) -> AsyncGenerator[unit_of_work.UnitOfWork, N
     db_session_maker = request.app.state.db_session_maker
     if not db_session_maker:
         raise HTTPException(status_code=500, detail="Database session factory not available")
-    
-    uow = unit_of_work.UnitOfWork(db_session_maker)
-    yield uow
+
+    async with unit_of_work.UnitOfWork(db_session_maker) as uow:
+        yield uow
 
 async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
     """Предоставляет пул Arq."""
