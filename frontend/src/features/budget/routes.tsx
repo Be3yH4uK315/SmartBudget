@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react'
-import { Container } from '@mui/material'
+import { lazy } from 'react'
+import { SuspenseFallbackWrapper } from '@shared/components'
 import { Route } from 'react-router'
+import { BudgetScreenSkeleton } from './screens/BudgetScreen'
 
 const BudgetScreen = lazy(() => import('./screens/BudgetScreen'))
 
@@ -10,9 +11,9 @@ export const budgetRoutes = {
       path="budget"
       index
       element={
-        <Suspense>
+        <SuspenseFallbackWrapper Fallback={<BudgetScreenSkeleton />}>
           <BudgetScreen />
-        </Suspense>
+        </SuspenseFallbackWrapper>
       }
     />
   ),
