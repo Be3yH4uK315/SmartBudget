@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CATEGORIES_ICONS_MAP } from '@features/transactions/constants/categoriesIcons'
+import { CATEGORIES_ICONS_MAP } from '@shared/constants/categoriesIcons'
 
 export type CategoryRow = {
   categoryId: number
@@ -60,7 +60,7 @@ export const useCreateBudget = () => {
   const addCategory = () => {
     setValues((prev) => ({
       ...prev,
-      categories: [...prev.categories, { categoryId: -1, limit: 0, percent: 0 }],
+      categories: [...prev.categories, { categoryId: 0, limit: 0, percent: 0 }],
     }))
   }
 
