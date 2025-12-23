@@ -1,4 +1,4 @@
-import { CategoryRow } from '@features/budget/hooks/useCreateBudget'
+import { CategoryRow } from '@features/budget/hooks'
 import { CreateBudgetPayload } from '@features/budget/types'
 
 type FormValues = {
@@ -12,10 +12,7 @@ export const mapFormToCreateBudgetPayload = (values: FormValues): CreateBudgetPa
     totalLimit: values.totalLimit,
     isAutoRenew: values.isAutoRenew,
     categories: values.categories
-      .filter(
-        (c): c is Required<Pick<CategoryRow, 'categoryId' | 'limit'>> =>
-          c.categoryId !== null && c.limit > 0,
-      )
+      .filter((c) => c.categoryId !== null && c.limit > 0)
       .map((c) => ({
         categoryId: c.categoryId,
         limit: c.limit,
