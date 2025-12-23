@@ -1,3 +1,4 @@
+import { KeyboardArrowDownOutlined } from '@mui/icons-material'
 import { ThemeOptions } from '@mui/material'
 import NeueRegular from '@shared/assets/fonts/Neue Haas Unica W1G Light.ttf'
 import TinkoffSansBold from '@shared/assets/fonts/TinkoffSans-Bold.ttf'
@@ -247,25 +248,60 @@ export const components: ThemeOptions['components'] = {
   MuiTextField: {
     styleOverrides: {
       root: ({ theme }) => ({
-        '& .MuiOutlinedInput-root': {
-          height: '56px',
-          '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: theme.palette.primary.main,
-            borderWidth: '2px',
-            borderRadius: '12px',
-          },
-          '&:hover:not(.Mui-focused)': {
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.primary.light,
-            },
-          },
-        },
         '& .MuiInputLabel-outlined': {
           color: theme.palette.text.primary,
           '&.Mui-focused': {
             color: theme.palette.text.primary,
           },
         },
+      }),
+    },
+  },
+
+  MuiSelect: {
+    defaultProps: {
+      IconComponent: KeyboardArrowDownOutlined,
+    },
+    styleOverrides: {
+      select: ({ theme }) => ({
+        display: 'flex',
+        alignItems: 'center',
+        padding: theme.spacing(2),
+      }),
+
+      icon: ({ theme }) => ({
+        color: theme.palette.gray.main,
+      }),
+    },
+  },
+
+  MuiOutlinedInput: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        height: 56,
+        borderRadius: 12,
+
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.main,
+          borderWidth: 2,
+        },
+
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.light,
+        },
+
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.main,
+        },
+
+        // ❗ убираем белую подсветку
+        '&:hover': {
+          backgroundColor: 'transparent',
+        },
+      }),
+
+      input: ({ theme }) => ({
+        padding: theme.spacing(2),
       }),
     },
   },
