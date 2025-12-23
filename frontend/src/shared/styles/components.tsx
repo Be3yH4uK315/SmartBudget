@@ -294,7 +294,6 @@ export const components: ThemeOptions['components'] = {
           borderColor: theme.palette.primary.main,
         },
 
-        // ❗ убираем белую подсветку
         '&:hover': {
           backgroundColor: 'transparent',
         },
