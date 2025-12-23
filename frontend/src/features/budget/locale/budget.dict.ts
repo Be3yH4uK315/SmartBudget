@@ -14,7 +14,7 @@ export const budgetDict: LocaleDictionary = {
       cannotFindData: 'К сожалению, у нас что-то сломалось :(',
       tryAgain: 'Попробуйте обновить страницу или загляните позже - мы обязательно все починим',
 
-      CategoryBlock: {
+      CategoryInfoBlock: {
         category: 'Лимиты не установлены',
         category_one: '{{count}} категория',
         category_few: '{{count}} категории',
@@ -56,7 +56,8 @@ export const budgetDict: LocaleDictionary = {
         categoriesSubtitle: 'Лимит для каждой категории. Можно изменить в настройках бюджета',
         selectPlaceholder: 'Категория',
         limit: 'Лимит категории, руб',
-        percentSumError: 'Сумма процентов должна быть равна 100',
+        percentOverflow: 'Лимиты по категориям превышают лимит бюджета на {{value}}%',
+        remainingPercent: 'Осталось распределить {{value}}% бюджета',
       },
     },
 
