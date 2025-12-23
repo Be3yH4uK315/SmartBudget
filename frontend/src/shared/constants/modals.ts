@@ -1,4 +1,4 @@
-import { CreateBudgetModal } from '@features/budget/screens/CreateBudgetModal/CreateBudgetModal'
+import { CreateBudgetModal } from '@features/budget/screens/CreateBudgetModal'
 import {
   ChangeCategoryModal,
   TransactionInfoModal,
