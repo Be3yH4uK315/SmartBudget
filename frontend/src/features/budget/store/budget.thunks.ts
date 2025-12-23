@@ -1,8 +1,7 @@
-import { budgetApi } from '@features/budget/api'
+import { budgetApi, budgetMock } from '@features/budget/api'
 import { BudgetPayload, CreateBudgetPayload } from '@features/budget/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { showToast } from '@shared/utils/toast.helpers'
-import { budgetMock } from '../api/budget.mock'
+import { showToast } from '@shared/utils'
 
 export const getBudgetData = createAsyncThunk<
   BudgetPayload,
@@ -10,7 +9,7 @@ export const getBudgetData = createAsyncThunk<
   { rejectValue: 'cannotGetBudgetData' }
 >('getBudgetData', async (_, { rejectWithValue }) => {
   try {
-    const response = await budgetApi.getBudgetData()
+    const response = await budgetMock.getBudgetData()
 
     return response
   } catch (e: any) {

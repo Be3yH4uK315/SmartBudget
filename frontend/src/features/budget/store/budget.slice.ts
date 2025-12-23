@@ -1,6 +1,6 @@
+import { BudgetSliceReducers, BudgetSliceState } from '@features/budget/types'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
-import { BudgetSliceReducers, BudgetSliceState } from '../types'
 import { getBudgetInitialState } from './budget.state'
 import { getBudgetData } from './budget.thunks'
 
@@ -40,3 +40,4 @@ declare module '@shared/store' {
 }
 
 budgetSlice.injectInto(rootReducer)
+export const { clearBudgetState } = budgetSlice.actions
