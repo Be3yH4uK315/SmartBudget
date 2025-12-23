@@ -1,8 +1,6 @@
 import { useCreateBudget } from '@features/budget/hooks/useCreateBudget'
 import { createBudget } from '@features/budget/store'
 import { mapFormToCreateBudgetPayload } from '@features/budget/utils'
-import { CategoryOption } from '@features/transactions/components'
-import { CATEGORIES_ICONS_MAP } from '@features/transactions/constants/categoriesIcons'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import {
   Button,
@@ -15,11 +13,17 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import { CategoryOption } from '@shared/components'
+import { CATEGORIES_ICONS_MAP } from '@shared/constants/categoriesIcons'
 import { useTranslate } from '@shared/hooks'
 import ModalLayout from '@shared/screens/ModalProvider'
 import { useAppDispatch } from '@shared/store'
 
-export const CreateBudgetModal = ({ onClose }: { onClose: () => void }) => {
+type Props = {
+  onClose: () => void
+}
+
+export const CreateBudgetModal = ({ onClose }: Props) => {
   const translate = useTranslate('Budget.Modal')
   const dispatch = useAppDispatch()
 
@@ -101,7 +105,6 @@ export const CreateBudgetModal = ({ onClose }: { onClose: () => void }) => {
                           const Icon = CATEGORIES_ICONS_MAP.get(Number(value))!
                           return <CategoryOption value={Number(value)} Icon={Icon} />
                         }}
-                        sx={{ height: 'min-content', borderRadius: '12px' }}
                       >
                         {availableCategories.concat(row.categoryId ?? []).map((id) => {
                           if (!id) return null
@@ -135,13 +138,35 @@ export const CreateBudgetModal = ({ onClose }: { onClose: () => void }) => {
                       <IconButton
                         onClick={() => removeCategory(index)}
                         disabled={values.categories.length === 1}
-                        sx={{ bgcolor: 'primary.main', borderRadius: '12px', maxHeight: '56px' }}
+                        sx={{
+                          bgcolor: 'primary.main',
+                          borderRadius: '12px',
+                          maxHeight: '56px',
+                          '&:disabled': { bgcolor: 'grayButton.dark' },
+                          ':hover': { bgcolor: 'primary.light' },
+                        }}
                       >
                         <DeleteOutlineIcon />
                       </IconButton>
                     </Stack>
                   )
                 })}
+
+                {isPercentOverflow && (
+                  <Typography variant="caption" color="error.main">
+                    {translate('percentOverflow', {
+                      value: totalPercent,
+                    })}
+                  </Typography>
+                )}
+
+                {values.totalLimit > 0 && !isPercentOverflow && remainingPercent > 0 && (
+                  <Typography variant="caption">
+                    {translate('remainingPercent', {
+                      value: remainingPercent,
+                    })}
+                  </Typography>
+                )}
 
                 {availableCategories.length > 0 && (
                   <Button onClick={addCategory}>{translate('addCategory')}</Button>
@@ -153,6 +178,7 @@ export const CreateBudgetModal = ({ onClose }: { onClose: () => void }) => {
                   <Checkbox
                     checked={values.isAutoRenew}
                     onChange={(e) => toggleAutoRenew(e.target.checked)}
+                    sx={{ color: 'text.primary', '&.Mui-checked': { color: 'text.primary' } }}
                   />
                 }
                 label={translate('autoRenew')}
