@@ -1,3 +1,4 @@
+export * from './CategoryOption'
 export * from './hocs'
 export * from './IconButton'
 export * from './PercentLine'

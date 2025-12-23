@@ -10,7 +10,7 @@ export const PercentLine = ({ limit, currentValue }: Props) => {
   const theme = useTheme()
 
   const percent = (currentValue / limit) * 100
-  const overLimit = currentValue > limit
+  const overLimit = currentValue / limit >= 0.999
   const preOverLimit = currentValue / limit >= 0.8
 
   const lineColor = overLimit
