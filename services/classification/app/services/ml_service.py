@@ -12,7 +12,7 @@ from sklearn.metrics import accuracy_score, f1_score
 from lightgbm import LGBMClassifier
 from typing import Tuple
 
-from app import settings, repositories
+from app import settings, unit_of_work
 
 logger = logging.getLogger(__name__)
 
@@ -194,9 +194,7 @@ class ModelManager:
         return cls._instance
 
     def get_pipeline(self):
-        """Получает текущий пайплайн."""
-        if not self.model:
-            return None
+        if not self.model: return None
         return {
             "model": self.model,
             "vectorizer": self.vectorizer,
@@ -205,15 +203,15 @@ class ModelManager:
         }
 
     async def check_for_updates(self, db_session_maker):
-        """Проверяет наличие новой модели в БД."""
+        """Проверяет наличие новой модели в БД через UoW."""
         now = datetime.now()
         if (now - self.last_check).total_seconds() < 60 and self.model_version:
             return 
         
         try:
-            async with db_session_maker() as session:
-                repository = repositories.ModelRepository(session)
-                active_model = await repository.get_active_model()
+            uow = unit_of_work.UnitOfWork(db_session_maker)
+            async with uow:
+                active_model = await uow.models.get_active_model()
                 
                 if not active_model:
                     if self.model_version is not None:
@@ -223,7 +221,7 @@ class ModelManager:
                     return
 
                 if active_model.version != self.model_version:
-                    logger.info(f"New active model: {active_model.version}")
+                    logger.info(f"Found new active model: {active_model.version}")
                     model, vec, labels = await MLService.load_prediction_pipeline(active_model.version)
                     
                     if model:
