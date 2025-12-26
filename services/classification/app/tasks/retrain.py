@@ -1,10 +1,8 @@
-import asyncio
 import logging
 import pandas as pd
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
-from app import models, repositories, settings
-from app.init_rules import init_all_rules
+from app import models, unit_of_work, settings
 from app.services.ml_service import MLService
 
 logger = logging.getLogger(__name__)
@@ -15,63 +13,51 @@ async def retrain_model_task(ctx):
     db_session_maker: async_sessionmaker[AsyncSession] = ctx.get("db_session_maker")
     
     if not db_session_maker:
-        logger.error("No db_session_maker in arq context. Aborting.")
+        logger.error("No db_session_maker in arq context.")
         return
 
-    async with db_session_maker() as session:
-        dataset_repository = repositories.DatasetRepository(session)
-        model_repository = repositories.ModelRepository(session)
+    uow = unit_of_work.UnitOfWork(db_session_maker)
+    
+    async with uow:
+        logger.info("Finding latest 'READY' training dataset...")
+        dataset = await uow.datasets.get_latest_ready()
         
+        if not dataset:
+            logger.info("No 'READY' training datasets found. Skipping.")
+            return
+        
+        dataset_path = dataset.file_path
+        dataset_ver = dataset.version
+
+    logger.info(f"Found dataset: {dataset_ver} (Path: {dataset_path})")
+
+    try:
         try:
-            logger.info("Finding latest 'READY' training dataset...")
-            dataset = await dataset_repository.get_latest_ready_dataset()
+            training_df = pd.read_parquet(dataset_path)
+        except FileNotFoundError:
+            logger.error(f"Dataset file not found: {dataset_path}. Skipping.")
+            return
 
-            if not dataset:
-                logger.info("No 'READY' training datasets found. Skipping training.")
-                return
-            
-            logger.info(f"Found dataset: {dataset.version} (Path: {dataset.file_path})")
+        if len(training_df) < 10:
+            logger.info("Insufficient data. Skipping.")
+            return
 
-            try:
-                training_df = pd.read_parquet(dataset.file_path)
-            except FileNotFoundError:
-                logger.error(f"Dataset file not found: {dataset.file_path}. Skipping.")
-                return
-            
-            if training_df.empty:
-                logger.info("Training dataset file is empty. Skipping.")
-                return
+        new_version, metrics = await MLService.train_model(training_df)
+        
+        if "val_f1" not in metrics:
+            metrics["val_f1"] = metrics.get("train_f1", 0.0)
 
-            min_samples = 10 
-            if len(training_df) < min_samples:
-                logger.info(f"Insufficient data in dataset ({len(training_df)} < {min_samples}). Skipping.")
-                return
-
-            new_version, metrics = await MLService.train_model(training_df)
-            
-            if "val_f1" not in metrics:
-                if "train_f1" in metrics:
-                    logger.warning("No 'val_f1' metric found. Using 'train_f1' as fallback.")
-                    metrics["val_f1"] = metrics["train_f1"]
-                else:
-                    logger.error("No 'val_f1' or 'train_f1' found. Setting to 0.0.")
-                    metrics["val_f1"] = 0.0
-
+        async with uow:
             model_entry = models.Model(
                 name="lightgbm_tfidf",
                 version=new_version,
-                path=f"{settings.settings.ML.MODEL_PATH}/{new_version}",
+                path=f"{settings.settings.ML.MODEL_PATH}",
                 metrics=metrics,
                 is_active=False
             )
-            await model_repository.create_model(model_entry)
+            uow.models.create(model_entry)
             
-            logger.info(f"Retraining task finished successfully. Metrics: {metrics}")
+            logger.info(f"Retraining finished. Model {new_version} created.")
 
-        except ValueError as e:
-            logger.error(f"Training aborted due to business logic error: {e}")
-            await session.rollback()
-        except Exception as e:
-            logger.exception("Model retraining task failed")
-            await session.rollback()
-            raise
+    except Exception as e:
+        logger.exception("Model retraining task failed")

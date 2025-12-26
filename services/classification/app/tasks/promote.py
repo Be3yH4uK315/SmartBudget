@@ -1,63 +1,47 @@
 import logging
-
-from app import repositories
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from app import unit_of_work
 
 logger = logging.getLogger(__name__)
 
 MIN_F1_THRESHOLD = 0.6 
 
 async def validate_and_promote_model(ctx):
-    """
-    ARQ-задача для валидации и продвижения новой модели.
-    """
-    logger.info("Starting model validation and promotion task...")
-    db_session_maker = ctx.get("db_session_maker")
-    if not db_session_maker:
-        logger.error("No db_session_maker in arq context. Aborting.")
-        return
+    """ARQ-задача для валидации и продвижения новой модели."""
+    logger.info("Starting model validation...")
+    db_session_maker: async_sessionmaker[AsyncSession] = ctx.get("db_session_maker")
+    
+    uow = unit_of_work.UnitOfWork(db_session_maker)
 
-    async with db_session_maker() as session:
-        model_repository = repositories.ModelRepository(session)
-        try:
-            active_model = await model_repository.get_active_model()
-            candidate_model = await model_repository.get_latest_candidate_model()
+    async with uow:
+        active_model = await uow.models.get_active_model()
+        candidate_model = await uow.models.get_latest_candidate()
 
-            if not candidate_model:
-                logger.info("No new candidate models found. Nothing to promote.")
-                return
+        if not candidate_model:
+            logger.info("No new candidate models.")
+            return
+        
+        candidateMetrics = candidate_model.metrics or {}
+        candidateF1 = candidateMetrics.get("val_f1", 0.0)
+
+        if candidateF1 < MIN_F1_THRESHOLD:
+            logger.warning(f"Candidate {candidate_model.version} F1 ({candidateF1}) too low.")
+            return
+
+        should_promote = False
+        if active_model:
+            activeMetrics = active_model.metrics or {}
+            activeF1 = activeMetrics.get("val_f1", 0.0)
             
-            candidateMetrics = candidate_model.metrics or {}
-            candidateF1 = candidateMetrics.get("val_f1", 0.0)
-
-            if candidateF1 < MIN_F1_THRESHOLD:
-                logger.warning(
-                    f"Candidate {candidate_model.version} (F1: {candidateF1:.4f}) "
-                    f"is below minimum F1 threshold ({MIN_F1_THRESHOLD}). Rejecting."
-                )
-                return
-
-            if active_model:
-                activeMetrics = active_model.metrics or {}
-                activeF1 = activeMetrics.get("val_f1", 0.0)
-                
-                logger.info(
-                    f"Comparing candidate {candidate_model.version} (F1: {candidateF1:.4f}) "
-                    f"with active {active_model.version} (F1: {activeF1:.4f})."
-                )
-
-                if candidateF1 > activeF1:
-                    logger.info("Candidate is better. Promoting...")
-                    await model_repository.promote_model(candidate_model, active_model)
-                    logger.info(f"SUCCESS: Model {candidate_model.version} is now active.")
-                else:
-                    logger.info("Candidate is not better than active model. No changes made.")
-
+            if candidateF1 > activeF1:
+                logger.info(f"Promoting candidate {candidate_model.version} (F1 {candidateF1} > {activeF1})")
+                should_promote = True
             else:
-                logger.info("No active model found. Promoting candidate...")
-                await model_repository.promote_model(candidate_model, None)
-                logger.info(f"SUCCESS: Model {candidate_model.version} is now active.")
+                logger.info("Candidate not better.")
+        else:
+            logger.info("No active model. Promoting candidate.")
+            should_promote = True
 
-        except Exception as e:
-            logger.exception("Model promotion task failed")
-            await session.rollback()
-            raise
+        if should_promote:
+            uow.models.promote(candidate_model, active_model)
+            logger.info(f"SUCCESS: Model {candidate_model.version} is now active.")
