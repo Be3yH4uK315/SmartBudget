@@ -201,3 +201,19 @@ class TrainingDataset(base.Base):
         ),
     )
 
+class OutboxEvent(base.Base):
+    __tablename__ = "outbox_events"
+
+    event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    topic = Column(String(255), nullable=False)
+    event_type = Column(String(255), nullable=False)
+    payload = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    retry_count = Column(Integer, default=0, nullable=False)
+    status = Column(String(50), default='pending', nullable=False)
+    last_error = Column(String(512), nullable=True)
+
+    __table_args__ = (
+        Index('ix_outbox_status_created_at', 'status', 'created_at'),
+        CheckConstraint('retry_count >= 0', name='ck_retry_count_non_negative'),
+    )
