@@ -1,12 +1,11 @@
 import asyncio
 import logging
 import signal
-from aiocache import caches
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka import AIOKafkaConsumer
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, create_async_engine
 
-from app import logging_config, settings, consumers, dependencies
+from app import settings, consumers, logging_config, dependencies
 
 logger = logging.getLogger(__name__)
 
@@ -14,21 +13,14 @@ async def main():
     logging_config.setup_logging()
     logger.info("Starting Kafka Consumer Service...")
     
-    engine = create_async_engine(settings.settings.DB.DB_URL)
+    engine = create_async_engine(
+        settings.settings.DB.DB_URL,
+        pool_size=settings.settings.DB.DB_POOL_SIZE,
+        max_overflow=settings.settings.DB.DB_MAX_OVERFLOW,
+    )
     dbSessionMaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
-    caches.set_config({
-        'default': {
-            'cache': "aiocache.RedisCache",
-            'endpoint': settings.settings.ARQ.REDIS_URL.split('//')[1].split(':')[0],
-            'port': int(settings.settings.ARQ.REDIS_URL.split(':')[-1].split('/')[0]),
-            'db': 0,
-            'ttl': 3600,
-        }
-    })
-    
     redis_pool = None
-    producer = None
     consumer_need_category = None
     
     maxRetries = 5
@@ -36,24 +28,7 @@ async def main():
     
     try:
         redis_pool = await dependencies.create_redis_pool()
-        redis = Redis(connection_pool=redis_pool)
-        
-        for attempt in range(maxRetries):
-            try:
-                producer = AIOKafkaProducer(
-                    bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
-                    request_timeout_ms=30000,
-                    acks="all",
-                )
-                await producer.start()
-                break
-            except Exception as e:
-                logger.error(f"Failed to start Kafka producer (attempt {attempt+1}): {e}")
-                if attempt < maxRetries - 1:
-                    await asyncio.sleep(retryDelay)
-                    retryDelay *= 2
-                else:
-                    raise
+        redis = Redis(connection_pool=redis_pool, decode_responses=True)
         
         for attempt in range(maxRetries):
             try:
@@ -76,7 +51,7 @@ async def main():
         
         tasks = [
             asyncio.create_task(consumers.consume_need_category(
-                consumer_need_category, producer, redis, dbSessionMaker
+                consumer_need_category, redis, dbSessionMaker
             )),
         ]
         
@@ -92,7 +67,7 @@ async def main():
         
         logger.info("Consumers running. Awaiting shutdown...")
         
-        done, pending = await asyncio.wait(
+        _done, pending = await asyncio.wait(
             tasks + [asyncio.create_task(shutdown_event.wait())],
             return_when=asyncio.FIRST_COMPLETED
         )
@@ -104,9 +79,6 @@ async def main():
         logger.exception(f"Consumer service failed critically: {e}")
     finally:
         logger.info("Shutting down consumer service...")
-        if producer:
-            await producer.stop()
-            logger.info("Kafka producer stopped")
         if consumer_need_category:
             await consumer_need_category.stop()
             logger.info("Kafka consumer stopped")
