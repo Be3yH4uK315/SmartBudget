@@ -3,6 +3,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from uuid import UUID
 
+# --- API Models ---
+
 class CategorizationResultResponse(BaseModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
     category_id: int = Field(..., description="ID присвоенной категории")
@@ -48,67 +50,31 @@ class UnifiedSuccessResponse(BaseModel):
     ok: bool = Field(True)
     detail: Optional[str] = Field(None)
 
+# --- Kafka Event Models (Pydantic instead of JSON Schema) ---
+
+class TransactionNeedCategoryEvent(BaseModel):
+    transaction_id: UUID
+    account_id: Optional[UUID] = None
+    merchant: str
+    mcc: Optional[int] = None
+    description: Optional[str] = None
+
+class ClassificationClassifiedEvent(BaseModel):
+    transaction_id: UUID
+    category_id: int
+    category_name: str
+
+class ClassificationUpdatedEvent(BaseModel):
+    transaction_id: UUID
+    merchant: Optional[str] = None
+    mcc: Optional[int] = None
+    description: Optional[str] = None
+    old_category: Optional[str] = None
+    new_category_id: int
+    new_category_name: str
+
 class DLQMessage(BaseModel):
     originalTopic: str
     originalMessage: str
     error: str
     timestamp: datetime
-
-SCHEMA_NEED_CATEGORY = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-        "transactionId": {"type": "string", "format": "uuid"},
-        "accountId": {"type": "string", "format": "uuid"},
-        "merchant": {"type": "string"},
-        "mcc": {"type": "integer"},
-        "description": {"type": "string"}
-    },
-    "required": ["transactionId", "merchant"]
-}
-
-SCHEMA_CLASSIFIED = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-        "transactionId": {"type": "string", "format": "uuid"},
-        "categoryId": {"type": ["integer", "string"]}, 
-        "categoryName": {"type": "string"}
-    },
-    "required": ["transactionId", "categoryId"]
-}
-
-SCHEMA_UPDATED = {
-    "$schema": "http://json-schema.org/draft-07/schema#", 
-    "type": "object",
-    "properties": {
-        "transactionId": {"type": "string", "format": "uuid"},
-        "merchant": {"type": "string"},
-        "mcc": {"type": "integer"},
-        "description": {"type": "string"},
-        "oldCategory": {"type": "string"},
-        "newCategoryId": {"type": ["integer", "string"]},
-        "newCategoryName": {"type": "string"}
-    },
-    "required": ["transactionId", "newCategoryId"]
-}
-
-SCHEMA_NEED_CATEGORY_DLQ = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-        "originalTopic": {"type": "string"},
-        "originalMessage": {"type": "string"},
-        "error": {"type": "string"},
-        "timestamp": {"type": "string"}
-    },
-    "required": ["originalTopic", "originalMessage", "error", "timestamp"]
-}
-
-SCHEMAS_MAP = {
-    "transaction.needCategory": SCHEMA_NEED_CATEGORY,
-    "transaction.classified": SCHEMA_CLASSIFIED,
-    "budget.classification.events": SCHEMA_CLASSIFIED,
-    "transaction.updated": SCHEMA_UPDATED,
-    "classification.dlq": SCHEMA_NEED_CATEGORY_DLQ 
-}
