@@ -18,11 +18,11 @@ services:
     networks:
       - smartbudget-net
 
-  auth_zookeeper_dev:
+  zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     env_file:
       - ../../infra/.env
-    container_name: auth_zookeeper_dev
+    container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
       ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
@@ -43,7 +43,7 @@ services:
       - ../../infra/.env
     container_name: kafka
     depends_on:
-      auth_zookeeper_dev:
+      zookeeper:
         condition: service_healthy
     environment:
       KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
