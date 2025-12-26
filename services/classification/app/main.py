@@ -4,7 +4,6 @@ from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 from arq import create_pool
 from arq.connections import RedisSettings
-from aiokafka import AIOKafkaProducer
 from prometheus_fastapi_instrumentator import Instrumentator
 from aiocache import caches
 from starlette.responses import JSONResponse
@@ -13,13 +12,18 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app import middleware, dependencies, settings, exceptions, logging_config
 from app.routers import api
 from app.services.ml_service import modelManager
+from app.services.rule_manager import ruleManager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging_config.setup_logging() 
     middleware.logger.info("CategorizationService starting...")
     
-    engine = create_async_engine(settings.settings.DB.DB_URL)
+    engine = create_async_engine(
+        settings.settings.DB.DB_URL,
+        pool_size=settings.settings.DB.DB_POOL_SIZE,
+        max_overflow=settings.settings.DB.DB_MAX_OVERFLOW,
+    )
     db_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     app.state.engine = engine
     app.state.db_session_maker = db_session_maker
@@ -37,17 +41,6 @@ async def lifespan(app: FastAPI):
     app.state.arq_pool = arq_pool
     middleware.logger.info("ARQ Pool initialized")
 
-    kafka_producer = AIOKafkaProducer(
-        bootstrap_servers=settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
-        request_timeout_ms=30000,
-        retry_backoff_ms=1000
-    )
-    await kafka_producer.start()
-    app.state.kafka_producer = kafka_producer
-    middleware.logger.info(
-        f"AIOKafkaProducer started for {settings.settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS}"
-    )
-
     caches.set_config({
         'default': {
             'cache': "aiocache.RedisCache",
@@ -60,6 +53,9 @@ async def lifespan(app: FastAPI):
 
     middleware.logger.info("Initializing Model Manager...")
     await modelManager.check_for_updates(db_session_maker)
+
+    middleware.logger.info("Initializing Rule Manager...")
+    await ruleManager.check_for_updates(db_session_maker)
     
     async def model_reloader_task():
         """Фоновая задача для обновления модели."""
@@ -67,6 +63,7 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(60)
             try:
                 await modelManager.check_for_updates(db_session_maker)
+                await ruleManager.check_for_updates(db_session_maker)
             except Exception as e:
                 middleware.logger.error(f"Error in background model reloader: {e}")
 
@@ -84,15 +81,10 @@ async def lifespan(app: FastAPI):
     middleware.logger.info("CategorizationService shutting down...")
     
     reloader.cancel()
-    
     try:
         await asyncio.wait_for(reloader, timeout=5)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         middleware.logger.warning("Model reloader task did not complete in time")
-    
-    if hasattr(app.state, 'kafka_producer') and app.state.kafka_producer:
-        await app.state.kafka_producer.stop()
-        middleware.logger.info("AIOKafkaProducer stopped.")
     
     if hasattr(app.state, 'arq_pool') and app.state.arq_pool:
         await app.state.arq_pool.close()
