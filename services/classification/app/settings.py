@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class DBSettings(BaseSettings):
     DB_URL: str
+    DB_POOL_SIZE: int
+    DB_MAX_OVERFLOW: int
 
 class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
