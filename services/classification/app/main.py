@@ -1,104 +1,70 @@
 import asyncio
-import signal
-from fastapi import FastAPI, Request
+import logging
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from arq import create_pool
 from arq.connections import RedisSettings
 from prometheus_fastapi_instrumentator import Instrumentator
-from aiocache import caches
-from starlette.responses import JSONResponse
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app import middleware, dependencies, settings, exceptions, logging_config
-from app.routers import api
-from app.services.ml_service import modelManager
-from app.services.rule_manager import ruleManager
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.core.database import get_db_engine, get_session_factory
+from app.core.redis import create_redis_pool, close_redis_pool
+from app.api.routes import router as api_router
+
+from app.services.ml.manager import modelManager
+from app.services.classification.rules import ruleManager
+
+from app.infrastructure.kafka.consumer import consume_loop
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging_config.setup_logging() 
-    middleware.logger.info("CategorizationService starting...")
+    logger.info("=== Service Starting ===")
     
-    engine = create_async_engine(
-        settings.settings.DB.DB_URL,
-        pool_size=settings.settings.DB.DB_POOL_SIZE,
-        max_overflow=settings.settings.DB.DB_MAX_OVERFLOW,
-    )
-    db_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    engine = get_db_engine()
+    session_factory = get_session_factory(engine)
     app.state.engine = engine
-    app.state.db_session_maker = db_session_maker
-    middleware.logger.info("Database engine and session maker created.")
-
-    redis_pool = await dependencies.create_redis_pool()
-    app.state.redis_pool = redis_pool
-    middleware.logger.info(f"Redis pool created")
+    app.state.db_session_maker = session_factory
     
-    arq_settings = RedisSettings.from_dsn(settings.settings.ARQ.REDIS_URL)
-    arq_pool = await create_pool(
-        arq_settings,
-        default_queue_name=settings.settings.ARQ.ARQ_QUEUE_NAME
+    app.state.redis_pool = await create_redis_pool()
+    
+    try:
+        arq_pool = await create_pool(RedisSettings.from_dsn(settings.ARQ.REDIS_URL))
+        app.state.arq_pool = arq_pool
+    except Exception as e:
+        logger.warning(f"ARQ Pool init failed (is Redis ready?): {e}")
+    
+    logger.info("Pre-loading models and rules...")
+    await modelManager.check_for_updates(session_factory)
+    await ruleManager.check_for_updates(session_factory)
+    
+    import redis.asyncio as aioredis
+    consumer_redis = aioredis.Redis(connection_pool=app.state.redis_pool)
+    
+    consumer_task = asyncio.create_task(
+        consume_loop(consumer_redis, session_factory)
     )
-    app.state.arq_pool = arq_pool
-    middleware.logger.info("ARQ Pool initialized")
-
-    caches.set_config({
-        'default': {
-            'cache': "aiocache.RedisCache",
-            'endpoint': settings.settings.ARQ.REDIS_URL.split('//')[1].split(':')[0],
-            'port': int(settings.settings.ARQ.REDIS_URL.split(':')[-1].split('/')[0]),
-            'db': 0,
-            'ttl': 3600,
-        }
-    })
-
-    middleware.logger.info("Initializing Model Manager...")
-    await modelManager.check_for_updates(db_session_maker)
-
-    middleware.logger.info("Initializing Rule Manager...")
-    await ruleManager.check_for_updates(db_session_maker)
-    
-    async def model_reloader_task():
-        """Фоновая задача для обновления модели."""
-        while True:
-            await asyncio.sleep(60)
-            try:
-                await modelManager.check_for_updates(db_session_maker)
-                await ruleManager.check_for_updates(db_session_maker)
-            except Exception as e:
-                middleware.logger.error(f"Error in background model reloader: {e}")
-
-    reloader = asyncio.create_task(model_reloader_task())
-    
-    def signal_handler(sig, frame):
-        middleware.logger.info(f"Received signal {sig}. Initiating shutdown...")
-        reloader.cancel()
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    logger.info("Background Consumer Task started.")
 
     yield
     
-    middleware.logger.info("CategorizationService shutting down...")
+    logger.info("=== Service Shutting Down ===")
     
-    reloader.cancel()
+    consumer_task.cancel()
     try:
-        await asyncio.wait_for(reloader, timeout=5)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        middleware.logger.warning("Model reloader task did not complete in time")
+        await consumer_task
+    except asyncio.CancelledError:
+        logger.info("Consumer task cancelled successfully.")
     
-    if hasattr(app.state, 'arq_pool') and app.state.arq_pool:
+    if hasattr(app.state, "arq_pool"):
         await app.state.arq_pool.close()
-        middleware.logger.info("Arq pool closed.")
-
-    if hasattr(app.state, 'redis_pool') and app.state.redis_pool:
-        await dependencies.close_redis_pool(app.state.redis_pool)
-        middleware.logger.info("Redis pool closed.")
         
-    if hasattr(app.state, 'engine') and app.state.engine:
-        await app.state.engine.dispose()
-        middleware.logger.info("DB engine disposed.")
-    
-    middleware.logger.info("CategorizationService shutdown complete")
+    await consumer_redis.aclose()
+    await close_redis_pool(app.state.redis_pool)
+    await app.state.engine.dispose()
 
 app = FastAPI(
     title="Classification Service", 
@@ -108,21 +74,5 @@ app = FastAPI(
     openapi_url="/api/v1/class/openapi.json"
 )
 
-@app.exception_handler(exceptions.ClassificationServiceError)
-async def classification_exception_handler(
-    request: Request, 
-    exc: exceptions.ClassificationServiceError
-):
-    status_code = 400
-    if isinstance(exc, exceptions.ClassificationResultNotFoundError) \
-        or isinstance(exc, exceptions.CategoryNotFoundError):
-        status_code = 404
-    
-    return JSONResponse(
-        status_code=status_code,
-        content={"detail": str(exc)},
-    )
-
-app.middleware("http")(middleware.error_middleware)
 Instrumentator().instrument(app).expose(app)
-app.include_router(api.router, prefix="/api/v1/class")
+app.include_router(api_router, prefix="/api/v1/class")
