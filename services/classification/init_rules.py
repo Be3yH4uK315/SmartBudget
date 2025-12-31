@@ -3,7 +3,8 @@ import logging
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from app import settings, models
+from app import settings
+from app.infrastructure.db import models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
