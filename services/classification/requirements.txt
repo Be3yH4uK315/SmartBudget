@@ -4,8 +4,8 @@ uvicorn
 pydantic-settings
 sqlalchemy[asyncio]
 alembic
-redis
-arq
+arq==0.26.3
+redis>=4.2.0,<6.0.0
 aiokafka
 lightgbm
 scikit-learn
@@ -25,3 +25,4 @@ opentelemetry-instrumentation-aiokafka
 opentelemetry-instrumentation-sqlalchemy 
 opentelemetry-instrumentation-redis
 opentelemetry-instrumentation-arq
+watchfiles>=0.21
