@@ -1,30 +1,46 @@
 ARG PYTHON_VERSION=3.12
 
-FROM python:${PYTHON_VERSION}-slim as builder
+FROM python:${PYTHON_VERSION}-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --prefix=/install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /tmp/wheels -r requirements.txt
 
 FROM python:${PYTHON_VERSION}-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libgomp1 curl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    netcat-openbsd \
+    libgomp1 \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /usr/local
-ENV PATH=/usr/local/bin:$PATH
+RUN addgroup --system appgroup && adduser --system --group appuser
 
-COPY ./app /app/app
+RUN mkdir -p /app/datasets /models /app/ml_models \
+    && chown -R appuser:appgroup /app/datasets /models /app/ml_models
 
-COPY alembic.ini /app/alembic.ini
-COPY ./alembic /app/alembic
+COPY --from=builder /tmp/wheels /tmp/wheels
+RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
 
-COPY run_consumers.py /app/run_consumers.py
+COPY . /app
+RUN chown -R appuser:appgroup /app
 
-RUN mkdir -p /models && chmod 755 /models
+USER appuser
+
+ENV PYTHONPATH=/app
 ENV MODEL_PATH=/models
+ENV PATH="/home/appuser/.local/bin:$PATH"
+
+CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8001"]

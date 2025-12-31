@@ -12,8 +12,8 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      retries: 10
-      timeout: 5s
+      retries: 5
+      timeout: 3s
     restart: unless-stopped
     networks:
       - smartbudget-net
@@ -29,9 +29,9 @@ services:
     ports:
       - "2181:2181"
     healthcheck:
-      test: ["CMD", "sh", "-c", "nc -z localhost 2181 || exit 1"]
-      interval: 5s
-      retries: 10
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      retries: 5
       timeout: 5s
     restart: unless-stopped
     networks:
@@ -59,8 +59,8 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
       interval: 10s
-      retries: 10
-      timeout: 3s
+      retries: 5
+      timeout: 10s
     restart: unless-stopped
     networks:
       - smartbudget-net
@@ -77,9 +77,9 @@ services:
     volumes:
       - pg_data_class:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${CLASS_POSTGRES_USER:-postgres}"]
       interval: 5s
-      retries: 10
+      retries: 5
       timeout: 5s
     networks:
       - smartbudget-net
@@ -87,6 +87,7 @@ services:
   categorization_service:
     build:
       context: ../../services/classification/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_service_dev
@@ -106,68 +107,62 @@ services:
     command: >
       sh -c "
         alembic upgrade head &&
-        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8001 --reload
       "
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/class/health"]
       interval: 10s
       retries: 3
-      start_period: 30s
+      start_period: 20s
     networks:
       - smartbudget-net
 
   categorization_worker:
     build:
       context: ../../services/classification/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_worker_dev
     depends_on:
       categorization_service:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis_cache:
-        condition: service_healthy
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
-    command: arq app.worker.WorkerSettings
+    command: arq app.workers.main.WorkerSettings --watch /app
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
       interval: 30s
       retries: 3
-      start_period: 30s
+      start_period: 20s
     networks:
       - smartbudget-net
 
   categorization_consumers:
     build:
       context: ../../services/classification/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_consumers_dev
     depends_on:
       categorization_service:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis_cache:
-        condition: service_healthy
     volumes:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
-    command: python run_consumers.py
+    command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
       interval: 30s
       retries: 3
-      start_period: 30s
+      start_period: 20s
     networks:
       - smartbudget-net
 
