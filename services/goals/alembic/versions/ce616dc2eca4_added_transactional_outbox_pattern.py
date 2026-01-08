@@ -25,7 +25,7 @@ def upgrade() -> None:
     sa.Column('event_id', sa.UUID(), nullable=False),
     sa.Column('topic', sa.String(length=255), nullable=False),
     sa.Column('event_type', sa.String(length=255), nullable=False),
-    sa.Column('payload', sa.JSON(), nullable=False),
+    sa.Column('payload', postgresql.JSONB, nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('retry_count', sa.Integer(), nullable=True),
     sa.Column('status', sa.String(length=50), nullable=True),
