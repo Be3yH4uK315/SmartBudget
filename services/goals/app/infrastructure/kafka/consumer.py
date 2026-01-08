@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.domain.schemas import kafka as schemas
+from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.service import GoalService
 from app.infrastructure.db.uow import UnitOfWork
 
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 HEALTH_FILE = Path("/tmp/healthy")
 
 BATCH_SIZE = 100
-COMMIT_INTERVAL = 1.0
 
 async def keep_alive_task():
     """Фоновая задача, сообщающая Kubernetes, что сервис жив."""
@@ -28,7 +28,7 @@ async def keep_alive_task():
             pass
         await asyncio.sleep(5)
 
-async def consume_loop(db_session_maker) -> None:
+async def consume_loop(db_session_maker, dlq_producer: KafkaProducerWrapper) -> None:
     """Оптимизированный цикл консьюмера с батчингом."""
     consumer = AIOKafkaConsumer(
         settings.KAFKA.KAFKA_TOPIC_TRANSACTION_GOAL,
@@ -52,7 +52,7 @@ async def consume_loop(db_session_maker) -> None:
                 if not messages:
                     continue
                 
-                await process_batch(messages, db_session_maker)
+                await process_batch(messages, db_session_maker, dlq_producer)
                 
                 await consumer.commit()
 
@@ -64,25 +64,44 @@ async def consume_loop(db_session_maker) -> None:
         health_task.cancel()
         await consumer.stop()
 
-async def process_batch(messages: List, db_session_maker) -> None:
-    """Обработка списка сообщений в одной транзакции (или поштучно)."""
+async def process_batch(
+    messages: List, 
+    db_session_maker, 
+    dlq_producer: KafkaProducerWrapper
+) -> None:
+    """Обработка списка сообщений с изоляцией ошибок и DLQ."""
     async with UnitOfWork(db_session_maker) as uow:
         service = GoalService(uow)
         
         for message in messages:
             try:
-                data = json.loads(message.value)
-                event = schemas.TransactionEvent(**data)
-                await service.update_goal_balance(event)
-                
-            except (json.JSONDecodeError, ValidationError) as e:
-                logger.error(f"Skipping invalid message at offset {message.offset}: {e}")
-                continue
-            
-            except SQLAlchemyError as e:
-                logger.error(f"Database error processing message {message.offset}: {e}")
-                raise e
+                async with uow.make_savepoint():
+                    try:
+                        data = json.loads(message.value)
+                        event = schemas.TransactionEvent(**data)
+                        await service.update_goal_balance(event)
+                    
+                    except (json.JSONDecodeError, ValidationError) as e:
+                        logger.warning(f"Validation error at offset {message.offset}: {e}")
+                        raise ValueError(f"Validation error: {e}")
+                    
+                    except SQLAlchemyError as e:
+                        logger.error(f"Database error at offset {message.offset}: {e}")
+                        raise 
 
             except Exception as e:
-                logger.error(f"Unexpected error processing message {message.offset}: {e}")
-                raise e
+                logger.error(f"Processing failed for message {message.offset}. Sending to DLQ. Reason: {e}")
+
+                headers = [("error", str(e).encode("utf-8"))]
+                
+                success = await dlq_producer.send_event(
+                    topic=settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DLQ,
+                    value=message.value,
+                    key=message.key,
+                    headers=headers
+                )
+                
+                if not success:
+                    logger.critical(f"CRITICAL: Failed to send message {message.offset} to DLQ!")
+                
+                continue

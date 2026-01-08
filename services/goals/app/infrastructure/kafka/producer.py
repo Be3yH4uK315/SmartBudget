@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Optional
 from aiokafka import AIOKafkaProducer
 
 from app.core.config import settings
@@ -37,7 +38,8 @@ class KafkaProducerWrapper:
         self,
         topic: str,
         value: bytes,
-        key: bytes = None
+        key: bytes = None,
+        headers: Optional[list[tuple[str, bytes]]] = None
     ) -> bool:
         """Отправляет событие с повторными попытками."""
         if not self._is_running or not self.producer:
@@ -50,6 +52,7 @@ class KafkaProducerWrapper:
                     topic=topic,
                     key=key,
                     value=value,
+                    headers=headers,
                 ),
                 timeout=SEND_TIMEOUT,
             )
