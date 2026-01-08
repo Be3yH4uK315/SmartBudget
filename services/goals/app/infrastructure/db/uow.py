@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import Self
 
 from app.infrastructure.db import repositories
@@ -27,6 +28,17 @@ class UnitOfWork:
                 await self._session.commit()
         finally:
             await self._session.close()
+
+    @asynccontextmanager
+    async def make_savepoint(self):
+        """
+        Создает точку сохранения (вложенную транзакцию).
+        """
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+            
+        async with self._session.begin_nested():
+            yield
 
     @property
     def goals(self) -> repositories.GoalRepository:
