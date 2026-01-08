@@ -5,12 +5,11 @@ sqlalchemy[asyncpg]
 alembic
 pydantic-settings
 aiokafka
-arq
-redis
+arq==0.26.3
+redis>=4.2.0,<6.0.0
 prometheus-fastapi-instrumentator
 jsonschema
 asyncpg
 greenlet
 tenacity
-pyjwt
-cryptography
+watchfiles
