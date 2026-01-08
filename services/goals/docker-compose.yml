@@ -49,7 +49,6 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
       KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
@@ -79,9 +78,9 @@ services:
     volumes:
       - pg_data_goals:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${GOALS_POSTGRES_USER}"]
       interval: 5s
-      retries: 10
+      retries: 5
       timeout: 5s
     networks:
       - smartbudget-net
@@ -89,6 +88,7 @@ services:
   goals_service:
     build:
       context: ../../services/goals/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_service_dev
@@ -103,65 +103,67 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
-    restart: unless-stopped
     command: >
       sh -c "
         alembic upgrade head &&
-        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --reload
       "
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health"]
       interval: 10s
       retries: 3
-      timeout: 5s
+      start_period: 20s
     networks:
       - smartbudget-net
 
   goals_worker:
     build:
       context: ../../services/goals/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_worker_dev
     depends_on:
-      goals_service:
+      redis_cache:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      redis_cache:
+      goals_postgres:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
-    command: arq app.worker.WorkerSettings
+    command: arq app.workers.main.WorkerSettings --watch /app
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
-      interval: 20s
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
+      interval: 30s
       retries: 3
+      start_period: 20s
     networks:
       - smartbudget-net
 
   goals_consumer:
     build:
       context: ../../services/goals/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_consumer_dev
     depends_on:
-      goals_service:
-        condition: service_healthy
       kafka:
         condition: service_healthy
-      redis_cache:
+      goals_postgres:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
-    command: python run_consumer.py
+    command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
-      interval: 20s
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
+      interval: 30s
       retries: 3
+      start_period: 20s
     networks:
       - smartbudget-net
 
