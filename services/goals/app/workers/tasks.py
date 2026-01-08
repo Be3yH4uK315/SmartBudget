@@ -5,7 +5,7 @@ from pathlib import Path
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.service import GoalService
-from app.utils.serialization import to_json_str
+from app.utils.serialization import to_json_bytes
 
 logger = logging.getLogger(__name__)
 HEALTH_FILE = Path("/tmp/healthy")
@@ -31,11 +31,12 @@ async def process_outbox_task(ctx) -> None:
 
         for i, event in enumerate(events):
             try:
-                msg_str = to_json_str(event.payload)
+                msg_bytes = to_json_bytes(event.payload)
+                
                 key_val = event.payload.get("goal_id") or event.payload.get("user_id")
                 key = str(key_val).encode('utf-8') if key_val else None
                 
-                task = kafka.send_event(event.topic, msg_str.encode('utf-8'), key=key)
+                task = kafka.send_event(event.topic, msg_bytes, key=key)
                 send_tasks.append(task)
                 event_map[i] = event.event_id
             except Exception as e:
