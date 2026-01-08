@@ -2,11 +2,11 @@ from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import (
-    Column, String, DateTime, Index, Date, DECIMAL, 
-    func, Integer, CheckConstraint, ForeignKey
+    ARRAY, Column, String, DateTime, Index, Date, DECIMAL, 
+    func, Integer, ForeignKey
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import validates
+from sqlalchemy.orm import validates, relationship
 
 from app.domain.schemas import api as schemas
 from app.infrastructure.db.base import Base
@@ -19,7 +19,8 @@ class Goal(Base):
     name = Column(String(255), nullable=False)
     target_value = Column(DECIMAL(12, 2), nullable=False)
     current_value = Column(DECIMAL(12, 2), nullable=False, default=0)
-    finish_date = Column(Date, nullable=False)
+    finish_date = Column(Date, nullable=True)
+    tags = Column(ARRAY(String), nullable=False, server_default='{}')
     status = Column(
         String(50), 
         nullable=False, 
@@ -36,25 +37,14 @@ class Goal(Base):
         server_default=func.now(),
         onupdate=func.now()
     )
-    last_checked_date = Column(DateTime(timezone=True), nullable=True)
+    notification_state = relationship("GoalNotification", uselist=False, back_populates="goal", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index('ix_goals_user_id', 'user_id'),
         Index('ix_goals_status_finish_date', 'status', 'finish_date'),
-        CheckConstraint('target_value > 0', name='ck_goal_target_value_positive'),
-        CheckConstraint('current_value >= 0', name='ck_goal_current_value_non_negative'),
     )
 
-    @validates("status")
-    def validate_status(self, _, value):
-        allowed = {s.value for s in schemas.GoalStatus}
-        if value not in allowed:
-            raise ValueError("Invalid goal status")
-        return value
-    
     @validates('target_value', 'current_value')
-    def validate_decimal_values(self, key, value):
-        """Валидирует значения перед сохранением."""
+    def validate_decimals(self, key, value):
         if not isinstance(value, Decimal):
             value = Decimal(str(value))
         if key == 'target_value' and value <= 0:
@@ -62,6 +52,17 @@ class Goal(Base):
         if key == 'current_value' and value < 0:
             raise ValueError("current_value must be non-negative")
         return value
+
+class GoalNotification(Base):
+    __tablename__ = "goal_notifications"
+    
+    goal_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("goals.goal_id", ondelete="CASCADE"), 
+        primary_key=True
+    )
+    last_checked_date = Column(DateTime(timezone=True), nullable=True)
+    goal = relationship("Goal", back_populates="notification_state")
 
 class ProcessedTransaction(Base):
     __tablename__ = "processed_goal_transactions"
@@ -91,6 +92,5 @@ class OutboxEvent(Base):
     status = Column(String(50), default='pending', nullable=False)
 
     __table_args__ = (
-        Index('ix_outbox_status_created_at', 'status', 'created_at'),
-        CheckConstraint('retry_count >= 0', name='ck_retry_count_non_negative'),
+        Index('ix_outbox_created_at', 'created_at'),
     )
