@@ -11,6 +11,7 @@ class KafkaSettings(BaseSettings):
     KAFKA_TOPIC_TRANSACTION_GOAL: str
     KAFKA_TOPIC_BUDGET_EVENTS: str
     KAFKA_TOPIC_BUDGET_NOTIFICATION: str
+    KAFKA_TOPIC_TRANSACTION_DLQ: str
 
 class ArqSettings(BaseSettings):
     REDIS_URL: str
