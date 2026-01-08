@@ -13,6 +13,7 @@ from app.core.config import settings
 
 # ---- Alembic Config ----
 config = context.config
+config.set_main_option("sqlalchemy.url", settings.DB.DB_URL)
 fileConfig(config.config_file_name)
 target_metadata = Base.metadata
 
