@@ -13,3 +13,4 @@ asyncpg
 greenlet
 tenacity
 watchfiles
+orjson
