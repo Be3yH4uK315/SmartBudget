@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from alembic import context
 
-from app.base import Base
-from app import models
-from app.settings import settings
+from app.infrastructure.db.base import Base
+from app.infrastructure.db.models import User, Session, OutboxEvent
+from app.core.config import settings
 
 # ---- Alembic Config ----
 config = context.config
