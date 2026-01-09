@@ -4,8 +4,8 @@ gunicorn
 sqlalchemy[asyncio]
 asyncpg
 aiokafka
-arq
-redis
+arq==0.26.3
+redis>=4.2.0,<6.0.0
 pyjwt
 bcrypt
 geoip2
@@ -13,10 +13,13 @@ user-agents
 aiosmtplib
 pydantic
 pydantic-settings
-pydantic[email]
+email-validator
 alembic
 prometheus-fastapi-instrumentator
 jsonschema
 python-multipart
 fastapi-limiter
 cryptography
+orjson
+uvloop>=0.19.0
+watchfiles
