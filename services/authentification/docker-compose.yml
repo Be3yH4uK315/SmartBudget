@@ -86,9 +86,10 @@ services:
   auth_service:
     build:
       context: ../../services/authentification/
+      dockerfile: Dockerfile
     env_file:
       - ../../services/authentification/.env
-    container_name: auth_service
+    container_name: auth_service_dev
     ports:
       - "8000:8000"
     depends_on:
@@ -102,17 +103,17 @@ services:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
-    restart: unless-stopped
     command: >
       sh -c "
         alembic upgrade head &&
-        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --reload
       "
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health"]
-    #   interval: 10s
-    #   retries: 3
-    #   timeout: 5s
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health"]
+      interval: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - smartbudget-net
 
@@ -121,10 +122,10 @@ services:
       context: ../../services/authentification/
     env_file:
       - ../../services/authentification/.env
-    container_name: auth_worker
+    container_name: auth_worker_dev
     depends_on:
-      # auth_service:
-      #   condition: service_healthy
+      auth_postgres:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       redis_cache:
@@ -133,12 +134,13 @@ services:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
-    command: arq app.worker.WorkerSettings
+    command: arq app.workers.main.WorkerSettings --watch /app
     restart: unless-stopped
-    # healthcheck:
-    #   test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
-    #   interval: 20s
-    #   retries: 3
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
+      interval: 30s
+      retries: 3
+      start_period: 20s
     networks:
       - smartbudget-net
 
