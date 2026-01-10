@@ -173,6 +173,15 @@ class SessionRepository(BaseRepository):
         session.refresh_fingerprint = new_fingerprint
         session.expires_at = new_expires_at
         self.db.add(session)
+    
+    async def update_last_activity(self, session_id: UUID, last_activity: datetime):
+        """Обновляет время последней активности."""
+        stmt = (
+            update(models.Session)
+            .where(models.Session.session_id == session_id)
+            .values(last_activity=last_activity)
+        )
+        await self.db.execute(stmt)
 
     async def revoke_by_fingerprint(self, user_id: UUID, fingerprint: str) -> None:
         """Отзывает сессию по fingerprint."""

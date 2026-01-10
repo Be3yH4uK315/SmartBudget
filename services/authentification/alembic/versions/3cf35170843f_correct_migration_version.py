@@ -47,6 +47,7 @@ def upgrade() -> None:
     sa.Column('location', sa.String(), nullable=False),
     sa.Column('revoked', sa.Boolean(), nullable=False),
     sa.Column('refresh_fingerprint', sa.String(length=64), nullable=False),
+    sa.Column('last_activity', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("refresh_fingerprint <> ''", name='ck_sessions_fingerprint_not_empty'),

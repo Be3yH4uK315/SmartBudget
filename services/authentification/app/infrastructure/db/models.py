@@ -84,6 +84,11 @@ class Session(Base):
     location = Column(String, nullable=False)
     revoked = Column(Boolean, default=False, nullable=False)
     refresh_fingerprint = Column(String(64), nullable=False, unique=True)
+    last_activity = Column(
+        DateTime(timezone=True), 
+        nullable=False, 
+        server_default=func.now()
+    )
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(
         DateTime(timezone=True),

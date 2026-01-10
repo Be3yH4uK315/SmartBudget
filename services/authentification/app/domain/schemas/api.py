@@ -78,8 +78,9 @@ class SessionInfo(CamelModel):
     device_name: str = Field(..., description="Устройство")
     location: str = Field(..., description="Локация")
     ip: str = Field(..., description="IP адрес")
-    created_at: datetime = Field(..., description="Дата создания")
     is_current_session: bool = Field(False, description="Текущая ли это сессия")
+    last_activity: datetime = Field(..., description="Время последней активности")
+    created_at: datetime = Field(..., description="Дата создания")
 
 class AllSessionsResponse(CamelModel):
     sessions: list[SessionInfo]
