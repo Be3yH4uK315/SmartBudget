@@ -16,7 +16,7 @@ class RuleManager:
         if cls._instance is None:
             cls._instance = super(RuleManager, cls).__new__(cls)
             cls._instance.last_check = datetime.min
-            cls._instance.update_interval_seconds = 60
+            cls._instance.update_interval_seconds = 30
             
             cls._instance._mcc_rules = {}
             cls._instance._exact_rules = {}
@@ -82,10 +82,6 @@ class RuleManager:
 
     def find_match(self, merchant: str, mcc: int | None, description: str) -> tuple[int | None, str | None, str | None]:
         """Ищет подходящее правило."""
-        if mcc in self._mcc_rules:
-            rule = self._mcc_rules[mcc]
-            return rule["category_id"], rule["category_name"], "mcc"
-
         text = f"{merchant} {description}".lower().strip()
 
         if text in self._exact_rules:
@@ -105,6 +101,10 @@ class RuleManager:
             
             if is_match:
                 return rule["category_id"], rule["category_name"], pt
+
+        if mcc in self._mcc_rules:
+            rule = self._mcc_rules[mcc]
+            return rule["category_id"], rule["category_name"], "mcc"
 
         return None, None, None
 
