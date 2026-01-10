@@ -35,6 +35,21 @@ class UnitOfWork:
                 await self._session.commit()
         finally:
             await self._session.close()
+    
+    async def commit(self):
+        """Фиксирует текущую транзакцию."""
+        if self._session:
+            await self._session.commit()
+
+    async def rollback(self):
+        """Откатывает текущую транзакцию."""
+        if self._session:
+            await self._session.rollback()
+
+    async def close(self):
+        """Закрывает сессию."""
+        if self._session:
+            await self._session.close()
 
     @property
     def categories(self) -> rules.CategoryRepository:
