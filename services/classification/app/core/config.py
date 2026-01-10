@@ -8,6 +8,7 @@ class DBSettings(BaseSettings):
 class ArqSettings(BaseSettings):
     REDIS_URL: str
     ARQ_QUEUE_NAME: str
+    REDIS_MAX_CONNECTIONS: int
 
 class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
