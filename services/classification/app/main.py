@@ -15,8 +15,6 @@ from app.api.routes import router as api_router
 from app.services.ml.manager import modelManager
 from app.services.classification.rules import ruleManager
 
-from app.infrastructure.kafka.consumer import consume_loop
-
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,6 @@ async def lifespan(app: FastAPI):
     session_factory = get_session_factory(engine)
     app.state.engine = engine
     app.state.db_session_maker = session_factory
-    
     app.state.redis_pool = await create_redis_pool()
     
     try:
@@ -40,29 +37,12 @@ async def lifespan(app: FastAPI):
     logger.info("Pre-loading models and rules...")
     await modelManager.check_for_updates(session_factory)
     await ruleManager.check_for_updates(session_factory)
-    
-    import redis.asyncio as aioredis
-    consumer_redis = aioredis.Redis(connection_pool=app.state.redis_pool)
-    
-    consumer_task = asyncio.create_task(
-        consume_loop(consumer_redis, session_factory)
-    )
-    logger.info("Background Consumer Task started.")
 
     yield
     
     logger.info("=== Service Shutting Down ===")
-    
-    consumer_task.cancel()
-    try:
-        await consumer_task
-    except asyncio.CancelledError:
-        logger.info("Consumer task cancelled successfully.")
-    
     if hasattr(app.state, "arq_pool"):
         await app.state.arq_pool.close()
-        
-    await consumer_redis.aclose()
     await close_redis_pool(app.state.redis_pool)
     await app.state.engine.dispose()
 
