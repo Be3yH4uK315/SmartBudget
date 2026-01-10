@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from redis.asyncio import Redis
 from redis.exceptions import LockError
 from jwt import encode, decode, PyJWTError
-import geoip2.database
+from dadata import Dadata
 from arq.connections import ArqRedis
 from sqlalchemy.exc import IntegrityError
 
@@ -31,12 +31,12 @@ class AuthService:
         uow: uow.UnitOfWork,
         redis: Redis,
         arq_pool: ArqRedis,
-        geoip_reader: geoip2.database.Reader,
+        dadata_client: Dadata | None,
     ):
         self.uow = uow
         self.redis = redis
         self.arq_pool = arq_pool
-        self.geoip_reader = geoip_reader
+        self.dadata_client = dadata_client
 
     async def _save_kafka_event(self, event_type: k_schemas.AuthEventTypes, **kwargs):
         """Хелпер для сохранения события в Outbox внутри текущей транзакции."""
@@ -101,7 +101,11 @@ class AuthService:
         await self.validate_email_verification_token(body.token, body.email)
 
         device_name = network.parse_device(user_agent or "Unknown")
-        location_data = await asyncio.to_thread(network.get_location, ip, self.geoip_reader)
+        location_data = await asyncio.to_thread(
+            network.get_location, 
+            ip, 
+            self.dadata_client
+        )
         location = location_data.get("full", "Unknown")
         password_hash = await crypto.hash_password(body.password)
 
@@ -146,7 +150,11 @@ class AuthService:
         user_agent: str | None
     ):
         """Вход в систему."""
-        location_data = await asyncio.to_thread(network.get_location, ip, self.geoip_reader)
+        location_data = await asyncio.to_thread(
+            network.get_location, 
+            ip, 
+            self.dadata_client
+        )
         location = location_data.get("full", "Unknown")
 
         user_id = None
@@ -298,10 +306,21 @@ class AuthService:
                 user_id=str(user_id)
             )
 
+    async def update_session_activity(self, session_id: UUID):
+        """Обновляет last_activity сессии."""
+        throttle_key = f"session:throttle_activity:{session_id}"
+
+        should_update_db = await self.redis.set(throttle_key, "1", ex=300, nx=True)
+
+        if should_update_db:
+            now = datetime.now(timezone.utc)
+            async with self.uow:
+                await self.uow.sessions.update_last_activity(session_id, now)
+
     async def get_all_sessions(
         self, user_id: UUID, current_refresh_token: str | None
     ) -> list[api_schemas.SessionInfo]:
-        """Получение сессий."""
+        """Получение всех сессий пользователя."""
         current_fingerprint = crypto.hash_token(current_refresh_token) if current_refresh_token else None
         async with self.uow:
             sessions = await self.uow.sessions.get_all_active(user_id)
@@ -319,6 +338,7 @@ class AuthService:
         ]
 
     async def revoke_session_by_id(self, user_id: UUID, session_id: str) -> None:
+        """Отзывает сессию по ее ID."""
         async with self.uow:
             await self.uow.sessions.revoke_by_id(user_id, UUID(session_id))
             await self._save_kafka_event(
@@ -328,6 +348,7 @@ class AuthService:
             )
 
     async def revoke_other_sessions(self, user_id: UUID, current_refresh_token: str) -> None:
+        """Отзывает все сессии, кроме текущей."""
         async with self.uow:
             await self.uow.sessions.revoke_all_except(
                 user_id, crypto.hash_token(current_refresh_token)
@@ -429,6 +450,7 @@ class AuthService:
     ):
         refresh_token = str(uuid4())
         fingerprint = crypto.hash_token(refresh_token)
+        now = datetime.now(timezone.utc)
         session = models.Session(
             session_id=uuid4(),
             user=user,
@@ -438,8 +460,9 @@ class AuthService:
             location=location,
             revoked=False,
             refresh_fingerprint=fingerprint,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
-            created_at=datetime.now(timezone.utc),
+            last_activity=now,
+            expires_at=now + timedelta(days=30),
+            created_at=now,
         )
         self.uow.sessions.create(session)
         

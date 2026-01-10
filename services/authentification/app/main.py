@@ -3,13 +3,13 @@ import asyncio
 from contextlib import asynccontextmanager
 import mmap
 
+from dadata import Dadata
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from arq import create_pool
 from arq.connections import RedisSettings
 from prometheus_fastapi_instrumentator import Instrumentator
-import geoip2.database
 from redis.asyncio import Redis
 from fastapi_limiter import FastAPILimiter
 
@@ -59,27 +59,21 @@ async def lifespan(app: FastAPI):
         logger.error(f"Redis/ARQ init failed: {e}")
         raise
 
-    geoip_reader = None
+    dadata_client = None
     try:
-        geoip_reader = geoip2.database.Reader(
-            settings.APP.GEOIP_DB_PATH, 
-            mode=mmap.ACCESS_READ
-        )
-        app.state.geoip_reader = geoip_reader
-        logger.info("GeoIP initialized")
-    except (FileNotFoundError, TypeError):
-        logger.warning("GeoIP DB not found or path invalid. GeoIP disabled.")
-        app.state.geoip_reader = None
+        if settings.GEO.DADATA_API_KEY and settings.GEO.DADATA_SECRET_KEY:
+            dadata_client = Dadata(settings.GEO.DADATA_API_KEY, settings.GEO.DADATA_SECRET_KEY)
+            app.state.dadata_client = dadata_client
+            logger.info("DaData client initialized")
+        else:
+            logger.warning("DaData API keys are missing. Geolocation disabled.")
+            app.state.dadata_client = None
     except Exception as e:
-        logger.error(f"GeoIP init error: {e}")
-        app.state.geoip_reader = None
-
+        logger.error(f"DaData init error: {e}")
+        app.state.dadata_client = None
     yield
 
     logger.info("Application shutdown initiated")
-
-    if geoip_reader:
-        geoip_reader.close()
 
     if redis_pool:
         await FastAPILimiter.close()

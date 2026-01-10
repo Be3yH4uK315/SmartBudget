@@ -37,9 +37,12 @@ class KafkaSettings(BaseSettings):
     KAFKA_AUTH_GROUP_ID: str
     KAFKA_AUTH_EVENTS_TOPIC: str
 
+class GeoSettings(BaseSettings):
+    DADATA_API_KEY: str
+    DADATA_SECRET_KEY: str
+
 class AppSettings(BaseSettings):
     ENV: str
-    GEOIP_DB_PATH: str
     FRONTEND_URL: str
     PROMETHEUS_PORT: int
     LOG_LEVEL: str
@@ -52,6 +55,7 @@ class Settings(BaseSettings):
     JWT: JWTSettings
     ARQ: ArqSettings
     KAFKA: KafkaSettings
+    GEO: GeoSettings
     APP: AppSettings
 
     model_config = SettingsConfigDict(

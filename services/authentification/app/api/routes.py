@@ -12,12 +12,10 @@ from app.core import exceptions, config
 from app.infrastructure.db import models
 from app.domain.schemas import api as schemas
 from app.services import service
-from app import utils
+from app.utils import crypto
 
 router = APIRouter(tags=["auth"])
 settings = config.settings
-
-# --- HELPERS ---
 
 def _set_auth_cookies(
     response: Response,
@@ -51,8 +49,6 @@ def _delete_auth_cookies(response: Response):
     response.delete_cookie("access_token", httponly=True, secure=secure, samesite='None', path='/')
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='None', path='/')
 
-# --- ROUTES ---
-
 @router.get(
     "/health",
     status_code=status.HTTP_200_OK,
@@ -64,11 +60,10 @@ async def health_check(request: Request) -> dict:
         "db": "unknown",
         "redis": "unknown",
         "arq": "unknown",
-        "geoip": "unknown",
+        "dadata": "unknown",
     }
     has_error = False
 
-    # Check DB
     engine = getattr(app.state, "engine", None)
     if not engine:
         health_status["db"] = "disconnected"
@@ -82,7 +77,6 @@ async def health_check(request: Request) -> dict:
             health_status["db"] = "failed"
             has_error = True
 
-    # Check Redis/Arq
     arq_pool = getattr(app.state, "arq_pool", None)
     if not arq_pool:
         health_status["arq"] = "disconnected"
@@ -95,12 +89,11 @@ async def health_check(request: Request) -> dict:
             health_status["arq"] = "failed"
             has_error = True
 
-    # Check GeoIP
-    geoip = getattr(app.state, "geoip_reader", None)
-    if geoip is None:
-        health_status["geoip"] = "disabled"
+    dadata_client = getattr(app.state, "dadata_client", None)
+    if dadata_client is None:
+        health_status["dadata"] = "disabled"
     else:
-        health_status["geoip"] = "ok"
+        health_status["dadata"] = "configured" 
 
     if has_error:
         return JSONResponse(
@@ -266,7 +259,7 @@ async def get_all_user_sessions(
 
 @router.delete("/sessions/{sessionId}", status_code=200, response_model=schemas.UnifiedResponse)
 async def revoke_session(
-    sessionId: str, # Имя аргумента должно совпадать с path param (case sensitive в FastAPI)
+    sessionId: str,
     service: service.AuthService = Depends(dependencies.get_auth_service),
     user: models.User = Depends(dependencies.get_current_active_user)
 ):
@@ -325,9 +318,6 @@ async def refresh(
     _set_auth_cookies(response, new_access_token, new_refresh_token)
     return schemas.UnifiedResponse(status="success", action="refresh", detail="Tokens refreshed.")
 
-
-# --- JWKS & Gateway ---
-
 @lru_cache(maxsize=1)
 def _build_jwks() -> dict:
     public_key_obj = serialization.load_pem_public_key(
@@ -341,8 +331,8 @@ def _build_jwks() -> dict:
             "use": "sig",
             "kid": "sig-1",
             "alg": "RS256",
-            "n": utils.int_to_base64url(numbers.n),
-            "e": utils.int_to_base64url(numbers.e),
+            "n": crypto.int_to_base64url(numbers.n),
+            "e": crypto.int_to_base64url(numbers.e),
         }]
     }
 

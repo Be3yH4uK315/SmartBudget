@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import ipaddress
 from typing import AsyncGenerator
 from uuid import UUID
@@ -7,7 +7,6 @@ from jwt import ExpiredSignatureError, InvalidSignatureError, PyJWTError, decode
 import orjson
 from redis.asyncio import Redis, ConnectionPool
 from arq.connections import ArqRedis
-import geoip2.database
 
 from app.api import middleware
 from app.infrastructure.db import models, uow as unit_of_work
@@ -42,24 +41,22 @@ async def get_arq_pool(request: Request) -> AsyncGenerator[ArqRedis, None]:
         raise HTTPException(status_code=500, detail="ARQ pool not available")
     yield arq_pool
 
-def get_geoip_reader(request: Request) -> geoip2.database.Reader:
-    """Возвращает GeoIP reader, инициализированный при старте."""
-    reader = getattr(request.app.state, "geoip_reader", None)
-    if not reader:
-        raise HTTPException(status_code=500, detail="GeoIP reader not available")
-    return reader
+async def get_dadata_client(request: Request):
+    """Предоставляет клиент DaData из state приложения."""
+    client = getattr(request.app.state, "dadata_client", None)
+    return client
 
 def get_auth_service(
     uow=Depends(get_uow),
     redis=Depends(get_redis),
     arq_pool=Depends(get_arq_pool),
-    geoip=Depends(get_geoip_reader),
+    dadata_client=Depends(get_dadata_client)
 ) -> services.AuthService:
     return services.AuthService(
         uow=uow,
         redis=redis,
         arq_pool=arq_pool,
-        geoip_reader=geoip,
+        dadata_client=dadata_client
     )
 
 async def create_redis_pool() -> ConnectionPool:
@@ -89,7 +86,10 @@ async def get_current_active_user(
     uow: unit_of_work.UnitOfWork = Depends(get_uow),
     redis: Redis = Depends(get_redis)
 ) -> models.User:
-    """Извлекает и проверяет текущего активного пользователя из токена."""
+    """
+    Извлекает и проверяет текущего активного пользователя из токена. 
+    Обновляет последнюю активность сессии.
+    """
     access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -136,8 +136,6 @@ async def get_current_active_user(
                 serialization.to_json_str(session_data), 
                 ex=timedelta(days=30)
             )
-        else:
-            pass
 
         if not user:
             cache_key = f"user:{user_id_str}"
@@ -166,6 +164,19 @@ async def get_current_active_user(
 
         if not user.is_active:
              raise HTTPException(status_code=401, detail="User inactive")
+
+        try:
+            throttle_key = f"session:activity_throttle:{session_id_str}"
+            should_update = await redis.set(throttle_key, "1", ex=300, nx=True)
+            
+            if should_update:
+                async with uow:
+                    await uow.sessions.update_last_activity(
+                        session_uuid, 
+                        datetime.now(timezone.utc)
+                    )
+        except Exception as e:
+            middleware.logger.error(f"Failed to update session activity: {e}")
 
         return user
 

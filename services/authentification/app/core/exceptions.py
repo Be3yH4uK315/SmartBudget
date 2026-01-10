@@ -35,7 +35,7 @@ class SessionExpiredError(AuthServiceError):
     pass
 
 class GeoIPServiceError(AuthServiceError):
-    """Ошибка сервиса GeoIP."""
+    """Ошибка сервиса Dadata."""
     pass
 
 class DatabaseError(AuthServiceError):
