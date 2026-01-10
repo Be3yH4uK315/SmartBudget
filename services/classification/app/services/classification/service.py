@@ -1,9 +1,10 @@
+import asyncio
 import logging
 from uuid import UUID
 from redis.asyncio import Redis
 
 from app.core.config import settings
-from app.core.exceptions import ClassificationResultNotFoundError, InvalidKafkaMessageError, CategoryNotFoundError
+from app.core.exceptions import ClassificationResultNotFoundError, CategoryNotFoundError
 from app.domain.schemas.kafka import TransactionNeedCategoryEvent
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.db.models import Category, ClassificationResult, Feedback, ClassificationSource
@@ -56,83 +57,105 @@ class ClassificationService:
 
         return cat_id, cat.name, conf, self.ml_pipeline["modelVersion"]
     
-    async def process_transaction(
-    self,
-    event: TransactionNeedCategoryEvent
-) -> dict | None:
-        """Обрабатывает транзакцию: применяет правила и/или ML для классификации."""
-        try:
-            tx_id = event.transaction_id
-        except (KeyError, ValueError):
-            raise InvalidKafkaMessageError("Invalid transaction_id")
+    async def process_batch(self, events: list[TransactionNeedCategoryEvent]):
+        """Пакетная обработка транзакций."""
+        if not events:
+            return
 
+        tx_ids = [e.transaction_id for e in events]
+        
         async with self.uow:
-            if await self.uow.results.get_by_transaction_id(tx_id):
-                return None
+            existing_ids = await self.uow.results.get_existing_ids(tx_ids)
 
-            merchant = event.merchant
-            mcc = event.mcc
-            desc = event.description or ""
+            new_events = [e for e in events if e.transaction_id not in existing_ids]
             
-            rule_cat_id, rule_cat_name, rule_type = ruleManager.find_match(merchant, mcc, desc)
-
-            final_cat_id = rule_cat_id
-            final_cat_name = rule_cat_name
-            final_source = ClassificationSource.RULES
-            final_conf = 1.0
-            final_ver = None
-
-            is_weak_rule = rule_type == "mcc"
+            if not new_events:
+                return
             
-            if (rule_cat_id is None) or is_weak_rule:
-                ml_cat_id, ml_cat_name, ml_conf, ml_ver = await self._apply_ml(event)
+            semaphore = asyncio.Semaphore(10) 
+            
+            async def _classify(ev):
+                async with semaphore:
+                    return await self._calculate_classification(ev)
+
+            results_data = await asyncio.gather(*[_classify(ev) for ev in new_events])
+            
+            for res_model, outbox_data in results_data:
+                await self.uow.results.upsert(res_model)
                 
-                if ml_cat_id is not None:
-                    if rule_cat_id is None or (ml_conf > 0.9 and ml_cat_id != 1):
-                        final_cat_id = ml_cat_id
-                        final_cat_name = ml_cat_name
-                        final_source = ClassificationSource.ML
-                        final_conf = ml_conf
-                        final_ver = ml_ver
+                self.uow.outbox.add_event(
+                    settings.KAFKA.TOPIC_CLASSIFIED, 
+                    outbox_data, 
+                    "transaction.classified"
+                )
+                
+                resp = api_schemas.CategorizationResultResponse(
+                    transaction_id=res_model.transaction_id,
+                    category_id=res_model.category_id,
+                    category_name=res_model.category_name,
+                    confidence=res_model.confidence,
+                    source=res_model.source.value,
+                    model_version=res_model.model_version
+                )
+                await self.redis.set(
+                    f"classification:{res_model.transaction_id}", 
+                    resp.model_dump_json(), 
+                    ex=3600
+                )
 
-            if final_cat_id is None:
-                other = await self.uow.categories.get_by_id(1)
-                final_cat_id = 1
-                final_cat_name = other.name if other else "Other"
-                final_source = ClassificationSource.RULES
-                final_conf = 0.0
+    async def _calculate_classification(self, event: TransactionNeedCategoryEvent):
+        """Внутренняя логика классификации одной транзакции."""
+        merchant = event.merchant
+        mcc = event.mcc
+        desc = event.description or ""
+        
+        rule_cat_id, rule_cat_name, rule_type = ruleManager.find_match(merchant, mcc, desc)
 
-            result = ClassificationResult(
-                transaction_id=tx_id,
-                category_id=final_cat_id,
-                category_name=final_cat_name,
-                confidence=final_conf,
-                source=final_source,
-                model_version=final_ver,
-                merchant=merchant,
-                description=desc,
-                mcc=mcc
-            )
-            await self.uow.results.upsert(result)
+        final_cat_id = rule_cat_id
+        final_cat_name = rule_cat_name
+        final_source = ClassificationSource.RULES
+        final_conf = 1.0
+        final_ver = None
+        
+        is_weak_rule = rule_type == "mcc"
 
-            event_payload = {
-                "transaction_id": str(tx_id),
-                "category_id": final_cat_id,
-                "category_name": final_cat_name
-            }
-            self.uow.outbox.add_event(
-                settings.KAFKA.TOPIC_CLASSIFIED, 
-                event_payload, 
-                "transaction.classified"
-            )
+        if (rule_cat_id is None) or is_weak_rule:
+            ml_cat_id, ml_cat_name, ml_conf, ml_ver = await self._apply_ml(event)
             
-            resp = api_schemas.CategorizationResultResponse(
-                transaction_id=tx_id, category_id=final_cat_id, category_name=final_cat_name,
-                confidence=final_conf, source=final_source.value, model_version=final_ver
-            )
-            await self.redis.set(f"classification:{tx_id}", resp.model_dump_json(), ex=3600)
-            
-            return event_payload
+            if ml_cat_id is not None:
+                if rule_cat_id is None or (ml_conf > 0.95 and ml_cat_id != 1):
+                    final_cat_id = ml_cat_id
+                    final_cat_name = ml_cat_name
+                    final_source = ClassificationSource.ML
+                    final_conf = ml_conf
+                    final_ver = ml_ver
+
+        if final_cat_id is None:
+            other = await self.uow.categories.get_by_id(1)
+            final_cat_id = 1
+            final_cat_name = other.name if other else "Other"
+            final_source = ClassificationSource.RULES
+            final_conf = 0.0
+
+        result = ClassificationResult(
+            transaction_id=event.transaction_id,
+            category_id=final_cat_id,
+            category_name=final_cat_name,
+            confidence=final_conf,
+            source=final_source,
+            model_version=final_ver,
+            merchant=merchant,
+            description=desc,
+            mcc=mcc
+        )
+        
+        outbox_data = {
+            "transaction_id": str(event.transaction_id),
+            "category_id": final_cat_id,
+            "category_name": final_cat_name
+        }
+        
+        return result, outbox_data
     
     async def get_classification(self, tx_id: UUID) -> api_schemas.CategorizationResultResponse:
         """Получает результат классификации по ID транзакции."""
