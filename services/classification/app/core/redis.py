@@ -11,7 +11,7 @@ async def create_redis_pool() -> ConnectionPool:
         settings.ARQ.REDIS_URL,
         encoding="utf-8",
         decode_responses=True,
-        max_connections=20
+        max_connections=settings.ARQ.REDIS_MAX_CONNECTIONS
     )
     return pool
 
