@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.infrastructure.db.models import ClassificationResult, Feedback, ClassificationSource
@@ -81,3 +81,13 @@ class FeedbackRepository(BaseRepository):
             }
             for row in result.mappings().all()
         ]
+    
+    async def mark_unprocessed_as_processed(self) -> int:
+        """Помечает все необработанные записи Feedback как обработанные."""
+        stmt = (
+            update(Feedback)
+            .where(Feedback.processed == False)
+            .values(processed=True)
+        )
+        result = await self.db.execute(stmt)
+        return result.rowcount
