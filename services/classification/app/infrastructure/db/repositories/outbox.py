@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 import logging
 from uuid import UUID
 from sqlalchemy import select, delete
@@ -52,7 +53,20 @@ class OutboxRepository(BaseRepository):
         event = await self.db.get(OutboxEvent, event_id)
         if event:
             event.retry_count += 1
-            event.last_error = error_msg[:512]
+            event.last_error = str(error_msg)[:512]
             if event.retry_count >= max_retries:
+                logger.error(f"Event {event_id} reached max retries ({max_retries}). Marking as FAILED.")
                 event.status = 'failed'
             self.db.add(event)
+    
+    async def delete_old_failed_events(self, days: int) -> int:
+        """
+        Удаляет события со статусом 'failed', которые старше указанного количества дней.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        stmt = delete(OutboxEvent).where(
+            OutboxEvent.status == 'failed',
+            OutboxEvent.created_at < cutoff
+        )
+        result = await self.db.execute(stmt)
+        return result.rowcount
