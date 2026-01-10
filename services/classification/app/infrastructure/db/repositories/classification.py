@@ -45,6 +45,17 @@ class ClassificationResultRepository(BaseRepository):
         )
         return await self.db.scalar(insert_stmt)
 
+    async def get_existing_ids(self, tx_ids: list[UUID]) -> set[UUID]:
+        """Возвращает set из ID транзакций, которые уже есть в базе."""
+        if not tx_ids:
+            return set()
+            
+        stmt = select(ClassificationResult.transaction_id).where(
+            ClassificationResult.transaction_id.in_(tx_ids)
+        )
+        result = await self.db.execute(stmt)
+        return set(result.scalars().all())
+
 class FeedbackRepository(BaseRepository):
     def create(self, feedback: Feedback) -> Feedback:
         """Создает новую обратную связь."""
