@@ -2,6 +2,7 @@ import logging
 import joblib
 import re
 import asyncio
+import gc
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from typing import Tuple
@@ -10,7 +11,7 @@ import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import classification_report, f1_score, accuracy_score
 from lightgbm import LGBMClassifier
 
 from app.core.config import settings
@@ -24,7 +25,7 @@ def _preprocess_text(text: str) -> str:
     """Очистка текста для TF-IDF."""
     if not text or pd.isna(text): return ""
     text = str(text).lower()
-    text = re.sub(r'\d+', ' ', text)
+    text = re.sub(r'[^\w\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -37,47 +38,59 @@ def _create_features(data: dict) -> str:
     return _preprocess_text(f"{merchant} {desc} {mcc_str}")
 
 def _train_internal_process(df_dict: dict) -> Tuple[str | None, dict]:
-    """Внутренний процесс обучения модели в отдельном процессе."""
+    """Внутренний процесс обучения."""
     try:
         df = pd.DataFrame(df_dict)
         df.fillna({'merchant': '', 'description': '', 'mcc': 0}, inplace=True)
-        uniqueClasses = df['label'].nunique()
         
-        if uniqueClasses < 2:
+        unique_classes = df['label'].nunique()
+        if unique_classes < 2:
             return None, {"error": "Insufficient unique classes (need at least 2)"}
-
-        if len(df) < 50:
-            return None, {"error": "Insufficient data size (< 50 samples). Overfitting risk."}
-
+        
         df['features'] = df.apply(lambda row: _create_features(row.to_dict()), axis=1)
         X = df['features']
         y = df['label'].astype(int)
 
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.2, stratify=y, random_state=42
+        )
 
-        vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
+        vectorizer = TfidfVectorizer(max_features=10000, ngram_range=(1, 2), min_df=2)
         X_train_tfidf = vectorizer.fit_transform(X_train)
-
-        model = LGBMClassifier(n_estimators=100, learning_rate=0.1, objective='multiclass', n_jobs=1, verbose=-1)
-        model.fit(X_train_tfidf, y_train)
-
-        metrics = {"dataset_size": len(df), "uniqueClasses": int(uniqueClasses)}
-        y_train_pred = model.predict(X_train_tfidf)
-        metrics["train_accuracy"] = accuracy_score(y_train, y_train_pred)
-        metrics["train_f1"] = f1_score(y_train, y_train_pred, average='macro')
-        
         X_val_tfidf = vectorizer.transform(X_val)
+
+        model = LGBMClassifier(
+            n_estimators=150, 
+            learning_rate=0.05, 
+            num_leaves=31,
+            objective='multiclass', 
+            n_jobs=1, 
+            verbose=-1,
+            class_weight='balanced'
+        )
+        model.fit(X_train_tfidf, y_train)
         y_val_pred = model.predict(X_val_tfidf)
-        metrics["val_accuracy"] = accuracy_score(y_val, y_val_pred)
-        metrics["val_f1"] = f1_score(y_val, y_val_pred, average='macro')
+        report = classification_report(y_val, y_val_pred, output_dict=True, zero_division=0)
+        
+        metrics = {
+            "dataset_size": len(df),
+            "unique_classes": int(unique_classes),
+            "val_accuracy": accuracy_score(y_val, y_val_pred),
+            "val_f1_macro": f1_score(y_val, y_val_pred, average='macro'),
+            "val_f1_weighted": f1_score(y_val, y_val_pred, average='weighted'),
+            "per_class_metrics": {
+                k: v for k, v in report.items() if k.isdigit()
+            }
+        }
         
         new_version = datetime.now().strftime("%Y%m%d_%H%M%S")
-        modelPath = f"{settings.ML.MODEL_PATH}/{new_version}_{MODEL_FILE_NAME}"
-        vectorizerPath = f"{settings.ML.MODEL_PATH}/{new_version}_{VECTORIZER_FILE_NAME}"
+        model_path = f"{settings.ML.MODEL_PATH}/{new_version}_{MODEL_FILE_NAME}"
+        vec_path = f"{settings.ML.MODEL_PATH}/{new_version}_{VECTORIZER_FILE_NAME}"
 
-        joblib.dump(model, modelPath)
-        joblib.dump(vectorizer, vectorizerPath)
-        
+        joblib.dump(model, model_path)
+        joblib.dump(vectorizer, vec_path)
+        del df, X_train_tfidf, X_val_tfidf, model, vectorizer
+        gc.collect()
         return new_version, metrics
     except Exception as e:
         return None, {"error": str(e)}
@@ -103,7 +116,8 @@ class MLPipeline:
             v_path = f"{settings.ML.MODEL_PATH}/{version}_{VECTORIZER_FILE_NAME}"
             model = joblib.load(m_path)
             vec = joblib.load(v_path)
-            labels = list(range(model.n_classes_)) if hasattr(model, 'n_classes_') else None
+            labels = list(model.classes_) if hasattr(model, 'classes_') else []
+            gc.collect()
             return model, vec, labels
         except Exception as e:
             logger.error(f"Load error {version}: {e}")
@@ -120,7 +134,7 @@ class MLPipeline:
             proba = model.predict_proba(vec)[0]
             pred_idx = np.argmax(proba)
             conf = float(proba[pred_idx])
-            label = class_labels[pred_idx] if class_labels else pred_idx
+            label = class_labels[pred_idx] if (class_labels and pred_idx < len(class_labels)) else pred_idx
             return int(label), conf
 
         loop = asyncio.get_running_loop()
