@@ -9,7 +9,7 @@ type Props = {
   innerRadius?: number
   width?: number
   height?: number
-  centerLabel: CenterLabel
+  centerLabel?: CenterLabel
 }
 
 export const PieChartWithCenterLabel = React.memo(function PieChartWithCenterLabel({
@@ -36,7 +36,7 @@ export const PieChartWithCenterLabel = React.memo(function PieChartWithCenterLab
         },
       }}
     >
-      <PieCenterLabel centerLabel={centerLabel} />
+      {centerLabel && <PieCenterLabel centerLabel={centerLabel} />}
     </PieChart>
   )
 })
@@ -56,7 +56,7 @@ const PieCenterLabel = React.memo(({ centerLabel }: { centerLabel: CenterLabel }
   const x = left + width / 2
   const y = top + height / 2
 
-  if (centerLabel.type === 'amount') {
+  if (centerLabel.type === 'amount' && centerLabel.label !== undefined) {
     return (
       <StyledText x={x} y={y} sx={{ ...amountTypography }}>
         <tspan x={x} dy="-0.4em">
@@ -65,6 +65,12 @@ const PieCenterLabel = React.memo(({ centerLabel }: { centerLabel: CenterLabel }
         <tspan x={x} dy="1.2em" style={{ fontSize: '0.7em' }}>
           {centerLabel.label}
         </tspan>
+      </StyledText>
+    )
+  } else if (centerLabel.type === 'amount') {
+    return (
+      <StyledText x={x} y={y} sx={{ ...percentTypography, fontWeight: 600 }}>
+        {formatCurrency(centerLabel.total)}
       </StyledText>
     )
   }

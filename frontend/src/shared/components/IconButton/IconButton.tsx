@@ -3,7 +3,7 @@ import { IconButtonItem } from '@shared/types'
 import { noop } from '@shared/utils/noop'
 import { Link } from 'react-router'
 
-export const IconButton = ({ title, subtitle, Icon, path, onClick }: IconButtonItem) => {
+export const IconButton = ({ title, subtitle, Icon, path, paperSx, onClick }: IconButtonItem) => {
   const content = (
     <Stack spacing={2} direction={'row'} sx={{ alignItems: 'center', whiteSpace: 'wrap' }}>
       {Icon && (
@@ -33,7 +33,14 @@ export const IconButton = ({ title, subtitle, Icon, path, onClick }: IconButtonI
   return (
     <Paper
       role="button"
-      sx={{ p: 3, borderRadius: '24px', flex: '1 1 0%', textDecoration: 'none', cursor: 'pointer' }}
+      sx={{
+        p: 3,
+        borderRadius: '24px',
+        flex: '1 1 0%',
+        textDecoration: 'none',
+        cursor: 'pointer',
+        ...paperSx,
+      }}
       component={path ? Link : 'div'}
       to={path && path}
       elevation={2}

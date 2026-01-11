@@ -2,22 +2,10 @@ import { dispatch } from '@shared/store/store'
 import { logoutHelper } from '@shared/utils'
 import axios, { AxiosError, AxiosRequestConfig } from 'axios'
 
-const baseURL = 'http://127.0.0.1:8000/api/'
-
-const baseURLME = 'http://127.0.0.1:9000/api/'
+const baseURL = 'http://localhost:80/api/v1'
 
 export const api = axios.create({
   baseURL,
-  timeout: 3 * 60 * 1000,
-  withCredentials: true,
-  headers: {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  },
-})
-
-export const apiME = axios.create({
-  baseURL: baseURLME,
   timeout: 3 * 60 * 1000,
   withCredentials: true,
   headers: {
@@ -93,46 +81,6 @@ api.interceptors.response.use(
 
     if (result === 'logout') {
       await logoutHelper(dispatch)
-      return Promise.reject(error)
-    }
-
-    return Promise.reject(error)
-  },
-)
-
-apiME.interceptors.response.use(
-  (res) => res,
-  async (error: AxiosError) => {
-    const response = error.response
-    const config = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
-
-    if (!response || !config) {
-      return Promise.reject(error)
-    }
-
-    const status = response.status
-    const url = config.url ?? ''
-
-    const isAuthEndpoint = url.startsWith('/auth/')
-
-    if (isAuthEndpoint) {
-      return Promise.reject(error)
-    }
-
-    if (status !== 401 || config._retry) {
-      return Promise.reject(error)
-    }
-
-    const result = await refreshSession()
-
-    if (result === 'ok') {
-      config._retry = true
-      return api.request(config)
-    }
-
-    if (result === 'logout') {
-      await logoutHelper(dispatch)
-
       return Promise.reject(error)
     }
 

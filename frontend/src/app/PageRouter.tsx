@@ -1,3 +1,4 @@
+import { budgetRoutes } from '@features/budget/routes'
 import { dashboardRoutes } from '@features/dashboard/routes'
 import { transactionsRoutes } from '@features/transactions/routes'
 import { authRoutes } from '@shared/screens'
@@ -18,6 +19,8 @@ export const PageRouter = () => {
         {transactionsRoutes.pages}
 
         {goalsRoutes.pages}
+
+        {budgetRoutes.pages}
       </Route>
     </Routes>
   )

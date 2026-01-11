@@ -5,6 +5,7 @@ export const ROUTES = {
     GOALS: '/goals',
     DASHBOARD: '/main',
     SETTINGS: '/settings',
+    BUDGET_SETTINGS: '/settings/budget',
     BUDGET: '/budget',
     LOGIN: '/auth/sign-in',
     RESET_PASSWORD: '/auth/reset-password',

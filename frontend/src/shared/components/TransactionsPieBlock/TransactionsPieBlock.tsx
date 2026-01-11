@@ -7,11 +7,10 @@ import { PieChartWithCenterLabel } from './PieChartWithCenterLabel'
 
 type Props = {
   title: string
-  // normalizedData: normalizedCategory[]
-  activeType: FilterType
+  activeType?: FilterType
   pieData: PieDataItem[]
-  centerLabel: CenterLabel
-  toggleFilter: (type: FilterType) => void
+  centerLabel?: CenterLabel
+  toggleFilter?: (type: FilterType) => void
 }
 
 export const TransactionsPieBlock = React.memo(
@@ -43,20 +42,23 @@ export const TransactionsPieBlock = React.memo(
           <Stack spacing={1.5}>
             <Typography variant="h4">{title}</Typography>
 
-            <Stack direction={'row'} spacing={1}>
-              {(['expense', 'income'] as const).map((type) => (
-                <Button
-                  key={type}
-                  variant="white"
-                  sx={(theme) => ({
-                    borderColor: activeType === type ? theme.palette.primary.main : 'transparent',
-                  })}
-                  onClick={() => toggleFilter(type)}
-                >
-                  {translate(type)}
-                </Button>
-              ))}
-            </Stack>
+            {activeType && toggleFilter && (
+              <Stack direction={'row'} spacing={1}>
+                {(['expense', 'income'] as const).map((type) => (
+                  <Button
+                    key={type}
+                    variant="white"
+                    sx={(theme) => ({
+                      borderColor: activeType === type ? theme.palette.primary.main : 'transparent',
+                    })}
+                    onClick={() => toggleFilter(type)}
+                  >
+                    {translate(type)}
+                  </Button>
+                ))}
+              </Stack>
+            )}
+
             {pieData.length > 0 && (
               <Box
                 sx={{
@@ -80,8 +82,8 @@ export const TransactionsPieBlock = React.memo(
                 display: 'flex',
                 ml: { xs: 0, md: 'auto !important' },
                 mt: { xs: 2, md: 0 },
-                width: { xs: 'auto', md: 200 },
-                height: { md: 200 },
+                width: { xs: 'auto', md: 250 },
+                height: { md: 250 },
               }}
             >
               <PieChartWithCenterLabel

@@ -1,4 +1,5 @@
 import { JSX } from 'react'
+import { SxProps } from '@mui/material'
 
 export type IconButtonItem = {
   Icon?: JSX.Element
@@ -6,4 +7,5 @@ export type IconButtonItem = {
   subtitle?: string
   path?: string
   onClick?: () => void
+  paperSx?: SxProps
 }
