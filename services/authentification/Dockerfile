@@ -38,9 +38,6 @@ COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini
 COPY --chown=appuser:appgroup ./alembic /app/alembic
 COPY --chown=appuser:appgroup ./certs /app/certs
 
-RUN mkdir /geoip && chown appuser:appgroup /geoip
-ENV GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
-
 USER appuser
 
 ENV PYTHONPATH=/app

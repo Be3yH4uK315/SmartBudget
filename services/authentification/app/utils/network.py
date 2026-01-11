@@ -1,5 +1,4 @@
 import ipaddress
-import json
 import logging
 from dadata import Dadata
 from user_agents import parse as ua_parse

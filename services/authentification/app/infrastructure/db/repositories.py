@@ -22,8 +22,6 @@ class BaseRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    # --- OUTBOX METHODS ---
-
     def _prepare_outbox_event(self, topic: str, event_data: dict) -> dict:
         """Приводит входные данные к формату для вставки в outbox_events."""
         payload = event_data.get("payload", event_data)

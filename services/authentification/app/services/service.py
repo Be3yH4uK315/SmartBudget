@@ -46,8 +46,6 @@ class AuthService:
             event_data=event_data
         )
 
-    # --- PUBLIC METHODS ---
-
     async def start_email_verification(self, email: str) -> str:
         """Проверяет email и отправляет письмо."""
         async with self.uow:

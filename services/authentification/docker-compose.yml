@@ -101,7 +101,6 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/authentification:/app
-      - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
     command: >
       sh -c "
@@ -132,7 +131,6 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/authentification:/app
-      - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
     command: arq app.workers.main.WorkerSettings --watch /app
     restart: unless-stopped
@@ -146,7 +144,6 @@ services:
 
 volumes:
   pg_data_auth:
-  geoip_data:
   redis_data_cache:
   kafka_data:
 

@@ -6,5 +6,4 @@ __pycache__/
 *.sh
 *.db
 *.log
-/geoip/GeoLite2-City.mmdb
-celerybeat-schedule
+*/certs

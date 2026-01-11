@@ -1,7 +1,6 @@
 import logging
 import asyncio
 from contextlib import asynccontextmanager
-import mmap
 
 from dadata import Dadata
 from fastapi import FastAPI, Request

@@ -1,25 +1,36 @@
-fastapi
-uvicorn
-gunicorn
-sqlalchemy[asyncio]
-asyncpg
-aiokafka
-arq==0.26.3
-redis>=4.2.0,<6.0.0
-pyjwt
-bcrypt
-dadata
-user-agents
-aiosmtplib
-pydantic
-pydantic-settings
-email-validator
-alembic
-prometheus-fastapi-instrumentator
-jsonschema
-python-multipart
-fastapi-limiter
-cryptography
-orjson
-uvloop>=0.19.0
-watchfiles
+# --- Core Framework & Server ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+gunicorn>=21.2.0
+python-multipart>=0.0.9
+orjson>=3.9.15
+watchfiles>=0.21.0
+
+# --- Database & Migrations ---
+sqlalchemy>=2.0.29
+asyncpg>=0.29.0
+alembic>=1.13.1
+
+# --- Redis, Tasks & Messaging ---
+redis>=5.0.3,<6.0.0
+arq>=0.26.0
+aiokafka>=0.10.0
+
+# --- Auth & Security ---
+pyjwt>=2.8.0
+bcrypt>=4.1.2
+cryptography>=42.0.5
+
+# --- Utilities & Geo ---
+dadata>=21.10.1
+user-agents>=2.2.0
+aiosmtplib>=3.0.1
+email-validator>=2.1.1
+
+# --- Settings & Validation ---
+pydantic>=2.7.0
+pydantic-settings>=2.2.1
+
+# --- Monitoring & Limiting ---
+prometheus-fastapi-instrumentator>=7.0.0
+fastapi-limiter>=0.1.6
