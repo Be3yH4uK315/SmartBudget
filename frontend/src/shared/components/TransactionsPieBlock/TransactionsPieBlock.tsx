@@ -91,7 +91,7 @@ export const TransactionsPieBlock = React.memo(
                 innerRadius={80}
                 width={200}
                 height={200}
-                centerLabel={centerLabel && centerLabel}
+                centerLabel={centerLabel}
               />
             </Box>
           )}
