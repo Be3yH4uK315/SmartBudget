@@ -120,13 +120,13 @@ async def verify_email(
 async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
-    token_type: str = Query(...),
+    tokenType: str = Query(...),
     reg_service: RegistrationService = Depends(dependencies.get_registration_service),
     pwd_service: PasswordService = Depends(dependencies.get_password_service)
 ):
-    if token_type == 'verification':
+    if tokenType == 'verification':
         await reg_service.validate_email_verification_token(token, email)
-    elif token_type == 'reset':
+    elif tokenType == 'reset':
         await pwd_service.validate_password_reset_token(token, email)
     else:
         raise HTTPException(status_code=400, detail="Invalid token type")
@@ -151,7 +151,7 @@ async def complete_registration(
         body, ip, user_agent or "Unknown"
     )
     cookies.set_auth_cookies(response, access_token, refresh_token)
-    return schemas.UnifiedResponse(status="success", action="complete_registration", detail="Registration completed.")
+    return schemas.UnifiedResponse(status="success", action="completeRegistration", detail="Registration completed.")
 
 
 @router.post(
@@ -207,7 +207,7 @@ async def reset_password(
     pwd_service: PasswordService = Depends(dependencies.get_password_service)
 ):
     await pwd_service.start_password_reset(body.email)
-    return schemas.UnifiedResponse(status="success", action="reset_password", detail="Reset email sent.")
+    return schemas.UnifiedResponse(status="success", action="resetPassword", detail="Reset email sent.")
 
 
 @router.post(
@@ -220,7 +220,7 @@ async def complete_reset(
     pwd_service: PasswordService = Depends(dependencies.get_password_service)
 ):
     await pwd_service.complete_password_reset(body)
-    return schemas.UnifiedResponse(status="success", action="complete_reset", detail="Password reset completed.")
+    return schemas.UnifiedResponse(status="success", action="completeReset", detail="Password reset completed.")
 
 
 @router.post("/change-password", status_code=200, response_model=schemas.UnifiedResponse)
@@ -230,7 +230,7 @@ async def change_password(
     user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
     await pwd_service.change_password(user.user_id, body)
-    return schemas.UnifiedResponse(status="success", action="change_password", detail="Password changed.")
+    return schemas.UnifiedResponse(status="success", action="changePassword", detail="Password changed.")
 
 
 @router.get("/me", status_code=200, response_model=schemas.UserInfo)
@@ -258,7 +258,7 @@ async def revoke_session(
     user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
     await session_service.revoke_session(user.user_id, UUID(sessionId))
-    return schemas.UnifiedResponse(status="success", action="revoke_session", detail="Session has been revoked.")
+    return schemas.UnifiedResponse(status="success", action="revokeSession", detail="Session has been revoked.")
 
 
 @router.post(
@@ -277,7 +277,7 @@ async def revoke_other_sessions(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     await session_service.revoke_other_sessions(user.user_id, refresh_token)
-    return schemas.UnifiedResponse(status="success", action="revoke_other_sessions", detail="All other sessions have been revoked.")
+    return schemas.UnifiedResponse(status="success", action="revokeOtherSessions", detail="All other sessions have been revoked.")
 
 
 @router.post(
@@ -290,7 +290,7 @@ async def validate_token(
     session_service: SessionService = Depends(dependencies.get_session_service)
 ):
     await session_service.validate_access_token(body.token)
-    return schemas.UnifiedResponse(status="success", action="validate_token", detail="Token valid.")
+    return schemas.UnifiedResponse(status="success", action="validateToken", detail="Token valid.")
 
 
 @router.post(
