@@ -7,6 +7,7 @@
       "@features/budget/*": ["src/features/budget/*"],
       "@features/dashboard/*": ["src/features/dashboard/*"],
       "@features/goals/*": ["src/features/goals/*"],
+      "@features/settings/*": ["src/features/settings/*"],
       "@features/transactions/*": ["src/features/transactions/*"],
 
       "@shared/api/*": ["src/shared/api/*"],
