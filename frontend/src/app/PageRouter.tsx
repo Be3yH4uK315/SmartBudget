@@ -1,5 +1,6 @@
 import { budgetRoutes } from '@features/budget/routes'
 import { dashboardRoutes } from '@features/dashboard/routes'
+import { settingsRoutes } from '@features/settings/routes'
 import { transactionsRoutes } from '@features/transactions/routes'
 import { authRoutes } from '@shared/screens'
 import { Route, Routes, useLocation } from 'react-router'
@@ -19,6 +20,8 @@ export const PageRouter = () => {
         {transactionsRoutes.pages}
 
         {goalsRoutes.pages}
+
+        {settingsRoutes.pages}
 
         {budgetRoutes.pages}
       </Route>
