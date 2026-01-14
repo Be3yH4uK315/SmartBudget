@@ -1,13 +1,18 @@
 from uuid import uuid4
+from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, ForeignKey, Integer, 
-    Index, UniqueConstraint, CheckConstraint, func
+    Column, String, Boolean, DateTime, ForeignKey, Integer,
+    Index, UniqueConstraint, CheckConstraint
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import validates, relationship
 
 from app.infrastructure.db.base import Base
-from app.domain.schemas import api as schemas 
+from app.domain.schemas import api as schemas
+
+def utc_now():
+    """Возвращает текущее время в UTC."""
+    return datetime.now(timezone.utc)
 
 class User(Base):
     """Модель пользователя."""
@@ -20,25 +25,24 @@ class User(Base):
     name = Column(String(255), nullable=False)
     country = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
+    is_locked = Column(Boolean, default=False, nullable=False)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now()
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+
+    sessions = relationship(
+        "Session",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now()
-    )
-    
-    sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
         Index("ix_users_email", "email"),
         Index("ix_users_is_active", "is_active"),
+        Index("ix_users_is_locked", "is_locked"),
         CheckConstraint(
             "email ~ '^[^@]+@[^@]+$'",
             name="ck_users_email_format",
@@ -67,6 +71,7 @@ class User(Base):
             raise ValueError("Country is required")
         return value.strip()
 
+
 class Session(Base):
     """Модель сессии пользователя."""
     __tablename__ = "sessions"
@@ -84,17 +89,9 @@ class Session(Base):
     location = Column(String, nullable=False)
     revoked = Column(Boolean, default=False, nullable=False)
     refresh_fingerprint = Column(String(64), nullable=False, unique=True)
-    last_activity = Column(
-        DateTime(timezone=True), 
-        nullable=False, 
-        server_default=func.now()
-    )
+    last_activity = Column(DateTime(timezone=True), nullable=False, default=utc_now)
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now()
-    )
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
 
     user = relationship("User", back_populates="sessions")
 
@@ -107,6 +104,7 @@ class Session(Base):
         ),
     )
 
+
 class OutboxEvent(Base):
     __tablename__ = "outbox_events"
 
@@ -114,10 +112,12 @@ class OutboxEvent(Base):
     topic = Column(String(255), nullable=False)
     event_type = Column(String(255), nullable=False)
     payload = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     retry_count = Column(Integer, default=0, nullable=False)
     status = Column(String(50), default='pending', nullable=False)
+    next_retry_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     __table_args__ = (
         Index('ix_outbox_created_at', 'created_at'),
+        Index('ix_outbox_pending_retry', 'status', 'next_retry_at'),
     )
