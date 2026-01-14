@@ -1,7 +1,12 @@
 import asyncio
 import base64
+import secrets
 from hashlib import sha256
 from bcrypt import hashpw, gensalt, checkpw
+
+def secure_compare(val1: str, val2: str) -> bool:
+    """Сравнивает две строки за константное время."""
+    return secrets.compare_digest(val1, val2)
 
 def hash_token(token: str) -> str:
     """Быстрое хеширование (SHA256) для технических токенов (email, refresh)."""
