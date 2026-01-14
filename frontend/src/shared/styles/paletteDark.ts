@@ -14,15 +14,15 @@ export const paletteDark: PaletteOptions = {
   },
 
   surface: {
-    light: '#5F5F5F',
-    main: '#191919',
+    light: '#323234',
+    main: '#1C1C1E',
     dark: '#000000',
   },
 
   gray: {
     light: '#E2E2E4',
     main: '#8A8A8A',
-    dark: '#333333',
+    dark: '#343434',
   },
 
   link: {

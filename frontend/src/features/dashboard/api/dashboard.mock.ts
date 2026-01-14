@@ -7,8 +7,8 @@ class DashboardMock {
     await new Promise((resolve) => setTimeout(resolve, 1000))
     return {
       goals: [
-        { name: 'Квартира', totalValue: 10000000, currentValue: 100 },
-        { name: 'Машина', totalValue: 2000000, currentValue: 200 },
+        { name: 'Квартира', targetValue: 10000000, currentValue: 100 },
+        { name: 'Машина', targetValue: 2000000, currentValue: 200 },
       ],
       categories: [
         {

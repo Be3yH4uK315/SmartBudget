@@ -15,6 +15,12 @@ export const sharedDict: LocaleDictionary = {
     LoadingScreen: {
       loading: 'Загрузка...',
     },
+
+    TransactionsPieBlock: {
+      income: 'Пополнения',
+      expense: 'Расходы',
+      fallback: 'Нет операций за текущий период',
+    },
   },
 
   en: {
@@ -27,8 +33,15 @@ export const sharedDict: LocaleDictionary = {
       signIn: 'Sign In',
       logout: 'Logout',
     },
+
     LoadingScreen: {
       loading: 'Loading...',
+    },
+
+    TransactionsPieBlock: {
+      income: 'Income',
+      expense: 'Expense',
+      fallback: 'No transactions for the current period',
     },
   },
 }

@@ -27,11 +27,18 @@ export const GoalsBlock = ({ goals }: Props) => {
       <Typography variant="h4">{title}</Typography>
 
       <Stack spacing={2}>
-        <Stack>
-          {goals.map((g, i) => (
-            <Goal key={i} title={g.name} totalValue={g.totalValue} currentValue={g.currentValue} />
-          ))}
-        </Stack>
+        {goals.length > 0 && (
+          <Stack>
+            {goals.map((g, i) => (
+              <Goal
+                key={i}
+                title={g.name}
+                targetValue={g.targetValue}
+                currentValue={g.currentValue}
+              />
+            ))}
+          </Stack>
+        )}
 
         <Button
           variant="gray"

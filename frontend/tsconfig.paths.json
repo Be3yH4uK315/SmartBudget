@@ -4,7 +4,9 @@
       "@app": ["src/app"],
       "@app/*": ["src/app/*"],
 
+      "@features/budget/*": ["src/features/budget/*"],
       "@features/dashboard/*": ["src/features/dashboard/*"],
+      "@features/goals/*": ["src/features/goals/*"],
       "@features/transactions/*": ["src/features/transactions/*"],
 
       "@shared/api/*": ["src/shared/api/*"],

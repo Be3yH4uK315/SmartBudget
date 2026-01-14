@@ -1,13 +1,17 @@
-import { DashboardResponsePayload } from '@features/dashboard/types'
+import {
+  DashboardCategory,
+  DashboardGoal,
+  DashboardResponsePayload,
+} from '@features/dashboard/types'
 import { api } from '@shared/api'
 
 class DashboardApi {
   baseUrl = '/dashboard'
 
-  async getDashboardData(): Promise<DashboardResponsePayload> {
-    const url = `${this.baseUrl}/main`
+  async getDashboardData(): Promise<{ goals: DashboardGoal[] }> {
+    const url = `${this.baseUrl}/goals`
 
-    const response = await api.get<DashboardResponsePayload>(url)
+    const response = await api.get<{ goals: DashboardGoal[] }>(url)
     return response.data
   }
 }

@@ -1,7 +1,9 @@
+import { budgetRoutes } from '@features/budget/routes'
 import { dashboardRoutes } from '@features/dashboard/routes'
 import { transactionsRoutes } from '@features/transactions/routes'
 import { authRoutes } from '@shared/screens'
 import { Route, Routes, useLocation } from 'react-router'
+import { goalsRoutes } from 'src/features/goals/routes'
 
 export const PageRouter = () => {
   const location = useLocation()
@@ -15,6 +17,10 @@ export const PageRouter = () => {
         {dashboardRoutes.pages}
 
         {transactionsRoutes.pages}
+
+        {goalsRoutes.pages}
+
+        {budgetRoutes.pages}
       </Route>
     </Routes>
   )

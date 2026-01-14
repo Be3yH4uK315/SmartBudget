@@ -1,9 +1,6 @@
-import { CategoryOption } from '@features/transactions/components/CategoryOption'
-import {
-  CATEGORIES_ICONS_MAP,
-  CATEGORY_IDS,
-} from '@features/transactions/constants/categoriesIcons'
 import { Box, MenuItem, Select, SelectChangeEvent } from '@mui/material'
+import { CategoryOption } from '@shared/components'
+import { CATEGORIES_ICONS_MAP, CATEGORY_IDS } from '@shared/constants/categoriesIcons'
 import { useTranslate } from '@shared/hooks'
 
 type Props = {
