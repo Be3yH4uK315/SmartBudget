@@ -90,7 +90,9 @@ export default withAuth(function DashboardScreen() {
         <Stack spacing={2}>
           <GoalsBlock goals={goals}></GoalsBlock>
 
-          <BudgetBlock categories={categories} budgetLimit={budgetLimit} />
+          {categories.length > 0 && (
+            <BudgetBlock categories={categories} budgetLimit={budgetLimit} />
+          )}
         </Stack>
 
         <Stack spacing={2} sx={{ flex: { md: '1 1 0%' }, maxWidth: '920px' }}>

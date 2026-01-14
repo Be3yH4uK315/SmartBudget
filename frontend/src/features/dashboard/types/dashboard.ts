@@ -9,7 +9,7 @@ export type DashboardResponsePayload = {
 export type DashboardGoal = {
   name: string
 
-  totalValue: number
+  targetValue: number
 
   currentValue: number
 }
