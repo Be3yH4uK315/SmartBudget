@@ -1,13 +1,16 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
 import ssl
 from pathlib import Path
 from email.message import EmailMessage
+from uuid import UUID
 from aiosmtplib import SMTP
 
 from app.core.config import settings
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
+from app.utils import network
 from app.utils.serialization import to_json_bytes
 
 logger = logging.getLogger(__name__)
@@ -21,10 +24,53 @@ async def touch_health_file():
     except OSError: 
         pass
 
-async def send_email_task(ctx, to: str, subject: str, body: str):
-    """Задача отправки email (выполняется worker-ом)."""
+async def enrich_session_task(ctx, session_id: UUID, ip: str, user_agent: str):
+    """Фоновая задача для обогащения сессии (локация + устройство)."""
+    db_maker = ctx.get("db_session_maker")
+    dadata_client = ctx.get("dadata_client")
+    
+    if not db_maker: 
+        return
+    
     await touch_health_file()
-    logger.info(f"Sending email to {to}")
+    
+    loop = asyncio.get_running_loop()
+    
+    try:
+        location_data = await loop.run_in_executor(
+            None, 
+            network.get_location, 
+            ip, 
+            dadata_client
+        )
+        location = location_data.full
+    except Exception as e:
+        logger.error(f"Error resolving location for {ip}: {e}")
+        location = "Unknown"
+
+    try:
+        device_name = await loop.run_in_executor(
+            None,
+            network.parse_device,
+            user_agent
+        )
+    except Exception as e:
+        logger.error(f"Error parsing UA: {e}")
+        device_name = "Unknown Device"
+
+    try:
+        async with UnitOfWork(db_maker) as uow:
+            await uow.sessions.update_enrichment_data(session_id, location, device_name)
+            await uow.commit()
+            logger.info(f"Enriched session {session_id}: {location}, {device_name}")
+    except Exception as e:
+        logger.error(f"Failed to enrich session: {e}")
+
+async def send_email_task(ctx, to: str, subject: str, body: str, retry_count: int = 0):
+    """Задача отправки email (выполняется worker-ом) с retry logic."""
+    MAX_RETRIES = 3
+    await touch_health_file()
+    logger.info(f"Sending email to {to} (attempt {retry_count + 1}/{MAX_RETRIES})")
     
     message = EmailMessage()
     message["From"] = settings.SMTP.SMTP_FROM_EMAIL
@@ -46,13 +92,26 @@ async def send_email_task(ctx, to: str, subject: str, body: str):
     try:
         await client.connect()
         if not use_implicit_tls:
-            await client.starttls()
+            await client.starttls(tls_context=tls_context)
         await client.login(settings.SMTP.SMTP_USER, settings.SMTP.SMTP_PASS)
         await client.send_message(message)
         logger.info(f"Email sent successfully to {to}")
+    except asyncio.TimeoutError as e:
+        logger.warning(f"Timeout sending email to {to} (attempt {retry_count + 1}): {e}")
+        if retry_count < MAX_RETRIES - 1:
+            wait_time = 2 ** retry_count
+            await asyncio.sleep(wait_time)
+            return await send_email_task(ctx, to, subject, body, retry_count + 1)
+        else:
+            logger.error(f"Failed to send email to {to} after {MAX_RETRIES} attempts")
     except Exception as e:
         logger.error(f"Failed to send email to {to}: {e}", exc_info=True)
-        raise
+        if retry_count < MAX_RETRIES - 1:
+            wait_time = 2 ** retry_count
+            await asyncio.sleep(wait_time)
+            return await send_email_task(ctx, to, subject, body, retry_count + 1)
+        else:
+            logger.error(f"Giving up on email to {to} after {MAX_RETRIES} attempts")
     finally:
         try:
             await client.quit()
@@ -77,15 +136,8 @@ async def process_outbox_task(ctx) -> int:
         
         batch_data = []
         events_map = []
-        now = datetime.now(timezone.utc)
 
         for event in events:
-            if event.retry_count > 0:
-                required_delay = 5 ** event.retry_count
-                
-                if now < event.created_at + timedelta(seconds=required_delay):
-                    continue
-
             try:
                 msg_bytes = to_json_bytes(event.payload)
                 key_val = event.payload.get("user_id") or event.payload.get("email")
@@ -109,6 +161,7 @@ async def process_outbox_task(ctx) -> int:
         results = await kafka.send_batch(batch_data)
         
         successful_ids = []
+        now = datetime.now(timezone.utc)
         
         for i, success in enumerate(results):
             event = events_map[i]
@@ -120,6 +173,10 @@ async def process_outbox_task(ctx) -> int:
                 if event.retry_count >= 5:
                     event.status = 'failed'
                     logger.error(f"Event {event.event_id} failed permanently after 5 retries")
+                else:
+                    delay = 5 ** event.retry_count
+                    event.next_retry_at = now + timedelta(seconds=delay)
+                
                 uow.session.add(event)
 
         if successful_ids:
@@ -129,7 +186,6 @@ async def process_outbox_task(ctx) -> int:
         await uow.commit()
         
         return len(successful_ids)
-
 
 async def cleanup_sessions_task(ctx) -> None:
     """Очистка истекших и отозванных сессий."""

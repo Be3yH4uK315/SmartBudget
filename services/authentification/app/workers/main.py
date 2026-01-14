@@ -11,7 +11,8 @@ from app.workers.tasks import (
     cleanup_failed_outbox_task,
     send_email_task,
     process_outbox_task, 
-    cleanup_sessions_task
+    cleanup_sessions_task,
+    enrich_session_task
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ async def run_outbox_processor(ctx):
                 continue 
         except Exception as e:
             logging.getLogger(__name__).error(f"Outbox loop error: {e}")
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1.0)
 
 async def on_startup(ctx):
     setup_logging()
@@ -51,7 +52,8 @@ class WorkerSettings:
     functions = [
         send_email_task,
         cleanup_sessions_task,
-        cleanup_failed_outbox_task
+        cleanup_failed_outbox_task,
+        enrich_session_task
     ]
     on_startup = on_startup
     on_shutdown = on_shutdown
