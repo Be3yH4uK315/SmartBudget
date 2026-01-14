@@ -1,9 +1,17 @@
+from dataclasses import dataclass
 import ipaddress
 import logging
+from typing import Optional
 from dadata import Dadata
 from user_agents import parse as ua_parse
 
 logger = logging.getLogger(__name__)
+
+@dataclass(frozen=True)
+class LocationData:
+    country: Optional[str]
+    city: Optional[str]
+    full: str
 
 def parse_device(user_agent: str) -> str:
     """Анализирует информацию об устройстве из User-Agent."""
@@ -21,33 +29,31 @@ def parse_device(user_agent: str) -> str:
         logger.warning(f"Failed to parse user agent: {e}")
         return "Unknown Device"
 
-def get_location(ip: str, dadata_client: Dadata | None) -> dict:
+def get_location(ip: str, dadata_client: Dadata | None) -> LocationData:
     """Получает местоположение по IP-адресу через DaData."""
+    unknown = LocationData(None, None, "Unknown")
+    local = LocationData(None, None, "Local Network")
     try:
         ip_obj = ipaddress.ip_address(ip)
         if ip_obj.is_private or ip_obj.is_loopback:
-             return {
-                "country": None, 
-                "city": None, 
-                "full": "Local Network"
-            }
+             return local
     except ValueError:
         pass 
 
     if not dadata_client:
-        return {"country": None, "city": None, "full": "Unknown"}
+        return unknown
 
     try:
         response = dadata_client.iplocate(ip)
         
         if not response:
-             return {"country": None, "city": None, "full": "Unknown"}
+             return unknown
 
         data = response.get("data")
         
         if not data:
             logger.warning(f"DaData returned response without 'data' block for {ip}")
-            return {"country": None, "city": None, "full": "Unknown"}
+            return unknown
             
         country = data.get("country", "Unknown")
         city = data.get("city")
@@ -57,12 +63,12 @@ def get_location(ip: str, dadata_client: Dadata | None) -> dict:
 
         full_location = f"{country}, {city}"
 
-        return {
-            "country": country,
-            "city": city,
-            "full": full_location
-        }
+        return LocationData(
+            country=country,
+            city=city,
+            full=full_location
+        )
 
     except Exception as e:
         logger.error(f"DaData lookup error for IP {ip}: {e}", exc_info=True)
-        return {"country": None, "city": None, "full": "Unknown"}
+        return unknown
