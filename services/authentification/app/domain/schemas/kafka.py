@@ -1,19 +1,10 @@
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import Field, EmailStr
 from typing import Optional, Literal
 from datetime import datetime
 from uuid import UUID
 
-def to_camel(string: str) -> str:
-    parts = string.split("_")
-    return parts[0] + "".join(word.capitalize() for word in parts[1:])
-
-class CamelModel(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        json_encoders={datetime: lambda v: v.isoformat()}
-    )
+from app.core.schemas import CamelModel
 
 class KafkaTopics(str, Enum):
     AUTH_EVENTS = "auth.events"

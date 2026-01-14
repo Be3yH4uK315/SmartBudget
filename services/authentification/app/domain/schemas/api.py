@@ -1,29 +1,16 @@
 from enum import IntEnum
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import Field, EmailStr
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
 
-def to_camel(string: str) -> str:
-    """Конвертирует snake_case в camelCase."""
-    parts = string.split("_")
-    return parts[0] + "".join(word.capitalize() for word in parts[1:])
-
-class CamelModel(BaseModel):
-    """Базовая модель с поддержкой camelCase и alias."""
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        from_attributes=True
-    )
+from app.core.schemas import CamelModel
 
 class UserRole(IntEnum):
     """Роли пользователей."""
     USER = 0
     ADMIN = 1
     MODERATOR = 2
-
-# --- Request Models ---
 
 class VerifyEmailRequest(CamelModel):
     email: EmailStr = Field(..., description="Email для верификации")
@@ -56,8 +43,6 @@ class ChangePasswordRequest(CamelModel):
 
 class TokenValidateRequest(CamelModel):
     token: str = Field(..., description="JWT токен")
-
-# --- Response Models ---
 
 class UnifiedResponse(CamelModel):
     status: str = Field(..., description="Статус: success/error")
