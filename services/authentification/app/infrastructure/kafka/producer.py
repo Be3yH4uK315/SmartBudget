@@ -38,23 +38,32 @@ class KafkaProducerWrapper:
         topic: str,
         value: bytes,
         key: bytes = None,
-        headers: Optional[list[tuple[str, bytes]]] = None
+        headers: Optional[list[tuple[str, bytes]]] = None,
+        wait: bool = True
     ) -> bool:
-        """Отправляет событие с повторными попытками."""
+        """Отправляет событие."""
         if not self._is_running or not self.producer:
             logger.error("Kafka producer not running")
             return False
 
         try:
-            await asyncio.wait_for(
-                self.producer.send_and_wait(
+            if wait:
+                await asyncio.wait_for(
+                    self.producer.send_and_wait(
+                        topic=topic,
+                        key=key,
+                        value=value,
+                        headers=headers,
+                    ),
+                    timeout=SEND_TIMEOUT,
+                )
+            else:
+                self.producer.send(
                     topic=topic,
                     key=key,
                     value=value,
-                    headers=headers,
-                ),
-                timeout=SEND_TIMEOUT,
-            )
+                    headers=headers
+                )
             return True
         except Exception as e:
             logger.error(f"Kafka send error: {e}")
@@ -81,6 +90,11 @@ class KafkaProducerWrapper:
                 f.set_exception(e)
                 futures.append(f)
 
+        try:
+            await self.producer.flush()
+        except Exception as e:
+            logger.error(f"Kafka flush failed: {e}")
+        
         results = await asyncio.gather(*futures, return_exceptions=True)
         
         final_status = []
