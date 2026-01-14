@@ -1,6 +1,9 @@
 from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import cached_property
+
+from app.utils.crypto import hash_password
 
 class DBSettings(BaseSettings):
     DB_URL: str
@@ -19,6 +22,12 @@ class JWTSettings(BaseSettings):
     JWT_PRIVATE_KEY_PATH: Path
     JWT_PUBLIC_KEY_PATH: Path
     JWT_ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    REFRESH_TOKEN_EXPIRE_DAYS: int
+    EMAIL_TOKEN_EXPIRE_SECONDS: int
+    SESSION_CACHE_EXPIRE_DAYS: int
+    JWT_AUDIENCE: str
+    JWT_ISSUER: str
     
     @cached_property
     def JWT_PRIVATE_KEY(self) -> str:
@@ -48,6 +57,13 @@ class AppSettings(BaseSettings):
     LOG_LEVEL: str
     TZ: str
     DUMMY_HASH: str
+
+    @field_validator("DUMMY_HASH", mode="before")
+    @classmethod
+    def generate_dummy_hash(cls, v: str | None) -> str:
+        if v:
+            return v
+        return hash_password("dummy_password_for_timing_protection")
 
 class Settings(BaseSettings):
     DB: DBSettings
