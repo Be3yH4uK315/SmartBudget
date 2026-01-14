@@ -41,3 +41,11 @@ class GeoIPServiceError(AuthServiceError):
 class DatabaseError(AuthServiceError):
     """Ошибка базы данных."""
     pass
+
+class InvalidPasswordError(AuthServiceError):
+    """Пароль не соответствует требованиям безопасности."""
+    pass
+
+class SMTPError(AuthServiceError):
+    """Ошибка отправки email."""
+    pass
