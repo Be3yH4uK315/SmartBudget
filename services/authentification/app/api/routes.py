@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import RateLimiter
@@ -11,56 +12,38 @@ from app.api import dependencies, middleware
 from app.core import exceptions, config
 from app.infrastructure.db import models
 from app.domain.schemas import api as schemas
-from app.services import service
-from app.utils import crypto
+from app.domain.schemas import dtos
+from app.services.registration_service import RegistrationService
+from app.services.login_service import LoginService
+from app.services.password_service import PasswordService
+from app.services.session_service import SessionService
+from app.utils import crypto, cookies
 
 router = APIRouter(tags=["auth"])
 settings = config.settings
 
-def _set_auth_cookies(
-    response: Response,
-    access_token: str,
-    refresh_token: str
-):
-    """Хелпер для установки httpOnly cookie."""
-    secure = (settings.APP.ENV == 'prod')
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=secure,
-        samesite='None',
-        path='/',
-        max_age=900,  # 15 min
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=secure,
-        samesite='None',
-        path='/',
-        max_age=2592000,  # 30 days
-    )
-
-def _delete_auth_cookies(response: Response):
-    """Хелпер для удаления auth cookie."""
-    secure = (settings.APP.ENV == 'prod')
-    response.delete_cookie("access_token", httponly=True, secure=secure, samesite='None', path='/')
-    response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite='None', path='/')
+@router.get(
+    "/health/live",
+    status_code=status.HTTP_200_OK,
+    summary="Liveness probe"
+)
+async def liveness_check() -> dict:
+    """Легкая проверка."""
+    return {"status": "ok"}
 
 @router.get(
-    "/health",
+    "/health/ready",
     status_code=status.HTTP_200_OK,
-    summary="Health check сервиса авторизации"
+    summary="Readiness probe"
 )
-async def health_check(request: Request) -> dict:
+async def readiness_check(request: Request) -> Response:
+    """Тяжелая проверка. Проверяет зависимости."""
     app = request.app
     health_status = {
         "db": "unknown",
         "redis": "unknown",
         "arq": "unknown",
-        "dadata": "unknown",
+        "kafka": "unknown",
     }
     has_error = False
 
@@ -89,20 +72,29 @@ async def health_check(request: Request) -> dict:
             health_status["arq"] = "failed"
             has_error = True
 
-    dadata_client = getattr(app.state, "dadata_client", None)
-    if dadata_client is None:
-        health_status["dadata"] = "disabled"
+    kafka_producer = getattr(app.state, "kafka_producer", None)
+    if not kafka_producer:
+        health_status["kafka"] = "disconnected"
+        has_error = True
     else:
-        health_status["dadata"] = "configured" 
+        try:
+            # Check if Kafka producer is running
+            if kafka_producer._is_running:
+                health_status["kafka"] = "ok"
+            else:
+                health_status["kafka"] = "not_running"
+                has_error = True
+        except Exception:
+            health_status["kafka"] = "failed"
+            has_error = True
 
     if has_error:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"status": "error", "components": health_status},
+            content={"status": "not_ready", "components": health_status},
         )
 
-    return {"status": "ok", "components": health_status}
-
+    return JSONResponse(content={"status": "ready", "components": health_status})
 
 @router.post(
     "/verify-email",
@@ -112,24 +104,30 @@ async def health_check(request: Request) -> dict:
 )
 async def verify_email(
     body: schemas.VerifyEmailRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service)
+    reg_service: RegistrationService = Depends(dependencies.get_registration_service)
 ):
-    action = await service.start_email_verification(body.email)
+    action = await reg_service.start_email_verification(body.email)
     detail = "Complete sign in." if action == "sign_in" else "Verification email sent."
     return schemas.UnifiedResponse(status="success", action=action, detail=detail)
 
 
-@router.get("/verify-link", status_code=200, response_model=schemas.UnifiedResponse)
+@router.get(
+    "/verify-link",
+    status_code=200,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    response_model=schemas.UnifiedResponse
+)
 async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
     token_type: str = Query(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service),
+    reg_service: RegistrationService = Depends(dependencies.get_registration_service),
+    pwd_service: PasswordService = Depends(dependencies.get_password_service)
 ):
     if token_type == 'verification':
-        await service.validate_email_verification_token(token, email)
+        await reg_service.validate_email_verification_token(token, email)
     elif token_type == 'reset':
-        await service.validate_password_reset_token(token, email)
+        await pwd_service.validate_password_reset_token(token, email)
     else:
         raise HTTPException(status_code=400, detail="Invalid token type")
 
@@ -145,14 +143,14 @@ async def verify_link(
 async def complete_registration(
     response: Response,
     body: schemas.CompleteRegistrationRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service),
+    reg_service: RegistrationService = Depends(dependencies.get_registration_service),
     ip: str = Depends(dependencies.get_real_ip),
     user_agent: str | None = Header(None, alias="User-Agent")
 ):
-    _user, _session, access_token, refresh_token = await service.complete_registration(
+    _user, _session, access_token, refresh_token = await reg_service.complete_registration(
         body, ip, user_agent or "Unknown"
     )
-    _set_auth_cookies(response, access_token, refresh_token)
+    cookies.set_auth_cookies(response, access_token, refresh_token)
     return schemas.UnifiedResponse(status="success", action="complete_registration", detail="Registration completed.")
 
 
@@ -165,14 +163,14 @@ async def complete_registration(
 async def login(
     response: Response,
     body: schemas.LoginRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service),
+    login_service: LoginService = Depends(dependencies.get_login_service),
     ip: str = Depends(dependencies.get_real_ip),
     user_agent: str | None = Header(None, alias="User-Agent")
 ):
-    _user, _session, access_token, refresh_token = await service.authenticate_user(
+    _user, _session, access_token, refresh_token = await login_service.authenticate_user(
         body, ip, user_agent or "Unknown"
     )
-    _set_auth_cookies(response, access_token, refresh_token)
+    cookies.set_auth_cookies(response, access_token, refresh_token)
     return schemas.UnifiedResponse(status="success", action="login", detail="Login successful.")
 
 
@@ -184,17 +182,17 @@ async def login(
 async def logout(
     response: Response,
     request: Request,
-    service: service.AuthService = Depends(dependencies.get_auth_service),
+    login_service: LoginService = Depends(dependencies.get_login_service),
     user_id: str | None = Depends(dependencies.get_user_id_from_expired_token)
 ):
     refresh_token = request.cookies.get("refresh_token")
     if user_id and refresh_token:
         try:
-            await service.logout(user_id, refresh_token)
+            await login_service.logout(user_id, refresh_token)
         except exceptions.AuthServiceError as e:
             middleware.logger.warning(f"Failed to revoke session during logout: {e}")
 
-    _delete_auth_cookies(response)
+    cookies.delete_auth_cookies(response)
     return schemas.UnifiedResponse(status="success", action="logout", detail="Logout successful.")
 
 
@@ -206,9 +204,9 @@ async def logout(
 )
 async def reset_password(
     body: schemas.ResetPasswordRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service)
+    pwd_service: PasswordService = Depends(dependencies.get_password_service)
 ):
-    await service.start_password_reset(body.email)
+    await pwd_service.start_password_reset(body.email)
     return schemas.UnifiedResponse(status="success", action="reset_password", detail="Reset email sent.")
 
 
@@ -219,29 +217,25 @@ async def reset_password(
 )
 async def complete_reset(
     body: schemas.CompleteResetRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service)
+    pwd_service: PasswordService = Depends(dependencies.get_password_service)
 ):
-    await service.complete_password_reset(body)
+    await pwd_service.complete_password_reset(body)
     return schemas.UnifiedResponse(status="success", action="complete_reset", detail="Password reset completed.")
 
 
-@router.post(
-    "/change-password", 
-    status_code=200,
-    response_model=schemas.UnifiedResponse
-)
+@router.post("/change-password", status_code=200, response_model=schemas.UnifiedResponse)
 async def change_password(
     body: schemas.ChangePasswordRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service),
-    user: models.User = Depends(dependencies.get_current_active_user)
+    pwd_service: PasswordService = Depends(dependencies.get_password_service),
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
-    await service.change_password(user.user_id, body)
+    await pwd_service.change_password(user.user_id, body)
     return schemas.UnifiedResponse(status="success", action="change_password", detail="Password changed.")
 
 
 @router.get("/me", status_code=200, response_model=schemas.UserInfo)
 async def get_current_user_info(
-    user: models.User = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
     return user
 
@@ -249,21 +243,21 @@ async def get_current_user_info(
 @router.get("/sessions", status_code=200, response_model=schemas.AllSessionsResponse)
 async def get_all_user_sessions(
     request: Request,
-    service: service.AuthService = Depends(dependencies.get_auth_service),
-    user: models.User = Depends(dependencies.get_current_active_user)
+    session_service: SessionService = Depends(dependencies.get_session_service),
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
     current_refresh_token = request.cookies.get("refresh_token")
-    sessions_list = await service.get_all_sessions(user.user_id, current_refresh_token)
+    sessions_list = await session_service.get_all_sessions(user.user_id, current_refresh_token)
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
 @router.delete("/sessions/{sessionId}", status_code=200, response_model=schemas.UnifiedResponse)
 async def revoke_session(
     sessionId: str,
-    service: service.AuthService = Depends(dependencies.get_auth_service),
-    user: models.User = Depends(dependencies.get_current_active_user)
+    session_service: SessionService = Depends(dependencies.get_session_service),
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
-    await service.revoke_session_by_id(user.user_id, sessionId)
+    await session_service.revoke_session(user.user_id, UUID(sessionId))
     return schemas.UnifiedResponse(status="success", action="revoke_session", detail="Session has been revoked.")
 
 
@@ -275,14 +269,14 @@ async def revoke_session(
 )
 async def revoke_other_sessions(
     request: Request,
-    service: service.AuthService = Depends(dependencies.get_auth_service),
+    session_service: SessionService = Depends(dependencies.get_session_service),
     user: models.User = Depends(dependencies.get_current_active_user)
 ):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    await service.revoke_other_sessions(user.user_id, refresh_token)
+    await session_service.revoke_other_sessions(user.user_id, refresh_token)
     return schemas.UnifiedResponse(status="success", action="revoke_other_sessions", detail="All other sessions have been revoked.")
 
 
@@ -293,9 +287,9 @@ async def revoke_other_sessions(
 )
 async def validate_token(
     body: schemas.TokenValidateRequest = Body(...),
-    service: service.AuthService = Depends(dependencies.get_auth_service)
+    session_service: SessionService = Depends(dependencies.get_session_service)
 ):
-    await service.validate_access_token(body.token)
+    await session_service.validate_access_token(body.token)
     return schemas.UnifiedResponse(status="success", action="validate_token", detail="Token valid.")
 
 
@@ -308,14 +302,14 @@ async def validate_token(
 async def refresh(
     response: Response,
     request: Request,
-    service: service.AuthService = Depends(dependencies.get_auth_service)
+    session_service: SessionService = Depends(dependencies.get_session_service)
 ):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Missing refresh token")
     
-    new_access_token, new_refresh_token = await service.refresh_session(refresh_token)
-    _set_auth_cookies(response, new_access_token, new_refresh_token)
+    new_access_token, new_refresh_token = await session_service.refresh_session(refresh_token)
+    cookies.set_auth_cookies(response, new_access_token, new_refresh_token)
     return schemas.UnifiedResponse(status="success", action="refresh", detail="Tokens refreshed.")
 
 @lru_cache(maxsize=1)
@@ -352,8 +346,8 @@ async def gateway_verify(request: Request):
             access_token,
             settings.JWT.JWT_PUBLIC_KEY,
             algorithms=[settings.JWT.JWT_ALGORITHM],
-            issuer="auth-service",
-            audience="smart-budget",
+            issuer=settings.JWT.JWT_ISSUER,
+            audience=settings.JWT.JWT_AUDIENCE,
             options={"require": ["exp", "sub"]}
         )
 
