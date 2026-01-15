@@ -13,6 +13,7 @@ def user_to_dto(user: models.User) -> UserDTO:
         role=UserRole(user.role),
         is_active=user.is_active,
         last_login=user.last_login,
+        retention_days=user.retention_days,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

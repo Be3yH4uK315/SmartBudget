@@ -3,7 +3,7 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import cached_property
 
-from app.utils.crypto import hash_password
+from app.utils.crypto import hash_password_sync
 
 class DBSettings(BaseSettings):
     DB_URL: str
@@ -63,7 +63,7 @@ class AppSettings(BaseSettings):
     def generate_dummy_hash(cls, v: str | None) -> str:
         if v:
             return v
-        return hash_password("dummy_password_for_timing_protection")
+        return hash_password_sync("dummy_password_for_timing_protection")
 
 class Settings(BaseSettings):
     DB: DBSettings

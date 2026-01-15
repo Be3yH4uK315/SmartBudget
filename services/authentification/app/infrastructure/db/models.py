@@ -1,5 +1,4 @@
 from uuid import uuid4
-from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Boolean, DateTime, ForeignKey, Integer,
     Index, UniqueConstraint, CheckConstraint
@@ -9,10 +8,7 @@ from sqlalchemy.orm import validates, relationship
 
 from app.infrastructure.db.base import Base
 from app.domain.schemas import api as schemas
-
-def utc_now():
-    """Возвращает текущее время в UTC."""
-    return datetime.now(timezone.utc)
+from app.utils import time
 
 class User(Base):
     """Модель пользователя."""
@@ -24,12 +20,13 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     name = Column(String(255), nullable=False)
     country = Column(String(100), nullable=False)
+    retention_days = Column(Integer, default=30, nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
     is_locked = Column(Boolean, default=False, nullable=False)
     locked_until = Column(DateTime(timezone=True), nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=time.utc_now, onupdate=time.utc_now)
 
     sessions = relationship(
         "Session",
@@ -89,9 +86,9 @@ class Session(Base):
     location = Column(String, nullable=False)
     revoked = Column(Boolean, default=False, nullable=False)
     refresh_fingerprint = Column(String(64), nullable=False, unique=True)
-    last_activity = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    last_activity = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)
 
     user = relationship("User", back_populates="sessions")
 
@@ -112,10 +109,10 @@ class OutboxEvent(Base):
     topic = Column(String(255), nullable=False)
     event_type = Column(String(255), nullable=False)
     payload = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=time.utc_now, nullable=False)
     retry_count = Column(Integer, default=0, nullable=False)
     status = Column(String(50), default='pending', nullable=False)
-    next_retry_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    next_retry_at = Column(DateTime(timezone=True), default=time.utc_now, nullable=False)
 
     __table_args__ = (
         Index('ix_outbox_created_at', 'created_at'),

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from dadata import Dadata
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import ORJSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -88,6 +88,7 @@ app = FastAPI(
     title="Auth Service", 
     version="1.0", 
     lifespan=lifespan,
+    default_response_class=ORJSONResponse,
     docs_url="/api/v1/auth/docs",
     openapi_url="/api/v1/auth/openapi.json"
 )
@@ -115,7 +116,7 @@ async def auth_service_exception_handler(request: Request, exc: exceptions.AuthS
 
     logger.warning(f"Service error: {type(exc).__name__}: {detail}")
     
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=status_code,
         content={
             "status": "error", 
@@ -128,7 +129,7 @@ async def auth_service_exception_handler(request: Request, exc: exceptions.AuthS
 async def db_error_handler(request: Request, exc: SQLAlchemyError):
     """Обработка ошибок БД."""
     logger.error(f"Database error: {exc}", exc_info=True)
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=500, 
         content={"detail": "Internal server error"}
     )
@@ -137,7 +138,7 @@ async def db_error_handler(request: Request, exc: SQLAlchemyError):
 async def general_exception_handler(request: Request, exc: Exception):
     """Обработка неожиданных ошибок."""
     logger.critical(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=500,
         content={"detail": "Internal server error"}
     )

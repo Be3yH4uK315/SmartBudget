@@ -1,11 +1,8 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import ORJSONResponse
 from fastapi_limiter.depends import RateLimiter
 from functools import lru_cache
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
-from jwt import decode
 from sqlalchemy import text
 
 from app.api import dependencies, middleware
@@ -17,7 +14,8 @@ from app.services.registration_service import RegistrationService
 from app.services.login_service import LoginService
 from app.services.password_service import PasswordService
 from app.services.session_service import SessionService
-from app.utils import crypto, cookies
+from app.services.token_service import TokenService
+from app.utils import cookies
 
 router = APIRouter(tags=["auth"])
 settings = config.settings
@@ -89,12 +87,12 @@ async def readiness_check(request: Request) -> Response:
             has_error = True
 
     if has_error:
-        return JSONResponse(
+        return ORJSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"status": "not_ready", "components": health_status},
         )
 
-    return JSONResponse(content={"status": "ready", "components": health_status})
+    return ORJSONResponse(content={"status": "ready", "components": health_status})
 
 @router.post(
     "/verify-email",
@@ -240,6 +238,25 @@ async def get_current_user_info(
     return user
 
 
+@router.patch(
+    "/me/retention", 
+    status_code=200, 
+    response_model=schemas.UnifiedResponse
+)
+async def update_retention_settings(
+    body: schemas.UpdateRetentionRequest,
+    session_service: SessionService = Depends(dependencies.get_session_service),
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+):
+    await session_service.update_user_retention_settings(user.user_id, body.days)
+    
+    return schemas.UnifiedResponse(
+        status="success", 
+        action="updateRetention", 
+        detail=f"Session retention updated to {body.days} days."
+    )
+
+
 @router.get("/sessions", status_code=200, response_model=schemas.AllSessionsResponse)
 async def get_all_user_sessions(
     request: Request,
@@ -312,49 +329,42 @@ async def refresh(
     cookies.set_auth_cookies(response, new_access_token, new_refresh_token)
     return schemas.UnifiedResponse(status="success", action="refresh", detail="Tokens refreshed.")
 
-@lru_cache(maxsize=1)
-def _build_jwks() -> dict:
-    public_key_obj = serialization.load_pem_public_key(
-        settings.JWT.JWT_PUBLIC_KEY.encode(),
-        backend=default_backend()
-    )
-    numbers = public_key_obj.public_numbers()
-    return {
-        "keys": [{
-            "kty": "RSA",
-            "use": "sig",
-            "kid": "sig-1",
-            "alg": "RS256",
-            "n": crypto.int_to_base64url(numbers.n),
-            "e": crypto.int_to_base64url(numbers.e),
-        }]
-    }
-
 @router.get("/.well-known/jwks.json")
-async def get_jwks():
-    return _build_jwks()
+async def get_jwks(
+    token_service: TokenService = Depends(dependencies.get_token_service)
+):
+    return _get_cached_jwks(token_service)
+
+@lru_cache(maxsize=1)
+def _get_cached_jwks(service: TokenService):
+    return service.get_jwks()
 
 @router.get("/gateway-verify", include_in_schema=False)
-async def gateway_verify(request: Request):
+async def gateway_verify(
+    request: Request, 
+    token_service: TokenService = Depends(dependencies.get_token_service),
+    session_service: SessionService = Depends(dependencies.get_session_service)
+):
     """Легковесный эндпоинт для API Gateway."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return Response(status_code=401)
+
     try:
-        access_token = request.cookies.get("access_token")
-        if not access_token:
-            return Response(status_code=401)
-
-        payload = decode(
-            access_token,
-            settings.JWT.JWT_PUBLIC_KEY,
-            algorithms=[settings.JWT.JWT_ALGORITHM],
-            issuer=settings.JWT.JWT_ISSUER,
-            audience=settings.JWT.JWT_AUDIENCE,
-            options={"require": ["exp", "sub"]}
-        )
-
+        payload = await token_service.decode_token(access_token, verify_exp=True)
+        
         user_id = payload.get("sub")
-        if not user_id:
+        session_id = payload.get("sid")
+
+        if not user_id or not session_id:
+             return Response(status_code=401)
+
+        is_valid = await session_service.verify_session_fast(session_id)
+        
+        if not is_valid:
             return Response(status_code=401)
 
         return Response(status_code=200, headers={"X-User-Id": user_id})
+
     except Exception:
         return Response(status_code=401)

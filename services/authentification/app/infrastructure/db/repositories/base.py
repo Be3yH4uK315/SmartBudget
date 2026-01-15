@@ -1,10 +1,10 @@
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from uuid import UUID, uuid4
 from typing import Any
 from sqlalchemy import select, delete, and_, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.db import models
-from app.utils import serialization
+from app.utils import serialization, time
 
 class BaseRepository:
     """
@@ -26,7 +26,7 @@ class BaseRepository:
                  event_type = payload.get("event", "unknown")
         
         clean_payload = serialization.recursive_normalize(payload)
-        now = datetime.now(timezone.utc)
+        now = time.utc_now()
         
         return {
             "event_id": uuid4(),
@@ -58,7 +58,7 @@ class BaseRepository:
     
     async def get_pending_outbox_events(self, limit: int = 100) -> list[models.OutboxEvent]:
         """Получает события для отправки (только pending и retry_count < 5)."""
-        now = datetime.now(timezone.utc)
+        now = time.utc_now()
         query = (
             select(models.OutboxEvent)
             .where(
@@ -84,7 +84,7 @@ class BaseRepository:
 
     async def delete_old_failed_events(self, retention_days: int = 7) -> int:
         """Удаляет события Outbox со статусом 'failed', старше N дней."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        cutoff_date = time.utc_now() - timedelta(days=retention_days)
         stmt = delete(models.OutboxEvent).where(
             and_(
                 models.OutboxEvent.status == 'failed',

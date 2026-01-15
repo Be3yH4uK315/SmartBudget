@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from time import monotonic
 from uuid import UUID
 
@@ -14,7 +14,7 @@ from app.domain.mappers.user import user_to_dto
 from app.domain.mappers.session import session_to_dto
 from app.services.session_service import SessionService
 from app.services.notifier import AuthNotifier
-from app.utils import crypto
+from app.utils import crypto, time
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class LoginService:
                 user_orm
                 and user_orm.is_locked
                 and user_orm.locked_until
-                and user_orm.locked_until > datetime.now(timezone.utc)
+                and user_orm.locked_until > time.utc_now()
             ):
                 logger.warning(
                     "Login locked",
@@ -111,7 +111,7 @@ class LoginService:
                         if user_for_lock:
                             user_for_lock.is_locked = True
                             user_for_lock.locked_until = (
-                                datetime.now(timezone.utc)
+                                time.utc_now()
                                 + timedelta(minutes=30)
                             )
                         await self.uow.commit()
