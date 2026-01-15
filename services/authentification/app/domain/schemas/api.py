@@ -44,6 +44,9 @@ class ChangePasswordRequest(CamelModel):
 class TokenValidateRequest(CamelModel):
     token: str = Field(..., description="JWT токен")
 
+class UpdateRetentionRequest(CamelModel):
+    days: int = Field(..., description="Новый срок жизни сессий (7, 30, 90, 180)")
+
 class UnifiedResponse(CamelModel):
     status: str = Field(..., description="Статус: success/error")
     action: str = Field(..., description="Выполненное действие")
@@ -56,6 +59,7 @@ class UserInfo(CamelModel):
     country: str = Field(..., description="Страна")
     role: UserRole = Field(..., description="Роль")
     last_login: Optional[datetime] = Field(None, description="Дата последнего входа")
+    retention_days: int = Field(..., description="Настройка срока жизни сессии")
     created_at: datetime = Field(..., description="Дата регистрации")
 
 class SessionInfo(CamelModel):
@@ -63,7 +67,7 @@ class SessionInfo(CamelModel):
     device_name: str = Field(..., description="Устройство")
     location: str = Field(..., description="Локация")
     ip: str = Field(..., description="IP адрес")
-    is_current_session: bool = Field(False, description="Текущая ли это сессия")
+    is_current: bool = Field(False, description="Текущая ли это сессия")
     last_activity: datetime = Field(..., description="Время последней активности")
     created_at: datetime = Field(..., description="Дата создания")
 

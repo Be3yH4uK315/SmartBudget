@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
 from uuid import UUID
 from sqlalchemy import select, update
 from app.infrastructure.db import models
 from app.domain.schemas import api as schemas
 from app.infrastructure.db.repositories.base import BaseRepository
+from app.utils import time
 
 class UserRepository(BaseRepository):
     """Репозиторий для операций с пользователями."""
@@ -37,11 +37,19 @@ class UserRepository(BaseRepository):
         await self.db.execute(
             update(models.User)
             .where(models.User.user_id == user_id)
-            .values(last_login=datetime.now(timezone.utc))
+            .values(last_login=time.utc_now())
         )
 
     def update_password(self, user: models.User, new_hash: str) -> None:
         """Обновляет хэш пароля."""
         user.password_hash = new_hash
-        user.updated_at = datetime.now(timezone.utc)
+        user.updated_at = time.utc_now()
         self.db.add(user)
+    
+    async def update_retention_days(self, user_id: UUID, days: int) -> None:
+        """Обновляет настройку срока жизни сессии."""
+        await self.db.execute(
+            update(models.User)
+            .where(models.User.user_id == user_id)
+            .values(retention_days=days, updated_at=time.utc_now())
+        )
