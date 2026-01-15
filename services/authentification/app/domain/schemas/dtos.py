@@ -13,6 +13,7 @@ class UserDTO(CamelModel):
     role: UserRole
     is_active: bool
     last_login: Optional[datetime]
+    retention_days: int
     created_at: datetime
     updated_at: datetime
 
