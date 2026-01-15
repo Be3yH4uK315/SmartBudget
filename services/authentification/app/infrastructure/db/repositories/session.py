@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy import select, update, delete, and_, or_
 from app.infrastructure.db import models
 from app.infrastructure.db.repositories.base import BaseRepository
+from app.utils import time
 
 class SessionRepository(BaseRepository):
     """Репозиторий для операций с сессиями."""
@@ -19,7 +20,7 @@ class SessionRepository(BaseRepository):
             and_(
                 models.Session.refresh_fingerprint == fingerprint,
                 models.Session.revoked == sa.false(),
-                models.Session.expires_at > datetime.now(timezone.utc),
+                models.Session.expires_at > time.utc_now(),
             )
         ).with_for_update()
         
@@ -76,9 +77,10 @@ class SessionRepository(BaseRepository):
                 and_(
                     models.Session.user_id == user_id,
                     models.Session.revoked == sa.false(),
+                    models.Session.expires_at > time.utc_now()
                 )
             )
-            .order_by(models.Session.created_at.desc())
+            .order_by(models.Session.last_activity.desc())
         )
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -132,7 +134,7 @@ class SessionRepository(BaseRepository):
         result = await self.db.execute(
             delete(models.Session).where(
                 or_(
-                    models.Session.expires_at < datetime.now(timezone.utc),
+                    models.Session.expires_at < time.utc_now(),
                     models.Session.revoked == sa.true()
                 )
             )
@@ -145,7 +147,7 @@ class SessionRepository(BaseRepository):
             and_(
                 models.Session.session_id == session_id,
                 models.Session.revoked == sa.false(),
-                models.Session.expires_at > datetime.now(timezone.utc),
+                models.Session.expires_at > time.utc_now(),
             )
         )
         result = await self.db.execute(query)
