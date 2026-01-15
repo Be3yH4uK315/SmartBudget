@@ -65,5 +65,6 @@ class WorkerSettings:
     
     queue_name = settings.ARQ.ARQ_QUEUE_NAME
     redis_settings = RedisSettings.from_dsn(settings.ARQ.REDIS_URL)
-    max_tries = 5
+    max_tries = 3
     max_jobs = 20
+    keep_result = 60
