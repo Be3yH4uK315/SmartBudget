@@ -1,14 +1,13 @@
-import calendar
 import logging
-from typing import Optional
-from uuid import UUID, uuid4
+from datetime import date, datetime, timezone
 from decimal import Decimal
-from datetime import datetime, timezone, date
+from uuid import UUID, uuid4
 
-from app.infrastructure.db import models, uow
-from app.core import exceptions, config
+from app.core import config, exceptions, metrics
+from app.domain.enums import GoalEventType, GoalStatus, TransactionType
 from app.domain.schemas import api as api_schemas
 from app.domain.schemas import kafka as k_schemas
+from app.infrastructure.db import models, uow
 
 logger = logging.getLogger(__name__)
 settings = config.settings
@@ -16,46 +15,31 @@ settings = config.settings
 def _get_utc_today() -> date:
     return datetime.now(timezone.utc).date()
 
-
-def _get_days_left(finish_date: date) -> int:
-    return max((finish_date - _get_utc_today()).days, 0)
-
-def _create_outbox_event(event_type: k_schemas.GoalEventType, **kwargs) -> dict:
-    """Фабрика для создания событий Outbox."""
-    return {"event_type": event_type.value, **kwargs}
+def _create_outbox_event(
+    event_type: GoalEventType,
+    **kwargs,
+) -> dict:
+    return {
+        "event_type": event_type.value,
+        **kwargs,
+    }
 
 class GoalService:
-    """Сервис для управления целями используя Unit of Work."""
-    
-    def __init__(self, uow: uow.UnitOfWork):
-        self.uow = uow
-    
-    def _calculate_recommended_payment(self, target: Decimal, current: Decimal, finish_date: Optional[date]) -> Optional[Decimal]:
-        """Рекомендованный платеж = (Остаток / Дней до конца) * Дней в текущем месяце"""
-        if not finish_date:
-            return None
-        today = _get_utc_today()
-        if finish_date <= today:
-            return Decimal("0.00")
-        if current >= target:
-            return Decimal("0.00")
+    """Сервис для управления целями."""
 
-        remaining = target - current
-        days_left = (finish_date - today).days
-        days_in_month = calendar.monthrange(today.year, today.month)[1]
+    def __init__(self, uow_goals: uow.UnitOfWork):
+        self.uow_goals = uow_goals
 
-        if days_left <= days_in_month:
-            return remaining
+    async def create_goal(
+        self,
+        user_id: UUID,
+        request: api_schemas.CreateGoalRequest,
+    ) -> api_schemas.CreateGoalResponse:
+        if request.finish_date and request.finish_date <= _get_utc_today():
+            raise exceptions.InvalidGoalDataError(
+                "Finish date must be in the future"
+            )
 
-        daily_need = remaining / Decimal(days_left)
-        monthly_payment = daily_need * Decimal(days_in_month)
-        return monthly_payment.quantize(Decimal("0.01"))
-
-    async def create_goal(self, user_id: UUID, request: api_schemas.CreateGoalRequest) -> api_schemas.CreateGoalResponse:
-        """Создание новой цели."""
-        if request.finish_date <= _get_utc_today():
-            raise exceptions.InvalidGoalDataError("Finish date must be in the future")
-        
         goal = models.Goal(
             goal_id=uuid4(),
             user_id=user_id,
@@ -63,222 +47,361 @@ class GoalService:
             target_value=request.target_value,
             current_value=Decimal("0"),
             finish_date=request.finish_date,
-            status=api_schemas.GoalStatus.ONGOING.value,
-            tags=request.tags
+            status=GoalStatus.ONGOING.value,
+            tags=request.tags,
         )
-        
-        async with self.uow:
-            self.uow.goals.create(goal)
-            
+
+        async with self.uow_goals:
+            self.uow_goals.goals.create(goal)
+
             event_data = _create_outbox_event(
-                k_schemas.GoalEventType.CREATED,
+                GoalEventType.CREATED,
                 goal_id=str(goal.goal_id),
                 user_id=str(user_id),
                 name=goal.name,
                 target_value=goal.target_value,
-                finish_date=goal.finish_date
+                finish_date=goal.finish_date,
             )
-            await self.uow.goals.add_outbox_event(
+
+            await self.uow_goals.goals.add_outbox_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
                 event_data=event_data,
             )
-            return api_schemas.CreateGoalResponse(goal_id=goal.goal_id)
 
-    async def get_goal_details(self, user_id: UUID, goal_id: UUID) -> api_schemas.GoalResponse:
-        """Получение детальной информации о цели."""
-        async with self.uow:
-            goal = await self.uow.goals.get_by_id(user_id, goal_id)
+        metrics.GOALS_CREATED_TOTAL.inc()
+        return api_schemas.CreateGoalResponse(goal_id=goal.goal_id)
+
+    async def get_goal_details(
+        self,
+        user_id: UUID,
+        goal_id: UUID,
+    ) -> api_schemas.GoalResponse:
+        async with self.uow_goals:
+            goal = await self.uow_goals.goals.get_by_id(user_id, goal_id)
+
             if not goal:
                 raise exceptions.GoalNotFoundError("Goal not found")
-            rec_payment = self._calculate_recommended_payment(goal.target_value, goal.current_value, goal.finish_date)
+
+            rec_payment = goal.calculate_recommended_payment()
+            days_left = goal.days_left
 
             response = api_schemas.GoalResponse.model_validate(goal)
-            return response.model_copy(
-                update={
-                    "days_left": _get_days_left(goal.finish_date),
-                    "recommended_payment": rec_payment,
-                }
-            )
 
-    async def get_main_goals(self, user_id: UUID) -> api_schemas.MainGoalsResponse:
-        """Получение целей для главного экрана."""
-        async with self.uow:
-            goals = await self.uow.goals.get_main_goals(user_id)
-            return api_schemas.MainGoalsResponse(
-                goals=[api_schemas.MainGoalInfo.model_validate(goal) for goal in goals]
-            )
+        return response.model_copy(
+            update={
+                "days_left": days_left,
+                "recommended_payment": rec_payment,
+            }
+        )
+
+    async def get_main_goals(
+        self,
+        user_id: UUID,
+    ) -> api_schemas.MainGoalsResponse:
+        async with self.uow_goals:
+            goals = await self.uow_goals.goals.get_main_goals(user_id)
+
+        return api_schemas.MainGoalsResponse(
+            goals=[
+                api_schemas.MainGoalInfo.model_validate(goal)
+                for goal in goals
+            ]
+        )
 
     async def get_all_goals(
         self,
-        user_id: UUID
+        user_id: UUID,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[api_schemas.AllGoalsResponse]:
-        async with self.uow:
-            goals = await self.uow.goals.get_all_goals(user_id)
-            return [api_schemas.AllGoalsResponse.model_validate(goal) for goal in goals]
+        async with self.uow_goals:
+            goals = await self.uow_goals.goals.get_all_goals(
+                user_id,
+                limit=limit,
+                offset=offset,
+            )
+
+        return [
+            api_schemas.AllGoalsResponse.model_validate(goal)
+            for goal in goals
+        ]
 
     async def update_goal(
-        self, user_id: UUID, goal_id: UUID, request: api_schemas.GoalPatchRequest
+        self,
+        user_id: UUID,
+        goal_id: UUID,
+        request: api_schemas.GoalPatchRequest,
     ) -> api_schemas.GoalResponse:
-        """Обновление цели."""
-        async with self.uow:
-            goal = await self.uow.goals.get_by_id(user_id, goal_id)
-            if not goal:
+        async with self.uow_goals:
+            goal = await self.uow_goals.goals.get_for_update(goal_id)
+
+            if not goal or goal.user_id != user_id:
                 raise exceptions.GoalNotFoundError("Goal not found")
 
             update_data = request.model_dump(exclude_unset=True)
-            if not update_data:
-                rec_payment = self._calculate_recommended_payment(goal.target_value, goal.current_value, goal.finish_date)
-                response = api_schemas.GoalResponse.model_validate(goal)
-                return response.model_copy(
-                    update={
-                        "days_left": _get_days_left(goal.finish_date),
-                        "recommended_payment": rec_payment,
-                    }
-                )
-            
-            if "finish_date" in update_data and update_data["finish_date"]:
-                if update_data["finish_date"] <= _get_utc_today():
-                    raise exceptions.InvalidGoalDataError("Finish date must be in the future")
 
-            changes_for_db = {}
-            changes_for_kafka = {}
+            if (
+                "finish_date" in update_data
+                and update_data["finish_date"]
+                and update_data["finish_date"] <= _get_utc_today()
+            ):
+                raise exceptions.InvalidGoalDataError(
+                    "Finish date must be in the future"
+                )
+
+            changes_for_db: dict = {}
+            changes_for_kafka: dict = {}
+
             for field, value in update_data.items():
-                if value is None and field != 'finish_date': continue
-                db_value = value.value if isinstance(value, api_schemas.GoalStatus) else value
-                if isinstance(db_value, str): db_value = db_value.strip()
+                if value is None and field != "finish_date":
+                    continue
+
+                db_value = value.value if isinstance(value, GoalStatus) else value
+
+                if isinstance(db_value, str):
+                    db_value = db_value.strip()
+
                 changes_for_db[field] = db_value
                 changes_for_kafka[field] = db_value
-            
+
             if changes_for_db:
-                goal = await self.uow.goals.update_fields(user_id, goal_id, changes_for_db)
-                await self._check_and_process_achievement_in_uow(goal)
+                goal = await self.uow_goals.goals.update_fields(
+                    user_id,
+                    goal_id,
+                    changes_for_db,
+                )
 
-                if changes_for_kafka:
-                    event = _create_outbox_event(
-                        k_schemas.GoalEventType.CHANGED,
-                        goal_id=str(goal_id),
-                        changes=changes_for_kafka
-                    )
-                    await self.uow.goals.add_outbox_event(
-                        topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                        event_data=event
-                    )
+                await self._check_and_process_achievement_in_uow_goals(goal)
 
-            rec_payment = self._calculate_recommended_payment(goal.target_value, goal.current_value, goal.finish_date)
+            if changes_for_kafka:
+                event = _create_outbox_event(
+                    GoalEventType.CHANGED,
+                    goal_id=str(goal_id),
+                    changes=changes_for_kafka,
+                )
+
+                await self.uow_goals.goals.add_outbox_event(
+                    topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                    event_data=event,
+                )
+
+            rec_payment = goal.calculate_recommended_payment()
+            days_left = goal.days_left
+
             response = api_schemas.GoalResponse.model_validate(goal)
-            return response.model_copy(
-                update={
-                    "days_left": _get_days_left(goal.finish_date),
-                    "recommended_payment": rec_payment,
-                }
+
+        return response.model_copy(
+            update={
+                "days_left": days_left,
+                "recommended_payment": rec_payment,
+            }
+        )
+
+    async def update_goal_balance(
+        self,
+        event: k_schemas.TransactionEvent,
+    ) -> None:
+        value_change = event.value * (
+            Decimal("1")
+            if event.type == TransactionType.INCOME
+            else Decimal("-1")
+        )
+
+        async with self.uow_goals:
+            goal = await self.uow_goals.goals.adjust_balance(
+                event.user_id,
+                event.goal_id,
+                value_change,
+                event.transaction_id,
             )
 
-    async def update_goal_balance(self, event: k_schemas.TransactionEvent) -> None:
-        """Обработка события изменения баланса из Kafka (идемпотентная)."""
-        value_change = event.value * (Decimal(1) if event.type == k_schemas.TransactionType.INCOME else Decimal(-1))
-        
-        async with self.uow:
-            goal = await self.uow.goals.adjust_balance(
-                event.user_id, event.goal_id, value_change, event.transaction_id
-            )
             if goal is None:
-                logger.info(f"Transaction {event.transaction_id} duplicate. Skipping.")
+                logger.info(
+                    "Transaction %s skipped (duplicate or closed goal).",
+                    event.transaction_id,
+                )
                 return
 
             update_event = _create_outbox_event(
-                k_schemas.GoalEventType.UPDATED,
+                GoalEventType.UPDATED,
                 goal_id=str(goal.goal_id),
                 current_value=goal.current_value,
-                status=goal.status
+                status=goal.status,
             )
-            await self.uow.goals.add_outbox_event(
+
+            await self.uow_goals.goals.add_outbox_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                event_data=update_event
+                event_data=update_event,
             )
-            await self._check_and_process_achievement_in_uow(goal)
 
-    async def _check_and_process_achievement_in_uow(self, goal: models.Goal) -> bool:
-        """Внутренний метод, работает в контексте текущего UoW."""
-        achieved_goal = await self.uow.goals.mark_achieved_if_eligible(goal.user_id, goal.goal_id)
-        
-        if achieved_goal:
-            goal.status = achieved_goal.status
+            achieved_goal = await self.uow_goals.goals.mark_achieved_atomically(
+                event.user_id,
+                event.goal_id,
+            )
+
+            if achieved_goal:
+                event_achieved = _create_outbox_event(
+                    GoalEventType.ALERT,
+                    goal_id=str(achieved_goal.goal_id),
+                    days_left=0,
+                )
+
+                await self.uow_goals.goals.add_outbox_event(
+                    topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                    event_data=event_achieved,
+                )
+
+                duration = (
+                    datetime.now(timezone.utc) - achieved_goal.created_at
+                ).total_seconds()
+                metrics.GOAL_ACHIEVEMENT_TIME.observe(duration)
+
+                logger.info("Goal %s achieved", achieved_goal.goal_id)
+            else:
+                reverted_goal = (
+                    await self.uow_goals.goals.revert_achievement_atomically(
+                        event.user_id,
+                        event.goal_id,
+                    )
+                )
+                if reverted_goal:
+                    logger.info(
+                        "Goal %s reverted to ONGOING",
+                        reverted_goal.goal_id,
+                    )
+
+    async def _check_and_process_achievement_in_uow_goals(
+        self,
+        goal: models.Goal,
+    ) -> bool:
+        if goal.check_achievement():
             event = _create_outbox_event(
-                k_schemas.GoalEventType.ALERT,
+                GoalEventType.ALERT,
                 goal_id=str(goal.goal_id),
-                days_left=0
+                days_left=0,
             )
-            await self.uow.goals.add_outbox_event(
+
+            await self.uow_goals.goals.add_outbox_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                event_data=event
+                event_data=event,
             )
-            logger.info(f"Goal {goal.goal_id} achieved")
+
+            duration = (
+                datetime.now(timezone.utc) - goal.created_at
+            ).total_seconds()
+            metrics.GOAL_ACHIEVEMENT_TIME.observe(duration)
+
+            logger.info("Goal %s achieved", goal.goal_id)
             return True
 
-        elif goal.current_value < goal.target_value and goal.status == api_schemas.GoalStatus.ACHIEVED.value:
-            new_status = api_schemas.GoalStatus.ONGOING.value
-            await self.uow.goals.update_fields(
-                user_id=goal.user_id, 
-                goal_id=goal.goal_id, 
-                changes={"status": new_status}
+        if goal.revert_achievement_if_needed():
+            logger.info(
+                "Goal %s reverted to ONGOING",
+                goal.goal_id,
             )
-            goal.status = new_status
-            logger.info(f"Goal {goal.goal_id} reverted to ONGOING")
             return True
+
         return False
 
     async def check_deadlines(self) -> None:
-        """Крон-задача для проверки сроков целей (запускается ежедневно)."""
         logger.info("Starting daily deadline check task...")
         today = _get_utc_today()
         batch_size = 500
         last_id: UUID | None = None
 
         while True:
-            async with self.uow:
-                batch = await self.uow.goals.get_expired_goals_batch(today=today, limit=batch_size, last_id=last_id)
-                if not batch: break
-                
+            async with self.uow_goals:
+                batch = await self.uow_goals.goals.get_expired_goals_batch(
+                    today=today,
+                    limit=batch_size,
+                    last_id=last_id,
+                )
+
+                if not batch:
+                    break
+
                 last_id = batch[-1].goal_id
-                outbox_events = []
-                expired_goal_ids = []
+
+                outbox_events: list[dict] = []
+                expired_goal_ids: list[UUID] = []
 
                 for goal in batch:
-                    if not goal.finish_date: continue
-                    outbox_events.append({
-                        "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                        "payload": _create_outbox_event(k_schemas.GoalEventType.UPDATED, goal_id=str(goal.goal_id), status=api_schemas.GoalStatus.EXPIRED.value)
-                    })
-                    outbox_events.append({
-                        "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                        "payload": _create_outbox_event(k_schemas.GoalEventType.EXPIRED, goal_id=str(goal.goal_id), days_left=0)
-                    })
+                    if not goal.finish_date:
+                        continue
+
+                    outbox_events.append(
+                        {
+                            "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                            "payload": _create_outbox_event(
+                                GoalEventType.UPDATED,
+                                goal_id=str(goal.goal_id),
+                                status=GoalStatus.EXPIRED.value,
+                            ),
+                        }
+                    )
+                    outbox_events.append(
+                        {
+                            "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                            "payload": _create_outbox_event(
+                                GoalEventType.EXPIRED,
+                                goal_id=str(goal.goal_id),
+                                days_left=0,
+                            ),
+                        }
+                    )
+
                     expired_goal_ids.append(goal.goal_id)
 
                 if outbox_events:
-                    await self.uow.goals.add_outbox_events(outbox_events)
+                    await self.uow_goals.goals.add_outbox_events(outbox_events)
+
                 if expired_goal_ids:
-                    await self.uow.goals.bulk_update_status(expired_goal_ids, api_schemas.GoalStatus.EXPIRED.value)
-                logger.info(f"Processed batch of {len(batch)} expired goals.")
+                    await self.uow_goals.goals.bulk_update_status(
+                        expired_goal_ids,
+                        GoalStatus.EXPIRED.value,
+                    )
+
+            logger.info(
+                "Processed batch of %s expired goals.",
+                len(batch),
+            )
 
         while True:
-            async with self.uow:
-                approaching_batch = await self.uow.goals.get_approaching_goals_batch(today, limit=batch_size)
-                if not approaching_batch: break
-                
-                outbox_events = []
-                checked_ids = []
+            async with self.uow_goals:
+                approaching_batch = await self.uow_goals.goals.get_approaching_goals_batch(
+                    today,
+                    limit=batch_size,
+                )
+
+                if not approaching_batch:
+                    break
+
+                outbox_events: list[dict] = []
+                checked_ids: list[UUID] = []
 
                 for goal in approaching_batch:
-                    days_left = _get_days_left(goal.finish_date)
-                    outbox_events.append({
-                        "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                        "payload": _create_outbox_event(k_schemas.GoalEventType.APPROACHING, goal_id=str(goal.goal_id), type="approaching", days_left=days_left)
-                    })
+                    days_left = goal.days_left
+
+                    outbox_events.append(
+                        {
+                            "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                            "payload": _create_outbox_event(
+                                GoalEventType.APPROACHING,
+                                goal_id=str(goal.goal_id),
+                                type="approaching",
+                                days_left=days_left,
+                            ),
+                        }
+                    )
                     checked_ids.append(goal.goal_id)
 
                 if outbox_events:
-                    await self.uow.goals.add_outbox_events(outbox_events)
+                    await self.uow_goals.goals.add_outbox_events(outbox_events)
+
                 if checked_ids:
-                    await self.uow.goals.update_last_checked(checked_ids)
-                logger.info(f"Processed batch of {len(approaching_batch)} approaching goals.")
+                    await self.uow_goals.goals.update_last_checked(checked_ids)
+
+            logger.info(
+                "Processed batch of %s approaching goals.",
+                len(approaching_batch),
+            )
