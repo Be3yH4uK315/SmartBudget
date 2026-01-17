@@ -92,6 +92,10 @@ class Goal(Base):
         return max((self.finish_date - today).days, 0)
 
     def calculate_recommended_payment(self) -> Decimal | None:
+        """
+        Считает рекомендуемый платеж в этом месяце.
+        Формула: (Остаток / Всего дней) * Дней до конца месяца
+        """
         if not self.finish_date:
             return None
 
@@ -105,13 +109,20 @@ class Goal(Base):
             return Decimal("0.00")
 
         days_total_left = (self.finish_date - today).days
-        days_in_month = calendar.monthrange(today.year, today.month)[1]
+        if days_total_left == 0: 
+             return remaining
 
-        if days_total_left <= days_in_month:
-            return remaining
+        last_day_of_month = calendar.monthrange(today.year, today.month)[1]
+        date_end_of_month = today.replace(day=last_day_of_month)
+        
+        days_left_in_current_month = (date_end_of_month - today).days
+        
+        days_to_count = min(days_left_in_current_month, days_total_left)
+        if days_to_count <= 0:
+             return Decimal("0.00")
 
         daily_need = remaining / Decimal(days_total_left)
-        monthly_payment = daily_need * Decimal(days_in_month)
+        monthly_payment = daily_need * Decimal(days_to_count)
 
         return monthly_payment.quantize(Decimal("0.01"))
 
