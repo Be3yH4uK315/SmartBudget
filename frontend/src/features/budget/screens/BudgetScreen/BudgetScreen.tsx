@@ -73,7 +73,7 @@ export default function BudgetScreen() {
     }
   }, [dispatch])
 
-  const handleRedirect = () => navigate(ROUTES.PAGES.BUDGET_SETTINGS)
+  const handleRedirect = () => navigate(ROUTES.PAGES.SETTINGS.BUDGET)
 
   const settingsButtonTitle = translate('settingsButtonTitle')
   const settingsButtonSubtitle = translate('settingsButtonSubtitle')
