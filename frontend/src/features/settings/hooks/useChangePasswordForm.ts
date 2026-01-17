@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { changePassword } from '@features/settings/store/security'
 import { ChangePasswordErrors, ChangePasswordFormValues } from '@features/settings/types'
+import { useTranslate } from '@shared/hooks'
 import { dispatch } from '@shared/store'
 
 export function useChangePasswordFrom() {
+  const translate = useTranslate('Settings.Security.ChangePassword.Errors')
+
   const [values, setValues] = useState<ChangePasswordFormValues>({
     password: '',
     newPassword: '',
@@ -23,17 +26,17 @@ export function useChangePasswordFrom() {
     if (!password) newErrors.password = ''
 
     if (!!password && newPassword.length < 8) {
-      newErrors.newPassword = 'Пароль должен содержать минимум 8 символов'
+      newErrors.newPassword = translate('tooShortPassword')
     }
 
     if (!!newPassword && !newPasswordConfirm) {
-      newErrors.newPasswordConfirm = 'Подтвердите пароль'
+      newErrors.newPasswordConfirm = translate('confirmPassword')
     } else if (newPassword !== newPasswordConfirm) {
-      newErrors.newPasswordConfirm = 'Пароли не совпадают'
+      newErrors.newPasswordConfirm = translate('passwordsNotMatch')
     }
 
     return newErrors
-  }, [values])
+  }, [values, translate])
 
   const canSubmit = Object.keys(errors).length === 0
 
