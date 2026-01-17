@@ -1,6 +1,9 @@
 import { ComponentType, PropsWithChildren } from 'react'
-import { Container, SkeletonProps, SxProps, Typography } from '@mui/material'
-import { ScrollToTop } from '../ScrollToTop'
+import { ArrowBackOutlined } from '@mui/icons-material'
+import { Container, IconButton, SkeletonProps, SxProps, Typography } from '@mui/material'
+import { ScrollToTop } from '@shared/components'
+import { useTranslate } from '@shared/hooks'
+import { useNavigate } from 'react-router'
 import { ScreenSkeleton } from './ScreenSkeleton'
 
 type Props = PropsWithChildren<{
@@ -8,6 +11,7 @@ type Props = PropsWithChildren<{
   noScrollButton?: boolean
   ContentSkeleton?: ComponentType<SkeletonProps>
   isLoading?: boolean
+  isBackButton?: boolean
   containerSx?: SxProps
 }>
 
@@ -17,8 +21,16 @@ export const ScreenContent = ({
   ContentSkeleton,
   children,
   isLoading = false,
+  isBackButton = false,
   noScrollButton = false,
 }: Props) => {
+  const navigate = useNavigate()
+  const translate = useTranslate('ScreenContentComponent')
+
+  const handleClose = () => {
+    navigate(-1)
+  }
+
   return (
     <Container
       maxWidth={'lg'}
@@ -36,6 +48,25 @@ export const ScreenContent = ({
         <ScreenSkeleton>{ContentSkeleton}</ScreenSkeleton>
       ) : (
         <>
+          {isBackButton && (
+            <IconButton
+              onClick={handleClose}
+              sx={{
+                display: 'flex',
+                justifyContent: 'flex-start',
+                width: 'max-content',
+                borderRadius: '6px',
+                gap: 1,
+                left: -10,
+                color: 'text.primary',
+              }}
+            >
+              <ArrowBackOutlined />
+
+              <Typography>{translate('goBack')}</Typography>
+            </IconButton>
+          )}
+
           {title && (
             <Typography
               noWrap
