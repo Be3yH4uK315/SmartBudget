@@ -90,11 +90,17 @@ class GoalRepository:
             else_=5,
         )
 
+        priority_order = case(
+            (models.Goal.tags.contains(["High priority"]), 1),
+            (models.Goal.tags.contains(["Medium priority"]), 2),
+            (models.Goal.tags.contains(["Low priority"]), 3),
+            else_=4,
+        )
+
         completion_percentage = case(
             (
                 models.Goal.target_value > 0,
-                models.Goal.current_value
-                / models.Goal.target_value,
+                models.Goal.current_value / models.Goal.target_value,
             ),
             else_=0,
         )
@@ -104,6 +110,7 @@ class GoalRepository:
             .where(models.Goal.user_id == user_id)
             .order_by(
                 status_priority.asc(),
+                priority_order.asc(),
                 completion_percentage.desc(),
             )
             .limit(limit)
