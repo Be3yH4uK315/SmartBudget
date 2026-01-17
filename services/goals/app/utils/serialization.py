@@ -22,7 +22,7 @@ def to_json_str(data: Any) -> str:
     return orjson.dumps(
         data, 
         default=app_default, 
-        option=orjson.OPT_NON_STR_KEYS
+        option=orjson.OPT_NON_STR_KEYS | orjson.OPT_UTC_Z
     ).decode('utf-8')
 
 def to_json_bytes(data: Any) -> bytes:
@@ -32,7 +32,7 @@ def to_json_bytes(data: Any) -> bytes:
     return orjson.dumps(
         data, 
         default=app_default,
-        option=orjson.OPT_NON_STR_KEYS
+        option=orjson.OPT_NON_STR_KEYS | orjson.OPT_UTC_Z
     )
 
 def recursive_normalize(obj: Any) -> Any:
