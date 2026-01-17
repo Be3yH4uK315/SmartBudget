@@ -73,3 +73,6 @@ class SessionInfo(CamelModel):
 
 class AllSessionsResponse(CamelModel):
     sessions: list[SessionInfo]
+
+class RetentionInfo(CamelModel):
+    days: int = Field(..., description="Текущий срок жизни сессий (в днях)")

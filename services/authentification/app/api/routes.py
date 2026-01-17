@@ -256,6 +256,17 @@ async def update_retention_settings(
     )
 
 
+@router.get(
+    "/me/retention",
+    status_code=200,
+    response_model=schemas.RetentionInfo
+)
+async def get_retention_settings(
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+):
+    return schemas.RetentionInfo(days=user.retention_days)
+
+
 @router.get("/sessions", status_code=200, response_model=schemas.AllSessionsResponse)
 async def get_all_user_sessions(
     request: Request,
