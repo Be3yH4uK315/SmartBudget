@@ -4,6 +4,10 @@ import { Session } from './settings'
 export type SecuritySliceState = {
   sessions: Session[]
   isLoading: boolean
+
+  refreshTokenDuration: number
+  isRefreshLoading: boolean
+
   isDeleteLoading: boolean
   isPasswordChanging: boolean
 }

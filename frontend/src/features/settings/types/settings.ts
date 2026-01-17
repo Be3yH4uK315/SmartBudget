@@ -1,6 +1,6 @@
 export type Session = {
   sessionId: string
-  isCurrentSession: boolean
+  isCurrent: boolean
   ip: string
   location: string
   deviceName: string
@@ -13,9 +13,14 @@ export type changePasswordApiRequest = {
 }
 
 export type ChangePasswordFormValues = {
-  password: ''
-  newPassword: ''
-  newPasswordConfirm: ''
+  password: string
+  newPassword: string
+  newPasswordConfirm: string
 }
 
 export type ChangePasswordErrors = Partial<Record<keyof ChangePasswordFormValues, string>>
+
+export type RefreshTokenFormItem = {
+  label: string
+  value: number
+}
