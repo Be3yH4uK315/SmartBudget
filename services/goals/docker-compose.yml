@@ -110,7 +110,7 @@ services:
       "
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health/live"]
       interval: 10s
       retries: 3
       start_period: 20s
