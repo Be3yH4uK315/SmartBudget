@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import ORJSONResponse
 from prometheus_client import make_asgi_app
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -42,6 +42,7 @@ app = FastAPI(
     title="Goals Service",
     version="1.0",
     lifespan=lifespan,
+    default_response_class=ORJSONResponse,
     docs_url="/api/v1/goals/docs",
     openapi_url="/api/v1/goals/openapi.json",
 )
@@ -80,7 +81,7 @@ async def goal_service_exception_handler(
         exc,
     )
 
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=status_code,
         content={"detail": str(exc)},
     )
@@ -97,7 +98,7 @@ async def db_error_handler(
         exc_info=True,
     )
 
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
     )
@@ -114,7 +115,7 @@ async def general_exception_handler(
         exc_info=True,
     )
 
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
     )
