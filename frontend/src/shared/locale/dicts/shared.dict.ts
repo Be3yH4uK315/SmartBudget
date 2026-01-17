@@ -21,6 +21,10 @@ export const sharedDict: LocaleDictionary = {
       expense: 'Расходы',
       fallback: 'Нет операций за текущий период',
     },
+
+    ScreenContentComponent: {
+      goBack: 'Назад',
+    },
   },
 
   en: {
@@ -42,6 +46,10 @@ export const sharedDict: LocaleDictionary = {
       income: 'Income',
       expense: 'Expense',
       fallback: 'No transactions for the current period',
+    },
+
+    ScreenContentComponent: {
+      goBack: 'Back',
     },
   },
 }
