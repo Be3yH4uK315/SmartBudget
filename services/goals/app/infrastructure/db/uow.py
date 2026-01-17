@@ -1,21 +1,24 @@
 from contextlib import asynccontextmanager
 from typing import Self
 
-from app.infrastructure.db import repositories
+from app.infrastructure.db.repositories import GoalRepository
 
 class UnitOfWork:
     """
-    Паттерн Unit of Work. 
-    Обеспечивает атомарность операций и инкапсулирует работу с транзакциями.
+    Паттерн Unit of Work.
+    Управляет жизненным циклом сессии и транзакцией.
     """
     
     def __init__(self, session_factory):
         self.session_factory = session_factory
         self._session = None
-        self._repositories = {}
+        self._committed = False
+        self._repositories: dict[type, object] = {}
 
     async def __aenter__(self) -> Self:
         self._session = self.session_factory()
+        self._repositories = {}
+        self._committed = False
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -24,25 +27,60 @@ class UnitOfWork:
         try:
             if exc_type:
                 await self._session.rollback()
-            else:
+            elif not self._committed:
                 await self._session.commit()
         finally:
             await self._session.close()
+    
+    @property
+    def session(self):
+        """Возвращает текущую сессию SQLAlchemy."""
+        if self._session is None:
+             raise RuntimeError("UoW not started. Use 'async with uow: ...'")
+        return self._session
+
+    async def commit(self) -> None:
+        """Ручной коммит транзакции."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.commit()
+        self._committed = True
+    
+    async def rollback(self) -> None:
+        """Ручной откат транзакции."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.rollback()
+    
+    async def flush(self) -> None:
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.flush()
+    
+    async def refresh(self, instance: object, attribute_names: list[str] | None = None) -> None:
+        """Метод для обновления состояния объекта из базы данных."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.refresh(instance, attribute_names)
 
     @asynccontextmanager
     async def make_savepoint(self):
-        """
-        Создает точку сохранения (вложенную транзакцию).
-        """
+        """Создает точку сохранения (вложенную транзакцию)."""
         if self._session is None:
             raise RuntimeError("UoW not started")
             
         async with self._session.begin_nested():
             yield
+    
+    def _get_repository(self, repo_cls):
+        """Инициализация репозитория."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+
+        if repo_cls not in self._repositories:
+            self._repositories[repo_cls] = repo_cls(self._session)
+        return self._repositories[repo_cls]
 
     @property
-    def goals(self) -> repositories.GoalRepository:
-        if self._session is None: raise RuntimeError("UoW not started")
-        if repositories.GoalRepository not in self._repositories:
-            self._repositories[repositories.GoalRepository] = repositories.GoalRepository(self._session)
-        return self._repositories[repositories.GoalRepository]
+    def goals(self) -> GoalRepository:
+        return self._get_repository(GoalRepository)
