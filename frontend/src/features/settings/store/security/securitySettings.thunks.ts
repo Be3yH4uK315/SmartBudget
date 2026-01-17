@@ -6,7 +6,7 @@ import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getSessions = createAsyncThunk<
-  Session[],
+  { sessions: Session[] },
   void,
   { state: RootState; rejectWithValue: string }
 >('getSessions', async (_, { rejectWithValue }) => {
@@ -66,5 +66,37 @@ export const changePassword = createAsyncThunk<
     showToast({ messageKey: 'cannotChangePassword', type: 'error' })
 
     return rejectWithValue('cannotChangePassword')
+  }
+})
+
+export const setRefreshTokenDuration = createAsyncThunk<
+  void,
+  { days: number },
+  { state: RootState; rejectWithValue: string }
+>('setRefreshTokenDuration', async ({ days }, { rejectWithValue }) => {
+  try {
+    await settingsMock.setRefreshTokenDuration(days)
+
+    showToast({ messageKey: 'refreshTokenDurationChanged', type: 'success' })
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotChangeRefreshTokenDuration', type: 'error' })
+
+    return rejectWithValue('cannotChangeRefreshTokenDuration')
+  }
+})
+
+export const getRefreshTokenDuration = createAsyncThunk<
+  { days: number },
+  void,
+  { state: RootState; rejectWithValue: string }
+>('getRefreshTokenDuration', async (_, { rejectWithValue }) => {
+  try {
+    const response = await settingsMock.getRefreshTokenDuration()
+
+    return response
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotGetRefreshTokenDuration', type: 'error' })
+
+    return rejectWithValue('cannotGetRefreshTokenDuration')
   }
 })

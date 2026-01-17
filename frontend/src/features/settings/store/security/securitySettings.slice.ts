@@ -6,7 +6,9 @@ import {
   changePassword,
   deleteOtherSessions,
   deleteSession,
+  getRefreshTokenDuration,
   getSessions,
+  setRefreshTokenDuration,
 } from './securitySettings.thunks'
 
 export const securitySlice = createSlice<
@@ -27,7 +29,7 @@ export const securitySlice = createSlice<
     builder
       .addCase(getSessions.fulfilled, (state, { payload }) => {
         state.isLoading = false
-        state.sessions = payload
+        state.sessions = payload.sessions
       })
 
       .addCase(getSessions.rejected, (state) => {
@@ -53,7 +55,7 @@ export const securitySlice = createSlice<
 
       .addCase(deleteOtherSessions.fulfilled, (state) => {
         state.isDeleteLoading = false
-        state.sessions = state.sessions.filter((s) => s.isCurrentSession)
+        state.sessions = state.sessions.filter((s) => s.isCurrent)
       })
 
       .addCase(deleteOtherSessions.rejected, (state) => {
@@ -74,6 +76,28 @@ export const securitySlice = createSlice<
 
       .addCase(changePassword.pending, (state) => {
         state.isPasswordChanging = true
+      })
+
+      .addCase(getRefreshTokenDuration.fulfilled, (state, { payload }) => {
+        state.refreshTokenDuration = payload.days
+        state.isRefreshLoading = false
+      })
+      .addCase(getRefreshTokenDuration.rejected, (state) => {
+        state.isRefreshLoading = false
+      })
+      .addCase(getRefreshTokenDuration.pending, (state) => {
+        state.isRefreshLoading = true
+      })
+
+      .addCase(setRefreshTokenDuration.fulfilled, (state, { meta }) => {
+        state.refreshTokenDuration = meta.arg.days
+        state.isRefreshLoading = false
+      })
+      .addCase(setRefreshTokenDuration.rejected, (state) => {
+        state.isRefreshLoading = false
+      })
+      .addCase(setRefreshTokenDuration.pending, (state) => {
+        state.isRefreshLoading = true
       })
   },
 })

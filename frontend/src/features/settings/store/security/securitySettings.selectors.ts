@@ -7,3 +7,5 @@ export const selectIsPasswordChanging = sliceStateSelector((state) => state.isPa
 export const selectSessions = sliceStateSelector((state) => state.sessions)
 export const selectIsSessionsLoading = sliceStateSelector((state) => state.isLoading)
 export const selectIsDeleteLoading = sliceStateSelector((state) => state.isDeleteLoading)
+export const selectIsRefreshLoading = sliceStateSelector((state) => state.isRefreshLoading)
+export const selectRefreshTokenDuration = sliceStateSelector((state) => state.refreshTokenDuration)
