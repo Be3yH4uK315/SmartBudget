@@ -1,3 +1,4 @@
+import React from 'react'
 import { deleteSession } from '@features/settings/store/security'
 import { Session } from '@features/settings/types'
 import { Box, Button, Stack, Typography } from '@mui/material'
@@ -10,12 +11,12 @@ type Props = {
   isLoading: boolean
 }
 
-export const SessionItem = ({ session, isLoading }: Props) => {
+export const SessionItem = React.memo(({ session, isLoading }: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Settings.Security.Sessions')
 
   const date = dayjs(session.lastActivity).format('DD MMMM YYYY')
-  const time = dayjs(session.lastActivity).format('hh:mm').split(' ')
+  const time = dayjs(session.lastActivity).format('HH:mm').split(' ')
 
   const title = [session.deviceName, session.location, session.ip].join(', ')
   const lastActivity = translate('lastActivity', {
@@ -44,12 +45,12 @@ export const SessionItem = ({ session, isLoading }: Props) => {
       spacing={2}
     >
       <Stack>
-        <Typography variant="caption">{title}</Typography>
+        <Typography>{title}</Typography>
 
         <Typography variant="caption">{lastActivity}</Typography>
       </Stack>
 
-      {session.isCurrentSession && (
+      {session.isCurrent && (
         <Box
           sx={{
             display: 'flex',
@@ -60,15 +61,21 @@ export const SessionItem = ({ session, isLoading }: Props) => {
             textAlign: 'center',
           }}
         >
-          <Typography variant="caption">{translate('current')}</Typography>
+          <Typography variant="caption" sx={{ color: '#333' }}>
+            {translate('current')}
+          </Typography>
         </Box>
       )}
 
-      {!session.isCurrentSession && (
-        <Button disabled={isLoading} sx={{ height: 'min-content' }} onClick={handleDeleteSession}>
+      {!session.isCurrent && (
+        <Button
+          disabled={isLoading}
+          sx={{ height: 'min-content', color: 'error.main', '&:hover': { color: 'error.dark' } }}
+          onClick={handleDeleteSession}
+        >
           {translate('deleteSession')}
         </Button>
       )}
     </Stack>
   )
-}
+})
