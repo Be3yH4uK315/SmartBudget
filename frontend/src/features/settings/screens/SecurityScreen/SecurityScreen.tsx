@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import {
   clearSecurityState,
   deleteOtherSessions,
+  getRefreshTokenDuration,
   getSessions,
   selectIsDeleteLoading,
   selectIsSessionsLoading,
@@ -12,6 +13,8 @@ import { ScreenContent, StyledPaper } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { ChangePasswordBlock } from './ChangePasswordBlock'
+import { RefreshTokenDurationBlock } from './RefreshTokenDurationBlock'
+import { SecurityScreenSkeleton } from './SecurityScreenSkeleton'
 import { SessionItem } from './SessionItem'
 
 export default function SecurityScreen() {
@@ -24,42 +27,61 @@ export default function SecurityScreen() {
 
   useEffect(() => {
     dispatch(getSessions())
+    dispatch(getRefreshTokenDuration())
   }, [dispatch])
 
   useEffect(() => {
     return () => {
       dispatch(clearSecurityState())
     }
-  }, [])
+  }, [dispatch])
 
   const handleDeleteOtherSessions = () => {
     dispatch(deleteOtherSessions())
   }
 
   return (
-    <ScreenContent title={translate('title')} isLoading={isLoading}>
-      <Stack spacing={2}>
+    <ScreenContent
+      title={translate('title')}
+      isLoading={isLoading}
+      ContentSkeleton={SecurityScreenSkeleton}
+      isBackButton
+    >
+      <Stack spacing={2} sx={{ maxWidth: { xs: '100%', md: '70%' } }}>
         <ChangePasswordBlock />
 
-        <StyledPaper paperSx={{ gap: 2 }} elevation={0}>
-          <Typography variant="h4">{translate('Sessions.title')}</Typography>
+        <RefreshTokenDurationBlock />
 
-          <Stack spacing={2}>
-            {sessions.map((session) => {
-              return (
-                <SessionItem
-                  key={session.sessionId}
-                  session={session}
-                  isLoading={isDeleteLoading}
-                />
-              )
-            })}
+        {sessions.length > 0 && (
+          <StyledPaper paperSx={{ gap: 2 }} elevation={0}>
+            <Typography variant="h4">{translate('Sessions.title')}</Typography>
 
-            <Button onClick={handleDeleteOtherSessions} sx={{ color: 'error.main' }}>
-              {translate('deleteOtherSessions')}
-            </Button>
-          </Stack>
-        </StyledPaper>
+            <Stack spacing={2}>
+              {sessions.map((session) => {
+                return (
+                  <SessionItem
+                    key={session.sessionId}
+                    session={session}
+                    isLoading={isDeleteLoading}
+                  />
+                )
+              })}
+
+              {sessions.length > 1 && (
+                <Button
+                  onClick={handleDeleteOtherSessions}
+                  sx={{
+                    color: 'error.main',
+                    bgcolor: 'surface.main',
+                    '&:hover': { color: 'error.dark' },
+                  }}
+                >
+                  {translate('deleteOtherSessions')}
+                </Button>
+              )}
+            </Stack>
+          </StyledPaper>
+        )}
       </Stack>
     </ScreenContent>
   )
