@@ -18,3 +18,8 @@ class GoalEventType(str, Enum):
 class TransactionType(str, Enum):
     INCOME = "income"
     EXPENSE = "expense"
+
+class GoalPriority(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"

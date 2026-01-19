@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
-from app.domain.enums import GoalStatus
+from app.domain.enums import GoalPriority, GoalStatus
 
 def to_camel(string: str) -> str:
     parts = string.split("_")
@@ -25,6 +25,7 @@ class CreateGoalRequest(CamelModel):
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
     )
     tags: list[str] = Field(default_factory=list, description="Список тегов")
+    priority: Optional[GoalPriority] = Field(None, description="Приоритет (high, medium, low)")
 
 class CreateGoalResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID созданной цели")
@@ -40,6 +41,8 @@ class GoalResponse(CamelModel):
     days_left: Optional[int] = Field(None, description="Дней осталось")
     status: GoalStatus = Field(..., description="Статус цели")
     tags: list[str] = Field(default_factory=list, description="Список тегов")
+    priority: Optional[GoalPriority] = Field(None, description="Приоритет (high, medium, low)")
+    is_archived: bool = Field(..., description="В архиве ли цель")
     recommended_payment: Optional[Decimal] = Field(
         None,
         description="Рекомендованный платеж в этом месяце",
@@ -73,7 +76,9 @@ class AllGoalsResponse(CamelModel):
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
     )
     status: GoalStatus = Field(..., description="Статус цели")
+    priority: Optional[GoalPriority] = Field(None, description="Приоритет (high, medium, low)")
     tags: list[str] = Field(default_factory=list, description="Список тегов")
+    is_archived: bool = Field(..., description="В архиве ли цель")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -89,3 +94,7 @@ class GoalPatchRequest(CamelModel):
     )
     status: Optional[GoalStatus] = Field(None, description="Статус цели")
     tags: Optional[list[str]] = Field(None, description="Список тегов")
+    priority: Optional[GoalPriority] = Field(None, description="Приоритет (high, medium, low)")
+
+class ArchiveRequest(CamelModel):
+    is_archived: bool = Field(..., description="Поместить в архив (true) или восстановить (false)")

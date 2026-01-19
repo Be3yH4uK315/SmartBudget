@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy import (
@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import exceptions
 from app.core.context import get_request_id
-from app.domain.enums import GoalStatus
+from app.domain.enums import GoalPriority, GoalStatus
 from app.infrastructure.db import models
 from app.utils import serialization
 
@@ -66,9 +66,10 @@ class GoalRepository:
             .where(
                 models.Goal.user_id == user_id,
                 models.Goal.status == GoalStatus.ONGOING.value,
+                models.Goal.is_archived.is_(False),
             )
             .order_by(remaining_amount.asc())
-            .limit(10)
+            .limit(5)
         )
 
         result = await self.db.execute(query)
@@ -79,6 +80,8 @@ class GoalRepository:
         user_id: UUID,
         limit: int = 100,
         offset: int = 0,
+        tags: Optional[list[str]] = None,
+        is_archived: bool = False,
     ) -> list[models.Goal]:
         """Получение целей с пагинацией."""
 
@@ -91,9 +94,9 @@ class GoalRepository:
         )
 
         priority_order = case(
-            (models.Goal.tags.contains(["High priority"]), 1),
-            (models.Goal.tags.contains(["Medium priority"]), 2),
-            (models.Goal.tags.contains(["Low priority"]), 3),
+            (models.Goal.priority == GoalPriority.HIGH.value, 1),
+            (models.Goal.priority == GoalPriority.MEDIUM.value, 2),
+            (models.Goal.priority == GoalPriority.LOW.value, 3),
             else_=4,
         )
 
@@ -105,10 +108,17 @@ class GoalRepository:
             else_=0,
         )
 
+        query = select(models.Goal).where(
+            models.Goal.user_id == user_id
+        )
+
+        query = query.where(models.Goal.is_archived == is_archived)
+
+        if tags:
+            query = query.where(models.Goal.tags.overlap(tags))
+
         query = (
-            select(models.Goal)
-            .where(models.Goal.user_id == user_id)
-            .order_by(
+            query.order_by(
                 status_priority.asc(),
                 priority_order.asc(),
                 completion_percentage.desc(),
@@ -142,19 +152,15 @@ class GoalRepository:
 
         try:
             await self.db.execute(stmt_check)
-
         except IntegrityError:
             return None
-
         except DBAPIError as e:
             logger.warning(
                 "Insert failed, attempting to ensure partition exists. "
                 "Error: %s",
                 e,
             )
-
             await self.ensure_current_partition()
-
             try:
                 await self.db.execute(stmt_check)
             except IntegrityError:
@@ -363,6 +369,7 @@ class GoalRepository:
             .where(
                 models.Goal.status == GoalStatus.ONGOING.value,
                 models.Goal.finish_date < today,
+                models.Goal.is_archived.is_(False),
             )
             .order_by(models.Goal.goal_id.asc())
             .limit(limit)
@@ -397,6 +404,7 @@ class GoalRepository:
             )
             .where(
                 models.Goal.status == GoalStatus.ONGOING.value,
+                models.Goal.is_archived.is_(False),
                 models.Goal.finish_date.is_not(None),
                 models.Goal.finish_date
                 <= check_date + timedelta(days=7),

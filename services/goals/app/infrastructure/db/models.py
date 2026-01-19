@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import uuid4
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -35,6 +36,8 @@ class Goal(Base):
     current_value = Column(DECIMAL(12, 2), nullable=False, default=0)
     finish_date = Column(Date, nullable=True)
     tags = Column(ARRAY(String), nullable=False, server_default="{}")
+    priority = Column(String(20), nullable=True)
+    is_archived = Column(Boolean, nullable=False, default=False, server_default="false")
     status = Column(
         String(50),
         nullable=False,
@@ -62,6 +65,7 @@ class Goal(Base):
     __table_args__ = (
         Index("ix_goals_status_finish_date", "status", "finish_date"),
         Index("ix_goals_tags", "tags", postgresql_using="gin"),
+        Index("ix_goals_main_filter", "user_id", "is_archived", "status", "priority"),
     )
 
     @validates("target_value", "current_value")

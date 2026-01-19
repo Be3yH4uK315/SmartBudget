@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, status
 from fastapi.responses import ORJSONResponse
@@ -99,7 +99,7 @@ async def create_goal(
 @router.get(
     "/main",
     response_model=schemas.MainGoalsResponse,
-    summary="Цели для главного экрана",
+    summary="Получение целей для главного экрана",
 )
 async def get_main_goals(
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -110,20 +110,28 @@ async def get_main_goals(
 @router.get(
     "/",
     response_model=List[schemas.AllGoalsResponse],
-    summary="Список целей",
+    summary="Получение списка целей с фильтрами",
 )
 async def get_goals(
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000, description="Лимит записей"),
+    offset: int = Query(0, ge=0, description="Смещение"),
+    tags: Optional[List[str]] = Query(None, description="Фильтр по тегам (логика ИЛИ)"),
+    is_archived: bool = Query(False, description="Показывать архивные"),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
-    return await service.get_all_goals(user_id, limit, offset)
+    return await service.get_all_goals(
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        tags=tags,
+        is_archived=is_archived,
+    )
 
 @router.get(
     "/{goal_id}",
     response_model=schemas.GoalResponse,
-    summary="Получение цели",
+    summary="Получение цели по ID",
 )
 async def get_goal(
     goal_id: UUID = Path(...),
@@ -135,7 +143,7 @@ async def get_goal(
 @router.patch(
     "/{goal_id}",
     response_model=schemas.GoalResponse,
-    summary="Обновление цели",
+    summary="Обновление полей цели",
 )
 async def update_goal(
     goal_id: UUID = Path(...),
@@ -144,3 +152,45 @@ async def update_goal(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.update_goal(user_id, goal_id, request)
+
+@router.post(
+    "/{goal_id}/close",
+    response_model=schemas.GoalResponse,
+    summary="Принудительное закрытие цели",
+)
+async def close_goal(
+    goal_id: UUID = Path(..., description="ID цели"),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    return await service.close_goal(user_id, goal_id)
+
+@router.post(
+    "/{goal_id}/restore",
+    response_model=schemas.GoalResponse,
+    summary="Восстановление цели",
+)
+async def restore_goal(
+    goal_id: UUID = Path(..., description="ID цели"),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    return await service.restore_goal(user_id, goal_id)
+
+
+@router.patch(
+    "/{goal_id}/archive",
+    response_model=schemas.GoalResponse,
+    summary="Архивация / разархивация цели",
+)
+async def archive_goal(
+    goal_id: UUID = Path(..., description="ID цели"),
+    request: schemas.ArchiveRequest = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    return await service.set_archived(
+        user_id=user_id,
+        goal_id=goal_id,
+        is_archived=request.is_archived,
+    )
