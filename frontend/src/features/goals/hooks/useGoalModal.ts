@@ -66,7 +66,7 @@ export function useGoalModalForm(goal?: Goal) {
     values.finishDate !== initialValues.finishDate ||
     values.priority !== initialValues.priority ||
     values.tags.length !== initialValues.tags.length ||
-    !values.tags.every((t) => initialValues.tags.includes(t))
+    values.tags.every((t) => !initialValues.tags.includes(t))
 
   const canSubmit = () => {
     if (!values.name.trim() || values.targetValue === '' || values.targetValue < 1) return false
