@@ -121,6 +121,7 @@ class GoalService:
         limit: int = 100,
         offset: int = 0,
         tags: list[str] | None = None,
+        priorities: list[GoalPriority] = None,
         is_archived: bool = False,
     ) -> list[api_schemas.AllGoalsResponse]:
         async with self.uow:
@@ -129,6 +130,7 @@ class GoalService:
                 limit=limit,
                 offset=offset,
                 tags=tags,
+                priorities=priorities,
                 is_archived=is_archived,
             )
 

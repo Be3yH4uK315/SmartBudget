@@ -5,6 +5,7 @@ from fastapi.responses import ORJSONResponse
 from sqlalchemy import text
 
 from app.api import dependencies
+from app.domain.enums import GoalPriority
 from app.domain.schemas import api as schemas
 from app.services.service import GoalService
 
@@ -116,6 +117,7 @@ async def get_goals(
     limit: int = Query(100, ge=1, le=1000, description="Лимит записей"),
     offset: int = Query(0, ge=0, description="Смещение"),
     tags: Optional[List[str]] = Query(None, description="Фильтр по тегам (логика ИЛИ)"),
+    priorities: Optional[List[GoalPriority]] = Query(None, description="Фильтр по приоритетам (ИЛИ)"),
     is_archived: bool = Query(False, description="Показывать архивные"),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
@@ -125,6 +127,7 @@ async def get_goals(
         limit=limit,
         offset=offset,
         tags=tags,
+        priorities=priorities,
         is_archived=is_archived,
     )
 

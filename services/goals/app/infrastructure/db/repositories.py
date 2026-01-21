@@ -81,6 +81,7 @@ class GoalRepository:
         limit: int = 100,
         offset: int = 0,
         tags: Optional[list[str]] = None,
+        priorities: Optional[list[GoalPriority]] = None,
         is_archived: bool = False,
     ) -> list[models.Goal]:
         """Получение целей с пагинацией."""
@@ -116,6 +117,10 @@ class GoalRepository:
 
         if tags:
             query = query.where(models.Goal.tags.overlap(tags))
+
+        if priorities:
+            priority_values = [p.value for p in priorities]
+            query = query.where(models.Goal.priority.in_(priority_values))
 
         query = (
             query.order_by(
