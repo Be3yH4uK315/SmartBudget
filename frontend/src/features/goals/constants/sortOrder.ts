@@ -1,4 +1,4 @@
-import { Goal } from '../types'
+import { Goal } from '@features/goals/types'
 
 export const STATUS_PRIORITY: Record<Goal['status'], number> = {
   ongoing: 0,
