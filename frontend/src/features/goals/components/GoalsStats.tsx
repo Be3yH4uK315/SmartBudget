@@ -3,6 +3,7 @@ import { Stack, Typography } from '@mui/material'
 import { StyledPaper } from '@shared/components'
 import { useTheme, useTranslate } from '@shared/hooks'
 import { formatCurrency, formatPercent } from '@shared/utils'
+import dayjs from 'dayjs'
 
 type Props = {
   targetValue: number
@@ -23,7 +24,9 @@ export const GoalsStats = React.memo(
 
     const hasDays = typeof daysLeft === 'number'
     const remaining = Math.max(targetValue - currentValue, 0)
-    const nextPeriod = hasDays ? Math.min(daysLeft, 30) : 0
+    const nextPeriod = hasDays
+      ? Math.min(daysLeft, dayjs().endOf('month').diff(dayjs().startOf('day'), 'day'))
+      : 0
 
     const paymentLabel =
       hasDays && daysLeft > 0
