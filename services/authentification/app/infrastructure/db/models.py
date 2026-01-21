@@ -20,6 +20,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     name = Column(String(255), nullable=False)
     country = Column(String(100), nullable=False)
+    gender = Column(String(20), nullable=False) 
     retention_days = Column(Integer, default=30, nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
     is_locked = Column(Boolean, default=False, nullable=False)

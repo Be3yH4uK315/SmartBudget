@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import Enum, IntEnum
 from pydantic import Field, EmailStr
 from typing import Optional
 from datetime import datetime
@@ -12,6 +12,10 @@ class UserRole(IntEnum):
     ADMIN = 1
     MODERATOR = 2
 
+class Gender(str, Enum):
+    MALE = "male"
+    FEMALE = "female"
+
 class VerifyEmailRequest(CamelModel):
     email: EmailStr = Field(..., description="Email для верификации")
 
@@ -21,6 +25,7 @@ class VerifyLinkRequest(CamelModel):
 class CompleteRegistrationRequest(CamelModel):
     email: EmailStr = Field(..., description="Email пользователя")
     name: str = Field(..., max_length=255, description="Имя пользователя")
+    gender: Gender = Field(None, description="Пол пользователя")
     country: str = Field(..., description="Страна")
     token: str = Field(..., description="Токен верификации")
     password: str = Field(..., min_length=8, description="Пароль")
@@ -49,6 +54,7 @@ class UpdateRetentionRequest(CamelModel):
 
 class UpdateProfileRequest(CamelModel):
     name: str = Field(..., min_length=2, max_length=255, description="Новое имя")
+    gender: Optional[Gender] = Field(None, description="Пол пользователя")
 
 class InitiateEmailChangeRequest(CamelModel):
     new_email: EmailStr = Field(..., description="Новый email")

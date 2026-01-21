@@ -1,6 +1,6 @@
 from app.infrastructure.db import models
 from app.domain.schemas.dtos import UserDTO
-from app.domain.schemas.api import UserRole
+from app.domain.schemas.api import Gender, UserRole
 
 
 def user_to_dto(user: models.User) -> UserDTO:
@@ -11,6 +11,7 @@ def user_to_dto(user: models.User) -> UserDTO:
         name=user.name,
         country=user.country,
         role=UserRole(user.role),
+        gender=Gender(user.gender) if user.gender else None,
         is_active=user.is_active,
         last_login=user.last_login,
         retention_days=user.retention_days,

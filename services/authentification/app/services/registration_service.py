@@ -84,6 +84,7 @@ class RegistrationService:
                     email=body.email,
                     name=body.name,
                     country=body.country,
+                    gender=body.gender.value,
                     password_hash=password_hash,
                     is_active=True,
                     role=api_schemas.UserRole.USER.value,

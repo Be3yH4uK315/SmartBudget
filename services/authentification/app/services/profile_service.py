@@ -36,16 +36,23 @@ class ProfileService:
         user_id: UUID,
         body: api_schemas.UpdateProfileRequest
     ) -> UserDTO:
-        """Обновление имени профиля."""
+        """Обновление профиля."""
         async with self.uow:
             user = await self.uow.users.get_by_id(user_id)
             if not user:
                 raise exceptions.UserNotFoundError("User not found")
             
-            if user.name == body.name.strip():
-                return user_to_dto(user)
+            new_gender = body.gender.value if body.gender else None
+            current_gender = user.gender
+            
+            if user.name == body.name and current_gender == new_gender:
+                 return user_to_dto(user)
 
-            await self.uow.users.update_name(user_id, body.name.strip())
+            await self.uow.users.update_profile_data(
+                user_id, 
+                name=body.name if body.name else None,
+                gender=new_gender
+            )
             
             await self.uow.refresh(user)
             user_dto = user_to_dto(user)

@@ -54,12 +54,20 @@ class UserRepository(BaseRepository):
             .values(retention_days=days, updated_at=time.utc_now())
         )
 
-    async def update_name(self, user_id: UUID, new_name: str) -> None:
-        """Обновляет имя пользователя."""
+    async def update_profile_data(self, user_id: UUID, name: str | None, gender: str | None) -> None:
+        """Обновляет основные данные профиля."""
+        # Собираем словарь изменений динамически
+        values = {"updated_at": time.utc_now()}
+        
+        if name is not None:
+            values["name"] = name
+        if gender is not None:
+            values["gender"] = gender
+            
         await self.db.execute(
             update(models.User)
             .where(models.User.user_id == user_id)
-            .values(name=new_name, updated_at=time.utc_now())
+            .values(**values)
         )
 
     async def update_email(self, user_id: UUID, new_email: str) -> None:
