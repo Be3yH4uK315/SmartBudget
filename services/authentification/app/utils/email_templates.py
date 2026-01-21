@@ -33,3 +33,20 @@ def get_password_reset_body(email: str, token: str) -> str:
 
     Если вы не запрашивали сброс, просто проигнорируйте это письмо.
     """
+
+def get_change_email_body(new_email: str, token: str) -> str:
+    """Генерирует тело письма для подтверждения смены email."""
+    confirm_url = f"{settings.APP.FRONTEND_URL}/profile/change-email/confirm?token={token}"
+    
+    return f"""
+    Здравствуйте!
+
+    Поступил запрос на смену Email адреса вашего аккаунта на {new_email}.
+    
+    Для подтверждения перехода на новый адрес, нажмите на ссылку:
+    {confirm_url}
+
+    Ссылка действительна в течение 15 минут.
+    
+    Если вы не инициировали это действие, срочно смените пароль, так как ваш аккаунт может быть скомпрометирован.
+    """

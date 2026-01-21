@@ -47,6 +47,16 @@ class TokenValidateRequest(CamelModel):
 class UpdateRetentionRequest(CamelModel):
     days: int = Field(..., description="Новый срок жизни сессий (7, 30, 90, 180)")
 
+class UpdateProfileRequest(CamelModel):
+    name: str = Field(..., min_length=2, max_length=255, description="Новое имя")
+
+class InitiateEmailChangeRequest(CamelModel):
+    new_email: EmailStr = Field(..., description="Новый email")
+    password: str = Field(..., description="Текущий пароль для подтверждения")
+
+class ConfirmEmailChangeRequest(CamelModel):
+    token: str = Field(..., description="Токен подтверждения смены email")
+
 class UnifiedResponse(CamelModel):
     status: str = Field(..., description="Статус: success/error")
     action: str = Field(..., description="Выполненное действие")

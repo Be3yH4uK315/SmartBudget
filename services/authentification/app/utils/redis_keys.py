@@ -6,6 +6,10 @@ def get_reset_password_key(email: str) -> str:
     """Ключ Redis для токена сброса пароля."""
     return f"auth:reset:{email}"
 
+def get_change_email_key(token: str) -> str:
+    """Ключ для хранения данных смены email."""
+    return f"auth:change_email:{token}"
+
 def get_login_fail_key(ip: str) -> str:
     """Ключ Redis для отслеживания неудачных попыток входа по IP."""
     return f"auth:fail:{ip}"

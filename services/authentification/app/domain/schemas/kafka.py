@@ -22,6 +22,9 @@ class AuthEventTypes(str, Enum):
     VERIFICATION_VALIDATED = "user.verification_validated"
     TOKEN_REFRESHED = "user.token_refreshed"
     SESSION_REVOKED = "user.session_revoked"
+    PROFILE_UPDATED = "user.profile_updated"
+    EMAIL_CHANGE_STARTED = "user.email_change_started"
+    EMAIL_CHANGED = "user.email_changed"
 
 class BaseAuthEvent(CamelModel):
     event: AuthEventTypes

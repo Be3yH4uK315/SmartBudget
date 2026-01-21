@@ -53,3 +53,19 @@ class UserRepository(BaseRepository):
             .where(models.User.user_id == user_id)
             .values(retention_days=days, updated_at=time.utc_now())
         )
+
+    async def update_name(self, user_id: UUID, new_name: str) -> None:
+        """Обновляет имя пользователя."""
+        await self.db.execute(
+            update(models.User)
+            .where(models.User.user_id == user_id)
+            .values(name=new_name, updated_at=time.utc_now())
+        )
+
+    async def update_email(self, user_id: UUID, new_email: str) -> None:
+        """Обновляет email пользователя."""
+        await self.db.execute(
+            update(models.User)
+            .where(models.User.user_id == user_id)
+            .values(email=new_email.lower().strip(), updated_at=time.utc_now())
+        )

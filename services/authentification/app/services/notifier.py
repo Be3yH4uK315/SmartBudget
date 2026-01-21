@@ -76,6 +76,21 @@ class AuthNotifier:
             k_schemas.AuthEventTypes.PASSWORD_RESET_STARTED,
             email=email,
         )
+    
+    async def send_change_email_confirmation(self, new_email: str, token: str, user_id: str) -> None:
+        """Отправка письма для подтверждения смены email."""
+        await self.arq.enqueue_job(
+            "send_email_task",
+            to=new_email,
+            subject="Confirm Email Change",
+            body=email_templates.get_change_email_body(new_email, token),
+        )
+
+        await self._save_event(
+            k_schemas.AuthEventTypes.EMAIL_CHANGE_STARTED,
+            user_id=user_id,
+            new_email=new_email
+        )
 
     async def notify_registration(
         self,
@@ -170,4 +185,18 @@ class AuthNotifier:
             k_schemas.AuthEventTypes.SESSION_REVOKED,
             user_id=user_id,
             session_id=session_id,
+        )
+
+    async def notify_profile_updated(self, user_id: str) -> None:
+        await self._save_event(
+            k_schemas.AuthEventTypes.PROFILE_UPDATED,
+            user_id=user_id
+        )
+
+    async def notify_email_changed(self, user_id: str, old_email: str, new_email: str) -> None:
+        await self._save_event(
+            k_schemas.AuthEventTypes.EMAIL_CHANGED,
+            user_id=user_id,
+            old_email=old_email,
+            new_email=new_email
         )

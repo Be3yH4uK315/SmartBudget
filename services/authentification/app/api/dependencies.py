@@ -14,6 +14,7 @@ from app.services.registration_service import RegistrationService
 from app.services.login_service import LoginService
 from app.services.password_service import PasswordService
 from app.services.token_service import TokenService
+from app.services.profile_service import ProfileService
 from app.core.config import settings
 
 async def get_uow(request: Request) -> UnitOfWork:
@@ -103,6 +104,19 @@ def get_password_service(
     notifier=Depends(get_auth_notifier)
 ) -> PasswordService:
     return PasswordService(
+        uow=uow,
+        redis=redis,
+        session_service=session_service,
+        notifier=notifier
+    )
+
+def get_profile_service(
+    uow=Depends(get_uow),
+    redis=Depends(get_redis),
+    session_service=Depends(get_session_service),
+    notifier=Depends(get_auth_notifier)
+) -> ProfileService:
+    return ProfileService(
         uow=uow,
         redis=redis,
         session_service=session_service,
