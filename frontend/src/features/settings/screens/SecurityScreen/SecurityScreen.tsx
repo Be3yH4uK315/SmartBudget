@@ -28,9 +28,7 @@ export default function SecurityScreen() {
   useEffect(() => {
     dispatch(getSessions())
     dispatch(getRefreshTokenDuration())
-  }, [dispatch])
 
-  useEffect(() => {
     return () => {
       dispatch(clearSecurityState())
     }
