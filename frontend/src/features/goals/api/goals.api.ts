@@ -12,27 +12,27 @@ import { api } from '@shared/api'
 class GoalsApi {
   baseUrl = '/goals'
 
-  async getGoals(filters: GoalsFilters): Promise<SimplifiedGoal[]> {
+  async getGoals(filters?: GoalsFilters): Promise<SimplifiedGoal[]> {
     const url = `${this.baseUrl}/`
 
     const params: Record<string, string> = {}
 
-    if (filters.tags.length > 0) {
+    if (filters && filters.tags.length > 0) {
       params.tags = filters.tags.join(',')
     }
 
-    if (filters.priority.length > 0) {
-      params.priority = filters.priority.join(',')
+    if (filters && filters.priority.length > 0) {
+      params.priorities = filters.priority.join(',')
     }
 
-    if (filters.isArchived) params.isArchived = 'True'
+    if (filters && filters.isArchived) params.isArchived = 'True'
 
     const response = await api.get<SimplifiedGoal[]>(url, { params })
     return response.data
   }
 
   async getGoal(goalId: string): Promise<Goal> {
-    const url = `${this.baseUrl}?goalId=${goalId}`
+    const url = `${this.baseUrl}/${goalId}`
 
     const response = await api.get<Goal>(url)
     return response.data
@@ -64,16 +64,16 @@ class GoalsApi {
     goalId,
     status,
   }: UpdateGoalStatusPayload): Promise<{ status: GoalStatus }> {
-    const url = `${this.baseUrl}/${status === 'closed' ? 'restore' : 'close'}`
+    const url = `${this.baseUrl}/${goalId}/${status === 'closed' ? 'restore' : 'close'}`
 
-    const response = await api.patch<{ status: GoalStatus }>(url, goalId)
+    const response = await api.post<{ status: GoalStatus }>(url)
     return response.data
   }
 
   async updateArchivedStatus(goalId: string): Promise<{ isArchived: boolean }> {
-    const url = `${this.baseUrl}/archive`
+    const url = `${this.baseUrl}/${goalId}/archive`
 
-    const response = await api.patch<{ isArchived: boolean }>(url, goalId)
+    const response = await api.patch<{ isArchived: boolean }>(url)
     return response.data
   }
 }
