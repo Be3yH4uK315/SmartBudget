@@ -1,17 +1,20 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { goalsApi, goalsMock } from '@features/goals/api'
-import { EditGoalPayload, Goal } from '@features/goals/types'
+import { EditGoalPayload, SimplifiedGoal } from '@features/goals/types'
 import { getGoalsStats } from '@features/goals/utils'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getGoals = createAsyncThunk<
-  { goals: Goal[]; targetValue: number; currentValue: number },
+  { goals: SimplifiedGoal[]; targetValue: number; currentValue: number },
   void,
   { state: RootState; rejectWithValue: string }
->('getGoals', async (_, { rejectWithValue }) => {
+>('getGoals', async (_, { getState, rejectWithValue }) => {
   try {
-    const response = await goalsMock.getGoals()
+    const filters = getState().goals?.filters
+
+    const response = await goalsMock.getGoals(filters)
     const { targetValue, currentValue } = getGoalsStats(response)
 
     return { goals: response, targetValue, currentValue }
@@ -28,7 +31,7 @@ export const createGoal = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('createGoal', async ({ payload }, { rejectWithValue }) => {
   try {
-    const response = await goalsApi.createGoal(payload)
+    const response = await goalsMock.createGoal(payload)
 
     return response
   } catch (e: any) {

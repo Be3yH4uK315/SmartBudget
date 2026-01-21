@@ -1,18 +1,20 @@
-import { SliceCaseReducers } from '@shared/types/reduxToolkit'
-import { Goal } from './goals'
+import { PayloadAction, SliceCaseReducers } from '@shared/types'
+import { FiltersTag, GoalsFilters, GoalsStats, SimplifiedGoal } from './goals'
 
 export type GoalsSliceState = {
-  goals: Goal[]
+  goals: SimplifiedGoal[]
   isLoading: boolean
+
   isCreateLoading: boolean
 
-  /** Статистика по целям */
-  goalsStats: {
-    targetValue: number
-    currentValue: number
-  }
+  filters: GoalsFilters
+
+  goalsStats: GoalsStats
 }
 
 export type GoalsSliceReducers = SliceCaseReducers<GoalsSliceState> & {
   clearGoalsState(state: GoalsSliceState): void
+  resetFilters(state: GoalsSliceState): void
+  setTags(state: GoalsSliceState, action: PayloadAction<FiltersTag[]>): void
+  setIsArchived(state: GoalsSliceState, action: PayloadAction<boolean>): void
 }

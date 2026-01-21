@@ -1,4 +1,4 @@
-import { Goal, GoalsSliceReducers, GoalsSliceState } from '@features/goals/types'
+import { GoalsSliceReducers, GoalsSliceState, SimplifiedGoal } from '@features/goals/types'
 import { pushIntoSorted } from '@features/goals/utils'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
@@ -9,6 +9,18 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
   name: 'goals',
   initialState: getGoalsInitialState(),
   reducers: {
+    setTags(state, { payload }) {
+      state.filters.tags = payload
+    },
+    setIsArchived(state, { payload }) {
+      state.filters.isArchived = payload
+    },
+    resetFilters(state) {
+      state.filters = {
+        tags: [],
+        isArchived: state.filters.isArchived,
+      }
+    },
     clearGoalsState() {
       return getGoalsInitialState()
     },
@@ -34,10 +46,11 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
       })
 
       .addCase(createGoal.fulfilled, (state, { payload, meta }) => {
-        const newGoal: Goal = {
+        const newGoal: SimplifiedGoal = {
           goalId: payload.goalId,
           ...meta.arg.payload,
           currentValue: 0,
+          isArchived: false,
           status: 'ongoing',
         }
 
@@ -62,4 +75,4 @@ declare module '@shared/store' {
 }
 
 goalsSlice.injectInto(rootReducer)
-export const { clearGoalsState } = goalsSlice.actions
+export const { setTags, setIsArchived, resetFilters, clearGoalsState } = goalsSlice.actions

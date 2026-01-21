@@ -2,7 +2,13 @@ import { CurrentGoalSliceReducers, CurrentGoalSliceState } from '@features/goals
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getCurrentGoalInitialState } from './currentGoal.state'
-import { editGoal, getGoal, getGoalTransactions } from './currentGoal.thunks'
+import {
+  editGoal,
+  getGoal,
+  getGoalTransactions,
+  updateArchivedStatus,
+  updateGoalStatus,
+} from './currentGoal.thunks'
 
 export const currentGoalSlice = createSlice<
   CurrentGoalSliceState,
@@ -57,6 +63,14 @@ export const currentGoalSlice = createSlice<
 
       .addCase(editGoal.pending, (state) => {
         state.isEditLoading = true
+      })
+
+      .addCase(updateGoalStatus.fulfilled, (state, { payload }) => {
+        state.goal.status = payload.status
+      })
+
+      .addCase(updateArchivedStatus.fulfilled, (state, { payload }) => {
+        state.goal.isArchived = payload.isArchived
       })
   },
 })
