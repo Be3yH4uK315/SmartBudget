@@ -1,107 +1,59 @@
-import { useEffect, useState } from 'react'
 import 'dayjs/locale/ru'
+import { AVAILABLE_TAGS, MAX_TAGS_LENGTH, PRIORITIES } from '@features/goals/constants/tags'
+import { useGoalModalForm } from '@features/goals/hooks'
 import { editGoal } from '@features/goals/store/currentGoal'
 import { createGoal } from '@features/goals/store/goals'
-import { CurrentGoal } from '@features/goals/types'
-import { CloseOutlined } from '@mui/icons-material'
-import { Button, IconButton, Stack, TextField, Typography } from '@mui/material'
+import { Goal } from '@features/goals/types'
+import { Button, Chip, Stack, TextField, Typography } from '@mui/material'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { CloseModalButton, StyledBox } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import ModalLayout from '@shared/screens/ModalProvider'
-import { dispatch } from '@shared/store'
-import dayjs, { Dayjs } from 'dayjs'
+import { useAppDispatch } from '@shared/store'
+import dayjs from 'dayjs'
 
 type Props = {
-  goal?: CurrentGoal
+  goal?: Goal
   onClose: () => void
-}
-
-type FormValues = {
-  name: string
-  targetValue: number | ''
-  finishDate: string
 }
 
 export const GoalModal = ({ onClose, goal }: Props) => {
   const translate = useTranslate('Goals')
-  const mode: 'create' | 'edit' = goal ? 'edit' : 'create'
+  const dispatch = useAppDispatch()
 
-  const [values, setValues] = useState<FormValues>({
-    name: '',
-    targetValue: '',
-    finishDate: '',
-  })
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setValues({
-      name: goal?.name ?? '',
-      targetValue: goal?.targetValue ?? '',
-      finishDate: goal?.finishDate ?? '',
-    })
-  }, [goal])
-
-  const handleChange =
-    <K extends keyof FormValues>(key: K) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value
-
-      setValues((prev) => ({
-        ...prev,
-        [key]: key === 'targetValue' ? (value === '' ? '' : Number(value)) : value,
-      }))
-    }
-
-  const canSubmit = (): boolean => {
-    const { name, targetValue, finishDate } = values
-
-    if (!name.trim() || targetValue === '' || !finishDate) return false
-
-    const today = new Date()
-    const finish = new Date(finishDate)
-    if (finish < new Date(today.toDateString())) return false
-
-    return true
-  }
+  const {
+    dirty,
+    mode,
+    values,
+    handleChange,
+    handleDateChange,
+    setPriority,
+    toggleTag,
+    canSubmit,
+    setPayload,
+  } = useGoalModalForm(goal)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (values.targetValue === '') {
-      return
-    }
+    if (!canSubmit() || !dirty) return
 
-    const payload = {
-      name: values.name,
-      targetValue: values.targetValue,
-      finishDate: values.finishDate,
-    }
+    const payload = setPayload(goal?.status)
 
-    if (mode === 'create') {
-      dispatch(createGoal({ payload: payload }))
-    }
-
-    if (mode === 'edit' && goal) {
-      dispatch(
-        editGoal({
-          goalId: goal.goalId,
-          ...payload,
-        }),
-      )
-    }
+    if (mode === 'create') dispatch(createGoal({ payload }))
+    if (mode === 'edit' && goal) dispatch(editGoal({ ...payload, goalId: goal.goalId }))
 
     onClose()
   }
 
-  const title = mode === 'edit' ? 'editGoal' : 'createGoal'
-  const buttonTitle = mode === 'edit' ? 'edit' : 'create'
+  const title = mode === 'edit' ? 'Modal.editTitle' : 'Modal.createTitle'
+  const buttonTitle = mode === 'edit' ? 'Modal.editButton' : 'Modal.createButton'
+
   return (
     <ModalLayout>
-      <IconButton onClick={onClose} sx={{ position: 'absolute', top: 12, right: 12 }}>
-        <CloseOutlined sx={{ color: 'link.main' }} />
-      </IconButton>
+      <CloseModalButton onClose={onClose} />
 
       <Stack
         spacing={3}
@@ -112,41 +64,80 @@ export const GoalModal = ({ onClose, goal }: Props) => {
         <form onSubmit={handleSubmit}>
           <Stack spacing={2} width={'100%'} px={4}>
             <TextField
-              label={translate('name')}
+              label={translate('Modal.name')}
               value={values.name}
               onChange={handleChange('name')}
               required
             />
 
             <TextField
-              label={translate('value')}
+              label={translate('Modal.value')}
               type="number"
               value={values.targetValue}
               onChange={handleChange('targetValue')}
-              slotProps={{ htmlInput: { min: 0 } }}
+              slotProps={{ htmlInput: { min: 1 } }}
               required
             />
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DatePicker
-                label={translate('date')}
+                label={translate('Modal.date')}
                 value={values.finishDate ? dayjs(values.finishDate) : null}
-                onChange={(newValue: Dayjs | null) => {
-                  setValues((prev) => ({
-                    ...prev,
-                    finishDate: newValue ? newValue.format('YYYY-MM-DD') : '',
-                  }))
-                }}
-                enableAccessibleFieldDOMStructure={false}
-                slots={{
-                  textField: TextField,
+                onChange={handleDateChange}
+                format="DD.MM.YYYY"
+                slots={{ textField: TextField }}
+                slotProps={{
+                  textField: {
+                    InputProps: {
+                      sx: {
+                        '& .MuiSvgIcon-root': {
+                          color: 'text.primary',
+                        },
+                      },
+                    },
+                  },
                 }}
                 disablePast
               />
             </LocalizationProvider>
 
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
-              <Button type="submit" variant="yellow" disabled={!canSubmit()}>
+            <Typography variant="h6" textAlign={'left'}>
+              {translate('Modal.priorityTags')}
+            </Typography>
+
+            <StyledBox>
+              {PRIORITIES.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={translate(`Tags.${tag}`)}
+                  variant={values.priority === tag ? 'filled' : 'outlined'}
+                  color={values.priority === tag ? 'primary' : 'default'}
+                  onClick={() => setPriority(tag)}
+                />
+              ))}
+            </StyledBox>
+
+            <Typography variant="h6" textAlign={'left'}>
+              {translate('Modal.otherTags')}
+            </Typography>
+
+            <StyledBox>
+              {AVAILABLE_TAGS.map((tag) => (
+                <Chip
+                  key={tag}
+                  component={'span'}
+                  label={translate(`Tags.${tag}`)}
+                  variant={values.tags.includes(tag) ? 'filled' : 'outlined'}
+                  color={values.tags.includes(tag) ? 'primary' : 'default'}
+                  onClick={() => toggleTag(tag)}
+                  disabled={!values.tags.includes(tag) && values.tags.length >= MAX_TAGS_LENGTH}
+                  sx={{ display: 'inline-flex' }}
+                />
+              ))}
+            </StyledBox>
+
+            <Stack direction="row" justifyContent="flex-end">
+              <Button type="submit" variant="yellow">
                 {translate(buttonTitle)}
               </Button>
             </Stack>
