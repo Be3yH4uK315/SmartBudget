@@ -1,6 +1,6 @@
-import { useChangePasswordFrom } from '@features/settings/hooks/useChangePasswordForm'
+import { useChangePasswordForm } from '@features/settings/hooks'
 import { selectIsPasswordChanging } from '@features/settings/store/security'
-import { Button, Stack, TextField, Typography } from '@mui/material'
+import { Button, CircularProgress, Stack, TextField, Typography } from '@mui/material'
 import { StyledPaper } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
@@ -12,10 +12,7 @@ export const ChangePasswordBlock = () => {
 
   const isPasswordChanging = useAppSelector(selectIsPasswordChanging)
 
-  const { values, errors, shouldShowError, handleChange, canSubmit, handleSubmit } =
-    useChangePasswordFrom()
-
-  const isDisabled = !canSubmit || isPasswordChanging
+  const { values, errors, shouldShowError, handleChange, handleSubmit } = useChangePasswordForm()
 
   const handleForgotPassword = () => {
     logoutHelper(dispatch)
@@ -33,7 +30,7 @@ export const ChangePasswordBlock = () => {
               label={translate('oldPassword')}
               value={values.password}
               onChange={handleChange('password')}
-              error={shouldShowError('password')}
+              required
             />
 
             <TextField
@@ -42,7 +39,9 @@ export const ChangePasswordBlock = () => {
               value={values.newPassword}
               onChange={handleChange('newPassword')}
               error={shouldShowError('newPassword')}
-              helperText={shouldShowError('newPassword') ? errors.newPassword : ''}
+              helperText={shouldShowError('newPassword') ? errors().newPassword : ''}
+              slotProps={{ htmlInput: { minLength: 8 } }}
+              required
             />
 
             <TextField
@@ -51,7 +50,9 @@ export const ChangePasswordBlock = () => {
               value={values.newPasswordConfirm}
               onChange={handleChange('newPasswordConfirm')}
               error={shouldShowError('newPasswordConfirm')}
-              helperText={shouldShowError('newPasswordConfirm') ? errors.newPasswordConfirm : ''}
+              helperText={shouldShowError('newPasswordConfirm') ? errors().newPasswordConfirm : ''}
+              slotProps={{ htmlInput: { minLength: 8 } }}
+              required
             />
 
             <Stack spacing={1}>
@@ -63,8 +64,12 @@ export const ChangePasswordBlock = () => {
                 {translate('forgotPassword')}
               </Typography>
 
-              <Button disabled={isDisabled} variant="yellow" type="submit">
-                {translate('button')}
+              <Button variant="yellow" type="submit" disabled={isPasswordChanging}>
+                {isPasswordChanging ? (
+                  <CircularProgress size={20} sx={{ color: '#333' }} />
+                ) : (
+                  translate('button')
+                )}
               </Button>
             </Stack>
           </Stack>
