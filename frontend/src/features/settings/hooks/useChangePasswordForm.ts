@@ -43,7 +43,7 @@ export function useChangePasswordForm() {
 
     if (!password) newErrors.password = ''
 
-    if (touched.newPassword && newPassword.length < 8) {
+    if (touched.newPassword && newPassword.length > 0 && newPassword.length < 8) {
       newErrors.newPassword = translate('tooShortPassword')
     }
 
