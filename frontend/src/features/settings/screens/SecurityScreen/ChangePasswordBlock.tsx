@@ -12,7 +12,8 @@ export const ChangePasswordBlock = () => {
 
   const isPasswordChanging = useAppSelector(selectIsPasswordChanging)
 
-  const { values, errors, shouldShowError, handleChange, handleSubmit } = useChangePasswordForm()
+  const { values, errors, shouldShowError, handleChange, handleSubmit, handleBlur } =
+    useChangePasswordForm()
 
   const handleForgotPassword = () => {
     logoutHelper(dispatch)
@@ -38,6 +39,7 @@ export const ChangePasswordBlock = () => {
               label={translate('newPassword')}
               value={values.newPassword}
               onChange={handleChange('newPassword')}
+              onBlur={handleBlur('newPassword')}
               error={shouldShowError('newPassword')}
               helperText={shouldShowError('newPassword') ? errors().newPassword : ''}
               slotProps={{ htmlInput: { minLength: 8 } }}
@@ -49,6 +51,7 @@ export const ChangePasswordBlock = () => {
               label={translate('newPasswordConfirm')}
               value={values.newPasswordConfirm}
               onChange={handleChange('newPasswordConfirm')}
+              onBlur={handleBlur('newPasswordConfirm')}
               error={shouldShowError('newPasswordConfirm')}
               helperText={shouldShowError('newPasswordConfirm') ? errors().newPasswordConfirm : ''}
               slotProps={{ htmlInput: { minLength: 8 } }}

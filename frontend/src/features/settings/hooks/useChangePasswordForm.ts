@@ -18,11 +18,21 @@ export function useChangePasswordForm() {
     {},
   )
 
+  const resetForm = () => {
+    setValues({ password: '', newPassword: '', newPasswordConfirm: '' })
+    setTouched({})
+  }
+
+  const handleBlur =
+    <K extends keyof ChangePasswordFormValues>(key: K) =>
+    () => {
+      setTouched((prev) => ({ ...prev, [key]: true }))
+    }
+
   const handleChange =
     <K extends keyof ChangePasswordFormValues>(key: K) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value
-      setTouched((prev) => ({ ...prev, [key]: true }))
 
       setValues((prev) => ({ ...prev, [key]: value }))
     }
@@ -33,13 +43,12 @@ export function useChangePasswordForm() {
 
     if (!password) newErrors.password = ''
 
-    if (touched.newPassword && !!newPasswordConfirm && newPassword.length < 8) {
+    if (touched.newPassword && newPassword.length < 8) {
       newErrors.newPassword = translate('tooShortPassword')
     }
 
     if (
       touched.newPasswordConfirm &&
-      !!newPassword &&
       newPasswordConfirm.length > 0 &&
       newPassword !== newPasswordConfirm
     ) {
@@ -51,23 +60,34 @@ export function useChangePasswordForm() {
 
   const canSubmit = () => Object.keys(errors()).length === 0
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    setTouched({
+      password: true,
+      newPassword: true,
+      newPasswordConfirm: true,
+    })
 
     if (!canSubmit()) {
       showToast({ messageKey: 'cannotSubmitForm', type: 'error' })
       return
     }
 
-    dispatch(
-      changePassword({
-        password: values.password,
-        newPassword: values.newPassword,
-      }),
-    )
+    try {
+      await dispatch(
+        changePassword({
+          password: values.password,
+          newPassword: values.newPassword,
+        }),
+      ).unwrap()
+
+      resetForm()
+    } catch {}
   }
 
-  const shouldShowError = (field: keyof ChangePasswordFormValues) => !!errors()[field]
+  const shouldShowError = (field: keyof ChangePasswordFormValues) =>
+    touched[field] && !!errors()[field]
 
   return {
     values,
@@ -75,5 +95,6 @@ export function useChangePasswordForm() {
     shouldShowError,
     handleChange,
     handleSubmit,
+    handleBlur,
   }
 }
