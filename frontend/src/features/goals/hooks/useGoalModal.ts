@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MAX_TAGS_LENGTH } from '@features/goals/constants/tags'
 import { Goal, GoalStatus, ModalFormValues, Priority, Tag } from '@features/goals/types'
-import { Dayjs } from 'dayjs'
+import dayjs, { Dayjs } from 'dayjs'
 
 export function useGoalModalForm(goal?: Goal) {
   const mode: 'create' | 'edit' = goal ? 'edit' : 'create'
@@ -73,7 +73,7 @@ export function useGoalModalForm(goal?: Goal) {
 
     if (!values.finishDate) return true
 
-    return new Date(values.finishDate) > new Date(new Date().toDateString())
+    return dayjs(values.finishDate).isAfter(dayjs().startOf('day'))
   }
 
   const setPayload = (goalStatus?: GoalStatus) => ({
