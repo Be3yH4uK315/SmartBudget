@@ -21,6 +21,10 @@ class GoalsApi {
       params.tags = filters.tags.join(',')
     }
 
+    if (filters.priority.length > 0) {
+      params.priority = filters.priority.join(',')
+    }
+
     if (filters.isArchived) params.isArchived = 'True'
 
     const response = await api.get<SimplifiedGoal[]>(url, { params })

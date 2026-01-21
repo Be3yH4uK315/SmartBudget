@@ -6,7 +6,7 @@ import { GoalTagsBlock } from './GoalTagsBlock'
 
 type Props = {
   tags: Tag[]
-  priority: Priority
+  priority: Priority | null
   onClick: () => void
 }
 

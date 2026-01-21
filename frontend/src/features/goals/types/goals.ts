@@ -10,7 +10,7 @@ export type Goal = {
   status: GoalStatus
   isArchived: boolean
   tags: Tag[]
-  priority: Priority
+  priority: Priority | null
   finishDate: string | null
   daysLeft: number | null
   recommendedPayment: number | null
@@ -29,7 +29,7 @@ export type EditGoalPayload = {
   name: string
   targetValue: number
   tags: Tag[]
-  priority: Priority
+  priority: Priority | null
   status: GoalStatus
   finishDate: string | null
 }
@@ -44,17 +44,16 @@ export type ModalFormValues = {
   targetValue: number | ''
   finishDate: string | null
   tags: Tag[]
-  priority: Priority
+  priority: Priority | null
 }
 
 export type UpdateGoalStatusPayload = Pick<Goal, 'goalId' | 'status'>
 
-export type FiltersTag = Tag | (typeof PRIORITIES)[number]
-
 export type GoalsFilters = {
-  tags: FiltersTag[]
+  tags: Tag[]
+  priority: Priority[]
   isArchived: boolean
 }
 
-export type Priority = (typeof PRIORITIES)[number] | null
+export type Priority = (typeof PRIORITIES)[number]
 export type Tag = (typeof AVAILABLE_TAGS)[number]

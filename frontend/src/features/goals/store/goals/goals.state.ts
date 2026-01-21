@@ -9,6 +9,7 @@ export function getGoalsInitialState(): GoalsSliceState {
 
     filters: {
       tags: [],
+      priority: [],
       isArchived: false,
     },
 

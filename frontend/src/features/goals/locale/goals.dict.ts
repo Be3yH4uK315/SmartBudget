@@ -48,7 +48,10 @@ export const goalsDict: LocaleDictionary = {
 
       Tags: {
         selected: 'Выбрано: {{value}}',
-        placeholder: 'Cортировать по тэгам',
+        placeholder: {
+          tags: 'Тэги',
+          priority: 'Приоритет',
+        },
         clear: 'Сбросить фильтры',
         archive: 'Архив',
 

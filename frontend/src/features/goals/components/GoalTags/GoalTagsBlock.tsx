@@ -4,7 +4,7 @@ import { GoalTag } from './GoalTag'
 
 type Props = {
   tags: Tag[]
-  priority: Priority
+  priority: Priority | null
 }
 
 export const GoalTagsBlock = ({ tags, priority }: Props) => {
