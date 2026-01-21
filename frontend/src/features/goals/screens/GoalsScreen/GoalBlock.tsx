@@ -11,6 +11,7 @@ import {
   StyledPaper,
   TypographyWithAdornment,
 } from '@shared/components'
+import { ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { CenterLabel, PieDataItem } from '@shared/types/components'
 import { formatCurrency } from '@shared/utils'
@@ -57,7 +58,7 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
   return (
     <StyledPaper
       role="button"
-      onClick={() => navigate(`./${goalId}`)}
+      onClick={() => navigate(`${ROUTES.PAGES.GOALS.MAIN}/${goalId}`)}
       paperSx={{
         cursor: 'pointer',
       }}

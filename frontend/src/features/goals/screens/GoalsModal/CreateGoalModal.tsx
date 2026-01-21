@@ -86,6 +86,7 @@ export const GoalModal = ({ onClose, goal }: Props) => {
                 onChange={handleDateChange}
                 format="DD.MM.YYYY"
                 slots={{ textField: TextField }}
+                enableAccessibleFieldDOMStructure={false}
                 slotProps={{
                   textField: {
                     InputProps: {
