@@ -1,136 +1,167 @@
-import { CurrentGoal, EditGoalPayload, Goal, GoalTransaction } from '../types/goals'
+import {
+  EditGoalPayload,
+  Goal,
+  GoalsFilters,
+  GoalStatus,
+  GoalTransaction,
+  Priority,
+  SimplifiedGoal,
+  Tag,
+} from '@features/goals/types'
+import { PRIORITIES } from '../constants/tags'
 
-const delay = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms))
+function generateMockGoals(total = 0): Goal[] {
+  const statuses: GoalStatus[] = ['ongoing', 'achieved', 'expired', 'closed']
+  const priorities: (Priority | null)[] = ['High', 'Medium', 'Low', null]
+  const availableTags: Tag[] = ['Health', 'Education', 'Sport', 'Travel', 'Family']
 
-const today = new Date()
+  const result: Goal[] = []
 
-const calcDaysLeft = (finishDate: string) => {
-  const finish = new Date(finishDate)
-  const diff = finish.getTime() - today.getTime()
-  return Math.max(Math.ceil(diff / (1000 * 60 * 60 * 24)), 0)
-}
+  for (let i = 0; i < total; i++) {
+    const targetValue = 100000 + i * 25000
+    const currentValue = Math.round(Math.random() * targetValue)
+    const priority = priorities[i % priorities.length]
 
-const goals: Goal[] = [
-  {
-    goalId: '1',
-    name: 'Подарок маме',
-    targetValue: 200000,
-    currentValue: 75000,
-    finishDate: '2026-01-18',
-    status: 'ongoing',
-  },
-  {
-    goalId: '2',
-    name: 'Стиральная машина',
-    targetValue: 50000,
-    currentValue: 5000,
-    finishDate: '2026-08-21',
-    status: 'ongoing',
-  },
-  {
-    goalId: '3',
-    name: 'Квартира',
-    targetValue: 150000000,
-    currentValue: 140000,
-    finishDate: '2024-08-21',
-    status: 'closed',
-  },
-  {
-    goalId: '4',
-    name: 'Подарок на день рождения',
-    targetValue: 150000,
-    currentValue: 150000,
-    finishDate: '2024-08-21',
-    status: 'achieved',
-  },
-  {
-    goalId: '5',
-    name: 'Отпуск',
-    targetValue: 150000,
-    currentValue: 140000,
-    finishDate: '2024-08-18',
-    status: 'expired',
-  },
-]
+    const tags: Tag[] = []
+    tags.push(...availableTags.slice(0, i % availableTags.length))
 
-const goalTransactions: Record<string, GoalTransaction[]> = {
-  '1': [
-    {
-      date: '2024-01-10',
-      value: 30000,
-      type: 'income',
-    },
-    {
-      date: '2024-02-15',
-      value: 45000,
-      type: 'income',
-    },
-  ],
-  '2': [
-    {
-      date: '2024-03-01',
-      value: 150000,
-      type: 'income',
-    },
-  ],
-}
-
-class GoalsApiMock {
-  async getGoals(): Promise<Goal[]> {
-    await delay()
-    return goals
+    result.push({
+      goalId: `goal_${i}_${Math.random().toString(36).slice(2, 8)}`,
+      name: `Цель#${i}Цель#Цель`,
+      targetValue,
+      currentValue,
+      status: statuses[i % statuses.length],
+      isArchived: i % 3 !== 0,
+      tags,
+      priority: priority ?? null,
+      finishDate: i % 2 === 0 ? '2026-12-31' : null,
+      daysLeft: i % 2 === 0 ? 120 - i * 3 : null,
+      recommendedPayment: i % 2 === 0 ? Math.round((targetValue - currentValue) / 6) : null,
+    })
   }
 
-  async getGoal(goalId: string): Promise<CurrentGoal> {
-    await delay()
+  return result
+}
 
-    const goal = goals.find((g) => g.goalId === goalId)
-    if (!goal) {
-      throw new Error('Goal not found')
+function generateMockGoalTransactions(goalId: string, total = 20): GoalTransaction[] {
+  const types = ['income', 'expense'] as const
+  const dates = [
+    '2025-11-12T12:12:12',
+    '2025-12-11T12:12:12',
+    '2025-10-10T12:12:12',
+    '2025-09-09T12:12:12',
+    '2025-08-08T12:12:12',
+  ]
+
+  return Array.from({ length: total }, (_, i) => ({
+    date: dates[i % dates.length],
+    value: Math.round(Math.random() * 10000),
+    type: types[i % types.length],
+  }))
+}
+
+const ALL_GOALS = generateMockGoals(12)
+const GOAL_TRANSACTIONS_MAP: Record<string, GoalTransaction[]> = {}
+ALL_GOALS.forEach((g) => {
+  GOAL_TRANSACTIONS_MAP[g.goalId] = generateMockGoalTransactions(g.goalId, 25)
+})
+
+class GoalsMock {
+  baseUrl = '/goals'
+
+  async getGoals(filters?: GoalsFilters): Promise<SimplifiedGoal[]> {
+    console.log('%cMOCK CALL getGoals', 'color: orange', filters)
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    let filteredGoals = [...ALL_GOALS]
+
+    if (filters?.tags?.length) {
+      filteredGoals = filteredGoals.filter((g) =>
+        filters.tags.every((tag) => {
+          if (PRIORITIES.includes(tag as (typeof PRIORITIES)[number])) {
+            return g.priority === tag
+          }
+
+          return g.tags.includes(tag as Tag)
+        }),
+      )
     }
 
-    return {
-      ...goal,
-      daysLeft: calcDaysLeft(goal.finishDate),
-      transactions: goalTransactions[goalId] ?? [],
+    if (typeof filters?.isArchived === 'boolean') {
+      filteredGoals = filteredGoals.filter((g) => g.isArchived === filters.isArchived)
     }
+
+    return filteredGoals.map(({ daysLeft, recommendedPayment, ...rest }) => rest)
+  }
+
+  async getGoal(goalId: string): Promise<Goal> {
+    console.log('%cMOCK CALL getGoal ' + goalId, 'color: orange')
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    const goal = ALL_GOALS.find((g) => g.goalId === goalId)
+    if (!goal) throw new Error('Goal not found')
+    return goal
+  }
+
+  async getGoalTransactions(goalId: string): Promise<GoalTransaction[]> {
+    console.log('%cMOCK CALL getGoalTransactions ' + goalId, 'color: orange')
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    return GOAL_TRANSACTIONS_MAP[goalId] ?? []
   }
 
   async editGoal(payload: EditGoalPayload): Promise<void> {
-    await delay()
+    console.log('%cMOCK CALL editGoal', 'color: orange', payload)
+    await new Promise((resolve) => setTimeout(resolve, 800))
 
-    const index = goals.findIndex((g) => g.goalId === payload.goalId)
-    if (index === -1) {
-      throw new Error('Goal not found')
-    }
-
-    goals[index] = {
-      ...goals[index],
-      name: payload.name,
-      targetValue: payload.targetValue,
-      finishDate: payload.finishDate,
-    }
+    const index = ALL_GOALS.findIndex((g) => g.goalId === payload.goalId)
+    if (index === -1) return
+    ALL_GOALS[index] = { ...ALL_GOALS[index], ...payload }
   }
 
-  async createGoal(payload: Omit<EditGoalPayload, 'goalId'>): Promise<string> {
-    await delay()
+  async createGoal(payload: Omit<EditGoalPayload, 'goalId'>): Promise<{ goalId: string }> {
+    console.log('%cMOCK CALL createGoal', 'color: orange', payload)
+    await new Promise((resolve) => setTimeout(resolve, 800))
 
-    const goalId = Date.now().toString()
-
-    const newGoal: Goal = {
+    const goalId = `goal_${Date.now()}`
+    ALL_GOALS.unshift({
       goalId,
       name: payload.name,
       targetValue: payload.targetValue,
       currentValue: 0,
-      finishDate: payload.finishDate,
       status: 'ongoing',
-    }
+      isArchived: false,
+      tags: payload.tags,
+      priority: payload.priority ?? null,
+      finishDate: payload.finishDate,
+      daysLeft: 180,
+      recommendedPayment: Math.round(payload.targetValue / 6),
+    })
 
-    goals.push(newGoal)
-    goalTransactions[goalId] = []
+    GOAL_TRANSACTIONS_MAP[goalId] = []
+    return { goalId }
+  }
 
-    return goalId
+  async updateGoalStatus({ goalId, status }: { goalId: string; status: GoalStatus }) {
+    console.log('%cMOCK CALL updateGoalStatus', 'color: orange', { goalId, status })
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    const goal = ALL_GOALS.find((g) => g.goalId === goalId)
+    if (!goal) throw new Error('Goal not found')
+    goal.status = status
+    return { status }
+  }
+
+  async updateArchivedStatus(goalId: string): Promise<{ isArchived: boolean }> {
+    console.log('%cMOCK CALL updateArchivedStatus', 'color: orange', goalId)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    const goal = ALL_GOALS.find((g) => g.goalId === goalId)
+    if (!goal) throw new Error('Goal not found')
+    goal.isArchived = !goal.isArchived
+    return { isArchived: goal.isArchived }
   }
 }
 
-export const goalsMock = new GoalsApiMock()
+export const goalsMock = new GoalsMock()
