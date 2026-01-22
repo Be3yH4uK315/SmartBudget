@@ -1,7 +1,6 @@
 from app.infrastructure.db import models
 from app.domain.schemas.dtos import SessionDTO
 
-
 def session_to_dto(session: models.Session) -> SessionDTO:
     """Безопасный mapper ORM → DTO."""
     return SessionDTO(

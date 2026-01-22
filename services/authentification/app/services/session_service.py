@@ -63,11 +63,13 @@ class SessionService:
         )
 
     async def invalidate_user_cache(self, user_id: UUID) -> None:
+        """Удаляет кэш пользователя."""
         await self.redis.delete(
             redis_keys.get_user_cache_key(str(user_id))
         )
 
     async def clear_session_cache(self, session_id: UUID) -> None:
+        """Очищает кэш конкретной сессии."""
         await self.redis.delete(
             redis_keys.get_session_key(str(session_id))
         )
@@ -228,7 +230,8 @@ class SessionService:
             )
 
     async def validate_access_token(self, token: str) -> None:
-        payload = self.token_service.get_token_payload(token)
+        """Проверяет access токен и кэш сессии."""
+        payload = await self.token_service.get_token_payload(token)
         session_id = payload.get("sid")
         cache_key = redis_keys.get_session_key(session_id)
 
@@ -271,6 +274,7 @@ class SessionService:
         user_id: UUID,
         current_refresh_token: str | None,
     ) -> list[dtos.SessionDTO]:
+        """Получает все активные сессии пользователя."""
         current_fp = (
             crypto.hash_token(current_refresh_token)
             if current_refresh_token
@@ -302,6 +306,7 @@ class SessionService:
         user_id: UUID,
         session_id: UUID,
     ) -> None:
+        """Отзывает конкретную сессию."""
         async with self.uow:
             await self.uow.sessions.revoke_by_id(
                 user_id,
@@ -320,6 +325,7 @@ class SessionService:
         user_id: UUID,
         current_refresh_token: str,
     ) -> None:
+        """Отзывает все сессии кроме текущей."""
         current_fp = crypto.hash_token(current_refresh_token)
 
         async with self.uow:
@@ -336,6 +342,7 @@ class SessionService:
         self,
         user_id: UUID,
     ) -> None:
+        """Отзывает все сессии пользователя."""
         async with self.uow:
             revoked_ids = await self.uow.sessions.revoke_all_for_user(
                 user_id
@@ -349,7 +356,8 @@ class SessionService:
         self,
         token: str,
     ) -> tuple[dtos.UserDTO, str]:
-        payload = self.token_service.get_token_payload(token)
+        """Получает пользователя и ID сессии по access токену."""
+        payload = await self.token_service.get_token_payload(token)
         user_id = payload.get("sub")
         session_id = payload.get("sid")
 
@@ -417,6 +425,7 @@ class SessionService:
         return user_dto, session_id
     
     async def update_activity(self, session_id: UUID) -> None:
+        """Обновляет время последней активности сессии с троттлингом."""
         throttle_key = f"auth:session:activity:{session_id}"
 
         should_update = await self.redis.set(
@@ -435,6 +444,7 @@ class SessionService:
                 await self.uow.commit()
     
     async def update_user_retention_settings(self, user_id: UUID, days: int) -> None:
+        """Обновляет настройки срока жизни сессии пользователя."""
         async with self.uow:
             await self.uow.users.update_retention_days(user_id, days)
             await self.uow.commit()

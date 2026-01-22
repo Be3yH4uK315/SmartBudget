@@ -9,10 +9,8 @@ from app.domain.schemas import kafka as k_schemas
 from app.domain.schemas import dtos
 from app.utils import email_templates
 
-
 logger = logging.getLogger(__name__)
 settings = config.settings
-
 
 class AuthNotifier:
     """Сервис уведомлений."""
@@ -26,6 +24,7 @@ class AuthNotifier:
         event_type: k_schemas.AuthEventTypes,
         **kwargs,
     ) -> None:
+        """Сохраняет событие в outbox для последующей отправки в Kafka."""
         payload = {
             "event_type": event_type.value,
             **kwargs,
@@ -42,6 +41,7 @@ class AuthNotifier:
         ip: str,
         user_agent: str,
     ) -> None:
+        """Запускает фоновую задачу обогащения сессии."""
         await self.arq.enqueue_job(
             "enrich_session_task",
             session_id=session_id,
@@ -50,6 +50,7 @@ class AuthNotifier:
         )
 
     async def send_verification_email(self, email: str, token: str) -> None:
+        """Отправка письма для верификации email."""
         email_body = email_templates.get_verification_email_body(email, token)
 
         await self.arq.enqueue_job(
@@ -65,6 +66,7 @@ class AuthNotifier:
         )
 
     async def send_password_reset_email(self, email: str, token: str) -> None:
+        """Отправка письма для сброса пароля."""
         await self.arq.enqueue_job(
             "send_email_task",
             to=email,
@@ -98,6 +100,7 @@ class AuthNotifier:
         ip: str,
         location: str,
     ) -> None:
+        """Событие: регистрация нового пользователя."""
         await self._save_event(
             k_schemas.AuthEventTypes.USER_REGISTERED,
             user_id=str(user.user_id),
@@ -113,6 +116,7 @@ class AuthNotifier:
         ip: str,
         location: str,
     ) -> None:
+        """Событие: успешный вход пользователя."""
         await self._save_event(
             k_schemas.AuthEventTypes.USER_LOGIN,
             user_id=str(user.user_id),
@@ -127,6 +131,7 @@ class AuthNotifier:
         ip: str,
         location: str,
     ) -> None:
+        """Событие: неуспешный вход пользователя."""
         await self._save_event(
             k_schemas.AuthEventTypes.USER_LOGIN_FAILED,
             email=email,
@@ -135,12 +140,14 @@ class AuthNotifier:
         )
 
     async def notify_email_verified(self, email: str) -> None:
+        """Событие: верификация email."""
         await self._save_event(
             k_schemas.AuthEventTypes.VERIFICATION_VALIDATED,
             email=email,
         )
 
     async def notify_password_reset_validated(self, email: str) -> None:
+        """Событие: валидация токена сброса пароля."""
         await self._save_event(
             k_schemas.AuthEventTypes.PASSWORD_RESET_VALIDATED,
             email=email,
@@ -150,6 +157,7 @@ class AuthNotifier:
         self,
         user: dtos.UserDTO,
     ) -> None:
+        """Событие: завершение сброса пароля."""
         await self._save_event(
             k_schemas.AuthEventTypes.PASSWORD_RESET_COMPLETED,
             user_id=str(user.user_id),
@@ -157,6 +165,7 @@ class AuthNotifier:
         )
 
     async def notify_password_changed(self, user_id: str) -> None:
+        """Событие: смена пароля пользователем."""
         await self._save_event(
             k_schemas.AuthEventTypes.PASSWORD_CHANGED,
             user_id=user_id,
@@ -188,12 +197,14 @@ class AuthNotifier:
         )
 
     async def notify_profile_updated(self, user_id: str) -> None:
+        """Событие: обновление профиля пользователя."""
         await self._save_event(
             k_schemas.AuthEventTypes.PROFILE_UPDATED,
             user_id=user_id
         )
 
     async def notify_email_changed(self, user_id: str, old_email: str, new_email: str) -> None:
+        """Событие: смена email пользователя."""
         await self._save_event(
             k_schemas.AuthEventTypes.EMAIL_CHANGED,
             user_id=user_id,

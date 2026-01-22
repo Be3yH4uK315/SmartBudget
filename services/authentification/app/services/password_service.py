@@ -12,9 +12,7 @@ from app.services.session_service import SessionService
 from app.services.notifier import AuthNotifier
 from app.utils import redis_keys, crypto
 
-
 settings = config.settings
-
 
 class PasswordService:
     """Сервис управления паролями."""
@@ -59,6 +57,7 @@ class PasswordService:
         token: str,
         email: str,
     ) -> None:
+        """Проверяет токен сброса пароля."""
         redis_key = redis_keys.get_reset_password_key(email)
         stored_hash = await self.redis.get(redis_key)
 
@@ -82,6 +81,7 @@ class PasswordService:
         self,
         body: api_schemas.CompleteResetRequest,
     ) -> None:
+        """Завершение сброса пароля."""
         await self.validate_password_reset_token(
             body.token,
             body.email,
@@ -134,6 +134,7 @@ class PasswordService:
         user_id: UUID,
         body: api_schemas.ChangePasswordRequest,
     ) -> None:
+        """Смена пароля пользователем."""
         async with self.uow:
             user = await self.uow.users.get_by_id(user_id)
             if not user:

@@ -50,12 +50,14 @@ async def get_dadata_client(request: Request):
     return client
 
 def get_token_service() -> TokenService:
+    """Создает сервис токенов."""
     return TokenService()
 
 def get_auth_notifier(
     uow=Depends(get_uow),
     arq_pool=Depends(get_arq_pool)
 ) -> AuthNotifier:
+    """Создает сервис уведомлений аутентификации."""
     return AuthNotifier(uow=uow, arq_pool=arq_pool)
 
 def get_session_service(
@@ -64,6 +66,7 @@ def get_session_service(
     token_service=Depends(get_token_service),
     notifier=Depends(get_auth_notifier)
 ) -> SessionService:
+    """Создает сервис сессий."""
     return SessionService(
         uow=uow, 
         redis=redis, 
@@ -77,6 +80,7 @@ def get_registration_service(
     session_service=Depends(get_session_service),
     notifier=Depends(get_auth_notifier)
 ) -> RegistrationService:
+    """Создает сервис регистрации."""
     return RegistrationService(
         uow=uow,
         redis=redis,
@@ -90,6 +94,7 @@ def get_login_service(
     session_service=Depends(get_session_service),
     notifier=Depends(get_auth_notifier)
 ) -> LoginService:
+    """Создает сервис логина."""
     return LoginService(
         uow=uow,
         redis=redis,
@@ -103,6 +108,7 @@ def get_password_service(
     session_service=Depends(get_session_service),
     notifier=Depends(get_auth_notifier)
 ) -> PasswordService:
+    """Создает сервис управления паролями."""
     return PasswordService(
         uow=uow,
         redis=redis,
@@ -116,6 +122,7 @@ def get_profile_service(
     session_service=Depends(get_session_service),
     notifier=Depends(get_auth_notifier)
 ) -> ProfileService:
+    """Создает сервис управления профилем пользователя."""
     return ProfileService(
         uow=uow,
         redis=redis,
@@ -150,6 +157,7 @@ async def get_current_active_user(
     background_tasks: BackgroundTasks,
     session_service: SessionService = Depends(get_session_service)
 ) -> UserDTO:
+    """Извлекает текущего активного пользователя из access_token в cookies."""
     access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -174,4 +182,4 @@ async def get_user_id_from_expired_token(
     token = request.cookies.get("access_token")
     if not token:
         return None
-    return token_service.get_user_id_from_expired_token(token)
+    return await token_service.get_user_id_from_expired_token(token)

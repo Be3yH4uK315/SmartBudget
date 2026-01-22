@@ -16,10 +16,8 @@ from app.services.session_service import SessionService
 from app.services.notifier import AuthNotifier
 from app.utils import crypto, time
 
-
 logger = logging.getLogger(__name__)
 settings = config.settings
-
 
 class LoginService:
     """Сервис аутентификации."""
@@ -42,6 +40,7 @@ class LoginService:
         ip: str,
         user_agent: str | None,
     ) -> tuple[UserDTO, SessionDTO, str, str]:
+        """Аутентификация пользователя."""
         location = "Unknown"
 
         async with self.uow:
@@ -189,6 +188,7 @@ class LoginService:
         user_id: str,
         refresh_token: str,
     ) -> None:
+        """Выход пользователя из системы."""
         fingerprint = crypto.hash_token(refresh_token)
         session_id: UUID | None = None
 

@@ -20,7 +20,7 @@ class UserRepository(BaseRepository):
         return await self.db.get(models.User, user_id)
 
     async def get_role_by_id(self, user_id: UUID) -> int:
-        """Получает только роль пользователя по ID (оптимизация)."""
+        """Получает только роль пользователя по ID."""
         result = await self.db.execute(
             select(models.User.role).where(models.User.user_id == user_id)
         )
@@ -56,7 +56,6 @@ class UserRepository(BaseRepository):
 
     async def update_profile_data(self, user_id: UUID, name: str | None, gender: str | None) -> None:
         """Обновляет основные данные профиля."""
-        # Собираем словарь изменений динамически
         values = {"updated_at": time.utc_now()}
         
         if name is not None:

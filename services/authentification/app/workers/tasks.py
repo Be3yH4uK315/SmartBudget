@@ -67,7 +67,7 @@ async def enrich_session_task(ctx, session_id: UUID, ip: str, user_agent: str):
         logger.error(f"Failed to enrich session: {e}")
 
 async def send_email_task(ctx, to: str, subject: str, body: str, retry_count: int = 0):
-    """Задача отправки email (выполняется worker-ом) с retry logic."""
+    """Задача отправки email с retry logic."""
     MAX_RETRIES = 3
     await touch_health_file()
     logger.info(f"Sending email to {to} (attempt {retry_count + 1}/{MAX_RETRIES})")

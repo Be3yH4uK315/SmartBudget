@@ -56,7 +56,6 @@ class ProfileService:
             
             await self.uow.refresh(user)
             user_dto = user_to_dto(user)
-
             await self.notifier.notify_profile_updated(str(user_id))
             await self.uow.commit()
 
@@ -136,10 +135,8 @@ class ProfileService:
 
             try:
                 await self.uow.users.update_email(user_id, new_email)
-                
                 await self.uow.refresh(user)
                 user_dto = user_to_dto(user)
-
                 await self.notifier.notify_email_changed(str(user_id), old_email, new_email)
                 await self.uow.commit()
 
@@ -147,9 +144,7 @@ class ProfileService:
                 raise exceptions.EmailAlreadyExistsError("Email already in use")
         
         await self.redis.delete(redis_key)
-
         await self.session_service.invalidate_user_cache(user_id)
-        
         await self.session_service.revoke_all_user_sessions(user_id)
         
         return user_dto

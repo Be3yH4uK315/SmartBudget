@@ -98,7 +98,8 @@ async def readiness_check(request: Request) -> Response:
     "/verify-email",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Начало верификации email"
 )
 async def verify_email(
     body: schemas.VerifyEmailRequest = Body(...),
@@ -113,7 +114,8 @@ async def verify_email(
     "/verify-link",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Проверка верификационной или сбросной ссылки"
 )
 async def verify_link(
     token: str = Query(...),
@@ -136,7 +138,8 @@ async def verify_link(
     "/complete-registration", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Завершение регистрации пользователя"
 )
 async def complete_registration(
     response: Response,
@@ -156,7 +159,8 @@ async def complete_registration(
     "/login", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Аутентификация пользователя"
 )
 async def login(
     response: Response,
@@ -175,7 +179,8 @@ async def login(
 @router.post(
     "/logout", 
     status_code=200,
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Выход пользователя из системы"
 )
 async def logout(
     response: Response,
@@ -198,7 +203,8 @@ async def logout(
     "/reset-password", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Начало сброса пароля пользователя"
 )
 async def reset_password(
     body: schemas.ResetPasswordRequest = Body(...),
@@ -211,7 +217,8 @@ async def reset_password(
 @router.post(
     "/complete-reset", 
     status_code=200,
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Завершение сброса пароля пользователя"
 )
 async def complete_reset(
     body: schemas.CompleteResetRequest = Body(...),
@@ -221,7 +228,11 @@ async def complete_reset(
     return schemas.UnifiedResponse(status="success", action="completeReset", detail="Password reset completed.")
 
 
-@router.post("/change-password", status_code=200, response_model=schemas.UnifiedResponse)
+@router.post("/change-password", 
+    status_code=200, 
+    response_model=schemas.UnifiedResponse,
+    summary="Смена пароля пользователя"
+)
 async def change_password(
     body: schemas.ChangePasswordRequest = Body(...),
     pwd_service: PasswordService = Depends(dependencies.get_password_service),
@@ -231,14 +242,22 @@ async def change_password(
     return schemas.UnifiedResponse(status="success", action="changePassword", detail="Password changed.")
 
 
-@router.get("/me", status_code=200, response_model=schemas.UserInfo)
+@router.get("/me", 
+    status_code=200, 
+    response_model=schemas.UserInfo,
+    summary="Получение информации о текущем пользователе"
+)
 async def get_current_user_info(
     user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
 ):
     return user
 
 
-@router.patch("/me/profile", status_code=200, response_model=schemas.UnifiedResponse)
+@router.patch("/me/profile",
+    status_code=200, 
+    response_model=schemas.UnifiedResponse,
+    summary="Обновление профиля пользователя"
+)
 async def update_profile(
     body: schemas.UpdateProfileRequest = Body(...),
     profile_service: ProfileService = Depends(dependencies.get_profile_service),
@@ -251,7 +270,8 @@ async def update_profile(
     "/me/email/request", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Инициация смены email пользователя"
 )
 async def request_email_change(
     body: schemas.InitiateEmailChangeRequest = Body(...),
@@ -269,7 +289,8 @@ async def request_email_change(
     "/me/email/confirm", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Подтверждение смены email пользователя"
 )
 async def confirm_email_change(
     response: Response,
@@ -289,7 +310,8 @@ async def confirm_email_change(
 @router.patch(
     "/me/retention", 
     status_code=200, 
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Обновление настроек хранения сессий пользователя"
 )
 async def update_retention_settings(
     body: schemas.UpdateRetentionRequest,
@@ -308,7 +330,8 @@ async def update_retention_settings(
 @router.get(
     "/me/retention",
     status_code=200,
-    response_model=schemas.RetentionInfo
+    response_model=schemas.RetentionInfo,
+    summary="Получение настроек хранения сессий пользователя"
 )
 async def get_retention_settings(
     user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
@@ -316,7 +339,11 @@ async def get_retention_settings(
     return schemas.RetentionInfo(days=user.retention_days)
 
 
-@router.get("/sessions", status_code=200, response_model=schemas.AllSessionsResponse)
+@router.get("/sessions", 
+    status_code=200, 
+    response_model=schemas.AllSessionsResponse,
+    summary="Получение всех сессий пользователя"
+)
 async def get_all_user_sessions(
     request: Request,
     session_service: SessionService = Depends(dependencies.get_session_service),
@@ -327,7 +354,11 @@ async def get_all_user_sessions(
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
-@router.delete("/sessions/{sessionId}", status_code=200, response_model=schemas.UnifiedResponse)
+@router.delete("/sessions/{sessionId}", 
+    status_code=200, 
+    response_model=schemas.UnifiedResponse,
+    summary="Ревокация сессии пользователя по ID"
+)
 async def revoke_session(
     sessionId: str,
     session_service: SessionService = Depends(dependencies.get_session_service),
@@ -341,7 +372,8 @@ async def revoke_session(
     "/sessions/logout-others", 
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Ревокация всех других сессий пользователя"
 )
 async def revoke_other_sessions(
     request: Request,
@@ -359,7 +391,8 @@ async def revoke_other_sessions(
 @router.post(
     "/validate-token", 
     status_code=200,
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Валидация access токена пользователя"
 )
 async def validate_token(
     body: schemas.TokenValidateRequest = Body(...),
@@ -373,7 +406,8 @@ async def validate_token(
     "/refresh", 
     status_code=200, 
     dependencies=[Depends(RateLimiter(times=30, seconds=60))],
-    response_model=schemas.UnifiedResponse
+    response_model=schemas.UnifiedResponse,
+    summary="Обновление access и refresh токенов пользователя"
 )
 async def refresh(
     response: Response,

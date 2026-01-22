@@ -18,6 +18,7 @@ class TokenService:
     """Сервис для работы с JWT токенами."""
 
     def create_access_token(self, user_id: str, role: int, session_id: str) -> str:
+        """Создает JWT access токен."""
         payload = {
             "sub": user_id,
             "sid": session_id,
