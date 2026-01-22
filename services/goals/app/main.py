@@ -52,6 +52,7 @@ async def tracing_middleware(
     request: Request,
     call_next,
 ):
+    """Middleware для установки и передачи Request ID."""
     req_id = (
         request.headers.get("X-Request-ID")
         or request.headers.get("X-Correlation-ID")

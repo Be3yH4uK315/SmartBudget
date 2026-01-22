@@ -13,6 +13,7 @@ from app.workers.tasks import (
 )
 
 async def on_startup(ctx):
+    """Инициализация контекста воркера."""
     setup_logging()
 
     engine = get_db_engine()
@@ -26,6 +27,7 @@ async def on_startup(ctx):
     ctx["outbox_task"] = asyncio.create_task(run_outbox_loop(ctx))
 
 async def on_shutdown(ctx):
+    """Очистка ресурсов при завершении работы воркера."""
     if ctx.get("outbox_task"):
         ctx["outbox_task"].cancel()
         try:
@@ -40,6 +42,7 @@ async def on_shutdown(ctx):
         await ctx["db_engine"].dispose()
 
 class WorkerSettings:
+    """Настройки воркера ARQ."""
     functions = [
         check_goals_deadlines_task,
         cleanup_transactions_task,

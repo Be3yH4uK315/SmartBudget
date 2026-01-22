@@ -18,6 +18,7 @@ HEALTH_FILE = Path("/tmp/healthy")
 BATCH_SIZE = 100
 
 async def keep_alive_task() -> None:
+    """Периодически обновляет файл здоровья для k8s/docker."""
     while True:
         try:
             HEALTH_FILE.touch(exist_ok=True)
@@ -30,6 +31,7 @@ async def consume_loop(
     db_session_maker,
     dlq_producer: KafkaProducerWrapper,
 ) -> None:
+    """Основной цикл потребителя Kafka для обработки событий транзакций."""
     consumer = AIOKafkaConsumer(
         settings.KAFKA.KAFKA_TOPIC_TRANSACTION_GOAL,
         bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
@@ -91,6 +93,7 @@ async def process_batch(
     db_session_maker,
     dlq_producer: KafkaProducerWrapper,
 ) -> None:
+    """Обрабатывает пакет сообщений из Kafka."""
     async with UnitOfWork(db_session_maker) as uow:
         service = GoalService(uow)
 

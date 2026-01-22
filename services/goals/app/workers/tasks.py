@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 HEALTH_FILE = Path("/tmp/healthy")
 
 async def touch_health_file() -> None:
+    """Обновляет файл здоровья для k8s/docker."""
     try:
         HEALTH_FILE.touch()
     except OSError:
@@ -139,6 +140,7 @@ async def process_outbox_batch(ctx) -> int:
         return len(successful_ids)
 
 async def cleanup_transactions_task(ctx) -> None:
+    """Очистка старых обработанных транзакций целей."""
     db_maker = ctx.get("db_session_maker")
     if not db_maker:
         return
@@ -157,6 +159,7 @@ async def cleanup_transactions_task(ctx) -> None:
         )
 
 async def check_goals_deadlines_task(ctx) -> None:
+    """Проверка сроков целей и отправка уведомлений."""
     db_maker = ctx.get("db_session_maker")
     if not db_maker:
         return

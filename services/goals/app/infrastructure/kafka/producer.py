@@ -21,11 +21,13 @@ class KafkaProducerWrapper:
         self._is_running = False
 
     async def start(self) -> None:
+        """Запускает Kafka producer."""
         await self.producer.start()
         self._is_running = True
         logger.info("Kafka producer started")
 
     async def stop(self) -> None:
+        """Останавливает Kafka producer."""
         if self._is_running and self.producer:
             await self.producer.stop()
             self._is_running = False
