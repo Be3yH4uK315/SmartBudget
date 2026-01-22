@@ -1,0 +1,50 @@
+import { changePasswordApiRequest, Session } from '@features/settings/types'
+import { api } from '@shared/api'
+
+class SettingsApi {
+  baseUrl = '/settings'
+
+  async getSessions(): Promise<{ sessions: Session[] }> {
+    const url = `${this.baseUrl}/sessions`
+
+    const response = await api.get<{ sessions: Session[] }>(url)
+    return response.data
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    const url = `${this.baseUrl}/sessions/${sessionId}`
+
+    const response = await api.delete<void>(url)
+    return response.data
+  }
+
+  async deleteOtherSessions(): Promise<void> {
+    const url = `${this.baseUrl}/sessions/logout-others`
+
+    const response = await api.post<void>(url)
+    return response.data
+  }
+
+  async changePassword({ ...payload }: changePasswordApiRequest): Promise<void> {
+    const url = `${this.baseUrl}/change-password`
+
+    const response = await api.post<void>(url, payload)
+    return response.data
+  }
+
+  async getRefreshTokenDuration(): Promise<{ days: number }> {
+    const url = `${this.baseUrl}/sessions/retention`
+
+    const response = await api.get<{ days: number }>(url)
+    return response.data
+  }
+
+  async setRefreshTokenDuration(payload: number): Promise<void> {
+    const url = `${this.baseUrl}/sessions/retention`
+
+    const response = await api.patch<void>(url, payload)
+    return response.data
+  }
+}
+
+export const settingsApi = new SettingsApi()
