@@ -3,19 +3,74 @@ import { LocaleDictionary } from '@shared/types'
 export const goalsDict: LocaleDictionary = {
   ru: {
     Goals: {
-      noGoals: {
-        title: 'Целей нет',
-        subtitle: 'Здесь можно создать цель и копить на приятные мелочи',
+      NoGoals: {
+        Empty: {
+          Archive: {
+            title: 'Архив пока пуст',
+            subtitle: ' ',
+          },
+
+          title: 'Нет целей',
+          subtitle: 'Здесь можно создать цель и копить на приятные мелочи',
+        },
+
+        Filtered: {
+          Archive: {
+            title: 'Кажется, таких целей нет',
+            subtitle: 'Попробуйте убрать лишние фильтры',
+          },
+
+          title: 'Кажется, таких целей нет',
+          subtitle: 'Попробуйте убрать лишние фильтры',
+        },
       },
 
       title: 'Ваши цели',
       create: 'Создать цель',
-      edit: 'Сохранить изменения',
-      editGoal: 'Редактирвоание Цели',
-      createGoal: 'Создание цели',
-      date: 'Дата окончания',
-      name: 'Название',
-      value: 'Сумма',
+
+      archiveTitle: 'Архив целей',
+      goBack: 'Назад',
+
+      Modal: {
+        editTitle: 'Редактирвоание Цели',
+        editButton: 'Сохранить изменения',
+
+        createTitle: 'Создание цели',
+        createButton: 'Создать цель',
+
+        name: 'Название',
+        value: 'Сумма',
+        date: 'Дата окончания',
+
+        priorityTags: 'Приоритет цели',
+        otherTags: 'Прочие тэги',
+      },
+
+      Tags: {
+        selected: 'Выбрано: {{value}}',
+        placeholder: {
+          tags: 'Тэги',
+          priority: 'Приоритет',
+        },
+        clear: 'Сбросить фильтры',
+        archive: 'Архив',
+
+        High: 'Высокий приоритет',
+        Medium: 'Средний приоритет',
+        Low: 'Низкий Приоритет',
+        Health: 'Здоровье',
+        Education: 'Образование',
+        Sport: 'Спорт',
+        Travel: 'Путешествия',
+        Home: 'Дом',
+        Auto: 'Авто',
+        Family: 'Семья',
+        Presents: 'Подарки',
+        Gadgets: 'Гаджеты',
+        Charity: 'Благотворительность',
+        RealEstate: 'Недвижимость',
+        FinancialCushion: 'Подушка безопасности',
+      },
 
       GoalsStats: {
         progress: 'Прогресс по всем целям',
@@ -24,14 +79,9 @@ export const goalsDict: LocaleDictionary = {
       },
 
       GoalBlock: {
-        currentValue: 'Накоплено: ',
-        achieveValue: 'Осталось: ',
-        finishDate: 'Дата окончания: ',
-
-        achieved: 'Достигнута',
-        expired: 'Просрочена',
-        closed: 'Закрыта',
-        ongoing: 'В процессе',
+        currentValue: 'Накоплено: {{value}}',
+        targetValue: 'Осталось: {{value}}',
+        finishDate: 'Дата окончания: {{value}}',
       },
 
       CurrentGoal: {
@@ -50,21 +100,55 @@ export const goalsDict: LocaleDictionary = {
         },
       },
     },
+
+    GoalStatus: {
+      achieved: 'Достигнута',
+      expired: 'Просрочена',
+      closed: 'Закрыта',
+      ongoing: 'В процессе',
+
+      archived: 'В архиве',
+    },
+
     CurrentGoal: {
       goBack: 'Назад',
-      finishDate: 'Дата окончания: {{date}}',
-      progress: 'Ваш прогресс по текущей целе',
-      autoAdd: 'Подключите автопополнение, чтобы достигать цели быстрее',
+      finishDate: 'Дата окончания: {{value}}',
+      targetValue: 'Осталось накопить: {{value}}',
 
-      settings: 'Настроить цель',
-      settingsSubtitle: 'Редактировать название, сумму цели и дату окончания',
+      Settings: {
+        title: 'Настроить цель',
+        subtitle: 'Редактировать название, сумму цели и дату окончания',
+      },
 
-      closeGoal: 'Удалить цель',
+      ActionsButtonsBlock: {
+        buttonClose: 'Завершить цель',
+        buttonRestore: 'Восстановить цель',
+
+        archive: 'Переместить в архив',
+        unarchive: 'Вернуть из архива',
+      },
 
       TransactionsPieBlock: {
         title: 'Текущий результат',
         income: 'Пополнения',
         expense: 'Расходы',
+      },
+
+      TagsBlock: {
+        title: 'Список тэгов',
+        subtitle: 'Вы можете добавить или удалить тэги в настройках',
+        noTagsSubtitle: 'Вы не установили тэги для этой цели',
+        button: 'Установить тэги',
+      },
+
+      ProgressBlock: {
+        title: 'Ваш прогресс по текущей цели',
+        subtitle: 'Подключите автопополнение, чтобы достигать цели быстрее',
+      },
+
+      ExpiredBlock: {
+        title: 'Цель просрочена',
+        subtitle: 'Вы можете установть новую дату окончания цели в настройках',
       },
     },
   },

@@ -36,7 +36,7 @@ export const GoalsBlock = ({ goals }: Props) => {
         <Button
           variant="gray"
           sx={{ height: 'auto', width: '100%' }}
-          onClick={() => navigate(ROUTES.PAGES.GOALS)}
+          onClick={() => navigate(ROUTES.PAGES.GOALS.MAIN)}
         >
           {translate('createButton')}
         </Button>

@@ -1,12 +1,7 @@
 import { STATUS_PRIORITY } from '@features/goals/constants/sortOrder'
-import { Goal } from '@features/goals/types'
+import { GoalsStats, SimplifiedGoal } from '@features/goals/types'
 
-type GoalsStats = {
-  targetValue: number
-  currentValue: number
-}
-
-export function getGoalsStats(goals: Goal[]): GoalsStats {
+export function getGoalsStats(goals: SimplifiedGoal[]): GoalsStats {
   const { targetValue, currentValue } = goals.reduce<GoalsStats>(
     (acc, goal) => {
       acc.currentValue += goal.currentValue
@@ -23,7 +18,7 @@ export function getGoalsStats(goals: Goal[]): GoalsStats {
   return { targetValue, currentValue }
 }
 
-export const sortGoals = (goals: Goal[]): Goal[] =>
+export const sortGoals = (goals: SimplifiedGoal[]): SimplifiedGoal[] =>
   [...goals].sort((a, b) => {
     const statusDiff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]
 
@@ -34,7 +29,10 @@ export const sortGoals = (goals: Goal[]): Goal[] =>
     return b.currentValue / b.targetValue - a.currentValue / a.targetValue
   })
 
-export const pushIntoSorted = (goals: Goal[], newGoal: Goal): Goal[] => {
+export const pushIntoSorted = (
+  goals: SimplifiedGoal[],
+  newGoal: SimplifiedGoal,
+): SimplifiedGoal[] => {
   const result = [...goals]
   const index = result.findIndex((g) => sortGoals([newGoal, g])[0] === newGoal)
 

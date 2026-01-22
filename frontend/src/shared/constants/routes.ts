@@ -2,7 +2,10 @@ export const ROUTES = {
   PAGES: {
     PUBLIC_PAGE: '/',
     TRANSACTIONS: '/transactions',
-    GOALS: '/goals',
+    GOALS: {
+      MAIN: '/goals',
+      ARCHIVE: '/goals/archive',
+    },
     DASHBOARD: '/main',
     SETTINGS: '/settings',
     BUDGET_SETTINGS: '/settings/budget',
@@ -11,6 +14,7 @@ export const ROUTES = {
     RESET_PASSWORD: '/auth/reset-password',
     REGISTRATION: '/auth/registration',
   },
+  GO_BACK: '../',
 }
 
 export const PUBLIC_ROUTES = [

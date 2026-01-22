@@ -4,20 +4,23 @@ import { formatPercent } from '@shared/utils'
 type Props = {
   limit: number
   currentValue: number
+  color?: string
 }
 
-export const PercentLine = ({ limit, currentValue }: Props) => {
+export const PercentLine = ({ limit, currentValue, color }: Props) => {
   const theme = useTheme()
 
   const percent = (currentValue / limit) * 100
   const overLimit = currentValue / limit >= 0.999
   const preOverLimit = currentValue / limit >= 0.8
 
-  const lineColor = overLimit
-    ? theme.palette.error.main
-    : preOverLimit
-      ? theme.palette.primary.main
-      : theme.palette.success.main
+  const lineColor = color
+    ? color
+    : overLimit
+      ? theme.palette.error.main
+      : preOverLimit
+        ? theme.palette.primary.main
+        : theme.palette.success.main
 
   return (
     <Stack direction="row" spacing={1} alignItems="center">

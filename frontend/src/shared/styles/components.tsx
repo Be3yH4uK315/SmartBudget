@@ -266,7 +266,7 @@ export const components: ThemeOptions['components'] = {
       select: ({ theme }) => ({
         display: 'flex',
         alignItems: 'center',
-        padding: theme.spacing(2),
+        paddingLeft: theme.spacing(2),
       }),
 
       icon: ({ theme }) => ({
@@ -299,9 +299,9 @@ export const components: ThemeOptions['components'] = {
         },
       }),
 
-      input: ({ theme }) => ({
-        padding: theme.spacing(2),
-      }),
+      // input: ({ theme }) => ({
+      //   padding: theme.spacing(2),
+      // }),
     },
   },
 

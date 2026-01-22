@@ -40,6 +40,12 @@ export const typography: TypographyVariantsOptions = {
     fontSize: '1.5rem',
   },
 
+  h6: {
+    fontFamily: brandTinkoffFont,
+    fontWeight: '500',
+    fontSize: '1.25rem',
+  },
+
   caption: {
     fontFamily: brandFont,
     fontWeight: '400',

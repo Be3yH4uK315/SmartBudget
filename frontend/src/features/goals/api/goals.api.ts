@@ -1,20 +1,40 @@
+import {
+  EditGoalPayload,
+  Goal,
+  GoalsFilters,
+  GoalStatus,
+  GoalTransaction,
+  SimplifiedGoal,
+  UpdateGoalStatusPayload,
+} from '@features/goals/types'
 import { api } from '@shared/api'
-import { CurrentGoal, EditGoalPayload, Goal, GoalTransaction } from '../types/goals'
 
 class GoalsApi {
   baseUrl = '/goals'
 
-  async getGoals(): Promise<Goal[]> {
+  async getGoals(filters?: GoalsFilters): Promise<SimplifiedGoal[]> {
     const url = `${this.baseUrl}/`
 
-    const response = await api.get<Goal[]>(url)
+    const params: Record<string, string> = {}
+
+    if (filters && filters.tags.length > 0) {
+      params.tags = filters.tags.join(',')
+    }
+
+    if (filters && filters.priority.length > 0) {
+      params.priorities = filters.priority.join(',')
+    }
+
+    if (filters && filters.isArchived) params.isArchived = 'True'
+
+    const response = await api.get<SimplifiedGoal[]>(url, { params })
     return response.data
   }
 
-  async getGoal(goalId: string): Promise<CurrentGoal> {
-    const url = `${this.baseUrl}?goalId=${goalId}`
+  async getGoal(goalId: string): Promise<Goal> {
+    const url = `${this.baseUrl}/${goalId}`
 
-    const response = await api.get<CurrentGoal>(url)
+    const response = await api.get<Goal>(url)
     return response.data
   }
 
@@ -37,6 +57,23 @@ class GoalsApi {
     const url = `${this.baseUrl}`
 
     const response = await api.post<{ goalId: string }>(url, payload)
+    return response.data
+  }
+
+  async updateGoalStatus({
+    goalId,
+    status,
+  }: UpdateGoalStatusPayload): Promise<{ status: GoalStatus }> {
+    const url = `${this.baseUrl}/${goalId}/${status === 'closed' ? 'restore' : 'close'}`
+
+    const response = await api.post<{ status: GoalStatus }>(url)
+    return response.data
+  }
+
+  async updateArchivedStatus(goalId: string): Promise<{ isArchived: boolean }> {
+    const url = `${this.baseUrl}/${goalId}/archive`
+
+    const response = await api.patch<{ isArchived: boolean }>(url)
     return response.data
   }
 }

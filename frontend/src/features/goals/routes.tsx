@@ -20,6 +20,15 @@ export const goalsRoutes = {
       />
 
       <Route
+        path="archive"
+        element={
+          <SuspenseFallbackWrapper Fallback={<GoalsScreenSkeleton />}>
+            <GoalsScreen />
+          </SuspenseFallbackWrapper>
+        }
+      />
+
+      <Route
         path=":id"
         element={
           <SuspenseFallbackWrapper Fallback={<CurrentGoalScreenSkeleton />}>
