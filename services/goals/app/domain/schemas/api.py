@@ -31,6 +31,7 @@ class CreateGoalResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID созданной цели")
 
 class GoalResponse(CamelModel):
+    goal_id: UUID = Field(..., description="ID цели")
     name: str = Field(..., description="Название цели")
     target_value: Decimal = Field(..., description="Целевая сумма")
     current_value: Decimal = Field(..., description="Текущая накопленная сумма")
@@ -92,9 +93,9 @@ class GoalPatchRequest(CamelModel):
         None,
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
     )
-    status: Optional[GoalStatus] = Field(None, description="Статус цели")
     tags: Optional[list[str]] = Field(None, description="Список тегов")
     priority: Optional[GoalPriority] = Field(None, description="Приоритет (high, medium, low)")
+    is_archived: Optional[bool] = Field(None, description="Поместить в архив (true) или восстановить (false)")
 
-class ArchiveRequest(CamelModel):
-    is_archived: bool = Field(..., description="Поместить в архив (true) или восстановить (false)")
+class GoalStatusResponse(CamelModel):
+    status: GoalStatus = Field(..., description="Статус цели")

@@ -8,6 +8,7 @@ from app.api import dependencies
 from app.domain.enums import GoalPriority
 from app.domain.schemas import api as schemas
 from app.services.service import GoalService
+from app.api.dependencies import GoalFilters
 
 router = APIRouter(tags=["Goals"])
 
@@ -114,21 +115,17 @@ async def get_main_goals(
     summary="Получение списка целей с фильтрами",
 )
 async def get_goals(
-    limit: int = Query(100, ge=1, le=1000, description="Лимит записей"),
-    offset: int = Query(0, ge=0, description="Смещение"),
-    tags: Optional[List[str]] = Query(None, description="Фильтр по тегам (логика ИЛИ)"),
-    priorities: Optional[List[GoalPriority]] = Query(None, description="Фильтр по приоритетам (ИЛИ)"),
-    is_archived: bool = Query(False, description="Показывать архивные"),
+    filters: GoalFilters = Depends(),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.get_all_goals(
         user_id=user_id,
-        limit=limit,
-        offset=offset,
-        tags=tags,
-        priorities=priorities,
-        is_archived=is_archived,
+        limit=filters.limit,
+        offset=filters.offset,
+        tags=filters.tags_list,
+        priorities=filters.priorities_list,
+        is_archived=filters.is_archived
     )
 
 @router.get(
@@ -158,7 +155,7 @@ async def update_goal(
 
 @router.post(
     "/{goal_id}/close",
-    response_model=schemas.GoalResponse,
+    response_model=schemas.GoalStatusResponse,
     summary="Принудительное закрытие цели",
 )
 async def close_goal(
@@ -170,7 +167,7 @@ async def close_goal(
 
 @router.post(
     "/{goal_id}/restore",
-    response_model=schemas.GoalResponse,
+    response_model=schemas.GoalStatusResponse,
     summary="Восстановление цели",
 )
 async def restore_goal(
@@ -179,21 +176,3 @@ async def restore_goal(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.restore_goal(user_id, goal_id)
-
-
-@router.patch(
-    "/{goal_id}/archive",
-    response_model=schemas.GoalResponse,
-    summary="Архивация / разархивация цели",
-)
-async def archive_goal(
-    goal_id: UUID = Path(..., description="ID цели"),
-    request: schemas.ArchiveRequest = Body(...),
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: GoalService = Depends(dependencies.get_goal_service),
-):
-    return await service.set_archived(
-        user_id=user_id,
-        goal_id=goal_id,
-        is_archived=request.is_archived,
-    )

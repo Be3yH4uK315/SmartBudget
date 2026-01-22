@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import exceptions
 from app.core.context import get_request_id
-from app.domain.enums import GoalPriority, GoalStatus
+from app.domain.enums import GoalPriority, GoalStatus, TransactionType
 from app.infrastructure.db import models
 from app.utils import serialization
 
@@ -39,6 +39,7 @@ class GoalRepository:
         user_id: UUID,
         goal_id: UUID,
     ) -> models.Goal | None:
+        """Получает цель по ID."""
         result = await self.db.execute(
             select(models.Goal).where(
                 models.Goal.goal_id == goal_id,
@@ -48,6 +49,7 @@ class GoalRepository:
         return result.scalar_one_or_none()
 
     async def get_for_update(self, goal_id: UUID) -> models.Goal | None:
+        """Получает цель по ID с блокировкой для обновления."""
         result = await self.db.execute(
             select(models.Goal)
             .where(models.Goal.goal_id == goal_id)
@@ -56,6 +58,7 @@ class GoalRepository:
         return result.scalar_one_or_none()
 
     async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
+        """Получение основных целей пользователя (до 5 штук с наименьшим остатком)."""
         remaining_amount = (
             models.Goal.target_value
             - models.Goal.current_value
@@ -84,7 +87,7 @@ class GoalRepository:
         priorities: Optional[list[GoalPriority]] = None,
         is_archived: bool = False,
     ) -> list[models.Goal]:
-        """Получение целей с пагинацией."""
+        """Получение всех целей пользователя с фильтрами и сортировкой."""
 
         status_priority = case(
             (models.Goal.status == GoalStatus.ONGOING.value, 1),
@@ -116,7 +119,7 @@ class GoalRepository:
         query = query.where(models.Goal.is_archived == is_archived)
 
         if tags:
-            query = query.where(models.Goal.tags.overlap(tags))
+            query = query.where(models.Goal.tags.contains(tags))
 
         if priorities:
             priority_values = [p.value for p in priorities]
@@ -136,23 +139,48 @@ class GoalRepository:
         return result.scalars().all()
 
     def create(self, goal_model: models.Goal) -> models.Goal:
+        """Создает новую цель (не делает commit)."""
         self.db.add(goal_model)
         return goal_model
+
+    async def get_net_change_for_current_month(self, goal_id: UUID) -> Decimal:
+        """Считает чистое изменение баланса с начала месяца."""
+        now = datetime.now(timezone.utc)
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        query = select(
+            func.sum(
+                case(
+                    (models.ProcessedTransaction.transaction_type == TransactionType.INCOME.value, models.ProcessedTransaction.amount),
+                    else_=-models.ProcessedTransaction.amount
+                )
+            )
+        ).where(
+            models.ProcessedTransaction.goal_id == goal_id,
+            models.ProcessedTransaction.created_at >= start_of_month
+        )
+        
+        result = await self.db.execute(query)
+        net_change = result.scalar()
+        
+        return net_change if net_change is not None else Decimal("0.00")
 
     async def adjust_balance(
         self,
         user_id: UUID,
         goal_id: UUID,
-        amount: Decimal,
+        amount_delta: Decimal,
         transaction_id: UUID,
+        raw_amount: Decimal,
+        transaction_type: str
     ) -> models.Goal | None:
         """Обновляет баланс цели."""
 
-        stmt_check = insert(
-            models.ProcessedTransaction
-        ).values(
+        stmt_check = insert(models.ProcessedTransaction).values(
             transaction_id=transaction_id,
             goal_id=goal_id,
+            amount=raw_amount,
+            transaction_type=transaction_type
         )
 
         try:
@@ -160,11 +188,7 @@ class GoalRepository:
         except IntegrityError:
             return None
         except DBAPIError as e:
-            logger.warning(
-                "Insert failed, attempting to ensure partition exists. "
-                "Error: %s",
-                e,
-            )
+            logger.warning(f"Insert failed, ensuring partition. Error: {e}")
             await self.ensure_current_partition()
             try:
                 await self.db.execute(stmt_check)
@@ -173,7 +197,7 @@ class GoalRepository:
 
         new_value = sa.func.greatest(
             Decimal(0),
-            models.Goal.current_value + amount,
+            models.Goal.current_value + amount_delta,
         )
 
         query = (
@@ -181,12 +205,10 @@ class GoalRepository:
             .where(
                 models.Goal.goal_id == goal_id,
                 models.Goal.user_id == user_id,
-                models.Goal.status.in_(
-                    [
-                        GoalStatus.ONGOING.value,
-                        GoalStatus.ACHIEVED.value,
-                    ]
-                ),
+                models.Goal.status.in_([
+                    GoalStatus.ONGOING.value, 
+                    GoalStatus.ACHIEVED.value
+                ])
             )
             .values(current_value=new_value)
             .execution_options(synchronize_session=False)
@@ -202,6 +224,7 @@ class GoalRepository:
         goal_id: UUID,
         changes: dict,
     ) -> models.Goal:
+        """Обновляет поля цели."""
         stmt = (
             update(models.Goal)
             .where(
@@ -225,6 +248,7 @@ class GoalRepository:
         user_id: UUID,
         goal_id: UUID,
     ) -> models.Goal | None:
+        """Отмечает цель как достигнутую атомарно."""
         stmt = (
             update(models.Goal)
             .where(
@@ -249,6 +273,7 @@ class GoalRepository:
         user_id: UUID,
         goal_id: UUID,
     ) -> models.Goal | None:
+        """Снимает отметку о достижении цели атомарно."""
         stmt = (
             update(models.Goal)
             .where(
@@ -273,6 +298,7 @@ class GoalRepository:
         goal_ids: list[UUID],
         new_status: str,
     ) -> None:
+        """Массовое обновление статуса целей."""
         if not goal_ids:
             return
 
@@ -319,6 +345,7 @@ class GoalRepository:
             await self.db.execute(sql)
 
     async def drop_old_partitions(self, retention_months: int = 3) -> None:
+        """Удаляет старые партиции таблицы processed_goal_transactions."""
         logger.warning(
             "Dropping partitions without DETACH CONCURRENTLY. "
             "Potential locking risk."
@@ -369,6 +396,7 @@ class GoalRepository:
         limit: int = 100,
         last_id: UUID | None = None,
     ) -> list[models.Goal]:
+        """Получает цели, срок которых истёк до today."""
         query = (
             select(models.Goal)
             .where(
@@ -391,6 +419,10 @@ class GoalRepository:
         check_date: date,
         limit: int = 100,
     ) -> list[models.Goal]:
+        """
+        Получает цели, срок которых истекает в течение недели после check_date,
+        которые ещё не проверялись.
+        """
         check_datetime_start = datetime.combine(
             check_date,
             datetime.min.time(),
@@ -422,6 +454,7 @@ class GoalRepository:
         return result.scalars().all()
 
     async def update_last_checked(self, goal_ids: list[UUID]) -> None:
+        """Обновляет дату последней проверки уведомлений по целям."""
         if not goal_ids:
             return
 
@@ -449,6 +482,7 @@ class GoalRepository:
         topic: str,
         event_data: dict,
     ) -> dict:
+        """Готовит данные для вставки в outbox_events."""
         payload = event_data.get("payload", event_data)
 
         event_type = event_data.get("event_type")
@@ -474,6 +508,7 @@ class GoalRepository:
         self,
         events: list[dict[str, Any]],
     ) -> None:
+        """Добавляет несколько событий в outbox_events."""
         if not events:
             return
 
@@ -493,6 +528,7 @@ class GoalRepository:
         topic: str,
         event_data: dict,
     ) -> None:
+        """Добавляет одно событие в outbox_events."""
         await self.add_outbox_events(
             [{"topic": topic, "payload": event_data}]
         )
@@ -525,6 +561,7 @@ class GoalRepository:
         self,
         event_ids: list[UUID],
     ) -> None:
+        """Удаляет успешно отправленные события из outbox_events."""
         if not event_ids:
             return
 

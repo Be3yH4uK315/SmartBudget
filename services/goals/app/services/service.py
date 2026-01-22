@@ -17,12 +17,14 @@ logger = logging.getLogger(__name__)
 settings = config.settings
 
 def _get_utc_today() -> date:
+    """Возвращает текущую дату в UTC."""
     return datetime.now(timezone.utc).date()
 
 def _create_outbox_event(
     event_type: GoalEventType,
     **kwargs,
 ) -> dict:
+    """Создает событие для outbox_events."""
     return {
         "event_type": event_type.value,
         **kwargs,
@@ -39,6 +41,7 @@ class GoalService:
         user_id: UUID,
         request: api_schemas.CreateGoalRequest,
     ) -> api_schemas.CreateGoalResponse:
+        """Создает новую цель."""
         if request.finish_date and request.finish_date <= _get_utc_today():
             raise exceptions.InvalidGoalDataError(
                 "Finish date must be in the future"
@@ -83,13 +86,15 @@ class GoalService:
         user_id: UUID,
         goal_id: UUID,
     ) -> api_schemas.GoalResponse:
+        """Получает детали цели по ID."""
         async with self.uow:
             goal = await self.uow.goals.get_by_id(user_id, goal_id)
 
             if not goal:
                 raise exceptions.GoalNotFoundError("Goal not found")
 
-            rec_payment = goal.calculate_recommended_payment()
+            net_change = await self.uow.goals.get_net_change_for_current_month(goal_id)
+            rec_payment = goal.calculate_recommended_payment(net_change_this_month=net_change)
             days_left = goal.days_left
 
             response = api_schemas.GoalResponse.model_validate(goal)
@@ -105,6 +110,7 @@ class GoalService:
         self,
         user_id: UUID,
     ) -> api_schemas.MainGoalsResponse:
+        """Получает цели для главного экрана."""
         async with self.uow:
             goals = await self.uow.goals.get_main_goals(user_id)
 
@@ -124,6 +130,7 @@ class GoalService:
         priorities: list[GoalPriority] = None,
         is_archived: bool = False,
     ) -> list[api_schemas.AllGoalsResponse]:
+        """Получает список целей с фильтрами."""
         async with self.uow:
             goals = await self.uow.goals.get_all_goals(
                 user_id,
@@ -145,6 +152,7 @@ class GoalService:
         goal_id: UUID,
         request: api_schemas.GoalPatchRequest,
     ) -> api_schemas.GoalResponse:
+        """Обновляет поля цели."""
         async with self.uow:
             goal = await self.uow.goals.get_for_update(goal_id)
 
@@ -171,7 +179,7 @@ class GoalService:
 
                 db_value = value
 
-                if isinstance(value, (GoalStatus, GoalPriority)):
+                if isinstance(value, GoalPriority):
                     db_value = value.value
 
                 if isinstance(db_value, str):
@@ -187,7 +195,8 @@ class GoalService:
                     changes_for_db,
                 )
 
-                await self._check_and_process_achievement_in_uow(goal)
+                if "is_archived" not in changes_for_db:
+                    await self._check_and_process_achievement_in_uow(goal)
 
             if changes_for_kafka:
                 event = _create_outbox_event(
@@ -201,7 +210,8 @@ class GoalService:
                     event_data=event,
                 )
 
-            rec_payment = goal.calculate_recommended_payment()
+            net_change = await self.uow.goals.get_net_change_for_current_month(goal_id)
+            rec_payment = goal.calculate_recommended_payment(net_change_this_month=net_change)
             days_left = goal.days_left
 
             response = api_schemas.GoalResponse.model_validate(goal)
@@ -217,7 +227,8 @@ class GoalService:
         self,
         user_id: UUID,
         goal_id: UUID,
-    ) -> api_schemas.GoalResponse:
+    ) -> api_schemas.GoalStatusResponse:
+        """Принудительно закрывает цель."""
         return await self._change_status_logic(
             user_id,
             goal_id,
@@ -229,6 +240,7 @@ class GoalService:
         user_id: UUID,
         goal_id: UUID,
     ) -> api_schemas.GoalResponse:
+        """Восстанавливает цель из закрытого состояния."""
         async with self.uow:
             goal = await self.uow.goals.get_by_id(user_id, goal_id)
 
@@ -255,78 +267,43 @@ class GoalService:
         user_id: UUID,
         goal_id: UUID,
         new_status: GoalStatus,
-    ) -> api_schemas.GoalResponse:
+    ) -> api_schemas.GoalStatusResponse:
+        """Изменяет статус цели."""
         async with self.uow:
-            goal = await self.uow.goals.update_fields(
+            await self.uow.goals.update_fields(
                 user_id,
                 goal_id,
                 {"status": new_status.value},
             )
-
             event = _create_outbox_event(
                 GoalEventType.CHANGED,
                 goal_id=str(goal_id),
                 changes={"status": new_status.value},
             )
-
             await self.uow.goals.add_outbox_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
                 event_data=event,
             )
 
-            rec_payment = goal.calculate_recommended_payment()
-            days_left = goal.days_left
-
-            response = api_schemas.GoalResponse.model_validate(goal)
-
-        return response.model_copy(
-            update={
-                "days_left": days_left,
-                "recommended_payment": rec_payment,
-            }
-        )
-
-    async def set_archived(
-        self,
-        user_id: UUID,
-        goal_id: UUID,
-        is_archived: bool,
-    ) -> api_schemas.GoalResponse:
-        async with self.uow:
-            goal = await self.uow.goals.update_fields(
-                user_id,
-                goal_id,
-                {"is_archived": is_archived},
-            )
-
-            rec_payment = goal.calculate_recommended_payment()
-            days_left = goal.days_left
-
-            response = api_schemas.GoalResponse.model_validate(goal)
-
-        return response.model_copy(
-            update={
-                "days_left": days_left,
-                "recommended_payment": rec_payment,
-            }
-        )
+        return api_schemas.GoalStatusResponse(status=new_status)
 
     async def update_goal_balance(
         self,
         event: k_schemas.TransactionEvent,
     ) -> None:
+        """Обновляет баланс цели на основе транзакции."""
         value_change = event.value * (
-            Decimal(1)
-            if event.type == TransactionType.INCOME
-            else Decimal(-1)
+            Decimal(1) if event.type == TransactionType.INCOME else Decimal(-1)
         )
 
         async with self.uow:
             goal = await self.uow.goals.adjust_balance(
-                event.user_id,
-                event.goal_id,
-                value_change,
-                event.transaction_id,
+                user_id=event.user_id,
+                goal_id=event.goal_id,
+                amount_delta=value_change,
+                transaction_id=event.transaction_id,
+                raw_amount=event.value,
+                transaction_type=event.type.value
             )
 
             if goal is None:
@@ -390,6 +367,7 @@ class GoalService:
         self,
         goal: models.Goal,
     ) -> bool:
+        """Проверяет и обрабатывает достижение цели внутри UnitOfWork."""
         if goal.check_achievement():
             event = _create_outbox_event(
                 GoalEventType.ALERT,
@@ -419,6 +397,7 @@ class GoalService:
         return False
 
     async def check_deadlines(self) -> None:
+        """Проверяет цели на истечение сроков и отправляет уведомления."""
         logger.info("Starting daily deadline check task...")
         today = _get_utc_today()
         batch_size = 500

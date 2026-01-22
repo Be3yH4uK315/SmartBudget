@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Column,
     Date,
@@ -15,7 +14,7 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 from sqlalchemy.orm import relationship, validates
 
 from app.domain.enums import GoalStatus
@@ -35,9 +34,9 @@ class Goal(Base):
     target_value = Column(DECIMAL(12, 2), nullable=False)
     current_value = Column(DECIMAL(12, 2), nullable=False, default=0)
     finish_date = Column(Date, nullable=True)
-    tags = Column(ARRAY(String), nullable=False, server_default="{}")
+    tags = Column(ARRAY(String), nullable=False, default=list)
     priority = Column(String(20), nullable=True)
-    is_archived = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_archived = Column(Boolean, nullable=False, default=False)
     status = Column(
         String(50),
         nullable=False,
@@ -95,11 +94,11 @@ class Goal(Base):
         today = datetime.now(timezone.utc).date()
         return max((self.finish_date - today).days, 0)
 
-    def calculate_recommended_payment(self) -> Decimal | None:
-        """
-        Считает рекомендуемый платеж в этом месяце.
-        Формула: (Остаток / Всего дней) * Дней до конца месяца
-        """
+    def calculate_recommended_payment(
+        self,
+        net_change_this_month: Decimal = Decimal(0),
+    ) -> Decimal | None:
+        """Гибридный расчет платежа."""
         if not self.finish_date:
             return None
 
@@ -108,27 +107,64 @@ class Goal(Base):
         if self.finish_date <= today:
             return Decimal("0.00")
 
-        remaining = self.remaining_amount
-        if remaining <= 0:
+        if self.current_value >= self.target_value:
             return Decimal("0.00")
 
-        days_total_left = (self.finish_date - today).days
-        if days_total_left == 0: 
-             return remaining
-
         last_day_of_month = calendar.monthrange(today.year, today.month)[1]
-        date_end_of_month = today.replace(day=last_day_of_month)
-        
-        days_left_in_current_month = (date_end_of_month - today).days
-        
-        days_to_count = min(days_left_in_current_month, days_total_left)
-        if days_to_count <= 0:
-             return Decimal("0.00")
+        end_of_month_date = today.replace(day=last_day_of_month)
+        period_end_date = min(end_of_month_date, self.finish_date)
 
-        daily_need = remaining / Decimal(days_total_left)
-        monthly_payment = daily_need * Decimal(days_to_count)
+        if net_change_this_month >= 0:
+            start_of_month = today.replace(day=1)
+            calc_start_date = start_of_month
+            if self.created_at.date() > start_of_month:
+                calc_start_date = self.created_at.date()
 
-        return monthly_payment.quantize(Decimal("0.01"))
+            balance_at_start = self.current_value - net_change_this_month
+            balance_at_start = max(balance_at_start, Decimal("0.00"))
+
+            remaining_at_start = self.target_value - balance_at_start
+            if remaining_at_start <= 0:
+                return Decimal("0.00")
+
+            total_days_remaining_from_start = (
+                self.finish_date - calc_start_date
+            ).days
+            if total_days_remaining_from_start <= 0:
+                return self.target_value - self.current_value
+
+            daily_rate = (
+                remaining_at_start / Decimal(total_days_remaining_from_start)
+            )
+
+            days_in_period = (period_end_date - calc_start_date).days + 1
+            if days_in_period <= 0:
+                return Decimal("0.00")
+
+            monthly_quota = daily_rate * Decimal(days_in_period)
+            recommendation = monthly_quota - net_change_this_month
+
+            return max(
+                recommendation,
+                Decimal("0.00"),
+            ).quantize(Decimal("0.01"))
+
+        else:
+            days_total_left = (self.finish_date - today).days
+            if days_total_left <= 0:
+                return self.remaining_amount
+
+            daily_rate_new = (
+                self.remaining_amount / Decimal(days_total_left)
+            )
+
+            days_left_in_month = (period_end_date - today).days + 1
+            if days_left_in_month <= 0:
+                return Decimal("0.00")
+
+            recommendation = daily_rate_new * Decimal(days_left_in_month)
+
+            return recommendation.quantize(Decimal("0.01"))
 
     def check_achievement(self) -> bool:
         if (
@@ -175,6 +211,8 @@ class ProcessedTransaction(Base):
         nullable=False,
     )
     goal_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    amount = Column(DECIMAL(12, 2), nullable=False)
+    transaction_type = Column(String(50), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
