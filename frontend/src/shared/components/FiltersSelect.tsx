@@ -2,6 +2,7 @@ import {
   Checkbox,
   FormControl,
   MenuItem,
+  Radio,
   Select,
   SelectChangeEvent,
   Typography,
@@ -9,32 +10,51 @@ import {
 import { useTranslate } from '@shared/hooks'
 
 type Props<T extends string> = {
-  value: T[]
+  multiple?: boolean
+  translateItemKey: string
+  translateKey: string
+  placeholderKey: string
+  value: T | null | T[]
   items: readonly T[]
-  placeholder: string
-  onChange: (e: SelectChangeEvent<T[]>) => void
+  onChange: (e: SelectChangeEvent<any>) => void
   onClose: () => void
 }
 
 export function FiltersSelect<T extends string>({
+  multiple = false,
+  translateItemKey,
+  translateKey,
+  placeholderKey,
   value,
   items,
-  placeholder,
-  onClose,
   onChange,
+  onClose,
 }: Props<T>) {
-  const translate = useTranslate('Goals.Tags')
+  const translateItem = useTranslate(translateItemKey)
+  const translate = useTranslate(translateKey)
+
+  const selectedArray = Array.isArray(value) ? value : []
+  const selectedSingle = !Array.isArray(value) ? value : null
+
   return (
     <FormControl sx={{ minWidth: 200, maxWidth: 250 }}>
       <Select
-        multiple
+        multiple={multiple}
         displayEmpty
         value={value}
         onChange={onChange}
         onClose={onClose}
-        renderValue={(v) =>
-          v.length === 0 ? placeholder : translate('selected', { value: v.length })
-        }
+        renderValue={(value) => {
+          if (multiple) {
+            const arr = Array.isArray(value) ? (value as T[]) : []
+            if (arr.length === 0) {
+              return translate(placeholderKey)
+            } else return translate('selected', { value: arr.length })
+          }
+
+          const single = value as T | null
+          return single ? translateItem(single) : translate(placeholderKey)
+        }}
         size="small"
         sx={{
           height: 'max-content',
@@ -45,8 +65,13 @@ export function FiltersSelect<T extends string>({
       >
         {items.map((item) => (
           <MenuItem key={item} value={item}>
-            <Checkbox checked={value.includes(item)} sx={{ color: 'primary.main' }} />
-            <Typography>{translate(item)}</Typography>
+            {multiple ? (
+              <Checkbox checked={selectedArray.includes(item)} sx={{ color: 'primary.main' }} />
+            ) : (
+              <Radio checked={selectedSingle === item} sx={{ color: 'primary.main' }} />
+            )}
+
+            <Typography>{translateItem(item)}</Typography>
           </MenuItem>
         ))}
       </Select>

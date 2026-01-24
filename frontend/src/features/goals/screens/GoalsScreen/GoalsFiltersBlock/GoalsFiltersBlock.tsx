@@ -29,17 +29,23 @@ export const GoalsFiltersBlock = ({ filters }: Props) => {
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between' }}>
         <Stack spacing={2} direction={'row'}>
           <FiltersSelect<Tag>
+            multiple
             value={localTags}
             items={AVAILABLE_TAGS}
-            placeholder={translate('placeholder.tags')}
+            translateItemKey={'Goals.Tags'}
+            translateKey={'Goals.Filters'}
+            placeholderKey={'placeholder.tags'}
             onChange={handleTagsChange}
             onClose={handleApplyTags}
           />
 
           <FiltersSelect<Priority>
+            multiple
             value={localPriority}
             items={PRIORITIES}
-            placeholder={translate('placeholder.priority')}
+            translateItemKey={'Goals.Tags'}
+            translateKey={'Goals.Filters'}
+            placeholderKey={'placeholder.priority'}
             onChange={handlePriorityChange}
             onClose={handleApplyPriority}
           />
