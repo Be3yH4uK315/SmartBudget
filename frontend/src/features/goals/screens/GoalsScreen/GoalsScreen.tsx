@@ -12,13 +12,12 @@ import {
 } from '@features/goals/store/goals'
 import { Add, ArchiveOutlined } from '@mui/icons-material'
 import { Button, Stack } from '@mui/material'
-import { ScreenContent } from '@shared/components'
+import { EmptyList, ScreenContent } from '@shared/components'
 import { MODAL_IDS, ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
 import { useMatch, useNavigate } from 'react-router'
-import { EmptyGoalsList } from './EmptyGoalsList'
 import { GoalBlock } from './GoalBlock'
 import { GoalsFiltersBlock } from './GoalsFiltersBlock'
 import { GoalsScreenSkeleton } from './GoalsScreenSkeleton'
@@ -51,6 +50,20 @@ export default function GoalsScreen() {
     }
   }, [dispatch, isArchivePage])
 
+  const translationKey =
+    filters.tags.length > 0
+      ? isArchivePage
+        ? 'NoGoals.Filtered.Archive'
+        : 'NoGoals.Filtered'
+      : isArchivePage
+        ? 'NoGoals.Empty.Archive'
+        : 'NoGoals.Empty'
+
+  const emptyListReason = {
+    title: translate(`${translationKey}.title`),
+    subtitle: translate(`${translationKey}.subtitle`),
+  }
+
   return (
     <ScreenContent
       isLoading={isLoading}
@@ -60,7 +73,10 @@ export default function GoalsScreen() {
     >
       <Stack spacing={2} sx={{ maxWidth: '800px' }}>
         {goals.length === 0 && (
-          <EmptyGoalsList filtersLength={filters.tags.length} isArchive={isArchivePage} />
+          <EmptyList
+            reasonTitle={emptyListReason.title}
+            reasonSubtitle={emptyListReason.subtitle}
+          />
         )}
 
         {goals.length === 0 && filters.tags.length > 0 && (
