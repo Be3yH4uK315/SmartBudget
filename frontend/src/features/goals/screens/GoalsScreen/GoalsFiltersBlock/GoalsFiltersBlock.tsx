@@ -2,9 +2,8 @@ import { AVAILABLE_TAGS, PRIORITIES } from '@features/goals/constants/tags'
 import { useGoalsFilters } from '@features/goals/hooks'
 import { GoalsFilters, Priority, Tag } from '@features/goals/types'
 import { Button, Chip, Stack } from '@mui/material'
-import { StyledBox } from '@shared/components'
+import { FiltersSelect, StyledBox } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
-import { FiltersSelect } from './FiltersSelect'
 
 type Props = {
   filters: GoalsFilters
