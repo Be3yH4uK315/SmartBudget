@@ -1,7 +1,8 @@
 # 💸 Финансовое приложение "Умный Бюджет" — микросервисная архитектура
 
-Добро пожаловать в монорепозиторий финансового приложения.  
-Система реализована на **микросервисной архитектуре** с использованием **Python (FastAPI)** и **C# (.NET 8)**, а также современного фронтенда на **React**.  
+Добро пожаловать в монорепозиторий финансового приложения, реализуемого в рамках проектного практикума от Т-Банка.
+ 
+Система реализована на **микросервисной архитектуре** с использованием **Python (FastAPI)** и **C# (.NET 8)**, а также фронтенда в стилистике Т-Банка без логотипа на **React**.  
 
 ---
 
@@ -11,7 +12,7 @@
 
 | Сервис | Язык | Назначение |
 |---------|------|------------|
-| **Auth** | Python (FastAPI) | Аутентификация, JWT, JWKS, refresh токены |
+| **Authentification** | Python (FastAPI) | Аутентификация, JWT, JWKS, refresh токены |
 | **Transactions** | C# (ASP.NET Core) | Управление транзакциями |
 | **Classification** | Python (FastAPI) | Классификация транзакций |
 | **Budget** | C# (ASP.NET Core) | Управление бюджетом и лимитами |
@@ -29,7 +30,7 @@
 ```
 .
 ├── services/
-│   ├── auth/
+│   ├── authentification/
 │   ├── transactions/
 │   ├── classification/
 │   ├── budget/
@@ -37,9 +38,17 @@
 │   ├── logs/
 │   └── notification/
 │
-├── frontend/               # Веб-интерфейс (Next.js)
-│   ├── app/
+├── frontend/               
 │   ├── public/
+│   ├── src/
+│   │   ├── app/
+│   │   ├── features/
+│   │   │   ├── budget/      # Экран бюджета
+│   │   │   ├── dashboard/   # Главный экран
+│   │   │   ├── goals/       # Экран целей
+│   │   │   ├── settings/    # Экран настроек
+│   │   │   └── transactions/   # Экран транзакций
+│   │   └── shared/             # Общие экраны и компоненты
 │   └── package.json
 │
 ├── shared/                 # Общие библиотеки (Python / .NET)
@@ -62,38 +71,119 @@
 ## 🚀 Быстрый старт (локальная разработка)
 
 ### 1. Клонировать репозиторий
-```bash
+`
 git clone https://github.com/<your-org>/<your-repo>.git
-cd <your-repo>
-```
+cd SmartBudget
+`
 
 ### 2. Скопировать и настроить переменные окружения
-```bash
+`
 cp .env.example .env
-```
+`
 
 ### 3. Запустить инфраструктуру
-```bash
-docker compose -f infra/compose/docker-compose.dev.yml up -d
-```
+`
+docker compose -f infra/compose/docker-compose.yml up -d
+`
 
-### 4. Запустить все микросервисы и фронтенд
-```bash
+### 4. Запустить все микросервисы
+`
 docker compose up --build
-```
+`
 
+### 5. Запустить фронтенд
+Для запуска фронтенда потребуется Yarn версии **1.x.x** (проверялась только **1.22.22**) ([инструкция по
+   установке](https://classic.yarnpkg.com/lang/en/docs/install/))
+
+Проверить версию Yarn можно командой:
+`
+yarn --version
+`
+#### Алгоритм запуска
+1. Выполните команду для перехода в папку  **frontend**
+`
+cd frontend
+`
+
+2. Выполните команду для установки зависимостей проекта:
+`
+yarn install
+`
+
+3. Выполните команду для запуска проекта:
+`
+yarn start
+`
+
+Фронтенд будет доступен по адресу: http://localhost:3000
+
+---
 После сборки сервисы будут доступны по адресам:
 | Сервис | URL |
 |--------|------|
-| Auth | http://localhost:8000/docs |
-| Transactions | http://localhost:8001/swagger |
-| Classification | http://localhost:8002/docs |
-| Budget | http://localhost:8003/swagger |
-| Goals | http://localhost:8004/docs |
-| Logs | http://localhost:8005/swagger |
-| Notification | http://localhost:8006/docs |
-| Frontend | http://localhost:3000 |
+| ✅ Authentification | http://localhost:8000/api/v1/docs |
+| ✅ Classification | http://localhost:8001/api/v1/docs |
+| ✅ Goals | http://localhost:8002/api/v1/docs |
+| 🟡 Notification | http://localhost:8003/api/v1/docs |
+| ❌ Budget | http://localhost:8004/swagger |
+| ❌ Transactions | http://localhost:8005/swagger |
+| ❌ Logs | http://localhost:8006/swagger |
+| ✅ Frontend | http://localhost:3000 |
 
+---
+
+## 🖥️ Frontend (Web UI)
+
+Веб-интерфейс реализован на **React + TypeScript** в стилистике Т-Банка **без использования логотипов**.
+
+### ✨ Основные возможности UI
+- **✅ Авторизация**: вход пользователя, работа с JWT-токеном
+- **✅ Главный экран**: отображение статистики:
+   - топ 5 целей по проценту выполнения
+   - сумма доходов/расходов за последний месяц
+   - процент расхода бюджета 
+- **🟡 Транзакции**: 
+   - ✅ список транзакций
+   - ✅/🟡 фильтрация (частично)
+   - ❌ поиск (в разработке)
+   - ✅ просмотр деталей
+   - ✅ ручная перекатегоризация
+- **✅ Бюджет**: 
+   - дашборд (факт VS план)
+   - просмотр лимитов по категориям
+- **✅ Цели**:
+   - создание
+   - редактирование
+   - фильтрация целей
+   - отслеживание прогресса конкретной цели
+   - установка меток(тэгов)
+- **🟡 Настройки**: 
+   - ✅ управление активными сессиями
+   - ✅ установка срока жизни refresh-токена
+   - ✅ смена пароля
+   - ❌ настройка уведомлений
+   - ❌ настройка категорий бюджета
+   - ❌ профиля
+- **❌ Уведомления**: отображение алертов и событий в центре уведомлений **_(в разработке)_**
+
+> ⚠️ Некоторые экраны/сценарии могут работать в демонстрационном режиме (используя файлы frontend/src/features/*/api/\*.mock.ts).
+
+### 🧭 Навигация и структура
+Фронтенд построен по feature-based структуре:
+
+- `frontend/src/features/` — экраны и бизнес-логика по доменам (budget, dashboard, goals, settings, transactions)
+- `frontend/src/shared/` — переиспользуемые компоненты, экраны авторизации, store, утилиты и слой API
+- `frontend/src/app/` — глобальные провайдеры
+
+### 🔌 Интеграция с API
+Фронтенд взаимодействует с микросервисами через REST API:
+
+- `/api/v1/authentification` — регистрация, логин, обновление токена  
+- `/api/v1/goals` — создание, редактирование, получение и фильтрация целей  
+- `/api/v1/transactions` — получение и перекатегоризация транзакций  
+- `/api/v1/budget` — создание, получение информации о бюджете и лимитах  
+- `/api/v1/dashboard` — агрегированная статистика (реализуется через API Gateway)  
+- `/api/v1/settings` — управление настройками пользователя (сессии, пароль, параметры безопасности)
 ---
 
 ## ⚙️ Технологии проекта
@@ -102,7 +192,8 @@ docker compose up --build
 - FastAPI
 - SQLAlchemy
 - Pydantic
-- Celery + Redis
+- ARQ
+- Redis
 - PostgreSQL
 
 ### 💠 Backend (.NET)
@@ -113,16 +204,17 @@ docker compose up --build
 ### 💻 Frontend
 - React
 - TypeScript
-- TailwindCSS
-- React Query
+- Material UI
+- Redux toolkit
+- React Router
 
 ### ☁️ Инфраструктура
-- Docker / Docker Compose
-- Kubernetes (манифесты в `infra/k8s`)
-- Nginx (reverse proxy)
-- Prometheus + Grafana (мониторинг)
-- Kafka (очереди сообщений)
-- GitHub Actions (CI/CD)
+- ✅ Docker / Docker Compose
+- ❌ Kubernetes  - (в планах)
+- ✅ Nginx (reverse proxy)
+- ❌ Prometheus + Grafana для мониторинга - (в планах)
+- ✅ Kafka (очереди сообщений)
+- 🟡 GitHub Actions (CI/CD) - (в процессе)
 
 ---
 
@@ -140,10 +232,11 @@ docker compose up --build
 ## 🧠 Принципы архитектуры
 
 - Каждый микросервис полностью автономен.  
-- Общение между сервисами — через REST API, брокер сообщений (Kafka) или gRPC.  
+- Общение между сервисами — через брокер сообщений Kafka.  
+- Общение между сервисами и фронтендом — через REST API.  
 - Все токены подписываются централизованно через **JWKS** из Auth.  
 - Логи собираются централизованно через **Logs Service**.  
-- Общие компоненты вынесены в `shared/`.  
+- Общие компоненты вынесены в `shared/`  
 - В продакшн — деплой через CI/CD и Kubernetes.
 
 ---
@@ -152,12 +245,10 @@ docker compose up --build
 
 | Участник | Роль | Ответственность |
 |-----------|------|-----------------|
-| Артем Горшков | Backend(C#) | Transactions, Budget, Logs |
-| Дмитрий Костерин | Backend (Python) | Classification, Goals, Notification, Authentification |
-| Антон Седлецкий | Frontend | UI, интеграция API |
+| Артем Горшков | Backend developer (C#) | Transactions, Budget, Logs |
+| Дмитрий Костерин ([Телеграм](https://t.me/KostDmitry)) | Backend developer (Python) | Classification, Goals, Notification, Authentification |
+| Антон Седлецкий ([Телеграм](https://t.me/a_sedletskii)) | Frontend developer | UI, интеграция API |
 | Софья Евланова | Analityc | Анализ эффиктивности и работоспособности приложения |
-
----
 
 ---
 
