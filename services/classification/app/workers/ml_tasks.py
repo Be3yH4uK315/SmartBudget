@@ -1,8 +1,11 @@
 import logging
 import pandas as pd
+import pyarrow as pa
 import uuid
 import os
 from datetime import datetime, timezone
+import pyarrow.parquet as pq
+
 from app.core.config import settings
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.db.models import TrainingDataset, TrainingDatasetStatus, Model
@@ -21,59 +24,71 @@ async def build_dataset_task(ctx):
     
     dataset_id = uuid.uuid4()
     new_version = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    
-    os.makedirs(settings.ML.DATASET_PATH, exist_ok=True)
     file_path = f"{settings.ML.DATASET_PATH}/dataset_{new_version}.parquet"
+    os.makedirs(settings.ML.DATASET_PATH, exist_ok=True)
+
+    async with UnitOfWork(db_session_maker) as uow:
+        dataset_entry = TrainingDataset(
+            training_dataset_id=dataset_id,
+            version=new_version,
+            file_path=file_path,
+            status=TrainingDatasetStatus.BUILDING,
+        )
+        uow.datasets.create(dataset_entry)
 
     try:
-        async with UnitOfWork(db_session_maker) as uow:
-            dataset_entry = TrainingDataset(
-                training_dataset_id=dataset_id,
-                version=new_version,
-                file_path=file_path,
-                status=TrainingDatasetStatus.BUILDING,
-            )
-            uow.datasets.create(dataset_entry)
-            logger.info(f"Created dataset entry {dataset_id} with status BUILDING")
-    except Exception as e:
-        logger.error(f"Failed to create dataset entry: {e}")
-        return
-
-    try:
-        async with UnitOfWork(db_session_maker) as uow:
-            logger.info("Loading feedback data...")
-            data_rows = await uow.feedback.get_training_data(days_limit=180)
-            marked_count = await uow.feedback.mark_unprocessed_as_processed()
-            logger.info(f"Marked {marked_count} feedback rows as processed.")
-
-        if not data_rows:
-            raise ValueError("No training data found (empty list)")
-
-        logger.info(f"Converting {len(data_rows)} rows to DataFrame...")
-        df = pd.DataFrame(data_rows)
-        df['label'] = df['label'].astype('int32')
+        total_rows = 0
+        class_distribution = {}
+        writer = None
         
-        logger.info(f"Saving to {file_path}...")
-        df.to_parquet(file_path, index=False, engine='pyarrow', compression='snappy')
+        async with UnitOfWork(db_session_maker) as uow:
+            async for batch_data in uow.feedback.stream_training_data(days_limit=180, batch_size=5000):
+                if not batch_data:
+                    continue
+                
+                df_chunk = pd.DataFrame(batch_data)
+                df_chunk.fillna({'merchant': '', 'description': '', 'mcc': 0}, inplace=True)
+                
+                counts = df_chunk['label'].value_counts().to_dict()
+                for k, v in counts.items():
+                    k_str = str(k)
+                    class_distribution[k_str] = class_distribution.get(k_str, 0) + v
+                
+                table = pa.Table.from_pandas(df_chunk)
+                
+                if writer is None:
+                    writer = pq.ParquetWriter(file_path, table.schema, compression='snappy')
+                
+                writer.write_table(table)
+                total_rows += len(df_chunk)
+            
+            if writer:
+                writer.close()
+            
+            await uow.feedback.mark_unprocessed_as_processed()
+
+        if total_rows == 0:
+            raise ValueError("No training data collected")
 
         async with UnitOfWork(db_session_maker) as uow:
             dataset = await uow.datasets.get_by_id(dataset_id)
             if dataset:
-                dist = df['label'].value_counts().to_dict()
-                dist_str = {str(k): int(v) for k, v in dist.items()}
-                
                 await uow.datasets.update_status(
                     dataset, 
                     TrainingDatasetStatus.READY, 
                     {
-                        "row_count": len(df),
-                        "class_distribution": dist_str
+                        "row_count": total_rows,
+                        "class_distribution": class_distribution
                     }
                 )
-                logger.info(f"SUCCESS: Dataset {new_version} READY. Rows: {len(df)}")
+                logger.info(f"SUCCESS: Dataset {new_version} READY. Rows: {total_rows}")
 
     except Exception as e:
         logger.exception("Training dataset build failed")
+        if writer:
+            try: writer.close()
+            except: pass
+        
         async with UnitOfWork(db_session_maker) as uow:
             dataset = await uow.datasets.get_by_id(dataset_id)
             if dataset:

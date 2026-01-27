@@ -6,6 +6,7 @@ from app.core.logging import setup_logging
 from app.core.database import get_db_engine, get_session_factory
 from app.core.redis import close_redis_pool, create_redis_pool
 from app.infrastructure.kafka.consumer import consume_loop
+from app.infrastructure.kafka.producer import KafkaProducerWrapper
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -19,14 +20,18 @@ async def main():
     redis_pool = await create_redis_pool()
     redis_client = Redis(connection_pool=redis_pool, decode_responses=True)
     
+    dlq_producer = KafkaProducerWrapper()
+    await dlq_producer.start()
+
     try:
-        await consume_loop(redis_client, session_maker)
+        await consume_loop(redis_client, session_maker, dlq_producer)
     except asyncio.CancelledError:
         logger.info("Consumer cancelled")
     except Exception as e:
         logger.critical(f"Consumer failed: {e}", exc_info=True)
     finally:
         logger.info("Shutting down consumer resources...")
+        await dlq_producer.stop()
         await close_redis_pool(redis_pool)
         await engine.dispose()
 

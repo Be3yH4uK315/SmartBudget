@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import AsyncGenerator
 from uuid import UUID
 from sqlalchemy import select, or_, update
 from sqlalchemy.dialects.postgresql import insert
@@ -92,6 +93,50 @@ class FeedbackRepository(BaseRepository):
             }
             for row in result.mappings().all()
         ]
+    
+    async def stream_training_data(self, days_limit: int = 180, batch_size: int = 1000) -> AsyncGenerator[list[dict], None]:
+        """Стриминг данных для обучения пачками."""
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
+        
+        stmt = (
+            select(
+                ClassificationResult.merchant, 
+                ClassificationResult.description, 
+                ClassificationResult.mcc, 
+                Feedback.correct_category_id
+            )
+            .join(
+                ClassificationResult, 
+                Feedback.transaction_id == ClassificationResult.transaction_id
+            )
+            .where(
+                Feedback.created_at >= cutoff_date,
+                or_(
+                    ClassificationResult.source.in_(
+                        [ClassificationSource.ML, ClassificationSource.MANUAL]
+                    ),
+                    ClassificationResult.confidence < 0.8
+                )
+            )
+            .order_by(Feedback.created_at.asc()) 
+        )
+
+        result = await self.db.stream(stmt)
+        
+        while True:
+            chunk = await result.fetchmany(batch_size)
+            if not chunk:
+                break
+            
+            yield [
+                {
+                    "merchant": row.merchant,
+                    "description": row.description,
+                    "mcc": row.mcc,
+                    "label": int(row.correct_category_id)
+                }
+                for row in chunk
+            ]
     
     async def mark_unprocessed_as_processed(self) -> int:
         """Помечает все необработанные записи Feedback как обработанные."""

@@ -87,7 +87,7 @@ class Rule(base.Base):
         onupdate=func.now()
     )
     
-    category = relationship("Category", lazy="joined")
+    category = relationship("Category")
     
     __table_args__ = (
         Index('ix_rules_priority', priority),
@@ -117,7 +117,7 @@ class ClassificationResult(base.Base):
         server_default=func.now()
     )
     
-    category = relationship("Category", lazy="joined")
+    category = relationship("Category")
     
     __table_args__ = (
         Index('ix_classification_results_transaction_id', transaction_id, unique=True),
@@ -140,7 +140,7 @@ class Feedback(base.Base):
         server_default=func.now()
     )
     
-    correct_category = relationship("Category", lazy="joined")
+    correct_category = relationship("Category")
     
     __table_args__ = (
         Index('ix_feedback_transaction_id', transaction_id),

@@ -50,6 +50,12 @@ class UnitOfWork:
         """Закрывает сессию."""
         if self._session:
             await self._session.close()
+    
+    def make_savepoint(self):
+        """Создает вложенную транзакцию (SAVEPOINT)."""
+        if not self._session:
+            raise RuntimeError("Session is not active. Use 'async with uow:' first.")
+        return self._session.begin_nested()
 
     @property
     def categories(self) -> rules.CategoryRepository:

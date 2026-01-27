@@ -213,3 +213,33 @@ class ClassificationService:
             await self.redis.delete(f"classification:{body.transaction_id}")
             
             return event_data, correct_cat
+    
+    async def classify_transaction(self, event: TransactionNeedCategoryEvent) -> None:
+        """Обработка одной транзакции. Вызывается из потребителя Kafka."""
+        existing = await self.uow.results.get_by_transaction_id(event.transaction_id)
+        if existing:
+            return
+
+        result_model, outbox_payload = await self._calculate_classification(event)
+        
+        await self.uow.results.upsert(result_model)
+        
+        self.uow.outbox.add_event(
+            settings.KAFKA.TOPIC_CLASSIFIED, 
+            outbox_payload, 
+            "transaction.classified"
+        )
+        
+        resp = api_schemas.CategorizationResultResponse(
+            transaction_id=result_model.transaction_id,
+            category_id=result_model.category_id,
+            category_name=result_model.category_name,
+            confidence=result_model.confidence,
+            source=result_model.source.value,
+            model_version=result_model.model_version
+        )
+        await self.redis.set(
+            f"classification:{result_model.transaction_id}", 
+            resp.model_dump_json(), 
+            ex=3600
+        )
