@@ -7,19 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from alembic import context
 
-from app.base import Base
-from app import models
-from app.settings import settings
+from app.infrastructure.db.base import Base
+from app.infrastructure.db import models
+from app.core.config import settings
 
 # ---- Alembic Config ----
 config = context.config
+config.set_main_option("sqlalchemy.url", settings.DB.DB_URL)
 fileConfig(config.config_file_name)
 target_metadata = Base.metadata
 
 
 # ---- Async engine setup ----
 def get_url():
-    return settings.db.db_url
+    return settings.DB.DB_URL
 
 
 def run_migrations_offline() -> None:
