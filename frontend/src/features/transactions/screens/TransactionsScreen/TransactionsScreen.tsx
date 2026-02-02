@@ -1,47 +1,44 @@
 import { useEffect } from 'react'
-import { useCategoryFilter } from '@features/transactions/hooks/useCategoryFilter'
 import {
   clearTransactionsState,
   getTransactions,
   selectIsTransactionsLoading,
   selectTransactions,
+  selectTransactionsFilters,
   selectTransactionsIsLast,
+  setCategoryIds,
 } from '@features/transactions/store'
-import { CancelOutlined } from '@mui/icons-material'
-import { Box, Paper, Stack, Typography } from '@mui/material'
-import { withAuth } from '@shared/components'
-import { ScreenContent } from '@shared/components/ScreenContent'
+import { parseCategoryIds } from '@features/transactions/utils'
+import { Stack } from '@mui/material'
+import { EmptyList, ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
-import { CategoryFilter } from './CategoryFilter'
-import { TransactionsList } from './TransactionList'
+import { useSearchParams } from 'react-router'
+import { TransactionsFiltersBlock } from './TransactionsFilters'
+import { TransactionsList } from './TransactionsList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
-export default withAuth(function TransactionsScreen() {
+export default function TransactionsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
+  const [searchParams] = useSearchParams()
 
   const isLoading = useAppSelector(selectIsTransactionsLoading)
   const transactions = useAppSelector(selectTransactions)
   const isLast = useAppSelector(selectTransactionsIsLast)
-
-  const { selectedCategory, parsedCategoryId, handleCategoryChange, setSelectedCategory } =
-    useCategoryFilter()
+  const filters = useAppSelector(selectTransactionsFilters)
 
   useEffect(() => {
-    dispatch(clearTransactionsState())
+    const categoryParam = searchParams.get('categoriesIds')
+    const ids = parseCategoryIds(categoryParam?.split(',') ?? [])
 
-    if (selectedCategory) {
-      dispatch(getTransactions({ categoryId: selectedCategory }))
-    } else {
-      dispatch(getTransactions({}))
+    if (categoryParam !== null) {
+      dispatch(setCategoryIds(ids))
     }
-  }, [dispatch, selectedCategory])
 
-  useEffect(() => {
-    setSelectedCategory(Number.isFinite(parsedCategoryId) ? parsedCategoryId : null)
+    dispatch(getTransactions())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parsedCategoryId])
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -50,54 +47,23 @@ export default withAuth(function TransactionsScreen() {
   }, [dispatch])
 
   return (
-    <ScreenContent
-      title={translate('title')}
-      isLoading={isLoading && transactions.length === 0}
-      ContentSkeleton={TransactionsScreenSkeleton}
-    >
-      {transactions.length === 0 && (
-        <Paper
-          sx={{
-            p: 4,
-            maxWidth: '800px',
-            bgcolor: 'surface.light',
-            minHeight: '400px',
-            borderRadius: '32px',
-          }}
-        >
-          <Stack
-            spacing={1}
-            sx={{
-              height: '100%',
-              borderStyle: 'dashed',
-              borderColor: 'primary.main',
-              borderWidth: '2px',
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: '24px',
-            }}
-          >
-            <Box sx={{ borderRadius: '24px', lineHeight: 0, p: 2, m: 0, bgcolor: 'error.light' }}>
-              <CancelOutlined sx={{ width: '50px', height: '50px', color: 'error.main' }} />
-            </Box>
+    <ScreenContent title={translate('title')}>
+      <Stack spacing={1} maxWidth={'800px'}>
+        <TransactionsFiltersBlock filters={filters} />
 
-            <Typography variant="h3">{translate('noTransactions')}</Typography>
-          </Stack>
-        </Paper>
-      )}
-
-      {transactions.length > 0 && (
-        <>
-          <CategoryFilter onChange={handleCategoryChange} selectedCategory={selectedCategory} />
-
-          <TransactionsList
-            isLast={isLast}
-            isLoading={isLoading}
-            transactions={transactions}
-            selectedCategory={selectedCategory}
+        {transactions.length === 0 && !isLoading && (
+          <EmptyList
+            reasonTitle={translate('noTransactions')}
+            reasonSubtitle={translate('noTransactionsSubtitle')}
           />
-        </>
-      )}
+        )}
+
+        {transactions.length > 0 && (
+          <TransactionsList isLast={isLast} isLoading={isLoading} transactions={transactions} />
+        )}
+
+        {transactions.length === 0 && isLoading && <TransactionsScreenSkeleton />}
+      </Stack>
     </ScreenContent>
   )
-})
+}
