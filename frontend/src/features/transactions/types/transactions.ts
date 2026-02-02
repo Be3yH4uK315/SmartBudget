@@ -1,6 +1,6 @@
+import { CATEGORY_IDS } from '@shared/constants'
+
 export type TransactionsApiRequestPayload = {
-  /** Временно для тестов */
-  userId: string
   /** Кол-во строк */
   limit: number
   /** Сколько всего строк получил */
@@ -12,7 +12,7 @@ export type Transaction = {
   /** Сумма */
   value: number
   /** ID категории */
-  categoryId: number
+  categoryId: Category
   /** Описание */
   description: string | null
   /** Продавец / название */
@@ -24,12 +24,14 @@ export type Transaction = {
   /** Дата транзакции */
   date: string
   /** Тип транзакции */
-  type: 'income' | 'expense'
+  type: TransactionType
 }
+
+export type TransactionType = 'income' | 'expense'
 
 export type ChangeCategoryRequest = {
   transactionId: string
-  categoryId: number
+  categoryId: Category
 }
 
 export type TransactionsBlock = {
@@ -37,17 +39,13 @@ export type TransactionsBlock = {
   transactions: Transaction[]
 }
 
-export type TempAddPayload = {
-  /** Временно для тестов */
-  userId: string
-
-  accountId: string
-
-  value: number
-
-  categoryId: number
-
-  description: string
-
-  name: string
+export type TransactionsFilters = {
+  categoryIds: Category[]
+  valueFrom?: number
+  valueTo?: number
+  dateFrom: string
+  dateTo: string
+  type: TransactionType | ''
 }
+
+export type Category = (typeof CATEGORY_IDS)[number]
