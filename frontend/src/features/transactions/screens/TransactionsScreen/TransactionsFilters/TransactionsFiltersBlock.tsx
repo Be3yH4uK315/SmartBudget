@@ -127,7 +127,12 @@ export const TransactionsFiltersBlock = ({ filters }: Props) => {
               key={i}
               label={getLabel(chip)}
               onDelete={() => handleDeleteChip(chip)}
-              sx={{ typography: 'caption' }}
+              sx={{
+                bgcolor: 'primary.main',
+                color: '#333',
+                typography: 'caption',
+                '& .MuiSvgIcon-root': { color: '#333' },
+              }}
             />
           ))}
         </StyledBox>
