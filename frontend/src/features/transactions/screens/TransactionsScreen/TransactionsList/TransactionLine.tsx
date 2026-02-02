@@ -37,6 +37,8 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
           ? 'success.main'
           : 'text.primary'
 
+  const hoverColor = theme.colorMode === 'light' ? 'surface.dark' : 'surface.light'
+
   const iconBgColor = theme.colorMode === 'light' ? 'gray.light' : 'surface.light'
   const iconColor = theme.colorMode === 'light' ? 'gray.dark' : 'text.primary'
 
@@ -49,7 +51,16 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
 
   return (
     <Box
-      sx={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}
+      sx={{
+        display: 'flex',
+        width: '100%',
+        justifyContent: 'space-between',
+        cursor: 'pointer',
+        ':hover': { bgcolor: hoverColor },
+        p: 1,
+        px: 2,
+        borderRadius: '12px',
+      }}
       onClick={handleClick}
     >
       <Stack direction={'row'} spacing={2} alignItems={'center'}>
@@ -72,7 +83,7 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
           text={formatCurrency(transaction.value, transaction.type)}
           position="end"
           typographyVariant="h5"
-          typographySx={{ textAlign: 'right' }}
+          typographySx={{ textAlign: 'right', whiteSpace: 'nowrap' }}
           color={color}
           Icon={Icon}
         />

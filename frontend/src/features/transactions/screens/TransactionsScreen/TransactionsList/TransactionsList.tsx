@@ -8,27 +8,24 @@ import { useTranslate } from '@shared/hooks'
 import { useAppDispatch } from '@shared/store'
 import dayjs from 'dayjs'
 import { GroupedVirtuoso } from 'react-virtuoso'
-import { TransactionLine } from '../TransactionLine'
+import { TransactionLine } from './TransactionLine'
 import { ListFooter, MUIComponents } from './TransactionsListComponents'
 
 type Props = {
   isLast: boolean
   isLoading: boolean
   transactions: TransactionsBlock[]
-  selectedCategory: number | null
 }
 
-export const TransactionsList = ({ isLast, isLoading, transactions, selectedCategory }: Props) => {
+export const TransactionsList = ({ isLast, isLoading, transactions }: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
 
   const normalizedBlocks = useMemo(() => normalizeBlocksList(transactions), [transactions])
 
   const loadMore = useCallback(() => {
-    const payload = selectedCategory ? { categoryId: selectedCategory } : {}
-
-    dispatch(getTransactions(payload))
-  }, [dispatch, selectedCategory])
+    dispatch(getTransactions())
+  }, [dispatch])
 
   const formatGroupDate = (inputDate: string) => {
     const date = dayjs(inputDate)

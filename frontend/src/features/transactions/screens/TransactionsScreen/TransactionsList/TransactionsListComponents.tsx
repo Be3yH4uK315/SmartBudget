@@ -21,7 +21,7 @@ export const MUIComponents: GroupedVirtuosoProps<unknown, unknown>['components']
   )),
 
   Item: ({ children, ...props }) => (
-    <ListItem component={'div'} {...props} sx={{ px: 0, py: 1 }}>
+    <ListItem component={'div'} {...props} sx={{ px: 0, py: 0 }}>
       {children}
     </ListItem>
   ),
