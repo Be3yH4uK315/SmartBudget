@@ -123,7 +123,12 @@ export const TransactionsFiltersBlock = ({ filters }: Props) => {
       {dirty && (
         <StyledBox>
           {chips.map((chip, i) => (
-            <Chip key={i} label={getLabel(chip)} onDelete={() => handleDeleteChip(chip)} />
+            <Chip
+              key={i}
+              label={getLabel(chip)}
+              onDelete={() => handleDeleteChip(chip)}
+              sx={{ typography: 'caption' }}
+            />
           ))}
         </StyledBox>
       )}
