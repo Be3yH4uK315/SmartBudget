@@ -18,6 +18,48 @@ export const transactionsSlice = createSlice<
     clearTransactionsState() {
       return getTransactionsInitialState()
     },
+    resetFilters(state) {
+      state.filters = {
+        categoryIds: [],
+        valueFrom: undefined,
+        valueTo: undefined,
+        dateFrom: '',
+        dateTo: '',
+        type: '',
+      }
+      state.offset = 0
+      state.transactions = []
+    },
+    setCategoryIds(state, { payload }) {
+      state.filters.categoryIds = payload
+      state.offset = 0
+      state.transactions = []
+    },
+    setType(state, { payload }) {
+      state.filters.type = payload
+      state.offset = 0
+      state.transactions = []
+    },
+    setDateFrom(state, { payload }) {
+      state.filters.dateFrom = payload
+      state.offset = 0
+      state.transactions = []
+    },
+    setDateTo(state, { payload }) {
+      state.filters.dateTo = payload
+      state.offset = 0
+      state.transactions = []
+    },
+    setValueFrom(state, { payload }) {
+      state.filters.valueFrom = payload
+      state.offset = 0
+      state.transactions = []
+    },
+    setValueTo(state, { payload }) {
+      state.filters.valueTo = payload
+      state.offset = 0
+      state.transactions = []
+    },
   },
 
   extraReducers: (builder) => {
@@ -78,4 +120,13 @@ declare module '@shared/store' {
 
 transactionsSlice.injectInto(rootReducer)
 
-export const { clearTransactionsState } = transactionsSlice.actions
+export const {
+  clearTransactionsState,
+  resetFilters,
+  setCategoryIds,
+  setDateFrom,
+  setDateTo,
+  setType,
+  setValueFrom,
+  setValueTo,
+} = transactionsSlice.actions
