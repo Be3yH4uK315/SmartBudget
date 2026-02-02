@@ -5,6 +5,7 @@ import {
   Radio,
   Select,
   SelectChangeEvent,
+  SxProps,
   Typography,
 } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
@@ -17,7 +18,8 @@ type Props<T extends string> = {
   value: T | null | T[]
   items: readonly T[]
   onChange: (e: SelectChangeEvent<any>) => void
-  onClose: () => void
+  onClose?: () => void
+  formSx?: SxProps
 }
 
 export function FiltersSelect<T extends string>({
@@ -29,6 +31,7 @@ export function FiltersSelect<T extends string>({
   items,
   onChange,
   onClose,
+  formSx,
 }: Props<T>) {
   const translateItem = useTranslate(translateItemKey)
   const translate = useTranslate(translateKey)
@@ -37,7 +40,7 @@ export function FiltersSelect<T extends string>({
   const selectedSingle = !Array.isArray(value) ? value : null
 
   return (
-    <FormControl sx={{ minWidth: 200, maxWidth: 250 }}>
+    <FormControl sx={{ minWidth: 125, maxWidth: 250, ...formSx }}>
       <Select
         multiple={multiple}
         displayEmpty
@@ -52,8 +55,8 @@ export function FiltersSelect<T extends string>({
             } else return translate('selected', { value: arr.length })
           }
 
-          const single = value as T | null
-          return single ? translateItem(single) : translate(placeholderKey)
+          const single = value as T | ''
+          return single !== '' ? translateItem(single) : translate(placeholderKey)
         }}
         size="small"
         sx={{
@@ -71,7 +74,7 @@ export function FiltersSelect<T extends string>({
               <Radio checked={selectedSingle === item} sx={{ color: 'primary.main' }} />
             )}
 
-            <Typography>{translateItem(item)}</Typography>
+            <Typography>{item ? translateItem(item) : translateItem('empty')}</Typography>
           </MenuItem>
         ))}
       </Select>
