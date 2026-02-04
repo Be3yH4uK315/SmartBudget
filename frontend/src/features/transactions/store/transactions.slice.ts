@@ -4,7 +4,7 @@ import { groupByDate, mergeTransactionBlocks } from '@features/transactions/util
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getTransactionsInitialState } from './transactions.state'
-import { changeCategory, getTransactions } from './transactions.thunks'
+import { changeCategory, getTransactions, searchTransactions } from './transactions.thunks'
 
 export const transactionsSlice = createSlice<
   TransactionsSliceState,
@@ -17,48 +17,6 @@ export const transactionsSlice = createSlice<
   reducers: {
     clearTransactionsState() {
       return getTransactionsInitialState()
-    },
-    resetFilters(state) {
-      state.filters = {
-        categoryIds: [],
-        valueFrom: undefined,
-        valueTo: undefined,
-        dateFrom: '',
-        dateTo: '',
-        type: '',
-      }
-      state.offset = 0
-      state.transactions = []
-    },
-    setCategoryIds(state, { payload }) {
-      state.filters.categoryIds = payload
-      state.offset = 0
-      state.transactions = []
-    },
-    setType(state, { payload }) {
-      state.filters.type = payload
-      state.offset = 0
-      state.transactions = []
-    },
-    setDateFrom(state, { payload }) {
-      state.filters.dateFrom = payload
-      state.offset = 0
-      state.transactions = []
-    },
-    setDateTo(state, { payload }) {
-      state.filters.dateTo = payload
-      state.offset = 0
-      state.transactions = []
-    },
-    setValueFrom(state, { payload }) {
-      state.filters.valueFrom = payload
-      state.offset = 0
-      state.transactions = []
-    },
-    setValueTo(state, { payload }) {
-      state.filters.valueTo = payload
-      state.offset = 0
-      state.transactions = []
     },
   },
 
@@ -98,6 +56,20 @@ export const transactionsSlice = createSlice<
 
       .addCase(getTransactions.pending, (state) => {
         state.isLoading = true
+      })
+
+      .addCase(searchTransactions.fulfilled, (state, { payload }) => {
+        state.searchTransactions = payload.transactions
+        state.isSearchLoading = false
+      })
+
+      .addCase(searchTransactions.rejected, (state) => {
+        state.searchTransactions = []
+        state.isSearchLoading = false
+      })
+
+      .addCase(searchTransactions.pending, (state) => {
+        state.isSearchLoading = true
       })
 
       .addCase(changeCategory.fulfilled, (state, { meta }) => {

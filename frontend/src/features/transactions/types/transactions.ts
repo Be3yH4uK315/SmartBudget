@@ -16,7 +16,7 @@ export type Transaction = {
   /** Описание */
   description: string | null
   /** Продавец / название */
-  name: string | null
+  name: string
   /** МСС */
   mcc: string | null
   /** Статус */

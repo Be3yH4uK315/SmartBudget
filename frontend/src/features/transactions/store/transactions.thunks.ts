@@ -1,20 +1,19 @@
 import { transactionsApi } from '@features/transactions/api/transactions.api'
 import { transactionsMock } from '@features/transactions/api/transactions.mock'
-import { Transaction } from '@features/transactions/types'
+import { Transaction, TransactionsFilters } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getTransactions = createAsyncThunk<
   { transactions: Transaction[]; length: number },
-  void,
+  TransactionsFilters,
   { state: RootState }
->('getTransactions', async (_, { getState }) => {
+>('getTransactions', async (filters, { getState }) => {
   try {
     const state = getState()
 
     const offset = state.transactions?.offset ?? 0
-    const filters = state.transactions?.filters
 
     const response = await transactionsMock.getTransactions(offset, filters)
 
@@ -25,6 +24,22 @@ export const getTransactions = createAsyncThunk<
     return { transactions: [], length: 0 }
   }
 })
+
+export const searchTransactions = createAsyncThunk<{ transactions: Transaction[] }, string>(
+  'searchTransactions',
+  async (query, { signal }) => {
+    const limit = 10
+    try {
+      const response = await transactionsMock.searchTransactions(query, limit, signal)
+
+      return { transactions: response }
+    } catch (e: any) {
+      showToast({ messageKey: 'cannotFindTransactions', type: 'error' })
+
+      return { transactions: [] }
+    }
+  },
+)
 
 export const changeCategory = createAsyncThunk<
   void,

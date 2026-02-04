@@ -5,14 +5,8 @@ export function getTransactionsInitialState(): TransactionsSliceState {
     transactions: [],
     isLoading: true,
 
-    filters: {
-      categoryIds: [],
-      valueFrom: undefined,
-      valueTo: undefined,
-      dateFrom: '',
-      dateTo: '',
-      type: '',
-    },
+    searchTransactions: [],
+    isSearchLoading: false,
 
     offset: 0,
     isLast: false,

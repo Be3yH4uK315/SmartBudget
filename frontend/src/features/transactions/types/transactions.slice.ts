@@ -1,11 +1,12 @@
-import { PayloadAction, SliceCaseReducers } from '@shared/types'
-import { Category, TransactionsBlock, TransactionsFilters, TransactionType } from './transactions'
+import { SliceCaseReducers } from '@shared/types'
+import { Transaction, TransactionsBlock } from './transactions'
 
 export type TransactionsSliceState = {
   transactions: TransactionsBlock[]
   isLoading: boolean
 
-  filters: TransactionsFilters
+  searchTransactions: Transaction[]
+  isSearchLoading: boolean
 
   offset: number
   isLast: boolean
@@ -13,11 +14,4 @@ export type TransactionsSliceState = {
 
 export type TransactionsSliceReducers = SliceCaseReducers<TransactionsSliceState> & {
   clearTransactionsState(state: TransactionsSliceState): void
-  resetFilters(state: TransactionsSliceState): void
-  setCategoryIds(state: TransactionsSliceState, action: PayloadAction<Category[]>): void
-  setType(state: TransactionsSliceState, action: PayloadAction<TransactionType | ''>): void
-  setDateFrom(state: TransactionsSliceState, action: PayloadAction<string>): void
-  setDateTo(state: TransactionsSliceState, action: PayloadAction<string>): void
-  setValueFrom(state: TransactionsSliceState, action: PayloadAction<number | undefined>): void
-  setValueTo(state: TransactionsSliceState, action: PayloadAction<number | undefined>): void
 }
