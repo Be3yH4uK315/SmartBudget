@@ -5,9 +5,6 @@ export function getTransactionsInitialState(): TransactionsSliceState {
     transactions: [],
     isLoading: true,
 
-    searchTransactions: [],
-    isSearchLoading: false,
-
     offset: 0,
     isLast: false,
   }

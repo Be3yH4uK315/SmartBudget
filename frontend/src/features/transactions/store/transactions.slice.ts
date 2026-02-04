@@ -4,7 +4,7 @@ import { groupByDate, mergeTransactionBlocks } from '@features/transactions/util
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getTransactionsInitialState } from './transactions.state'
-import { changeCategory, getTransactions, searchTransactions } from './transactions.thunks'
+import { changeCategory, getTransactions } from './transactions.thunks'
 
 export const transactionsSlice = createSlice<
   TransactionsSliceState,
@@ -56,20 +56,6 @@ export const transactionsSlice = createSlice<
 
       .addCase(getTransactions.pending, (state) => {
         state.isLoading = true
-      })
-
-      .addCase(searchTransactions.fulfilled, (state, { payload }) => {
-        state.searchTransactions = payload.transactions
-        state.isSearchLoading = false
-      })
-
-      .addCase(searchTransactions.rejected, (state) => {
-        state.searchTransactions = []
-        state.isSearchLoading = false
-      })
-
-      .addCase(searchTransactions.pending, (state) => {
-        state.isSearchLoading = true
       })
 
       .addCase(changeCategory.fulfilled, (state, { meta }) => {

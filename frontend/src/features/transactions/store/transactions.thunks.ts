@@ -25,22 +25,6 @@ export const getTransactions = createAsyncThunk<
   }
 })
 
-export const searchTransactions = createAsyncThunk<{ transactions: Transaction[] }, string>(
-  'searchTransactions',
-  async (query, { signal }) => {
-    const limit = 10
-    try {
-      const response = await transactionsMock.searchTransactions(query, limit, signal)
-
-      return { transactions: response }
-    } catch (e: any) {
-      showToast({ messageKey: 'cannotFindTransactions', type: 'error' })
-
-      return { transactions: [] }
-    }
-  },
-)
-
 export const changeCategory = createAsyncThunk<
   void,
   Pick<Transaction, 'categoryId' | 'transactionId'>,

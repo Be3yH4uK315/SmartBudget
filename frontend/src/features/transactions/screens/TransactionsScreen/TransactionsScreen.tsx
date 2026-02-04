@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { SearchBar } from '@features/transactions/components'
 import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
   clearTransactionsState,
@@ -55,8 +54,6 @@ export default function TransactionsScreen() {
     <ScreenContent title={translate('title')}>
       <Stack spacing={1} maxWidth={'800px'}>
         <Stack spacing={2}>
-          <SearchBar />
-
           <TransactionsFiltersBlock
             {...props}
             appliedFiltersRef={appliedFiltersRef}

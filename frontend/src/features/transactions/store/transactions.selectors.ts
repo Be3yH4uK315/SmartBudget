@@ -12,11 +12,6 @@ export const selectIsTransactionsLoading = sliceStateSelector((state) => state.i
 export const selectTransactionsIsLast = sliceStateSelector((state) => state.isLast)
 export const selectTransactionsOffset = sliceStateSelector((state) => state.offset)
 
-export const selectSearchTransactions = sliceStateSelector((state) => state.searchTransactions)
-export const selectIsSearchTransactionsLoading = sliceStateSelector(
-  (state) => state.isSearchLoading,
-)
-
 export const selectTransactionById = (transactionId: string) =>
   createSelector(selectTransactions, (blocks) => {
     for (const block of blocks) {
