@@ -1,14 +1,6 @@
-import {
-  getTransactions,
-  setDateFrom,
-  setDateTo,
-  setType,
-  setValueFrom,
-  setValueTo,
-} from '@features/transactions/store'
-import { TransactionType } from '@features/transactions/types'
+import { TransactionsFilters, TransactionType } from '@features/transactions/types'
 import { useTranslate } from '@shared/hooks'
-import { useAppDispatch } from '@shared/store'
+import { formatCurrency } from '@shared/utils/formatCurrency'
 import dayjs from 'dayjs'
 
 type TransactionsChip =
@@ -18,37 +10,44 @@ type TransactionsChip =
   | { type: 'type'; value: string }
 
 type Props = {
+  appliedFiltersRef: React.RefObject<TransactionsFilters>
   localCategoryIds: string[]
-  setLocalType: React.Dispatch<React.SetStateAction<'' | TransactionType>>
-  setLocalValueFrom: React.Dispatch<React.SetStateAction<number | undefined>>
-  setLocalValueTo: React.Dispatch<React.SetStateAction<number | undefined>>
-  setLocalDateFrom: React.Dispatch<React.SetStateAction<string>>
-  setLocalDateTo: React.Dispatch<React.SetStateAction<string>>
   localDateFrom: string
   localDateTo: string
   localValueFrom?: number
   localValueTo?: number
   localType: string
-  handleRemoveCategoryId: (id: string) => void
+  setLocalType: React.Dispatch<React.SetStateAction<'' | TransactionType>>
+  setLocalValueFrom: React.Dispatch<React.SetStateAction<number | undefined>>
+  setLocalValueTo: React.Dispatch<React.SetStateAction<number | undefined>>
+  setLocalDateFrom: React.Dispatch<React.SetStateAction<string>>
+  setLocalDateTo: React.Dispatch<React.SetStateAction<string>>
+  handleApplyCategories: (value?: string[]) => void
+  handleApplyType: (value?: '' | TransactionType) => void
+  handleApplyDates: (from?: string, to?: string) => void
+  handleApplyValues: (from?: number, to?: number) => void
+  handleRemoveCategoryId: (value: number) => void
 }
 
 export function useTransactionsChips({
   localCategoryIds,
-  setLocalType,
-  setLocalValueFrom,
-  setLocalValueTo,
-  setLocalDateFrom,
-  setLocalDateTo,
   localDateFrom,
   localDateTo,
   localValueFrom,
   localValueTo,
   localType,
+  setLocalType,
+  setLocalValueFrom,
+  setLocalValueTo,
+  setLocalDateFrom,
+  setLocalDateTo,
+  handleApplyType,
+  handleApplyDates,
+  handleApplyValues,
   handleRemoveCategoryId,
 }: Props) {
   const translate = useTranslate('Transactions')
   const translateCategory = useTranslate('Categories')
-  const dispatch = useAppDispatch()
 
   const chips: TransactionsChip[] = []
 
@@ -86,11 +85,16 @@ export function useTransactionsChips({
 
       case 'value':
         if (chip.from !== undefined && chip.to !== undefined)
-          return translate('Filters.Value.range', { from: chip.from, to: chip.to })
+          return translate('Filters.Value.range', {
+            from: formatCurrency(chip.from),
+            to: formatCurrency(chip.to),
+          })
 
-        if (chip.from !== undefined) return translate('Filters.Value.from', { from: chip.from })
+        if (chip.from !== undefined)
+          return translate('Filters.Value.from', { from: formatCurrency(chip.from) })
 
-        if (chip.to !== undefined) return translate('Filters.Value.to', { to: chip.to })
+        if (chip.to !== undefined)
+          return translate('Filters.Value.to', { to: formatCurrency(chip.to) })
 
         return ''
     }
@@ -99,30 +103,28 @@ export function useTransactionsChips({
   const handleDeleteChip = (chip: TransactionsChip) => {
     switch (chip.type) {
       case 'category':
-        handleRemoveCategoryId(chip.id)
+        handleRemoveCategoryId(Number(chip.id))
         break
 
-      case 'type':
+      case 'type': {
+        handleApplyType('')
         setLocalType('')
-        dispatch(setType(''))
-        dispatch(getTransactions())
         break
+      }
 
-      case 'value':
+      case 'value': {
+        handleApplyValues(-1, -1)
         setLocalValueFrom(undefined)
         setLocalValueTo(undefined)
-        dispatch(setValueFrom(undefined))
-        dispatch(setValueTo(undefined))
-        dispatch(getTransactions())
         break
+      }
 
-      case 'date':
+      case 'date': {
+        handleApplyDates('', '')
         setLocalDateFrom('')
         setLocalDateTo('')
-        dispatch(setDateFrom(''))
-        dispatch(setDateTo(''))
-        dispatch(getTransactions())
         break
+      }
     }
   }
 

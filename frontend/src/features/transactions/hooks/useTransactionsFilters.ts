@@ -1,23 +1,14 @@
-import { useState } from 'react'
-import {
-  getTransactions,
-  resetFilters,
-  setCategoryIds,
-  setDateFrom,
-  setDateTo,
-  setType,
-  setValueFrom,
-  setValueTo,
-} from '@features/transactions/store'
-import { TransactionsFilters, TransactionType } from '@features/transactions/types'
-import { parseCategoryIds } from '@features/transactions/utils'
+import { useRef, useState } from 'react'
+import { clearTransactionsState, getTransactions } from '@features/transactions/store'
+import { Category, TransactionsFilters, TransactionType } from '@features/transactions/types'
+import { isSameFilters, parseCategoryIds } from '@features/transactions/utils'
 import { SelectChangeEvent } from '@mui/material'
 import { useAppDispatch } from '@shared/store'
-import { isSetsEqual } from '@shared/utils'
+import { isSetsEqual } from '@shared/utils/isSetsEqual'
 import dayjs from 'dayjs'
 import { useSearchParams } from 'react-router'
 
-export function useTransactionsFilters(filters: TransactionsFilters) {
+export function useTransactionsFilters() {
   const dispatch = useAppDispatch()
 
   const [searchParams, setSearchParams] = useSearchParams()
@@ -26,112 +17,173 @@ export function useTransactionsFilters(filters: TransactionsFilters) {
   const initialCategoryIds = parseCategoryIds(categoryParam?.split(',') ?? [])
 
   const [localCategoryIds, setLocalCategoryIds] = useState<string[]>(initialCategoryIds.map(String))
-  const [localType, setLocalType] = useState<TransactionType | ''>(filters.type)
-  const [localDateFrom, setLocalDateFrom] = useState<string>(filters.dateFrom)
-  const [localDateTo, setLocalDateTo] = useState<string>(filters.dateTo)
-  const [localValueFrom, setLocalValueFrom] = useState<number | undefined>(filters.valueFrom)
-  const [localValueTo, setLocalValueTo] = useState<number | undefined>(filters.valueTo)
+  const [localType, setLocalType] = useState<TransactionType | ''>('')
+  const [localDateFrom, setLocalDateFrom] = useState<string>('')
+  const [localDateTo, setLocalDateTo] = useState<string>('')
+  const [localValueFrom, setLocalValueFrom] = useState<number | undefined>()
+  const [localValueTo, setLocalValueTo] = useState<number | undefined>()
 
-  const dirty =
-    filters.categoryIds.length > 0 ||
-    filters.type !== '' ||
-    filters.valueFrom !== undefined ||
-    filters.valueTo !== undefined ||
-    filters.dateFrom !== '' ||
-    filters.dateTo !== ''
+  const appliedFiltersRef = useRef<TransactionsFilters>({
+    categoryIds: initialCategoryIds,
+    type: '',
+    dateFrom: '',
+    dateTo: '',
+    valueFrom: undefined,
+    valueTo: undefined,
+  })
 
-  const handleCategoryIdsChange = (e: SelectChangeEvent<string[]>) => {
-    const value = e.target.value
+  const isDirty = () => {
+    return !isSameFilters(appliedFiltersRef.current, {
+      categoryIds: [],
+      type: '',
+      dateFrom: '',
+      dateTo: '',
+      valueFrom: undefined,
+      valueTo: undefined,
+    })
+  }
+
+  const applyFilters = (nextFilters: TransactionsFilters) => {
+    appliedFiltersRef.current = nextFilters
+
+    dispatch(clearTransactionsState())
+    dispatch(getTransactions(nextFilters))
+  }
+
+  const handleCategoryIdsChange = (e: SelectChangeEvent<string[]> | string[]) => {
+    const value = 'target' in e ? e.target.value : e
     setLocalCategoryIds(typeof value === 'string' ? value.split(',') : value)
   }
 
+  const handleApplyCategories = (nextLocalCategoryIds?: string[]) => {
+    const categoriesArray: Category[] = Array.isArray(nextLocalCategoryIds)
+      ? parseCategoryIds(nextLocalCategoryIds)
+      : parseCategoryIds(localCategoryIds)
+
+    const nextFilters: TransactionsFilters = {
+      ...appliedFiltersRef.current,
+      categoryIds: categoriesArray,
+    }
+
+    if (isSetsEqual(appliedFiltersRef.current.categoryIds, categoriesArray)) return
+
+    applyFilters(nextFilters)
+
+    const params = new URLSearchParams(searchParams)
+    if (categoriesArray.length) {
+      params.set('categoriesIds', categoriesArray.join(','))
+    } else {
+      params.delete('categoriesIds')
+    }
+    setSearchParams(params, { replace: true })
+  }
+
+  const handleRemoveCategoryId = (categoryId: number) => {
+    const nextLocal = localCategoryIds.filter((id) => id !== String(categoryId))
+
+    setLocalCategoryIds(nextLocal)
+    handleApplyCategories(nextLocal)
+  }
+
   const handleTypeChange = (e: SelectChangeEvent<string>) => {
-    const value = e.target.value
-    setLocalType(value as TransactionType | '')
+    const value = e.target.value as TransactionType | ''
+    setLocalType(value)
 
-    if (value === filters.type) return
+    handleApplyType(value)
+  }
 
-    dispatch(setType(value as TransactionType | ''))
-    dispatch(getTransactions())
+  const handleApplyType = (newType?: TransactionType | '') => {
+    const typeToApply = newType !== undefined ? newType : localType
+
+    const nextFilters: TransactionsFilters = {
+      ...appliedFiltersRef.current,
+      type: typeToApply,
+    }
+
+    if (appliedFiltersRef.current.type === typeToApply) return
+
+    applyFilters(nextFilters)
   }
 
   const handleDateFromChange = (value: string) => setLocalDateFrom(value)
   const handleDateToChange = (value: string) => setLocalDateTo(value)
+
+  const handleApplyDates = (from?: string, to?: string) => {
+    const fromToApply = from ?? localDateFrom
+    const toToApply = to ?? localDateTo
+
+    let finalFrom = fromToApply
+    let finalTo = toToApply
+    if (fromToApply && toToApply && dayjs(fromToApply).isAfter(dayjs(toToApply))) {
+      finalFrom = toToApply
+      finalTo = fromToApply
+      setLocalDateFrom(finalFrom)
+      setLocalDateTo(finalTo)
+    }
+
+    const nextFilters: TransactionsFilters = {
+      ...appliedFiltersRef.current,
+      dateFrom: finalFrom,
+      dateTo: finalTo,
+    }
+
+    if (
+      appliedFiltersRef.current.dateFrom === finalFrom &&
+      appliedFiltersRef.current.dateTo === finalTo
+    )
+      return
+
+    applyFilters(nextFilters)
+  }
+
   const handleValueFromChange = (value?: number) => setLocalValueFrom(value)
   const handleValueToChange = (value?: number) => setLocalValueTo(value)
 
-  const handleApplyCategories = () => {
-    const categoriesIds = parseCategoryIds(localCategoryIds)
+  const handleApplyValues = (from?: number, to?: number) => {
+    const valueFromToApply = from ?? localValueFrom
+    const valueToToApply = to ?? localValueTo
 
-    if (isSetsEqual(categoriesIds, filters.categoryIds)) return
+    //костыль для сброса через чипы, но вроде бы работает :)
+    let finalValueFrom = valueFromToApply === -1 ? undefined : valueFromToApply
+    let finalValueTo = valueToToApply === -1 ? undefined : valueToToApply
 
-    dispatch(setCategoryIds(categoriesIds))
-    dispatch(getTransactions())
-
-    const next = new URLSearchParams(searchParams)
-
-    if (categoriesIds.length > 0) next.set('categoriesIds', categoriesIds.join(','))
-    else next.delete('categoriesIds')
-
-    setSearchParams(next, { replace: true })
-  }
-
-  const handleApplyValues = () => {
-    if (localValueFrom === filters.valueFrom && localValueTo === filters.valueTo) return
-
-    if (localValueFrom && localValueTo && localValueFrom > localValueTo) {
-      handleValueFromChange(localValueTo)
-      handleValueToChange(localValueFrom)
-
-      dispatch(setValueFrom(localValueTo))
-      dispatch(setValueTo(localValueFrom))
-      dispatch(getTransactions())
-      return
+    if (
+      valueFromToApply !== undefined &&
+      valueFromToApply !== -1 &&
+      valueToToApply !== undefined &&
+      valueToToApply !== -1 &&
+      valueFromToApply > valueToToApply
+    ) {
+      finalValueFrom = valueToToApply
+      finalValueTo = valueFromToApply
+      setLocalValueFrom(finalValueFrom)
+      setLocalValueTo(finalValueTo)
     }
 
-    dispatch(setValueFrom(localValueFrom))
-    dispatch(setValueTo(localValueTo))
-    dispatch(getTransactions())
-  }
-
-  const handleApplyDates = () => {
-    if (localDateFrom === filters.dateFrom && localDateTo === filters.dateTo) return
-
-    if (localDateFrom && localDateTo && dayjs(localDateFrom).isAfter(dayjs(localDateTo))) {
-      handleDateFromChange(localDateTo)
-      handleDateToChange(localDateFrom)
-
-      dispatch(setDateFrom(localDateTo))
-      dispatch(setDateTo(localDateFrom))
-      dispatch(getTransactions())
-      return
+    const nextFilters: TransactionsFilters = {
+      ...appliedFiltersRef.current,
+      valueFrom: finalValueFrom,
+      valueTo: finalValueTo,
     }
 
-    dispatch(setDateFrom(localDateFrom))
-    dispatch(setDateTo(localDateTo))
-    dispatch(getTransactions())
-  }
+    if (
+      appliedFiltersRef.current.valueFrom === finalValueFrom &&
+      appliedFiltersRef.current.valueTo === finalValueTo
+    )
+      return
 
-  const handleRemoveCategoryId = (categoryId: string) => {
-    if (filters.categoryIds.length === 0) return
-
-    const next = localCategoryIds.filter((id) => id !== categoryId)
-    setLocalCategoryIds(next)
-
-    const categoriesIds = parseCategoryIds(next)
-    dispatch(setCategoryIds(categoriesIds))
-    dispatch(getTransactions())
-
-    const nextParam = new URLSearchParams(searchParams)
-
-    if (categoriesIds.length > 0) nextParam.set('categoriesIds', categoriesIds.join(','))
-    else nextParam.delete('categoriesIds')
-
-    setSearchParams(nextParam, { replace: true })
+    applyFilters(nextFilters)
   }
 
   const handleClearFilters = () => {
-    if (!dirty) return
+    const emptyFilters: TransactionsFilters = {
+      categoryIds: [],
+      type: '',
+      dateFrom: '',
+      dateTo: '',
+      valueFrom: undefined,
+      valueTo: undefined,
+    }
 
     setLocalCategoryIds([])
     setLocalType('')
@@ -140,37 +192,44 @@ export function useTransactionsFilters(filters: TransactionsFilters) {
     setLocalValueFrom(undefined)
     setLocalValueTo(undefined)
 
-    dispatch(resetFilters())
-    dispatch(getTransactions())
+    applyFilters(emptyFilters)
 
-    const next = new URLSearchParams(searchParams)
-    next.delete('categoriesIds')
-    setSearchParams(next, { replace: true })
+    const params = new URLSearchParams(searchParams)
+    params.delete('categoriesIds')
+    setSearchParams(params, { replace: true })
   }
 
   return {
-    dirty,
+    isDirty,
+    appliedFiltersRef,
+
     localCategoryIds,
+    setLocalCategoryIds,
+    handleCategoryIdsChange,
+    handleApplyCategories,
+    handleRemoveCategoryId,
+
     localType,
+    setLocalType,
+    handleTypeChange,
+    handleApplyType,
+
     localDateFrom,
     localDateTo,
-    localValueFrom,
-    localValueTo,
-    setLocalType,
-    setLocalValueFrom,
-    setLocalValueTo,
     setLocalDateFrom,
     setLocalDateTo,
-    handleCategoryIdsChange,
-    handleTypeChange,
     handleDateFromChange,
     handleDateToChange,
+    handleApplyDates,
+
+    localValueFrom,
+    localValueTo,
+    setLocalValueFrom,
+    setLocalValueTo,
     handleValueFromChange,
     handleValueToChange,
-    handleApplyCategories,
     handleApplyValues,
-    handleApplyDates,
-    handleRemoveCategoryId,
+
     handleClearFilters,
   }
 }
