@@ -1,4 +1,6 @@
 import { PropsWithChildren } from 'react'
+import { LocalizationProvider as MUILocalizationProvider } from '@mui/x-date-pickers'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { LocalizationProvider } from './LocalizationProvider'
 import { ReduxProvider } from './ReduxProvider'
 import { RouterProvider } from './RouterProvider'
@@ -11,7 +13,9 @@ export const Providers = ({ children }: PropsWithChildren) => {
       <RouterProvider>
         <ThemeProvider>
           <LocalizationProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <MUILocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ru-RU">
+              <ToastProvider>{children}</ToastProvider>
+            </MUILocalizationProvider>
           </LocalizationProvider>
         </ThemeProvider>
       </RouterProvider>
