@@ -11,7 +11,11 @@ export const selectTransactions = sliceStateSelector((state) => state.transactio
 export const selectIsTransactionsLoading = sliceStateSelector((state) => state.isLoading)
 export const selectTransactionsIsLast = sliceStateSelector((state) => state.isLast)
 export const selectTransactionsOffset = sliceStateSelector((state) => state.offset)
-export const selectTransactionsFilters = sliceStateSelector((state) => state.filters)
+
+export const selectSearchTransactions = sliceStateSelector((state) => state.searchTransactions)
+export const selectIsSearchTransactionsLoading = sliceStateSelector(
+  (state) => state.isSearchLoading,
+)
 
 export const selectTransactionById = (transactionId: string) =>
   createSelector(selectTransactions, (blocks) => {

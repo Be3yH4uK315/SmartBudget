@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Button, Popover, Stack, TextField, Typography } from '@mui/material'
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import { DatePicker } from '@mui/x-date-pickers'
 import { useTranslate } from '@shared/hooks'
 import dayjs from 'dayjs'
 
@@ -61,7 +60,17 @@ export function TransactionsRangePopover({
 
   return (
     <>
-      <Button variant="yellow" onClick={handleOpen} sx={{ height: 'min-content' }}>
+      <Button
+        variant="white"
+        onClick={handleOpen}
+        sx={{
+          height: 'min-content',
+          bgcolor: 'surface.light',
+          border: '1px solid',
+          borderColor: 'primary.main',
+          px: 2,
+        }}
+      >
         {translate(`${labelKey}.emptyLabel`)}
       </Button>
 
@@ -72,35 +81,33 @@ export function TransactionsRangePopover({
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         slotProps={{ paper: { sx: { borderRadius: '12px' } } }}
       >
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <Stack spacing={1} sx={{ p: 2, minWidth: 240 }}>
-            <Typography>{translate(`${labelKey}.emptyLabel`)}</Typography>
+        <Stack spacing={1} sx={{ p: 2, minWidth: 240 }}>
+          <Typography>{translate(`${labelKey}.emptyLabel`)}</Typography>
 
-            {renderInput({
-              label: translate(`${labelKey}.from`),
-              value: from,
-              type,
-              from,
-              to,
-              onChange: onChangeFrom,
-            })}
+          {renderInput({
+            label: translate(`${labelKey}.from`),
+            value: from,
+            type,
+            from,
+            to,
+            onChange: onChangeFrom,
+          })}
 
-            {renderInput({
-              label: translate(`${labelKey}.to`),
-              value: to,
-              type,
-              from,
-              to,
-              onChange: onChangeTo,
-            })}
-          </Stack>
-        </LocalizationProvider>
+          {renderInput({
+            label: translate(`${labelKey}.to`),
+            value: to,
+            type,
+            from,
+            to,
+            onChange: onChangeTo,
+          })}
+        </Stack>
       </Popover>
     </>
   )
 }
 
-const renderInput = ({ label, value, type, from, to, onChange }: InputProps) => {
+const renderInput = ({ label, value, type, onChange }: InputProps) => {
   if (type === 'number') {
     return (
       <TextField
@@ -108,10 +115,32 @@ const renderInput = ({ label, value, type, from, to, onChange }: InputProps) => 
         type="number"
         value={value ?? ''}
         size="small"
-        slotProps={{ htmlInput: { min: 0 } }}
+        slotProps={{
+          htmlInput: {
+            min: 0,
+          },
+          input: { endAdornment: <Typography>₽</Typography> },
+        }}
+        onKeyDown={(e) => {
+          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+            e.preventDefault()
+          }
+        }}
+        onPaste={(e) => {
+          const text = e.clipboardData.getData('text')
+          if (/[-eE+]/.test(text)) {
+            e.preventDefault()
+          }
+        }}
         onChange={(e) => {
           const v = e.target.value
           onChange(v === '' ? undefined : Math.max(0, Number(v)))
+        }}
+        sx={{
+          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+            WebkitAppearance: 'none',
+            margin: 0,
+          },
         }}
       />
     )
@@ -121,12 +150,11 @@ const renderInput = ({ label, value, type, from, to, onChange }: InputProps) => 
     <DatePicker
       label={label}
       value={value ? dayjs(value) : null}
-      minDate={from ? dayjs(from) : undefined}
-      maxDate={to ? dayjs(to) : undefined}
       onChange={(v) => onChange(v ? v.format('YYYY-MM-DD') : '')}
       format="DD.MM.YYYY"
       slots={{ textField: TextField }}
       enableAccessibleFieldDOMStructure={false}
+      disableFuture
       slotProps={{
         textField: {
           size: 'small',
