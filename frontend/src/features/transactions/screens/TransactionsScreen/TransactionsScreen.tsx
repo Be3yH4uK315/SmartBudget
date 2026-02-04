@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
+import { SearchBar } from '@features/transactions/components'
+import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
   clearTransactionsState,
   getTransactions,
   selectIsTransactionsLoading,
   selectTransactions,
-  selectTransactionsFilters,
   selectTransactionsIsLast,
-  setCategoryIds,
 } from '@features/transactions/store'
+import { TransactionsFilters } from '@features/transactions/types'
 import { parseCategoryIds } from '@features/transactions/utils'
 import { Stack } from '@mui/material'
 import { EmptyList, ScreenContent, withAuth } from '@shared/components'
@@ -26,17 +27,21 @@ export default function TransactionsScreen() {
   const isLoading = useAppSelector(selectIsTransactionsLoading)
   const transactions = useAppSelector(selectTransactions)
   const isLast = useAppSelector(selectTransactionsIsLast)
-  const filters = useAppSelector(selectTransactionsFilters)
+
+  const { appliedFiltersRef, isDirty, ...props } = useTransactionsFilters()
 
   useEffect(() => {
     const categoryParam = searchParams.get('categoriesIds')
     const ids = parseCategoryIds(categoryParam?.split(',') ?? [])
 
-    if (categoryParam !== null) {
-      dispatch(setCategoryIds(ids))
+    const filters: TransactionsFilters = {
+      categoryIds: ids,
+      dateFrom: '',
+      dateTo: '',
+      type: '',
     }
 
-    dispatch(getTransactions())
+    dispatch(getTransactions(filters))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -49,7 +54,15 @@ export default function TransactionsScreen() {
   return (
     <ScreenContent title={translate('title')}>
       <Stack spacing={1} maxWidth={'800px'}>
-        <TransactionsFiltersBlock filters={filters} />
+        <Stack spacing={2}>
+          <SearchBar />
+
+          <TransactionsFiltersBlock
+            {...props}
+            appliedFiltersRef={appliedFiltersRef}
+            isDirty={isDirty()}
+          />
+        </Stack>
 
         {transactions.length === 0 && !isLoading && (
           <EmptyList
@@ -59,7 +72,12 @@ export default function TransactionsScreen() {
         )}
 
         {transactions.length > 0 && (
-          <TransactionsList isLast={isLast} isLoading={isLoading} transactions={transactions} />
+          <TransactionsList
+            isLast={isLast}
+            isLoading={isLoading}
+            transactions={transactions}
+            appliedFiltersRef={appliedFiltersRef}
+          />
         )}
 
         {transactions.length === 0 && isLoading && <TransactionsScreenSkeleton />}

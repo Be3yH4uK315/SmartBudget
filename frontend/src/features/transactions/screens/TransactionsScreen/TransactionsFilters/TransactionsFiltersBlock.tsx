@@ -1,31 +1,50 @@
-import { useTransactionsChips, useTransactionsFilters } from '@features/transactions/hooks'
+import { useTransactionsChips } from '@features/transactions/hooks'
 import { TransactionsFilters, TransactionType } from '@features/transactions/types'
-import { Button, Chip, Grid, Stack } from '@mui/material'
+import { Button, Chip, Grid, SelectChangeEvent, Stack } from '@mui/material'
 import { FiltersSelect, StyledBox } from '@shared/components'
 import { CATEGORY_IDS } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { TransactionsRangePopover } from './TransactionsRangePopover'
 
 type Props = {
-  filters: TransactionsFilters
+  isDirty: boolean
+  localCategoryIds: string[]
+  localType: TransactionType | ''
+  localDateFrom: string
+  localDateTo: string
+  localValueFrom: number | undefined
+  localValueTo: number | undefined
+  appliedFiltersRef: React.RefObject<TransactionsFilters>
+  setLocalType: React.Dispatch<React.SetStateAction<'' | TransactionType>>
+  setLocalValueFrom: React.Dispatch<React.SetStateAction<number | undefined>>
+  setLocalValueTo: React.Dispatch<React.SetStateAction<number | undefined>>
+  setLocalDateFrom: React.Dispatch<React.SetStateAction<string>>
+  setLocalDateTo: React.Dispatch<React.SetStateAction<string>>
+  handleCategoryIdsChange: (e: SelectChangeEvent<string[]>) => void
+  handleTypeChange: (e: SelectChangeEvent<string>) => void
+  handleDateFromChange: (value: string) => void
+  handleDateToChange: (value: string) => void
+  handleValueFromChange: (value?: number | undefined) => void
+  handleValueToChange: (value?: number | undefined) => void
+  handleApplyCategories: (next?: string[]) => void
+  handleApplyType: (newType?: '' | TransactionType) => void
+  handleApplyDates: (from?: string, to?: string) => void
+  handleApplyValues: (from?: number, to?: number) => void
+  handleClearFilters: () => void
+  handleRemoveCategoryId: (value: number) => void
 }
 
-export const TransactionsFiltersBlock = ({ filters }: Props) => {
+export const TransactionsFiltersBlock = ({ ...props }: Props) => {
   const translate = useTranslate('Transactions')
 
   const {
-    dirty,
+    isDirty,
     localCategoryIds,
     localType,
     localDateFrom,
     localDateTo,
     localValueFrom,
     localValueTo,
-    setLocalType,
-    setLocalValueFrom,
-    setLocalValueTo,
-    setLocalDateFrom,
-    setLocalDateTo,
     handleCategoryIdsChange,
     handleTypeChange,
     handleDateFromChange,
@@ -36,23 +55,9 @@ export const TransactionsFiltersBlock = ({ filters }: Props) => {
     handleApplyDates,
     handleApplyValues,
     handleClearFilters,
-    handleRemoveCategoryId,
-  } = useTransactionsFilters(filters)
+  } = props
 
-  const { chips, getLabel, handleDeleteChip } = useTransactionsChips({
-    localCategoryIds,
-    localType,
-    localDateFrom,
-    localDateTo,
-    localValueFrom,
-    localValueTo,
-    handleRemoveCategoryId,
-    setLocalType,
-    setLocalValueFrom,
-    setLocalValueTo,
-    setLocalDateFrom,
-    setLocalDateTo,
-  })
+  const { chips, getLabel, handleDeleteChip } = useTransactionsChips({ ...props })
 
   return (
     <Stack spacing={2}>
@@ -107,7 +112,7 @@ export const TransactionsFiltersBlock = ({ filters }: Props) => {
           />
         </Grid>
 
-        {dirty && (
+        {isDirty && (
           <Grid size={{ xs: 12, sm: 'auto' }}>
             <Button
               onClick={handleClearFilters}
@@ -120,7 +125,7 @@ export const TransactionsFiltersBlock = ({ filters }: Props) => {
         )}
       </Grid>
 
-      {dirty && (
+      {isDirty && (
         <StyledBox>
           {chips.map((chip, i) => (
             <Chip

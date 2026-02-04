@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import 'dayjs/locale/ru'
 import { getTransactions } from '@features/transactions/store'
-import { TransactionsBlock } from '@features/transactions/types'
+import { TransactionsBlock, TransactionsFilters } from '@features/transactions/types'
 import { normalizeBlocksList } from '@features/transactions/utils'
 import { Typography } from '@mui/material'
 import { useTranslate } from '@shared/hooks'
@@ -15,16 +15,20 @@ type Props = {
   isLast: boolean
   isLoading: boolean
   transactions: TransactionsBlock[]
+  appliedFiltersRef: React.RefObject<TransactionsFilters>
 }
 
-export const TransactionsList = ({ isLast, isLoading, transactions }: Props) => {
+export const TransactionsList = ({ isLast, isLoading, transactions, appliedFiltersRef }: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
 
   const normalizedBlocks = useMemo(() => normalizeBlocksList(transactions), [transactions])
 
+  const filters = appliedFiltersRef.current
+
   const loadMore = useCallback(() => {
-    dispatch(getTransactions())
+    dispatch(getTransactions(filters))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch])
 
   const formatGroupDate = (inputDate: string) => {
