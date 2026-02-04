@@ -20,7 +20,7 @@ export const TransactionInfoModal = ({ transactionId, onClose }: Props) => {
   const translateCategory = useTranslate('Categories')
   const dispatch = useAppDispatch()
 
-  const transaction = useAppSelector(selectTransactionById(transactionId!))
+  const transaction = useAppSelector(selectTransactionById(transactionId))
 
   const handleChangeCategory = () =>
     dispatch(
