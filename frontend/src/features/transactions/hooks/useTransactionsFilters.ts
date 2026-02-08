@@ -118,6 +118,11 @@ export function useTransactionsFilters() {
     )
   }, [localFilters.categoryIds, setSearchParams])
 
+  useEffect(() => {
+    dispatch(getTransactions(localFilters))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return {
     isDirty,
     appliedFiltersRef,

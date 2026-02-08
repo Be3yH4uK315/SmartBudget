@@ -1,19 +1,16 @@
 import { useEffect } from 'react'
+import { SearchBar } from '@features/transactions/components'
 import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
   clearTransactionsState,
-  getTransactions,
   selectIsTransactionsLoading,
   selectTransactions,
   selectTransactionsIsLast,
 } from '@features/transactions/store'
-import { TransactionsFilters } from '@features/transactions/types'
-import { parseCategoryIds } from '@features/transactions/utils'
 import { Stack } from '@mui/material'
 import { EmptyList, ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
-import { useSearchParams } from 'react-router'
 import { TransactionsFiltersBlock } from './TransactionsFilters'
 import { TransactionsList } from './TransactionsList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
@@ -21,28 +18,12 @@ import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 export default function TransactionsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
-  const [searchParams] = useSearchParams()
 
   const isLoading = useAppSelector(selectIsTransactionsLoading)
   const transactions = useAppSelector(selectTransactions)
   const isLast = useAppSelector(selectTransactionsIsLast)
 
   const { appliedFiltersRef, isDirty, ...props } = useTransactionsFilters()
-
-  useEffect(() => {
-    const categoryParam = searchParams.get('categoriesIds')
-    const ids = parseCategoryIds(categoryParam?.split(',') ?? [])
-
-    const filters: TransactionsFilters = {
-      categoryIds: ids,
-      dateFrom: '',
-      dateTo: '',
-      type: '',
-    }
-
-    dispatch(getTransactions(filters))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     return () => {
