@@ -1,6 +1,6 @@
 import { useTransactionsChips } from '@features/transactions/hooks'
 import { TransactionsFilters, TransactionType } from '@features/transactions/types'
-import { Button, Chip, Grid, SelectChangeEvent, Stack } from '@mui/material'
+import { Button, Chip, Grid, Stack } from '@mui/material'
 import { FiltersSelect, StyledBox } from '@shared/components'
 import { CATEGORY_IDS } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
@@ -8,30 +8,16 @@ import { TransactionsRangePopover } from './TransactionsRangePopover'
 
 type Props = {
   isDirty: boolean
-  localCategoryIds: string[]
-  localType: TransactionType | ''
-  localDateFrom: string
-  localDateTo: string
-  localValueFrom: number | undefined
-  localValueTo: number | undefined
+  localFilters: TransactionsFilters
   appliedFiltersRef: React.RefObject<TransactionsFilters>
-  setLocalType: React.Dispatch<React.SetStateAction<'' | TransactionType>>
-  setLocalValueFrom: React.Dispatch<React.SetStateAction<number | undefined>>
-  setLocalValueTo: React.Dispatch<React.SetStateAction<number | undefined>>
-  setLocalDateFrom: React.Dispatch<React.SetStateAction<string>>
-  setLocalDateTo: React.Dispatch<React.SetStateAction<string>>
-  handleCategoryIdsChange: (e: SelectChangeEvent<string[]>) => void
-  handleTypeChange: (e: SelectChangeEvent<string>) => void
-  handleDateFromChange: (value: string) => void
-  handleDateToChange: (value: string) => void
-  handleValueFromChange: (value?: number | undefined) => void
-  handleValueToChange: (value?: number | undefined) => void
-  handleApplyCategories: (next?: string[]) => void
-  handleApplyType: (newType?: '' | TransactionType) => void
-  handleApplyDates: (from?: string, to?: string) => void
-  handleApplyValues: (from?: number, to?: number) => void
+  setLocalFilters: React.Dispatch<React.SetStateAction<TransactionsFilters>>
+  applyFilters: (value: TransactionsFilters) => void
   handleClearFilters: () => void
-  handleRemoveCategoryId: (value: number) => void
+  handleApply: () => void
+  updateLocalFilters: <K extends keyof TransactionsFilters>(
+    key: K,
+    value: TransactionsFilters[K],
+  ) => void
 }
 
 export const TransactionsFiltersBlock = ({ ...props }: Props) => {
@@ -39,25 +25,15 @@ export const TransactionsFiltersBlock = ({ ...props }: Props) => {
 
   const {
     isDirty,
-    localCategoryIds,
-    localType,
-    localDateFrom,
-    localDateTo,
-    localValueFrom,
-    localValueTo,
-    handleCategoryIdsChange,
-    handleTypeChange,
-    handleDateFromChange,
-    handleDateToChange,
-    handleValueFromChange,
-    handleValueToChange,
-    handleApplyCategories,
-    handleApplyDates,
-    handleApplyValues,
+    localFilters,
+    applyFilters,
+    setLocalFilters,
+    handleApply,
+    updateLocalFilters,
     handleClearFilters,
   } = props
 
-  const { chips, getLabel, handleDeleteChip } = useTransactionsChips({ ...props })
+  const { chips, getLabel, handleDeleteChip } = useTransactionsChips(props)
 
   return (
     <Stack spacing={2}>
@@ -65,25 +41,29 @@ export const TransactionsFiltersBlock = ({ ...props }: Props) => {
         <Grid size={{ xs: 6, sm: 'auto' }}>
           <FiltersSelect<string>
             multiple
-            value={localCategoryIds}
+            value={localFilters.categoryIds.map(String)}
             items={CATEGORY_IDS.map(String)}
             translateItemKey={'Categories'}
             translateKey={'Transactions.Filters'}
             placeholderKey={'placeholder.categories'}
-            onChange={handleCategoryIdsChange}
-            onClose={handleApplyCategories}
+            onChange={(e) => updateLocalFilters('categoryIds', e.target.value)}
+            onClose={handleApply}
             formSx={{ width: { xs: '100%', sm: 'auto' } }}
           />
         </Grid>
 
         <Grid size={{ xs: 6, sm: 'auto' }}>
           <FiltersSelect<TransactionType | ''>
-            value={localType}
+            value={localFilters.type}
             items={['', 'income', 'expense']}
             translateItemKey={'Transactions.Filters.Type'}
             translateKey={'Transactions.Filters'}
             placeholderKey={'placeholder.type'}
-            onChange={handleTypeChange}
+            onChange={(e) => {
+              const next = { ...localFilters, type: e.target.value }
+              setLocalFilters(next)
+              applyFilters(next)
+            }}
             formSx={{ width: { xs: '100%', sm: 'auto' } }}
           />
         </Grid>
@@ -91,24 +71,24 @@ export const TransactionsFiltersBlock = ({ ...props }: Props) => {
         <Grid size={'auto'}>
           <TransactionsRangePopover
             labelKey={'value'}
-            from={localValueFrom}
-            to={localValueTo}
+            from={localFilters.valueFrom}
+            to={localFilters.valueTo}
             type="number"
-            onChangeFrom={handleValueFromChange}
-            onChangeTo={handleValueToChange}
-            onClose={handleApplyValues}
+            onChangeFrom={(e) => updateLocalFilters('valueFrom', e)}
+            onChangeTo={(e) => updateLocalFilters('valueTo', e)}
+            onClose={handleApply}
           />
         </Grid>
 
         <Grid size={'auto'}>
           <TransactionsRangePopover
             labelKey={'date'}
-            from={localDateFrom}
-            to={localDateTo}
+            from={localFilters.dateFrom}
+            to={localFilters.dateTo}
             type="date"
-            onChangeFrom={handleDateFromChange}
-            onChangeTo={handleDateToChange}
-            onClose={handleApplyDates}
+            onChangeFrom={(e) => updateLocalFilters('dateFrom', e)}
+            onChangeTo={(e) => updateLocalFilters('dateTo', e)}
+            onClose={handleApply}
           />
         </Grid>
 

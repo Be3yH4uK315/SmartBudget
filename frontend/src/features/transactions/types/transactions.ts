@@ -49,3 +49,9 @@ export type TransactionsFilters = {
 }
 
 export type Category = (typeof CATEGORY_IDS)[number]
+
+export type TransactionsChip =
+  | { type: 'category'; id: number }
+  | { type: 'date'; from?: string; to?: string }
+  | { type: 'value'; from?: number; to?: number }
+  | { type: 'type'; value: string }
