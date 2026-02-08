@@ -1,5 +1,4 @@
-import { transactionsApi } from '@features/transactions/api/transactions.api'
-import { transactionsMock } from '@features/transactions/api/transactions.mock'
+import { transactionsApi, transactionsMock } from '@features/transactions/api'
 import { Transaction, TransactionsFilters } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
