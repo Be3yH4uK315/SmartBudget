@@ -78,13 +78,4 @@ declare module '@shared/store' {
 
 transactionsSlice.injectInto(rootReducer)
 
-export const {
-  clearTransactionsState,
-  resetFilters,
-  setCategoryIds,
-  setDateFrom,
-  setDateTo,
-  setType,
-  setValueFrom,
-  setValueTo,
-} = transactionsSlice.actions
+export const { clearTransactionsState } = transactionsSlice.actions
