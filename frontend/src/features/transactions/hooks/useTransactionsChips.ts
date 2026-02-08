@@ -1,70 +1,34 @@
-import { TransactionsFilters, TransactionType } from '@features/transactions/types'
+import { TransactionsChip, TransactionsFilters } from '@features/transactions/types'
 import { useTranslate } from '@shared/hooks'
 import { formatCurrency } from '@shared/utils/formatCurrency'
 import dayjs from 'dayjs'
 
-type TransactionsChip =
-  | { type: 'category'; id: string }
-  | { type: 'date'; from?: string; to?: string }
-  | { type: 'value'; from?: number; to?: number }
-  | { type: 'type'; value: string }
-
 type Props = {
-  appliedFiltersRef: React.RefObject<TransactionsFilters>
-  localCategoryIds: string[]
-  localDateFrom: string
-  localDateTo: string
-  localValueFrom?: number
-  localValueTo?: number
-  localType: string
-  setLocalType: React.Dispatch<React.SetStateAction<'' | TransactionType>>
-  setLocalValueFrom: React.Dispatch<React.SetStateAction<number | undefined>>
-  setLocalValueTo: React.Dispatch<React.SetStateAction<number | undefined>>
-  setLocalDateFrom: React.Dispatch<React.SetStateAction<string>>
-  setLocalDateTo: React.Dispatch<React.SetStateAction<string>>
-  handleApplyCategories: (value?: string[]) => void
-  handleApplyType: (value?: '' | TransactionType) => void
-  handleApplyDates: (from?: string, to?: string) => void
-  handleApplyValues: (from?: number, to?: number) => void
-  handleRemoveCategoryId: (value: number) => void
+  localFilters: TransactionsFilters
+  setLocalFilters: React.Dispatch<React.SetStateAction<TransactionsFilters>>
+  applyFilters: (value: TransactionsFilters) => void
 }
 
-export function useTransactionsChips({
-  localCategoryIds,
-  localDateFrom,
-  localDateTo,
-  localValueFrom,
-  localValueTo,
-  localType,
-  setLocalType,
-  setLocalValueFrom,
-  setLocalValueTo,
-  setLocalDateFrom,
-  setLocalDateTo,
-  handleApplyType,
-  handleApplyDates,
-  handleApplyValues,
-  handleRemoveCategoryId,
-}: Props) {
+export function useTransactionsChips({ localFilters, setLocalFilters, applyFilters }: Props) {
   const translate = useTranslate('Transactions')
   const translateCategory = useTranslate('Categories')
 
   const chips: TransactionsChip[] = []
 
-  localCategoryIds.forEach((id) => chips.push({ type: 'category', id }))
+  localFilters.categoryIds.forEach((id) => chips.push({ type: 'category', id }))
 
-  if (localDateFrom || localDateTo) {
+  if (localFilters.dateFrom || localFilters.dateTo) {
     chips.push({
       type: 'date',
-      from: localDateFrom ? dayjs(localDateFrom).format('DD.MM.YYYY') : undefined,
-      to: localDateTo ? dayjs(localDateTo).format('DD.MM.YYYY') : undefined,
+      from: localFilters.dateFrom ? dayjs(localFilters.dateFrom).format('DD.MM.YYYY') : undefined,
+      to: localFilters.dateTo ? dayjs(localFilters.dateTo).format('DD.MM.YYYY') : undefined,
     })
   }
 
-  if (localValueFrom !== undefined || localValueTo !== undefined)
-    chips.push({ type: 'value', from: localValueFrom, to: localValueTo })
+  if (localFilters.valueFrom !== undefined || localFilters.valueTo !== undefined)
+    chips.push({ type: 'value', from: localFilters.valueFrom, to: localFilters.valueTo })
 
-  if (localType) chips.push({ type: 'type', value: localType })
+  if (localFilters.type) chips.push({ type: 'type', value: localFilters.type })
 
   const getLabel = (chip: TransactionsChip) => {
     switch (chip.type) {
@@ -102,27 +66,45 @@ export function useTransactionsChips({
 
   const handleDeleteChip = (chip: TransactionsChip) => {
     switch (chip.type) {
-      case 'category':
-        handleRemoveCategoryId(Number(chip.id))
+      case 'category': {
+        const next = {
+          ...localFilters,
+          categoryIds: localFilters.categoryIds.filter((id) => id !== chip.id),
+        }
+        setLocalFilters(next)
+        applyFilters(next)
         break
+      }
 
       case 'type': {
-        handleApplyType('')
-        setLocalType('')
+        const next = {
+          ...localFilters,
+          type: '' as const,
+        }
+        setLocalFilters(next)
+        applyFilters(next)
         break
       }
 
       case 'value': {
-        handleApplyValues(-1, -1)
-        setLocalValueFrom(undefined)
-        setLocalValueTo(undefined)
+        const next = {
+          ...localFilters,
+          valueFrom: undefined,
+          valueTo: undefined,
+        }
+        setLocalFilters(next)
+        applyFilters(next)
         break
       }
 
       case 'date': {
-        handleApplyDates('', '')
-        setLocalDateFrom('')
-        setLocalDateTo('')
+        const next = {
+          ...localFilters,
+          dateFrom: '',
+          dateTo: '',
+        }
+        setLocalFilters(next)
+        applyFilters(next)
         break
       }
     }
