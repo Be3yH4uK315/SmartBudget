@@ -1,15 +1,12 @@
 import { useMemo, useState } from 'react'
-import { CategoryOption } from '@features/transactions/components'
-import {
-  CATEGORIES_ICONS_MAP,
-  CATEGORY_IDS,
-} from '@features/transactions/constants/categoriesIcons'
 import { changeCategory, selectCategoryByTransactionId } from '@features/transactions/store'
+import { Category } from '@features/transactions/types'
 import { ArrowBackOutlined } from '@mui/icons-material'
 import { Button, IconButton, MenuItem, Select, Stack, Typography } from '@mui/material'
-import { MODAL_IDS } from '@shared/constants/modals'
+import { CategoryOption } from '@shared/components'
+import { CATEGORIES_ICONS_MAP, CATEGORY_IDS, MODAL_IDS } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
-import ModalLayout from '@shared/screens/ModalProvider/ModalLayout'
+import ModalLayout from '@shared/screens/ModalProvider'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
 
@@ -36,7 +33,7 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
     await dispatch(
       changeCategory({
         transactionId: transactionId!,
-        categoryId: Number(selectedCategory),
+        categoryId: selectedCategory as Category,
       }),
     )
     openPrev()

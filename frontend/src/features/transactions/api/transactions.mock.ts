@@ -1,16 +1,17 @@
-import { Transaction } from '@features/transactions/types'
-function generateMockTransactions(total = 60): Transaction[] {
+import { Category, Transaction, TransactionsFilters } from '@features/transactions/types'
+
+function generateMockTransactions(total = 600): Transaction[] {
   const result: Transaction[] = []
   const statuses = ['confirmed', 'rejected', 'pending'] as const
 
   const dates = [
-    '2025-12-12T12:12:12',
-    '2025-12-11T12:12:12',
-    '2025-12-10T12:12:12',
-    '2025-12-09T12:12:12',
-    '2025-12-08T12:12:12',
-    '2025-12-07T12:12:12',
-    '2025-12-06T12:12:12',
+    '2026-01-24T12:12:12',
+    '2026-01-23T12:12:12',
+    '2026-01-21T12:12:12',
+    '2026-01-20T12:12:12',
+    '2026-01-19T12:12:12',
+    '2026-01-18T12:12:12',
+    '2026-01-17T12:12:12',
     '2025-12-05T12:12:12',
     '2025-12-04T12:12:12',
     '2025-12-03T12:12:12',
@@ -19,19 +20,20 @@ function generateMockTransactions(total = 60): Transaction[] {
     '2025-11-15T12:12:12',
   ]
 
-  const type = ['income', 'expense'] as const
+  const types = ['income', 'expense'] as const
 
   for (let i = 0; i < total; i++) {
     const date = dates[i % dates.length]
+
     result.push({
       transactionId: `tx_${i}_${Math.random().toString(36).slice(2, 8)}`,
       value: Math.round(Math.random() * 5000),
-      categoryId: (i % 5) + 1,
+      categoryId: ((i % 5) + 1) as Category,
       description: `Описание #${i}`,
       name: `Операция #${i}`,
       mcc: `${1000 + (i % 500)}`,
       status: statuses[i % statuses.length],
-      type: type[i % type.length],
+      type: types[i % types.length],
       date,
     })
   }
@@ -39,26 +41,72 @@ function generateMockTransactions(total = 60): Transaction[] {
   return result
 }
 
-const ALL_TRANSACTIONS = generateMockTransactions(1000)
-
-ALL_TRANSACTIONS.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0))
+const ALL_TRANSACTIONS: Transaction[] = generateMockTransactions(10000).sort((a, b) =>
+  a.date > b.date ? -1 : a.date < b.date ? 1 : 0,
+)
 
 class TransactionsMock {
-  baseUrl = ''
+  baseUrl = '/transactions'
 
-  async getTransactions(offset: number, categoryId: number | null): Promise<Transaction[]> {
-    console.log('%cMOCK CALL offset=' + offset, 'color: orange')
-    console.log(categoryId)
+  private readonly PAGE_SIZE = 50
+  private data: Transaction[] = ALL_TRANSACTIONS
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const PAGE_SIZE = 10
-    return ALL_TRANSACTIONS.slice(offset, offset + PAGE_SIZE)
+  private delay(ms = 500) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async changeCategory(payload: any): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+  private applyFilters(items: Transaction[], filters?: TransactionsFilters): Transaction[] {
+    if (!filters) return items
+
+    let res = [...items]
+
+    if (filters.categoryIds?.length) {
+      const set = new Set(filters.categoryIds)
+      res = res.filter((t) => set.has(t.categoryId))
+    }
+
+    if (filters.type) {
+      res = res.filter((t) => t.type === filters.type)
+    }
+
+    if (filters.valueFrom !== undefined) {
+      res = res.filter((t) => t.value >= filters.valueFrom!)
+    }
+
+    if (filters.valueTo !== undefined) {
+      res = res.filter((t) => t.value <= filters.valueTo!)
+    }
+
+    // фильтр по датам (включительно)
+    if (filters.dateFrom) {
+      res = res.filter((t) => t.date >= filters.dateFrom)
+    }
+
+    if (filters.dateTo) {
+      res = res.filter((t) => t.date <= filters.dateTo)
+    }
+
+    return res
+  }
+
+  async getTransactions(offset: number, filters?: TransactionsFilters): Promise<Transaction[]> {
+    console.log('%cMOCK CALL getTransactions', 'color: orange', { offset, filters })
+
+    await this.delay(500)
+
+    const filtered = this.applyFilters(this.data, filters)
+
+    return filtered.slice(offset, offset + this.PAGE_SIZE)
+  }
+
+  async changeCategory(payload: Pick<Transaction, 'categoryId' | 'transactionId'>): Promise<void> {
+    console.log('%cMOCK CALL changeCategory', 'color: orange', payload)
+
+    await this.delay(500)
+
+    this.data = this.data.map((t) =>
+      t.transactionId === payload.transactionId ? { ...t, categoryId: payload.categoryId } : t,
+    )
   }
 }
 

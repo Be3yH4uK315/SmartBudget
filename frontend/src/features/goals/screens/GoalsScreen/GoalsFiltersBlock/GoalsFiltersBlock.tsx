@@ -2,9 +2,8 @@ import { AVAILABLE_TAGS, PRIORITIES } from '@features/goals/constants/tags'
 import { useGoalsFilters } from '@features/goals/hooks'
 import { GoalsFilters, Priority, Tag } from '@features/goals/types'
 import { Button, Chip, Stack } from '@mui/material'
-import { StyledBox } from '@shared/components'
+import { FiltersSelect, StyledBox } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
-import { FiltersSelect } from './FiltersSelect'
 
 type Props = {
   filters: GoalsFilters
@@ -30,17 +29,23 @@ export const GoalsFiltersBlock = ({ filters }: Props) => {
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between' }}>
         <Stack spacing={2} direction={'row'}>
           <FiltersSelect<Tag>
+            multiple
             value={localTags}
             items={AVAILABLE_TAGS}
-            placeholder={translate('placeholder.tags')}
+            translateItemKey={'Goals.Tags'}
+            translateKey={'Goals.Filters'}
+            placeholderKey={'placeholder.tags'}
             onChange={handleTagsChange}
             onClose={handleApplyTags}
           />
 
           <FiltersSelect<Priority>
+            multiple
             value={localPriority}
             items={PRIORITIES}
-            placeholder={translate('placeholder.priority')}
+            translateItemKey={'Goals.Tags'}
+            translateKey={'Goals.Filters'}
+            placeholderKey={'placeholder.priority'}
             onChange={handlePriorityChange}
             onClose={handleApplyPriority}
           />

@@ -1,5 +1,6 @@
 export * from './formatCurrency'
 export * from './formatPercent'
+export * from './isSetsEqual'
 export * from './locale.helpers'
 export * from './logout.helpers'
 export * from './noop'

@@ -2,12 +2,12 @@ import { CategoryIcon } from '@features/transactions/components'
 import { selectTransactionById } from '@features/transactions/store'
 import { CloseOutlined } from '@mui/icons-material'
 import { Box, Button, IconButton, Stack, Typography } from '@mui/material'
-import { MODAL_IDS } from '@shared/constants/modals'
+import { MODAL_IDS } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
-import ModalLayout from '@shared/screens/ModalProvider/ModalLayout'
+import ModalLayout from '@shared/screens/ModalProvider'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
-import { formatCurrency } from '@shared/utils/formatCurrency'
+import { formatCurrency } from '@shared/utils'
 import dayjs from 'dayjs'
 
 type Props = {
@@ -20,7 +20,7 @@ export const TransactionInfoModal = ({ transactionId, onClose }: Props) => {
   const translateCategory = useTranslate('Categories')
   const dispatch = useAppDispatch()
 
-  const transaction = useAppSelector(selectTransactionById(transactionId!))
+  const transaction = useAppSelector(selectTransactionById(transactionId))
 
   const handleChangeCategory = () =>
     dispatch(

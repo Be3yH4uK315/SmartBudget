@@ -1,4 +1,4 @@
-import { SliceCaseReducers } from '@shared/types/reduxToolkit'
+import { SliceCaseReducers } from '@shared/types'
 import { TransactionsBlock } from './transactions'
 
 export type TransactionsSliceState = {

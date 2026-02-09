@@ -1,7 +1,7 @@
 import { lazy } from 'react'
 import { SuspenseFallbackWrapper } from '@shared/components'
 import { Route } from 'react-router'
-import { TransactionsScreenSkeleton } from './screens/TransactionsScreen/TransactionsScreenSkeleton'
+import { TransactionsChunkScreenSkeleton } from './screens/TransactionsScreen/TransactionsChunkScreenSkeleton'
 
 const TransactionsScreen = lazy(() => import('./screens/TransactionsScreen/TransactionsScreen'))
 
@@ -11,7 +11,7 @@ export const transactionsRoutes = {
       <Route
         index
         element={
-          <SuspenseFallbackWrapper Fallback={<TransactionsScreenSkeleton />}>
+          <SuspenseFallbackWrapper Fallback={<TransactionsChunkScreenSkeleton />}>
             <TransactionsScreen />
           </SuspenseFallbackWrapper>
         }
