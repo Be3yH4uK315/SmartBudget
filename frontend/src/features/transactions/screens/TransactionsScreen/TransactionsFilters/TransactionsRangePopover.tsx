@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, Popover, Stack, TextField, Typography } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers'
+import { NumberField } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import dayjs from 'dayjs'
 
@@ -28,12 +29,11 @@ type Props = NumberRangeProps | DateRangeProps
 
 type InputProps = {
   label: string
-  value: string | number | undefined
+  value?: string | number
   type: 'number' | 'date'
-  from: string | number | undefined
-  to: string | number | undefined
   onChange: (value: any) => void
 }
+
 export function TransactionsRangePopover({
   labelKey,
   type,
@@ -88,8 +88,6 @@ export function TransactionsRangePopover({
             label: translate(`${labelKey}.from`),
             value: from,
             type,
-            from,
-            to,
             onChange: onChangeFrom,
           })}
 
@@ -97,8 +95,6 @@ export function TransactionsRangePopover({
             label: translate(`${labelKey}.to`),
             value: to,
             type,
-            from,
-            to,
             onChange: onChangeTo,
           })}
         </Stack>
@@ -109,41 +105,7 @@ export function TransactionsRangePopover({
 
 const renderInput = ({ label, value, type, onChange }: InputProps) => {
   if (type === 'number') {
-    return (
-      <TextField
-        label={label}
-        type="number"
-        value={value ?? ''}
-        size="small"
-        slotProps={{
-          htmlInput: {
-            min: 0,
-          },
-          input: { endAdornment: <Typography>₽</Typography> },
-        }}
-        onKeyDown={(e) => {
-          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
-            e.preventDefault()
-          }
-        }}
-        onPaste={(e) => {
-          const text = e.clipboardData.getData('text')
-          if (/[-eE+]/.test(text)) {
-            e.preventDefault()
-          }
-        }}
-        onChange={(e) => {
-          const v = e.target.value
-          onChange(v === '' ? undefined : Math.max(0, Number(v)))
-        }}
-        sx={{
-          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-            WebkitAppearance: 'none',
-            margin: 0,
-          },
-        }}
-      />
-    )
+    return <NumberField label={label} value={value} onChange={onChange} />
   }
 
   return (
