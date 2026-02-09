@@ -10,7 +10,6 @@ type Props = {
   isDirty: boolean
   localFilters: TransactionsFilters
   appliedFiltersRef: React.RefObject<TransactionsFilters>
-  setLocalFilters: React.Dispatch<React.SetStateAction<TransactionsFilters>>
   applyFilters: (value: TransactionsFilters) => void
   handleClearFilters: () => void
   handleApply: () => void
@@ -27,7 +26,6 @@ export const TransactionsFiltersBlock = ({ ...props }: Props) => {
     isDirty,
     localFilters,
     applyFilters,
-    setLocalFilters,
     handleApply,
     updateLocalFilters,
     handleClearFilters,
@@ -61,7 +59,7 @@ export const TransactionsFiltersBlock = ({ ...props }: Props) => {
             placeholderKey={'placeholder.type'}
             onChange={(e) => {
               const next = { ...localFilters, type: e.target.value }
-              setLocalFilters(next)
+              updateLocalFilters('type', next.type)
               applyFilters(next)
             }}
             formSx={{ width: { xs: '100%', sm: 'auto' } }}

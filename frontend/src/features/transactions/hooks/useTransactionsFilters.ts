@@ -28,7 +28,7 @@ export function useTransactionsFilters() {
     getInitFilters(searchParams),
   )
 
-  const appliedFiltersRef = useRef<TransactionsFilters>(getInitFilters(searchParams))
+  const appliedFiltersRef = useRef<TransactionsFilters>(localFilters)
 
   function normalizeFilters(filters: TransactionsFilters): TransactionsFilters {
     let { valueFrom, valueTo, dateFrom, dateTo } = filters
@@ -127,7 +127,6 @@ export function useTransactionsFilters() {
     isDirty,
     appliedFiltersRef,
     localFilters,
-    setLocalFilters,
     applyFilters,
     handleApply,
     updateLocalFilters,

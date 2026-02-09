@@ -24,12 +24,9 @@ export const TransactionsList = ({ isLast, isLoading, transactions, appliedFilte
 
   const normalizedBlocks = useMemo(() => normalizeBlocksList(transactions), [transactions])
 
-  const filters = appliedFiltersRef.current
-
   const loadMore = useCallback(() => {
-    dispatch(getTransactions(filters))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch])
+    dispatch(getTransactions(appliedFiltersRef.current))
+  }, [dispatch, appliedFiltersRef])
 
   const formatGroupDate = (inputDate: string) => {
     const date = dayjs(inputDate)

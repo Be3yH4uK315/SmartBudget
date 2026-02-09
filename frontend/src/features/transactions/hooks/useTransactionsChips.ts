@@ -5,11 +5,14 @@ import dayjs from 'dayjs'
 
 type Props = {
   localFilters: TransactionsFilters
-  setLocalFilters: React.Dispatch<React.SetStateAction<TransactionsFilters>>
   applyFilters: (value: TransactionsFilters) => void
+  updateLocalFilters: <K extends keyof TransactionsFilters>(
+    key: K,
+    value: TransactionsFilters[K],
+  ) => void
 }
 
-export function useTransactionsChips({ localFilters, setLocalFilters, applyFilters }: Props) {
+export function useTransactionsChips({ localFilters, updateLocalFilters, applyFilters }: Props) {
   const translate = useTranslate('Transactions')
   const translateCategory = useTranslate('Categories')
 
@@ -71,7 +74,7 @@ export function useTransactionsChips({ localFilters, setLocalFilters, applyFilte
           ...localFilters,
           categoryIds: localFilters.categoryIds.filter((id) => id !== chip.id),
         }
-        setLocalFilters(next)
+        updateLocalFilters('categoryIds', next.categoryIds)
         applyFilters(next)
         break
       }
@@ -81,7 +84,7 @@ export function useTransactionsChips({ localFilters, setLocalFilters, applyFilte
           ...localFilters,
           type: '' as const,
         }
-        setLocalFilters(next)
+        updateLocalFilters('type', next.type)
         applyFilters(next)
         break
       }
@@ -92,7 +95,8 @@ export function useTransactionsChips({ localFilters, setLocalFilters, applyFilte
           valueFrom: undefined,
           valueTo: undefined,
         }
-        setLocalFilters(next)
+        updateLocalFilters('valueFrom', next.valueFrom)
+        updateLocalFilters('valueTo', next.valueTo)
         applyFilters(next)
         break
       }
@@ -103,7 +107,8 @@ export function useTransactionsChips({ localFilters, setLocalFilters, applyFilte
           dateFrom: '',
           dateTo: '',
         }
-        setLocalFilters(next)
+        updateLocalFilters('dateFrom', next.dateFrom)
+        updateLocalFilters('dateTo', next.dateTo)
         applyFilters(next)
         break
       }
