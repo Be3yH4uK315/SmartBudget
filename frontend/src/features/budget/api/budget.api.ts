@@ -1,4 +1,4 @@
-import { BudgetPayload, CreateBudgetPayload } from '@features/budget/types'
+import { BudgetPayload, BudgetSettings } from '@features/budget/types'
 import { api } from '@shared/api'
 
 class BudgetApi {
@@ -11,10 +11,10 @@ class BudgetApi {
     return response.data
   }
 
-  async createBudget(payload: CreateBudgetPayload): Promise<void> {
+  async createBudget(payload: BudgetSettings): Promise<void> {
     const url = `${this.baseUrl}`
 
-    const response = await api.post<void>(url, payload)
+    const response = await api.post<void>(url, { payload })
     return response.data
   }
 }
