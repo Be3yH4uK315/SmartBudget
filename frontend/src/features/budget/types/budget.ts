@@ -16,7 +16,7 @@ export type Category = {
   currentValue: number
 }
 
-export type CreateBudgetPayload = {
+export type BudgetSettings = {
   totalLimit: number
 
   isAutoRenew: boolean
