@@ -1,28 +1,32 @@
 import { useMemo, useState } from 'react'
-import { CATEGORIES_ICONS_MAP } from '@shared/constants/categoriesIcons'
+import { CATEGORIES_ICONS_MAP } from '@shared/constants'
+import { CategoryRow, FormValues } from '@shared/types/components'
 
-export type CategoryRow = {
-  categoryId: number
-  limit: number
-  percent?: number
+const fromPercent = (total: number | null, percent?: number) => {
+  if (total == null || total <= 0) return undefined
+  if (percent == null) return undefined
+
+  return Math.round((total * percent) / 100)
 }
 
-type FormValues = {
-  totalLimit: number
-  isAutoRenew: boolean
-  categories: CategoryRow[]
+const fromAmount = (total: number | null, limit?: number) => {
+  if (total == null || total <= 0) return undefined
+  if (limit == null) return undefined
+
+  return Math.round((limit / total) * 100)
 }
 
-const fromPercent = (total: number, percent: number) => Math.round((total * percent) / 100)
-
-const fromAmount = (total: number, limit: number) => (total ? Math.round((limit / total) * 100) : 0)
-
-export const useCreateBudget = () => {
+export const useBudgetForm = (initValues?: FormValues) => {
   const [values, setValues] = useState<FormValues>({
-    totalLimit: 0,
+    totalLimit: null,
     isAutoRenew: true,
     categories: [],
+    ...initValues,
   })
+
+  const resetInitValues = (init: FormValues) => {
+    setValues(init)
+  }
 
   const selectedCategoryIds = useMemo(
     () => values.categories.map((c) => c.categoryId).filter(Boolean) as number[],
@@ -41,33 +45,55 @@ export const useCreateBudget = () => {
 
   const remainingPercent = Math.max(0, 100 - totalPercent)
 
-  const isPercentOverflow = values.totalLimit > 0 && totalPercent > 100
+  const isPercentOverflow = values.totalLimit != null && totalPercent > 100
 
-  const canSubmit =
-    !isPercentOverflow && (values.totalLimit > 0 || values.categories.some((c) => c.limit > 0))
+  const canSubmit = () =>
+    !isPercentOverflow &&
+    ((values.totalLimit !== null && values.totalLimit !== 0) ||
+      values.categories.some((c) => c.limit && c.limit > 0))
 
   const setTotalLimit = (limit: number) => {
+    setValues((prev) => {
+      if (!limit) {
+        return {
+          ...prev,
+          totalLimit: null,
+          categories: prev.categories.map((c) => ({
+            ...c,
+            percent: undefined,
+          })),
+        }
+      }
+
+      return {
+        ...prev,
+        totalLimit: limit,
+        categories: prev.categories.map((c) => {
+          if (c.mode === 'percent' && c.percent != null) {
+            return { ...c, limit: fromPercent(limit, c.percent) }
+          }
+
+          if (c.mode === 'amount' && c.limit != null) {
+            return { ...c, percent: fromAmount(limit, c.limit) }
+          }
+
+          return c
+        }),
+      }
+    })
+  }
+
+  const addCategory = (value: number) => {
     setValues((prev) => ({
       ...prev,
-      totalLimit: limit,
-      categories: prev.categories.map((c) => ({
-        ...c,
-        limit: c.percent != null ? fromPercent(limit, c.percent) : c.limit,
-      })),
+      categories: [...prev.categories, { categoryId: value, limit: undefined, percent: undefined }],
     }))
   }
 
-  const addCategory = () => {
+  const removeCategory = (id: number) => {
     setValues((prev) => ({
       ...prev,
-      categories: [...prev.categories, { categoryId: 0, limit: 0, percent: 0 }],
-    }))
-  }
-
-  const removeCategory = (index: number) => {
-    setValues((prev) => ({
-      ...prev,
-      categories: prev.categories.filter((_, i) => i !== index),
+      categories: prev.categories.filter((c) => c.categoryId !== id),
     }))
   }
 
@@ -82,6 +108,7 @@ export const useCreateBudget = () => {
   const updateAmount = (index: number, limit: number) => {
     updateCategory(index, {
       limit,
+      mode: 'amount',
       percent: values.totalLimit ? fromAmount(values.totalLimit, limit) : undefined,
     })
   }
@@ -89,7 +116,8 @@ export const useCreateBudget = () => {
   const updatePercent = (index: number, percent: number) => {
     updateCategory(index, {
       percent,
-      limit: fromPercent(values.totalLimit, percent),
+      mode: 'percent',
+      limit: values.totalLimit ? fromPercent(values.totalLimit, percent) : undefined,
     })
   }
 
@@ -104,7 +132,7 @@ export const useCreateBudget = () => {
     remainingPercent,
     isPercentOverflow,
     canSubmit,
-
+    resetInitValues,
     setTotalLimit,
     addCategory,
     removeCategory,
