@@ -1,4 +1,5 @@
 export * from './auth.dict'
+export * from './budgetForm.dict'
 export * from './categories.dict'
 export * from './month.dict'
 export * from './shared.dict'
