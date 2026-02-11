@@ -1,24 +1,36 @@
-import { TextField, TextFieldProps, Typography } from '@mui/material'
+import { SxProps, TextField, TextFieldProps, Typography } from '@mui/material'
 
 type Props = {
   label: string
+  type?: 'number' | 'percent'
   value?: string | number
   onChange: (value: any) => void
   textFieldProps?: TextFieldProps
+  textFieldSx?: SxProps
 }
 
-export const NumberField = ({ label, value, onChange, textFieldProps }: Props) => {
+export const NumberField = ({
+  label,
+  type = 'number',
+  value,
+  onChange,
+  textFieldProps,
+  textFieldSx,
+}: Props) => {
   return (
     <TextField
       label={label}
-      type="number"
+      type="text"
       value={value ?? ''}
-      size="small"
       slotProps={{
         htmlInput: {
           min: 0,
         },
-        input: { endAdornment: <Typography>₽</Typography> },
+        input: {
+          endAdornment: <Typography>{type === 'number' ? '₽' : '%'}</Typography>,
+          inputMode: 'numeric',
+        },
+        inputLabel: { shrink: value !== undefined && value !== null && value !== '' },
       }}
       onKeyDown={(e) => {
         if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
@@ -32,14 +44,28 @@ export const NumberField = ({ label, value, onChange, textFieldProps }: Props) =
         }
       }}
       onChange={(e) => {
-        const v = e.target.value
-        onChange(v === '' ? undefined : Math.max(0, Number(v)))
+        const raw = e.target.value
+
+        if (raw === '') {
+          onChange(undefined)
+          return
+        }
+
+        if (!/^\d+$/.test(raw)) {
+          return
+        }
+
+        const num = parseInt(raw, 10)
+        if (!Number.isFinite(num)) return
+
+        onChange(num)
       }}
       sx={{
         '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
           WebkitAppearance: 'none',
           margin: 0,
         },
+        ...textFieldSx,
       }}
       {...textFieldProps}
     />
