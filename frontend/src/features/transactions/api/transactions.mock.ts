@@ -82,8 +82,8 @@ class TransactionsMock {
 
   searchTransactions = async (
     query: string,
+    signal: AbortSignal,
     limit: number,
-    signal?: AbortSignal,
   ): Promise<Transaction[]> => {
     console.log('%cMOCK CALL searchTransactions', 'color: orange', { query })
     const requestId = ++this.searchRequestId

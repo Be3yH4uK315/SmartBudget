@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { useSearch } from '@features/transactions/hooks'
 import { Search } from '@mui/icons-material'
 import { Autocomplete, Box, CircularProgress, InputAdornment, TextField } from '@mui/material'
 import { StyledPaper } from '@shared/components'
-import { useTheme, useTranslate } from '@shared/hooks'
+import { useSearch, useTheme, useTranslate } from '@shared/hooks'
 import { ApiFunc } from '@shared/types/components'
 
 type Props<T> = {
