@@ -1,27 +1,59 @@
-import { useTransactionsSearch } from '@features/transactions/hooks'
-import { TransactionLine } from '@features/transactions/screens/TransactionsScreen/TransactionsList'
+import { useState } from 'react'
+import { useSearch } from '@features/transactions/hooks'
 import { Search } from '@mui/icons-material'
 import { Autocomplete, Box, CircularProgress, InputAdornment, TextField } from '@mui/material'
 import { StyledPaper } from '@shared/components'
 import { useTheme, useTranslate } from '@shared/hooks'
+import { ApiFunc } from '@shared/types/components'
 
-export const SearchBar = () => {
+type Props<T> = {
+  apiFunc: ApiFunc<T>
+  getOptionLabel: (option: T) => string
+  renderOption: (props: React.HTMLAttributes<HTMLLIElement>, option: T) => React.ReactNode
+}
+
+export function SearchBar<T>({ apiFunc, getOptionLabel, renderOption }: Props<T>) {
   const translate = useTranslate('Transactions.SearchBar')
   const theme = useTheme()
 
-  const { options, isLoading, inputValue, setInputValue } = useTransactionsSearch()
+  const [inputValue, setInputValue] = useState<string>('')
+
+  const { results, isLoading, debouncedSearch, clearResults } = useSearch<T>(apiFunc)
+
+  const handleInputChange = (_: any, value: string, reason: string) => {
+    setInputValue(value)
+
+    if (reason !== 'input') return
+
+    if (value.trim().length < 2) {
+      debouncedSearch.cancel()
+      clearResults()
+      return
+    }
+
+    debouncedSearch(value)
+  }
+
+  const handleSelect = () => {
+    debouncedSearch.cancel()
+    clearResults()
+    setInputValue('')
+  }
 
   const bgColor = theme.colorMode === 'light' ? 'surface.dark' : 'surface.light'
 
   return (
     <Autocomplete
-      options={options}
+      options={results}
       value={null}
+      inputValue={inputValue}
       filterOptions={(x) => x}
       noOptionsText={isLoading ? '' : translate('emptyResult')}
       open={!!inputValue.trim()}
-      onInputChange={(_, value) => setInputValue(value)}
+      onInputChange={handleInputChange}
       popupIcon={false}
+      onChange={handleSelect}
+      getOptionLabel={getOptionLabel}
       slotProps={{
         paper: {
           component: (props) => (
@@ -48,9 +80,7 @@ export const SearchBar = () => {
           ),
         },
       }}
-      renderOption={(props, option) => (
-        <TransactionLine {...props} key={option.transactionId} transaction={option} />
-      )}
+      renderOption={(props, option) => renderOption(props, option)}
       renderInput={(params) => (
         <TextField
           {...params}

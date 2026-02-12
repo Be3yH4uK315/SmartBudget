@@ -1,3 +1,4 @@
+export * from './debounce'
 export * from './formatCurrency'
 export * from './formatPercent'
 export * from './isSetsEqual'

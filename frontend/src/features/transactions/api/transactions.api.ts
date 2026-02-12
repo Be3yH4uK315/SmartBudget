@@ -1,6 +1,7 @@
-import { PAGE_SIZE, SEARCH_LIMIT } from '@features/transactions/constants'
+import { PAGE_SIZE } from '@features/transactions/constants'
 import { Transaction, TransactionsFilters } from '@features/transactions/types'
 import { api } from '@shared/api'
+import { SEARCH_LIMIT } from '@shared/constants'
 
 class TransactionsApi {
   baseUrl = '/transactions'
@@ -24,11 +25,15 @@ class TransactionsApi {
     return response.data
   }
 
-  async searchTransactions(query: string, signal: AbortSignal): Promise<Transaction[]> {
+  searchTransactions = async (
+    query: string,
+    signal: AbortSignal,
+    limit?: number,
+  ): Promise<Transaction[]> => {
     const url = `${this.baseUrl}/search`
 
     const params: Record<string, string> = {
-      limit: String(SEARCH_LIMIT),
+      limit: limit ? String(limit) : String(SEARCH_LIMIT),
       query: query,
     }
 

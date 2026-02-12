@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { transactionsApi, transactionsMock } from '@features/transactions/api'
 import { SearchBar } from '@features/transactions/components'
 import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
@@ -7,12 +8,13 @@ import {
   selectTransactions,
   selectTransactionsIsLast,
 } from '@features/transactions/store'
+import { Transaction } from '@features/transactions/types'
 import { Stack } from '@mui/material'
 import { EmptyList, ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { TransactionsFiltersBlock } from './TransactionsFilters'
-import { TransactionsList } from './TransactionsList'
+import { TransactionLine, TransactionsList } from './TransactionsList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
 export default function TransactionsScreen() {
@@ -35,7 +37,13 @@ export default function TransactionsScreen() {
     <ScreenContent title={translate('title')}>
       <Stack spacing={1} maxWidth={'800px'}>
         <Stack spacing={2}>
-          <SearchBar />
+          <SearchBar<Transaction>
+            apiFunc={transactionsApi.searchTransactions}
+            getOptionLabel={(option) => option.name}
+            renderOption={(props, option) => (
+              <TransactionLine {...props} key={option.transactionId} transaction={option} />
+            )}
+          />
 
           <TransactionsFiltersBlock
             {...props}

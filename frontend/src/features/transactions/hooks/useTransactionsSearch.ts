@@ -1,49 +1,59 @@
-import { useEffect, useState } from 'react'
-import { transactionsApi, transactionsMock } from '@features/transactions/api'
-import { SEARCH_DEBOUNCE, SEARCH_LIMIT } from '@features/transactions/constants'
-import { Transaction } from '@features/transactions/types'
-import { showToast } from '@shared/utils'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { SEARCH_DEBOUNCE, SEARCH_LIMIT } from '@shared/constants'
+import { ApiFunc } from '@shared/types/components'
+import { debounce, showToast } from '@shared/utils'
 
-export function useTransactionsSearch() {
-  const [inputValue, setInputValue] = useState<string>('')
+export function useSearch<T>(apiFunc: ApiFunc<T>) {
   const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [options, setOptions] = useState<Transaction[]>([])
+  const [results, setResults] = useState<T[]>([])
+  const abortControllerRef = useRef<AbortController>(null)
 
-  useEffect(() => {
-    if (!inputValue.trim()) {
-      setOptions([])
-      return
-    }
+  const search = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        abortControllerRef.current?.abort()
+        setResults([])
+        setIsLoading(false)
+        return
+      }
 
-    const controller = new AbortController()
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
 
-    setOptions([])
-    setIsLoading(true)
+      setIsLoading(true)
 
-    const searchOptions = async () => {
       try {
-        const response = await transactionsMock.searchTransactions(
-          inputValue,
-          SEARCH_LIMIT,
-          controller.signal,
-        )
-        setOptions(response)
+        const response = await apiFunc(query, controller.signal, SEARCH_LIMIT)
+
+        if (controller.signal.aborted) return
+
+        setResults(response)
       } catch (e: any) {
         if (e.name !== 'AbortError') {
-          showToast({ messageKey: 'cannotSearchTransactions', type: 'error' })
+          showToast({ messageKey: 'cannotSearch', type: 'error' })
         }
       } finally {
         setIsLoading(false)
       }
-    }
+    },
+    [apiFunc],
+  )
 
-    const id = setTimeout(searchOptions, SEARCH_DEBOUNCE)
+  const clearResults = useCallback(() => {
+    abortControllerRef.current?.abort()
+    setResults([])
+    setIsLoading(false)
+  }, [])
 
+  const debouncedSearch = useMemo(() => debounce(search, SEARCH_DEBOUNCE), [search])
+
+  useEffect(() => {
     return () => {
-      clearTimeout(id)
-      controller.abort()
+      abortControllerRef.current?.abort()
+      debouncedSearch.cancel()
     }
-  }, [inputValue])
+  }, [debouncedSearch])
 
-  return { options, isLoading, inputValue, setInputValue }
+  return { results, isLoading, debouncedSearch, clearResults }
 }
