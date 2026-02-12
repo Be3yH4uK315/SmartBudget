@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { GoalsStats } from '@features/goals/components'
+import { goalsApi, goalsMock } from '@features/goals/api'
+import { GoalSearchItem, GoalsStats } from '@features/goals/components'
 import {
   clearGoalsState,
   getGoals,
@@ -10,9 +11,10 @@ import {
   selectIsGoalsLoading,
   setIsArchived,
 } from '@features/goals/store/goals'
+import { GoalSearchOption } from '@features/goals/types'
 import { Add, ArchiveOutlined } from '@mui/icons-material'
 import { Button, Stack } from '@mui/material'
-import { EmptyList, ScreenContent } from '@shared/components'
+import { EmptyList, ScreenContent, SearchBar } from '@shared/components'
 import { MODAL_IDS, ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
@@ -72,6 +74,14 @@ export default function GoalsScreen() {
       ContentSkeleton={GoalsScreenSkeleton}
     >
       <Stack spacing={2} sx={{ maxWidth: '800px' }}>
+        <SearchBar<GoalSearchOption>
+          apiFunc={goalsMock.searchGoals}
+          getOptionLabel={(option) => option.name}
+          renderOption={(props, option) => (
+            <GoalSearchItem {...props} key={option.goalId} goal={option} />
+          )}
+        />
+
         {goals.length === 0 && (
           <EmptyList
             reasonTitle={emptyListReason.title}

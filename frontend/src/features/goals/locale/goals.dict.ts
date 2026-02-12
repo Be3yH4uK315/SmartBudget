@@ -32,7 +32,7 @@ export const goalsDict: LocaleDictionary = {
       goBack: 'Назад',
 
       Modal: {
-        editTitle: 'Редактирвоание Цели',
+        editTitle: 'Редактирование Цели',
         editButton: 'Сохранить изменения',
 
         createTitle: 'Создание цели',
@@ -46,12 +46,14 @@ export const goalsDict: LocaleDictionary = {
         otherTags: 'Прочие тэги',
       },
 
-      Tags: {
+      Filters: {
         selected: 'Выбрано: {{value}}',
         placeholder: {
           tags: 'Тэги',
           priority: 'Приоритет',
         },
+      },
+      Tags: {
         clear: 'Сбросить фильтры',
         archive: 'Архив',
 
@@ -148,7 +150,7 @@ export const goalsDict: LocaleDictionary = {
 
       ExpiredBlock: {
         title: 'Цель просрочена',
-        subtitle: 'Вы можете установть новую дату окончания цели в настройках',
+        subtitle: 'Вы можете установить новую дату окончания цели в настройках',
       },
     },
   },
