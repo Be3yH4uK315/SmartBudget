@@ -25,6 +25,11 @@ export const sharedDict: LocaleDictionary = {
     ScreenContentComponent: {
       goBack: 'Назад',
     },
+
+    SearchBar: {
+      emptyResult: 'К сожалению, ничего не нашлось',
+      placeholder: 'Найти...',
+    },
   },
 
   en: {

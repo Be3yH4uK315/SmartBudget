@@ -12,7 +12,7 @@ type Props<T> = {
 }
 
 export function SearchBar<T>({ apiFunc, getOptionLabel, renderOption }: Props<T>) {
-  const translate = useTranslate('Transactions.SearchBar')
+  const translate = useTranslate('SearchBar')
   const theme = useTheme()
 
   const [inputValue, setInputValue] = useState<string>('')

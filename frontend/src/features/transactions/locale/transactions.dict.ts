@@ -14,11 +14,6 @@ export const transactionsDict: LocaleDictionary = {
       today: 'Сегодня',
       yesterday: 'Вчера',
 
-      SearchBar: {
-        emptyResult: 'К сожалению, ничего не нашлось',
-        placeholder: 'Наименование транзакции',
-      },
-
       Filters: {
         selected: 'Выбрано: {{value}}',
         clear: 'Сбросить фильтры',
