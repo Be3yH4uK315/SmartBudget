@@ -38,7 +38,7 @@ export const settingsDict: LocaleDictionary = {
 
       Security: {
         ChangePassword: {
-          title: 'Cмена пароля',
+          title: 'Смена пароля',
           oldPassword: 'Старый пароль',
           newPassword: 'Новый пароль',
           newPasswordConfirm: 'Повторите новый пароль',
@@ -61,6 +61,27 @@ export const settingsDict: LocaleDictionary = {
 
         title: 'Настройки безопасности',
         deleteOtherSessions: 'Завершить другие сессии',
+      },
+
+      Budget: {
+        title: 'Настройка бюджета',
+        submitButton: 'Сохранить изменения',
+
+        Month: {
+          next: 'Бюджет на следующий месяц',
+          current: 'Бюджет на текущий месяц',
+        },
+
+        Tooltip: {
+          info: 'Вы можете либо настроить текущий бюджет, либо заранее задать бюджет на следующий месяц.',
+          extraInfo:
+            ' Опция настройки бюджета на следующий месяц становится доступной с 25-го числа текущего месяца.',
+        },
+
+        MonthSwitch: {
+          current: 'Текущий',
+          next: 'Следующий',
+        },
       },
     },
   },

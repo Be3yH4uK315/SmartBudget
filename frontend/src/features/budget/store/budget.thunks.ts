@@ -1,5 +1,5 @@
 import { budgetApi, budgetMock } from '@features/budget/api'
-import { BudgetPayload, CreateBudgetPayload } from '@features/budget/types'
+import { BudgetPayload, BudgetSettings } from '@features/budget/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { showToast } from '@shared/utils'
 
@@ -19,7 +19,7 @@ export const getBudgetData = createAsyncThunk<
 
 export const createBudget = createAsyncThunk<
   void,
-  { payload: CreateBudgetPayload },
+  { payload: BudgetSettings },
   { rejectValue: 'cannotCreateBudget' }
 >('createBudget', async ({ payload }, { rejectWithValue }) => {
   try {

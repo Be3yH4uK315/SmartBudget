@@ -1,3 +1,4 @@
+import { BudgetSettings } from '@features/budget/types'
 import { changePasswordApiRequest, Session } from '@features/settings/types'
 import { api } from '@shared/api'
 
@@ -43,6 +44,22 @@ class SettingsApi {
     const url = `${this.baseUrl}/sessions/retention`
 
     const response = await api.patch<void>(url, payload)
+    return response.data
+  }
+
+  async getBudgetSettings(date: string): Promise<BudgetSettings> {
+    const url = `${this.baseUrl}/budget`
+
+    const params: Record<string, string> = { date }
+
+    const response = await api.get<BudgetSettings>(url, { params })
+    return response.data
+  }
+
+  async setBudgetSettings(payload: BudgetSettings): Promise<void> {
+    const url = `${this.baseUrl}/budget`
+
+    const response = await api.patch<void>(url, { payload })
     return response.data
   }
 }

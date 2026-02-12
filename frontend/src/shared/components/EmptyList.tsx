@@ -12,6 +12,7 @@ export const EmptyList = ({ reasonTitle, reasonSubtitle }: Props) => {
         bgcolor: 'transparent',
         minHeight: '200px',
         textAlign: 'center',
+        width: '100%',
       }}
     >
       <Stack
