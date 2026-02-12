@@ -5,6 +5,8 @@ export type TransactionsSliceState = {
   transactions: TransactionsBlock[]
   isLoading: boolean
 
+  isCategoryChanging: boolean
+
   offset: number
   isLast: boolean
 }

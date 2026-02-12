@@ -1,3 +1,4 @@
+import { PAGE_SIZE, SEARCH_LIMIT } from '@features/transactions/constants'
 import { Transaction, TransactionsFilters } from '@features/transactions/types'
 import { api } from '@shared/api'
 
@@ -9,6 +10,7 @@ class TransactionsApi {
 
     const params: Record<string, string> = {
       offset: String(offset),
+      limit: String(PAGE_SIZE),
       ...(filters?.categoryIds?.length ? { categoryId: filters.categoryIds.join(',') } : {}),
       ...(filters?.dateFrom ? { dateFrom: filters.dateFrom } : {}),
       ...(filters?.dateTo ? { dateTo: filters.dateTo } : {}),
@@ -18,6 +20,19 @@ class TransactionsApi {
     }
 
     const response = await api.get<Transaction[]>(url, { params })
+
+    return response.data
+  }
+
+  async searchTransactions(query: string, signal: AbortSignal): Promise<Transaction[]> {
+    const url = `${this.baseUrl}/search`
+
+    const params: Record<string, string> = {
+      limit: String(SEARCH_LIMIT),
+      query: query,
+    }
+
+    const response = await api.get<Transaction[]>(url, { params, signal })
 
     return response.data
   }

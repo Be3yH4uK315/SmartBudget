@@ -24,7 +24,7 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
     dispatch(
       openModal({
         id: MODAL_IDS.TRANSACTION_INFO_MODAL,
-        props: { transactionId: transaction.transactionId },
+        props: { transaction: transaction },
       }),
     )
 
