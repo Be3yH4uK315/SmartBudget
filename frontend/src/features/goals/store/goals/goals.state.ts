@@ -7,12 +7,6 @@ export function getGoalsInitialState(): GoalsSliceState {
     isLoading: true,
     isCreateLoading: false,
 
-    filters: {
-      tags: [],
-      priority: [],
-      isArchived: false,
-    },
-
     goalsStats: {
       targetValue: 0,
       currentValue: 0,

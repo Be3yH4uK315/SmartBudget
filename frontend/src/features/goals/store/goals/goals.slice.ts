@@ -9,22 +9,6 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
   name: 'goals',
   initialState: getGoalsInitialState(),
   reducers: {
-    setTags(state, { payload }) {
-      state.filters.tags = payload
-    },
-    setIsArchived(state, { payload }) {
-      state.filters.isArchived = payload
-    },
-    setPriority(state, { payload }) {
-      state.filters.priority = payload
-    },
-    resetFilters(state) {
-      state.filters = {
-        tags: [],
-        priority: [],
-        isArchived: state.filters.isArchived,
-      }
-    },
     clearGoalsState() {
       return getGoalsInitialState()
     },
@@ -79,5 +63,4 @@ declare module '@shared/store' {
 }
 
 goalsSlice.injectInto(rootReducer)
-export const { setTags, setPriority, setIsArchived, resetFilters, clearGoalsState } =
-  goalsSlice.actions
+export const { clearGoalsState } = goalsSlice.actions
