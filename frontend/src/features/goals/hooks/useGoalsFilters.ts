@@ -1,73 +1,119 @@
-import { useState } from 'react'
-import { getGoals, resetFilters, setPriority, setTags } from '@features/goals/store/goals'
-import { GoalsFilters, Priority, Tag } from '@features/goals/types'
-import { SelectChangeEvent } from '@mui/material'
+import { useEffect, useRef, useState } from 'react'
+import { getGoals } from '@features/goals/store/goals'
+import { GoalsFilters } from '@features/goals/types'
+import { ROUTES } from '@shared/constants/routes'
 import { useAppDispatch } from '@shared/store'
+import { isSameFilters } from '@shared/utils'
+import { useMatch, useSearchParams } from 'react-router'
 
-export function useGoalsFilters(filters: GoalsFilters) {
+export function useGoalsFilters() {
   const dispatch = useAppDispatch()
 
-  const [localTags, setLocalTags] = useState<Tag[]>(filters.tags)
-  const [localPriority, setLocalPriority] = useState<Priority[]>(filters.priority)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const isArchivePage = !!useMatch(ROUTES.PAGES.GOALS.ARCHIVE)
 
-  const handleTagsChange = (e: SelectChangeEvent<Tag[]>) => {
-    const value = e.target.value
-    setLocalTags(typeof value === 'string' ? (value.split(',') as Tag[]) : value)
+  function getInitFilters(searchParams: URLSearchParams): GoalsFilters {
+    const tagsParam = searchParams.get('tags')
+    const priorityParam = searchParams.get('priority')
+
+    return {
+      tags: tagsParam ? (tagsParam.split(',') as GoalsFilters['tags']) : [],
+      priority: priorityParam ? (priorityParam.split(',') as GoalsFilters['priority']) : [],
+      isArchived: isArchivePage,
+    }
   }
 
-  const handlePriorityChange = (e: SelectChangeEvent<Priority[]>) => {
-    const value = e.target.value
-    setLocalPriority(typeof value === 'string' ? (value.split(',') as Priority[]) : value)
+  const [localFilters, setLocalFilters] = useState<GoalsFilters>(() => getInitFilters(searchParams))
+
+  const appliedFiltersRef = useRef<GoalsFilters>(localFilters)
+
+  const updateLocalFilters = <K extends keyof GoalsFilters>(key: K, value: GoalsFilters[K]) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }))
   }
 
-  const handleApplyTags = () => {
-    if (localTags === filters.tags) return
+  const applyFilters = async (nextFilters: GoalsFilters) => {
+    if (isSameFilters(nextFilters, appliedFiltersRef.current)) return
 
-    dispatch(setTags(localTags))
-    dispatch(getGoals())
+    appliedFiltersRef.current = nextFilters
+
+    dispatch(getGoals(nextFilters))
   }
 
-  const handleApplyPriority = () => {
-    if (localPriority === filters.priority) return
+  const handleApply = () => {
+    const next = {
+      ...localFilters,
+      isArchived: isArchivePage,
+    }
 
-    dispatch(setPriority(localPriority))
-    dispatch(getGoals())
-  }
-
-  const handleRemovePriority = (priority: Priority) => {
-    const next = localPriority.filter((p) => p !== priority)
-    setLocalPriority(next)
-
-    dispatch(setPriority(next))
-    dispatch(getGoals())
-  }
-
-  const handleRemoveTag = (tag: Tag) => {
-    const next = localTags.filter((t) => t !== tag)
-    setLocalTags(next)
-
-    dispatch(setTags(next))
-    dispatch(getGoals())
+    setLocalFilters(next)
+    applyFilters(next)
   }
 
   const handleClearFilters = () => {
-    if (filters.tags?.length === 0 && filters.priority?.length === 0) return
+    const empty: GoalsFilters = {
+      tags: [],
+      priority: [],
+      isArchived: isArchivePage,
+    }
 
-    setLocalTags([])
-
-    dispatch(resetFilters())
-    dispatch(getGoals())
+    setLocalFilters(empty)
+    applyFilters(empty)
   }
 
+  const isDirty = () =>
+    !isSameFilters(appliedFiltersRef.current, {
+      tags: [],
+      priority: [],
+      isArchived: isArchivePage,
+    })
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev)
+
+        if (localFilters.tags.length) {
+          params.set('tags', localFilters.tags.join(','))
+        } else {
+          params.delete('tags')
+        }
+
+        if (localFilters.priority.length) {
+          params.set('priority', localFilters.priority.join(','))
+        } else {
+          params.delete('priority')
+        }
+
+        return params
+      },
+      { replace: true },
+    )
+  }, [localFilters.tags, localFilters.priority, setSearchParams])
+
+  useEffect(() => {
+    applyFilters({
+      ...localFilters,
+      isArchived: isArchivePage,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isArchivePage])
+
+  useEffect(() => {
+    dispatch(getGoals(localFilters))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return {
-    localPriority,
-    handlePriorityChange,
-    handleApplyPriority,
-    handleRemovePriority,
-    localTags,
-    handleTagsChange,
-    handleApplyTags,
+    isDirty,
+    isArchivePage,
+    appliedFiltersRef,
+    localFilters,
+    applyFilters,
+    handleApply,
+    updateLocalFilters,
     handleClearFilters,
-    handleRemoveTag,
   }
 }

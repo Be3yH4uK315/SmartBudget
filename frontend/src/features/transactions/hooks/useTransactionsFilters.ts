@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { clearTransactionsState, getTransactions } from '@features/transactions/store'
 import { TransactionsFilters } from '@features/transactions/types'
-import { isSameFilters, parseCategoryIds } from '@features/transactions/utils'
+import { parseCategoryIds } from '@features/transactions/utils'
 import { useAppDispatch } from '@shared/store'
+import { isSameFilters } from '@shared/utils'
 import dayjs from 'dayjs'
 import { useSearchParams } from 'react-router'
 
