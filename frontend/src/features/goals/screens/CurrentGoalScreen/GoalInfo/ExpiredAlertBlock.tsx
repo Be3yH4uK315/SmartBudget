@@ -9,7 +9,7 @@ export const ExpiredBlockAlert = () => {
   return (
     <StyledPaper
       paperSx={{ border: '2px solid', borderColor: 'error.main', bgcolor: 'error.dark' }}
-      elevation={0}
+      noElevation
     >
       <TypographyWithAdornment
         Icon={ErrorOutlineOutlined}

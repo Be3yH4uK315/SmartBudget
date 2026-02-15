@@ -28,7 +28,7 @@ export const GoalSearchItem = ({ goal }: Props) => {
 
   return (
     <StyledPaper
-      elevation={0}
+      noElevation
       paperSx={{
         ':hover': { bgcolor: hoverColor },
         cursor: 'pointer',

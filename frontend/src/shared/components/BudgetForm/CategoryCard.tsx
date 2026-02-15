@@ -30,7 +30,7 @@ export const CategoryCard = ({
 
   return (
     <Grid size={{ xs: 12, sm: 6 }}>
-      <StyledPaper elevation={0} paperSx={{ bgcolor: 'surface.main' }}>
+      <StyledPaper noElevation paperSx={{ bgcolor: 'surface.main' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Typography variant="h6">{translateCategory(category.categoryId)}</Typography>
 

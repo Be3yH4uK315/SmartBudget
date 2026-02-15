@@ -57,7 +57,7 @@ export function SearchBar<T>({ apiFunc, getOptionLabel, renderOption }: Props<T>
         paper: {
           component: (props) => (
             <StyledPaper
-              elevation={0}
+              noElevation
               {...props}
               paperSx={{
                 mt: 1,

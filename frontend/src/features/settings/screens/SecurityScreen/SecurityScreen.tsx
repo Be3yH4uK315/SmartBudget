@@ -51,7 +51,7 @@ export default function SecurityScreen() {
         <RefreshTokenDurationBlock />
 
         {sessions.length > 0 && (
-          <StyledPaper paperSx={{ gap: 2 }} elevation={0}>
+          <StyledPaper paperSx={{ gap: 2 }} noElevation>
             <Typography variant="h4">{translate('Sessions.title')}</Typography>
 
             <Stack spacing={2}>

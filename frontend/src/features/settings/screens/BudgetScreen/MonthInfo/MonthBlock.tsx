@@ -11,7 +11,7 @@ type Props = {
 export const MonthBlock = ({ status }: Props) => {
   const translate = useTranslate('Settings.Budget.Month')
   return (
-    <StyledPaper paperSx={{ bgcolor: 'primary.main' }} elevation={0}>
+    <StyledPaper paperSx={{ bgcolor: 'primary.main' }} noElevation>
       <Stack direction={'row'} justifyContent={'space-between'} alignItems={'center'}>
         <Typography variant="h4" sx={{ color: '#333' }}>
           {translate(status)}

@@ -17,7 +17,7 @@ export const BudgetFormField = ({
   children,
 }: Props) => {
   return (
-    <StyledPaper elevation={0}>
+    <StyledPaper noElevation>
       <Stack spacing={titleSpacing} display={'flex'}>
         <Stack>
           <Stack

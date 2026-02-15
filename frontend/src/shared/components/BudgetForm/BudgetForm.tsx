@@ -123,7 +123,7 @@ export const BudgetForm = ({
 
       {!!values.totalLimit && isPercentOverflow && (
         <StyledPaper
-          elevation={0}
+          noElevation
           paperSx={{ border: '2px solid', borderColor: 'error.main', textAlign: 'center' }}
         >
           <Typography variant="h6">
