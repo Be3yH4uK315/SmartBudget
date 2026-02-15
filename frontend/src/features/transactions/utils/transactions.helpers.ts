@@ -1,11 +1,5 @@
-import {
-  Category,
-  Transaction,
-  TransactionsBlock,
-  TransactionsFilters,
-} from '@features/transactions/types'
+import { Category, Transaction, TransactionsBlock } from '@features/transactions/types'
 import { CATEGORY_IDS } from '@shared/constants'
-import { isSetsEqual } from '@shared/utils'
 
 type MergeTransactionProps = {
   currentBlocks: TransactionsBlock[]
@@ -63,15 +57,4 @@ export function normalizeBlocksList(blocks: TransactionsBlock[]) {
 
 export function parseCategoryIds(ids: string[]): Category[] {
   return ids.map(Number).filter((n): n is Category => CATEGORY_IDS.includes(n as Category))
-}
-
-export function isSameFilters(a: TransactionsFilters, b: TransactionsFilters) {
-  return (
-    a.type === b.type &&
-    a.dateFrom === b.dateFrom &&
-    a.dateTo === b.dateTo &&
-    a.valueFrom === b.valueFrom &&
-    a.valueTo === b.valueTo &&
-    isSetsEqual(a.categoryIds, b.categoryIds)
-  )
 }

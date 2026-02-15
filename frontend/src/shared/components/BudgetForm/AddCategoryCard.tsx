@@ -19,7 +19,7 @@ export const AddCategoryCard = ({ categories, onSelect, onCancel }: Props) => {
 
   return (
     <Grid size={{ xs: 12, sm: 6 }}>
-      <StyledPaper elevation={0} paperSx={{ bgcolor: 'surface.main', height: '100%' }}>
+      <StyledPaper noElevation paperSx={{ bgcolor: 'surface.main', height: '100%' }}>
         <Stack spacing={2} sx={{ height: '100%', justifyContent: 'center' }}>
           <Autocomplete
             autoFocus

@@ -1,6 +1,7 @@
 import {
   EditGoalPayload,
   Goal,
+  GoalSearchOption,
   GoalsFilters,
   GoalStatus,
   GoalTransaction,
@@ -8,6 +9,7 @@ import {
   UpdateGoalStatusPayload,
 } from '@features/goals/types'
 import { api } from '@shared/api'
+import { SEARCH_LIMIT } from '@shared/constants'
 
 class GoalsApi {
   baseUrl = '/goals'
@@ -74,6 +76,23 @@ class GoalsApi {
     const url = `${this.baseUrl}/${goalId}/archive`
 
     const response = await api.patch<{ isArchived: boolean }>(url)
+    return response.data
+  }
+
+  searchGoals = async (
+    query: string,
+    signal: AbortSignal,
+    limit?: number,
+  ): Promise<GoalSearchOption[]> => {
+    const url = `${this.baseUrl}/search`
+
+    const params: Record<string, string> = {
+      limit: limit ? String(limit) : String(SEARCH_LIMIT),
+      query: query,
+    }
+
+    const response = await api.get<GoalSearchOption[]>(url, { params, signal })
+
     return response.data
   }
 }

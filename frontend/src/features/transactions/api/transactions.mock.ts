@@ -1,5 +1,6 @@
-import { PAGE_SIZE, SEARCH_LIMIT } from '@features/transactions/constants'
+import { PAGE_SIZE } from '@features/transactions/constants'
 import { Category, Transaction, TransactionsFilters } from '@features/transactions/types'
+import { SEARCH_LIMIT } from '@shared/constants'
 import dayjs from 'dayjs'
 
 function generateMockTransactions(total = 600): Transaction[] {
@@ -79,11 +80,11 @@ class TransactionsMock {
     return filtered.slice(offset, offset + PAGE_SIZE)
   }
 
-  async searchTransactions(
+  searchTransactions = async (
     query: string,
+    signal: AbortSignal,
     limit: number,
-    signal?: AbortSignal,
-  ): Promise<Transaction[]> {
+  ): Promise<Transaction[]> => {
     console.log('%cMOCK CALL searchTransactions', 'color: orange', { query })
     const requestId = ++this.searchRequestId
 

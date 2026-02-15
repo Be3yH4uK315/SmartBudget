@@ -41,7 +41,7 @@ export const RefreshTokenDurationBlock = () => {
   return (
     <>
       {checkedDuration > 0 && (
-        <StyledPaper elevation={0}>
+        <StyledPaper noElevation>
           <FormControl disabled={isLoading}>
             <Typography variant="h4">{translate('title')}</Typography>
 

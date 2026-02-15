@@ -1,4 +1,4 @@
-import { AVAILABLE_TAGS, PRIORITIES } from '@features/goals/constants/tags'
+import { AVAILABLE_TAGS, PRIORITIES } from '@features/goals/constants'
 
 export type GoalStatus = 'ongoing' | 'achieved' | 'expired' | 'closed'
 
@@ -54,6 +54,8 @@ export type GoalsFilters = {
   priority: Priority[]
   isArchived: boolean
 }
+
+export type GoalSearchOption = Omit<SimplifiedGoal, 'tags' | 'priority' | 'finishDate'>
 
 export type Priority = (typeof PRIORITIES)[number]
 export type Tag = (typeof AVAILABLE_TAGS)[number]
