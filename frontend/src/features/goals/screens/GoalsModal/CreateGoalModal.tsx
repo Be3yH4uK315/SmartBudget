@@ -5,9 +5,7 @@ import { editGoal } from '@features/goals/store/currentGoal'
 import { createGoal } from '@features/goals/store/goals'
 import { Goal } from '@features/goals/types'
 import { Button, Chip, Stack, TextField, Typography } from '@mui/material'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { CloseModalButton, StyledBox } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import ModalLayout from '@shared/screens/ModalProvider'
@@ -79,28 +77,26 @@ export const GoalModal = ({ onClose, goal }: Props) => {
               required
             />
 
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
-                label={translate('Modal.date')}
-                value={values.finishDate ? dayjs(values.finishDate) : null}
-                onChange={handleDateChange}
-                format="DD.MM.YYYY"
-                slots={{ textField: TextField }}
-                enableAccessibleFieldDOMStructure={false}
-                slotProps={{
-                  textField: {
-                    InputProps: {
-                      sx: {
-                        '& .MuiSvgIcon-root': {
-                          color: 'text.primary',
-                        },
+            <DatePicker
+              label={translate('Modal.date')}
+              value={values.finishDate ? dayjs(values.finishDate) : null}
+              onChange={handleDateChange}
+              format="DD.MM.YYYY"
+              slots={{ textField: TextField }}
+              enableAccessibleFieldDOMStructure={false}
+              slotProps={{
+                textField: {
+                  InputProps: {
+                    sx: {
+                      '& .MuiSvgIcon-root': {
+                        color: 'text.primary',
                       },
                     },
                   },
-                }}
-                disablePast
-              />
-            </LocalizationProvider>
+                },
+              }}
+              disablePast
+            />
 
             <Typography variant="h6" textAlign={'left'}>
               {translate('Modal.priorityTags')}
