@@ -30,6 +30,12 @@ export const sharedDict: LocaleDictionary = {
       emptyResult: 'К сожалению, ничего не нашлось',
       placeholder: 'Найти...',
     },
+
+    UndefinedScreen: {
+      title: 'Такой страницы нет',
+      subtitle: 'Возможно, она была удалена, перемещена, или ее адрес указан неверно',
+      button: 'Перейти на главную',
+    },
   },
 
   en: {
