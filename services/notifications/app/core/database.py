@@ -4,9 +4,9 @@ from app.core.config import settings
 def get_db_engine():
     """Создает Singleton Engine."""
     return create_async_engine(
-        settings.DB_URL,
-        pool_size=settings.DB_POOL_SIZE,
-        max_overflow=settings.DB_MAX_OVERFLOW,
+        settings.DB.DB_URL,
+        pool_size=settings.DB.DB_POOL_SIZE,
+        max_overflow=settings.DB.DB_MAX_OVERFLOW,
         echo=False,
         pool_pre_ping=True 
     )
