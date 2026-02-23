@@ -1,0 +1,9 @@
+{
+    "Limit.preOverflow.title": "Близость к лимиту",
+    "Limit.preOverflow.message": "По категории «{category_name}» использовано {limit_percent}% месячного лимита. Рекомендуем контролировать дальнейшие расходы.",
+    "Limit.overflow.title": "Лимит превышен",
+    "Limit.overflow.message": "Лимит по категории «{category_name}» исчерпан.",
+    "Goals.goalCreated.title": "Цель создана",
+    "Goals.goalCreated.message": "Цель «{name}» успешно создана. Рекомендуемый взнос: {recommendedPayment}."
+  }
+  

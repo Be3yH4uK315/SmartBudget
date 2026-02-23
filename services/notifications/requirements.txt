@@ -4,3 +4,6 @@ sqlalchemy[asyncpg]
 arq
 prometheus-fastapi-instrumentator
 aiokafka
+aiosmtplib
+firebase_admin
+jinja2
