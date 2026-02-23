@@ -46,8 +46,10 @@ services:
         condition: service_healthy
     environment:
       KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
+      KAFKA_LISTENERS: ${KAFKA_LISTENERS}
       KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
@@ -414,9 +416,9 @@ services:
 
   notification_service:
     build:
-      context: ../../services/notification/
+      context: ../../services/notifications/
     env_file:
-      - ../../services/notification/.env
+      - ../../services/notifications/.env
     container_name: notification_service
     ports:
       - "8003:8000"
@@ -428,7 +430,7 @@ services:
       kafka:
         condition: service_healthy
     volumes:
-      - ../../services/notification:/app
+      - ../../services/notifications:/app
     restart: unless-stopped
     command: >
       sh -c "
@@ -445,9 +447,9 @@ services:
 
   notification_worker:
     build:
-      context: ../../services/notification/
+      context: ../../services/notifications/
     env_file:
-      - ../../services/notification/.env
+      - ../../services/notifications/.env
     container_name: notification_worker
     depends_on:
       notification_service:
@@ -457,8 +459,8 @@ services:
       redis_cache:
         condition: service_healthy
     volumes:
-      - ../../services/notification:/app
-    command: arq app.workers.main_worker.WorkerSettings
+      - ../../services/notifications:/app
+    command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
@@ -469,9 +471,9 @@ services:
 
   notification_consumer:
     build:
-      context: ../../services/notification/
+      context: ../../services/notifications/
     env_file:
-      - ../../services/notification/.env
+      - ../../services/notifications/.env
     container_name: notification_consumer
     depends_on:
       notification_service:
@@ -481,7 +483,7 @@ services:
       redis_cache:
         condition: service_healthy
     volumes:
-      - ../../services/notification:/app
+      - ../../services/notifications:/app
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:

@@ -14,7 +14,7 @@ class JsonFormatter(Formatter):
             "logger": record.name,
         }
         
-        if hasattr(record, 'extra'):
+        if hasattr(record, 'extra') and isinstance(record.extra, dict):
             log_data.update(record.extra)
              
         if record.exc_info:
