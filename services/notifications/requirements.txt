@@ -1,3 +1,4 @@
+fastapi
 pydantic-settings
 sqlalchemy[asyncpg]
 arq
