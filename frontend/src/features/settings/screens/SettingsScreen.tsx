@@ -37,7 +37,7 @@ export default function SettingsScreen() {
 
   return (
     <ScreenContent title={translate('title')}>
-      <Grid container spacing={2} sx={{ maxWidth: '70%' }}>
+      <Grid container spacing={2} sx={{ maxWidth: '800px' }}>
         {buttons.map((b, i) => (
           <Grid key={i} size={{ xs: 12, md: 6 }}>
             <IconButton

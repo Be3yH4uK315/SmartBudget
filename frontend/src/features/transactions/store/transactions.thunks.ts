@@ -1,21 +1,20 @@
-import { transactionsApi } from '@features/transactions/api/transactions.api'
-import { transactionsMock } from '@features/transactions/api/transactions.mock'
-import { Transaction } from '@features/transactions/types'
+import { transactionsApi, transactionsMock } from '@features/transactions/api'
+import { Transaction, TransactionsFilters } from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getTransactions = createAsyncThunk<
   { transactions: Transaction[]; length: number },
-  { categoryId?: number },
+  TransactionsFilters,
   { state: RootState }
->('getTransactions', async ({ categoryId = null }, { getState }) => {
+>('getTransactions', async (filters, { getState }) => {
   try {
     const state = getState()
 
     const offset = state.transactions?.offset ?? 0
 
-    const response = await transactionsMock.getTransactions(offset, categoryId)
+    const response = await transactionsMock.getTransactions(offset, filters)
 
     return { transactions: response, length: response.length }
   } catch (e: any) {

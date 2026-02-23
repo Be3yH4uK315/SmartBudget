@@ -68,6 +68,16 @@ export const transactionsSlice = createSlice<
             break
           }
         }
+
+        state.isCategoryChanging = false
+      })
+
+      .addCase(changeCategory.rejected, (state) => {
+        state.isCategoryChanging = false
+      })
+
+      .addCase(changeCategory.pending, (state) => {
+        state.isCategoryChanging = true
       })
   },
 })

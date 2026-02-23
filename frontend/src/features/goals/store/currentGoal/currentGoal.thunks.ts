@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { goalsApi, goalsMock } from '@features/goals/api'
 import {
   EditGoalPayload,

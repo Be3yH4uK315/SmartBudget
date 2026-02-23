@@ -178,11 +178,21 @@ export const components: ThemeOptions['components'] = {
   },
 
   MuiTooltip: {
+    defaultProps: {
+      arrow: true,
+    },
     styleOverrides: {
       tooltip: ({ theme: { palette, typography } }) => ({
         color: palette.text.primary,
-        backgroundColor: palette.gray.dark,
+        textAlign: 'center',
+        backgroundColor: palette.surface.light,
+        border: '2px solid',
+        borderColor: palette.primary.main,
+        borderRadius: '12px',
         ...typography.caption,
+      }),
+      arrow: ({ theme: { palette } }) => ({
+        color: palette.primary.main,
       }),
     },
   },
@@ -406,6 +416,48 @@ export const components: ThemeOptions['components'] = {
       root: ({ theme }) => ({
         ...theme.typography.h2,
         padding: 0,
+      }),
+    },
+  },
+
+  MuiToggleButtonGroup: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        border: `1px solid`,
+        borderRadius: '12px',
+        borderColor: theme.palette.primary.main,
+        gap: 0,
+      }),
+      grouped: {
+        border: 0,
+      },
+    },
+  },
+
+  MuiToggleButton: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        textTransform: 'none',
+        borderRadius: '12px',
+        padding: theme.spacing(1, 2),
+        border: `1px solid`,
+        borderColor: theme.palette.primary.main,
+        color: theme.palette.text.primary,
+
+        '&.Mui-selected': {
+          backgroundColor: theme.palette.primary.main,
+          color: '#333',
+
+          '&:hover': {
+            backgroundColor: theme.palette.primary.light,
+          },
+        },
+
+        '&.Mui-disabled': {
+          opacity: 0.4,
+          backgroundColor: theme.palette.gray.light,
+          color: theme.palette.text.disabled,
+        },
       }),
     },
   },

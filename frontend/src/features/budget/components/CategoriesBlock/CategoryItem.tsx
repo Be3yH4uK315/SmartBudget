@@ -14,7 +14,7 @@ export const CategoryItem = ({ isLimited = true, category }: Props) => {
 
   return (
     <StyledPaper
-      elevation={0}
+      noElevation
       paperSx={{
         bgcolor: 'surface.main',
         height: '100%',

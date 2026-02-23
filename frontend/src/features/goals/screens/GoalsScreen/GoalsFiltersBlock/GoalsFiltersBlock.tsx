@@ -1,70 +1,67 @@
 import { AVAILABLE_TAGS, PRIORITIES } from '@features/goals/constants/tags'
-import { useGoalsFilters } from '@features/goals/hooks'
+import { useGoalsChips } from '@features/goals/hooks/useGoalsChips'
 import { GoalsFilters, Priority, Tag } from '@features/goals/types'
 import { Button, Chip, Stack } from '@mui/material'
-import { StyledBox } from '@shared/components'
+import { FiltersSelect, StyledBox } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
-import { FiltersSelect } from './FiltersSelect'
 
 type Props = {
-  filters: GoalsFilters
+  isDirty: boolean
+  localFilters: GoalsFilters
+  handleClearFilters: () => void
+  handleApply: () => void
+  applyFilters: (value: any) => void
+  updateLocalFilters: <K extends keyof GoalsFilters>(key: K, value: GoalsFilters[K]) => void
 }
 
-export const GoalsFiltersBlock = ({ filters }: Props) => {
+export const GoalsFiltersBlock = ({ ...props }: Props) => {
   const translate = useTranslate('Goals.Tags')
 
-  const {
-    handleClearFilters,
-    localPriority,
-    handlePriorityChange,
-    handleApplyPriority,
-    handleRemovePriority,
-    localTags,
-    handleTagsChange,
-    handleApplyTags,
-    handleRemoveTag,
-  } = useGoalsFilters(filters)
+  const { handleClearFilters, handleApply, isDirty, localFilters, updateLocalFilters } = props
+
+  const { chips, getLabel, handleDeleteChip } = useGoalsChips(props)
 
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between' }}>
         <Stack spacing={2} direction={'row'}>
           <FiltersSelect<Tag>
-            value={localTags}
+            multiple
+            value={localFilters.tags}
             items={AVAILABLE_TAGS}
-            placeholder={translate('placeholder.tags')}
-            onChange={handleTagsChange}
-            onClose={handleApplyTags}
+            translateItemKey={'Goals.Tags'}
+            translateKey={'Goals.Filters'}
+            placeholderKey={'placeholder.tags'}
+            onChange={(e) => updateLocalFilters('tags', e.target.value)}
+            onClose={handleApply}
           />
 
           <FiltersSelect<Priority>
-            value={localPriority}
+            multiple
+            value={localFilters.priority}
             items={PRIORITIES}
-            placeholder={translate('placeholder.priority')}
-            onChange={handlePriorityChange}
-            onClose={handleApplyPriority}
+            translateItemKey={'Goals.Tags'}
+            translateKey={'Goals.Filters'}
+            placeholderKey={'placeholder.priority'}
+            onChange={(e) => updateLocalFilters('priority', e.target.value)}
+            onClose={handleApply}
           />
         </Stack>
 
-        {filters.tags?.length > 0 ||
-          (filters.priority?.length > 0 && (
-            <Button onClick={handleClearFilters} sx={{ height: 'min-content' }} variant="yellow">
-              {translate('clear')}
-            </Button>
-          ))}
+        {(localFilters.tags?.length > 0 || localFilters.priority?.length > 0) && (
+          <Button onClick={handleClearFilters} sx={{ height: 'min-content' }} variant="yellow">
+            {translate('clear')}
+          </Button>
+        )}
       </Stack>
 
-      {(localTags.length > 0 || localPriority.length > 0) && (
+      {isDirty && (
         <StyledBox>
-          {[...localTags, ...localPriority].map((item) => (
+          {chips.map((chip, i) => (
             <Chip
-              key={item}
-              label={translate(item)}
-              onDelete={() =>
-                localTags.includes(item as any)
-                  ? handleRemoveTag(item as any)
-                  : handleRemovePriority(item as any)
-              }
+              key={i}
+              label={getLabel(chip)}
+              onDelete={() => handleDeleteChip(chip)}
               sx={{
                 bgcolor: 'primary.main',
                 color: '#333',

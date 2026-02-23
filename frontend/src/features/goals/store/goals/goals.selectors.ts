@@ -7,4 +7,3 @@ export const selectIsGoalsLoading = sliceStateSelector((state) => state.isLoadin
 export const selectIsCreateGoalLoading = sliceStateSelector((state) => state.isCreateLoading)
 export const selectGoals = sliceStateSelector((state) => state.goals)
 export const selectGoalsStats = sliceStateSelector((state) => state.goalsStats)
-export const selectGoalsFilters = sliceStateSelector((state) => state.filters)

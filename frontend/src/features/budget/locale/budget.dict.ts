@@ -43,21 +43,7 @@ export const budgetDict: LocaleDictionary = {
 
       Modal: {
         createTitle: 'Создание бюджета',
-
-        totalLimitTitle: 'Общий лимит',
-        totalLimitSubtitle: 'Сумма, которую планируете потратить',
-        totalLimit: 'Сумма',
-
-        addCategory: 'Добавить категорию',
-        autoRenew: 'Автопродление',
-        create: 'Создать бюджет',
-
-        categoriesTitle: 'Лимиты по категориям',
-        categoriesSubtitle: 'Лимит для каждой категории. Можно изменить в настройках бюджета',
-        selectPlaceholder: 'Категория',
-        limit: 'Лимит категории, руб',
-        percentOverflow: 'Лимиты по категориям превышают лимит бюджета на {{value}}%',
-        remainingPercent: 'Осталось распределить {{value}}% бюджета',
+        submitButton: 'Создать бюджет',
       },
     },
 

@@ -20,7 +20,7 @@ export const ChangePasswordBlock = () => {
   }
 
   return (
-    <StyledPaper elevation={0}>
+    <StyledPaper noElevation>
       <Stack spacing={2}>
         <Typography variant="h4">{translate('title')}</Typography>
 

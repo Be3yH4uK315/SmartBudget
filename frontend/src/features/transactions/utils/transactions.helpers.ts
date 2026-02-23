@@ -1,4 +1,5 @@
-import { Transaction, TransactionsBlock } from '@features/transactions/types'
+import { Category, Transaction, TransactionsBlock } from '@features/transactions/types'
+import { CATEGORY_IDS } from '@shared/constants'
 
 type MergeTransactionProps = {
   currentBlocks: TransactionsBlock[]
@@ -52,4 +53,8 @@ export function normalizeBlocksList(blocks: TransactionsBlock[]) {
   }
 
   return { groups, groupCounts, transactions }
+}
+
+export function parseCategoryIds(ids: string[]): Category[] {
+  return ids.map(Number).filter((n): n is Category => CATEGORY_IDS.includes(n as Category))
 }

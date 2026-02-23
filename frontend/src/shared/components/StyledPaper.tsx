@@ -2,19 +2,25 @@ import { AriaRole, ReactNode } from 'react'
 import { Paper, SxProps } from '@mui/material'
 
 type Props = {
-  children: ReactNode
+  children?: ReactNode
   paperSx?: SxProps
-  elevation?: number
+  noElevation?: boolean
   onClick?: () => void
   role?: AriaRole
 }
 
-export const StyledPaper = ({ children, paperSx, elevation, onClick, role = 'div' }: Props) => {
+export const StyledPaper = ({
+  children,
+  paperSx,
+  noElevation = false,
+  onClick,
+  role = 'div',
+}: Props) => {
   return (
     <Paper
       role={role}
       onClick={onClick}
-      elevation={elevation === 0 ? elevation : 2}
+      elevation={noElevation ? 0 : 2}
       sx={{
         px: 3,
         py: 2,

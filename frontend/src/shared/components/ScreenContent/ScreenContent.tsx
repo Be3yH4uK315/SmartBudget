@@ -1,7 +1,7 @@
-import { ComponentType, PropsWithChildren } from 'react'
-import { ArrowBackOutlined } from '@mui/icons-material'
-import { Container, IconButton, SkeletonProps, SxProps, Typography } from '@mui/material'
-import { ScrollToTop } from '@shared/components'
+import { ComponentType, JSX, PropsWithChildren } from 'react'
+import { ArrowBackOutlined, InfoOutlined } from '@mui/icons-material'
+import { Container, IconButton, SkeletonProps, Stack, SxProps, Typography } from '@mui/material'
+import { ScrollToTop, StyledTooltip } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
 import { ScreenSkeleton } from './ScreenSkeleton'
@@ -13,6 +13,7 @@ type Props = PropsWithChildren<{
   isLoading?: boolean
   isBackButton?: boolean
   containerSx?: SxProps
+  InfoBlock?: JSX.Element
 }>
 
 export const ScreenContent = ({
@@ -23,6 +24,7 @@ export const ScreenContent = ({
   isLoading = false,
   isBackButton = false,
   noScrollButton = false,
+  InfoBlock,
 }: Props) => {
   const navigate = useNavigate()
   const translate = useTranslate('ScreenContentComponent')
@@ -30,6 +32,9 @@ export const ScreenContent = ({
   const handleClose = () => {
     navigate(-1)
   }
+
+  const containerPaddingTop = isBackButton ? 2 : 4
+  const titleMarginTop = isBackButton ? 1 : 0
 
   return (
     <Container
@@ -39,7 +44,7 @@ export const ScreenContent = ({
         position: 'relative',
         flexDirection: 'column',
         flex: 1,
-        pt: 4,
+        pt: containerPaddingTop,
         overflow: 'visible',
         ...containerSx,
       }}
@@ -68,16 +73,32 @@ export const ScreenContent = ({
           )}
 
           {title && (
-            <Typography
-              noWrap
-              title={title}
+            <Stack
+              direction={'row'}
+              spacing={2}
               sx={{
-                typography: 'h3',
-                marginBottom: 3,
+                maxWidth: 'max-content',
+                mt: titleMarginTop,
+                mb: 3,
+                alignItems: 'center',
               }}
             >
-              {title}
-            </Typography>
+              <Typography
+                noWrap
+                title={title}
+                sx={{
+                  typography: 'h3',
+                }}
+              >
+                {title}
+              </Typography>
+
+              {InfoBlock && (
+                <StyledTooltip title={InfoBlock}>
+                  <InfoOutlined />
+                </StyledTooltip>
+              )}
+            </Stack>
           )}
 
           {children}

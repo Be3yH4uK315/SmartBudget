@@ -1,6 +1,7 @@
 import {
   EditGoalPayload,
   Goal,
+  GoalSearchOption,
   GoalsFilters,
   GoalStatus,
   GoalTransaction,
@@ -9,7 +10,6 @@ import {
   Tag,
   UpdateGoalStatusPayload,
 } from '@features/goals/types'
-import { PRIORITIES } from '../constants/tags'
 
 function generateMockGoals(total = 0): Goal[] {
   const statuses: GoalStatus[] = ['ongoing', 'achieved', 'expired', 'closed']
@@ -79,6 +79,8 @@ class GoalsMock {
 
     if (filters?.isArchived) {
       result = result.filter((g) => g.isArchived === true)
+    } else {
+      result = result.filter((g) => g.isArchived === false)
     }
 
     return result.map(({ daysLeft, recommendedPayment, ...rest }) => rest)
@@ -165,6 +167,44 @@ class GoalsMock {
 
     goal.isArchived = !goal.isArchived
     return { isArchived: goal.isArchived }
+  }
+
+  searchGoals = async (
+    query: string,
+    signal?: AbortSignal,
+    limit = 10,
+  ): Promise<GoalSearchOption[]> => {
+    console.log('%cMOCK CALL searchGoals', 'color: orange', { query })
+
+    const requestId = Date.now()
+    let canceled = false
+
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        canceled = true
+      })
+    }
+
+    await new Promise((r) => setTimeout(r, 400))
+    if (canceled) return []
+
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) return []
+
+    const results: GoalSearchOption[] = ALL_GOALS.filter((g) =>
+      g.name.toLowerCase().includes(normalizedQuery),
+    )
+      .slice(0, limit)
+      .map(({ goalId, name, targetValue, currentValue, status, isArchived }) => ({
+        goalId,
+        name,
+        targetValue,
+        currentValue,
+        status,
+        isArchived,
+      }))
+
+    return results
   }
 }
 

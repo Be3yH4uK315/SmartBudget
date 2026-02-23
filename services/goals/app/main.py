@@ -1,91 +1,127 @@
 import logging
-from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import ORJSONResponse
+from prometheus_client import make_asgi_app
 from arq import create_pool
 from arq.connections import RedisSettings
-from starlette.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
-from aiokafka.errors import KafkaError
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.routers import goals
-from app import (
-    settings,
-    exceptions,
-    logging_config
-)
-from app.kafka_producer import KafkaProducer
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.core.database import get_db_engine, get_session_factory
+from app.core.context import set_request_id
+from app.core import exceptions
+from app.api.routes import router as goals_router
 
+setup_logging()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Управляет ресурсами (DB, Kafka, Arq) во время жизни приложения."""
-    logging_config.setup_logging()
-    
-    try:
-        engine = create_async_engine(settings.settings.db.db_url)
-        session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        app.state.db_engine = engine
-        app.state.async_session_maker = session_maker
-        logger.info("Database engine and session maker created.")
-    except Exception as e:
-        logger.error(f"Failed to create DB engine: {e}")
-        app.state.db_engine = None
-        app.state.async_session_maker = None
+    """Управление ресурсами приложения."""
+    logger.info("Application startup initiated")
 
-    try:
-        kafka_prod_instance = KafkaProducer() 
-        await kafka_prod_instance.start()
-        app.state.kafka_producer = kafka_prod_instance
-    except KafkaError as e:
-        logger.error(f"Failed to start Kafka producer: {e}")
-        app.state.kafka_producer = None
+    engine = get_db_engine()
+    app.state.engine = engine
+    app.state.db_session_maker = get_session_factory(engine)
 
-    arq_redis_settings = RedisSettings.from_dsn(settings.settings.arq.redis_url)
-    arq_pool = await create_pool(
-        arq_redis_settings, 
-        default_queue_name=settings.settings.arq.arq_queue_name
+    app.state.arq_pool = await create_pool(
+        RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
+        default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
     )
-    app.state.arq_pool = arq_pool
-    
-    logger.info("Application startup complete.")
     yield
-    
-    if app.state.kafka_producer:
-        await app.state.kafka_producer.stop()
-        logger.info("Kafka producer stopped.")
-    if arq_pool:
-        await arq_pool.close()
-    if app.state.db_engine:
-        await app.state.db_engine.dispose()
-        logger.info("Database engine disposed.")
-    
-    logger.info("Application shutdown complete.")
+    logger.info("Application shutdown initiated")
 
+    await app.state.arq_pool.close()
+    await engine.dispose()
+
+    logger.info("Application shutdown complete")
 
 app = FastAPI(
-    title="Goals Service", 
-    version="1.0", 
+    title="Goals Service",
+    version="1.0",
     lifespan=lifespan,
+    default_response_class=ORJSONResponse,
     docs_url="/api/v1/goals/docs",
-    openapi_url="/api/v1/goals/openapi.json"
+    openapi_url="/api/v1/goals/openapi.json",
 )
 
+@app.middleware("http")
+async def tracing_middleware(
+    request: Request,
+    call_next,
+):
+    """Middleware для установки и передачи Request ID."""
+    req_id = (
+        request.headers.get("X-Request-ID")
+        or request.headers.get("X-Correlation-ID")
+    )
+    final_id = set_request_id(req_id)
+    response: Response = await call_next(request)
+    response.headers["X-Request-ID"] = final_id
+
+    return response
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 @app.exception_handler(exceptions.GoalServiceError)
-async def goal_service_exception_handler(request: Request, exc: exceptions.GoalServiceError):
+async def goal_service_exception_handler(
+    request: Request,
+    exc: exceptions.GoalServiceError,
+):
+    """Обработка ошибок бизнес-логики."""
     status_code = 400
     if isinstance(exc, exceptions.GoalNotFoundError):
         status_code = 404
-    
-    return JSONResponse(
+
+    logger.warning(
+        "Service error: %s: %s",
+        type(exc).__name__,
+        exc,
+    )
+
+    return ORJSONResponse(
         status_code=status_code,
         content={"detail": str(exc)},
     )
 
 @app.exception_handler(SQLAlchemyError)
-async def db_error_middleware(request: Request, exc: SQLAlchemyError):
-    logger.error(f"DB error: {exc}")
-    return JSONResponse(status_code=500, content={"detail": "Database error"})
+async def db_error_handler(
+    request: Request,
+    exc: SQLAlchemyError,
+):
+    """Обработка ошибок БД."""
+    logger.error(
+        "Database error: %s",
+        exc,
+        exc_info=True,
+    )
 
-app.include_router(goals.router, prefix="/api/v1/goals")
+    return ORJSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(
+    request: Request,
+    exc: Exception,
+):
+    """Обработка неожиданных ошибок."""
+    logger.critical(
+        "Unhandled exception: %s",
+        exc,
+        exc_info=True,
+    )
+
+    return ORJSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+app.include_router(
+    goals_router,
+    prefix="/api/v1/goals",
+)
