@@ -3,3 +3,4 @@ pydantic-settings
 sqlalchemy[asyncpg]
 arq
 prometheus-fastapi-instrumentator
+aiokafka
