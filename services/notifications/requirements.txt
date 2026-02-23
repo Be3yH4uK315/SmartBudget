@@ -1,2 +1,3 @@
 pydantic-settings
 sqlalchemy[asyncpg]
+arq
