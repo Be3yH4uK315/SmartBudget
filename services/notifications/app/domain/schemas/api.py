@@ -1,31 +1,51 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Dict, Any, List, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+from pydantic import BaseModel, Field, ConfigDict
 
-class NotificationResponse(BaseModel):
-    id: str
-    createdAt: str
-    titleKey: str
-    messageKey: str
-    type: str
-    isRead: bool
-    service: str
-    props: Optional[Dict[str, Any]] = None
+from app.domain.enums import NotificationType, NotificationServiceType
 
-    model_config = ConfigDict(populate_by_name=True)
+def to_camel(string: str) -> str:
+    parts = string.split("_")
+    return parts[0] + "".join(word.capitalize() for word in parts[1:])
 
-class PaginatedNotifications(BaseModel):
-    total: int
-    unreadCount: int
-    items: List[NotificationResponse]
+class CamelModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
-class NotificationSettingsResponse(BaseModel):
-    locale: str
-    emailEnabled: bool
-    pushEnabled: bool
-    disabledServices: List[str]
+class NotificationResponse(CamelModel):
+    """Модель одного уведомления в списке."""
+    id: UUID = Field(..., description="ID уведомления")
+    created_at: datetime = Field(..., description="Время создания")
+    title_key: str = Field(..., description="Ключ перевода заголовка")
+    message_key: str = Field(..., description="Ключ перевода текста")
+    type: NotificationType = Field(..., description="Тип уведомления")
+    is_read: bool = Field(..., description="Прочитано ли")
+    service: NotificationServiceType = Field(..., description="Сервис-отправитель")
+    props: Optional[Dict[str, Any]] = Field(None, description="Переменные для шаблона")
 
-class NotificationSettingsUpdate(BaseModel):
-    locale: Optional[str] = None
-    emailEnabled: Optional[bool] = None
-    pushEnabled: Optional[bool] = None
-    disabledServices: Optional[List[str]] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedNotifications(CamelModel):
+    """Ответ для списка уведомлений с пагинацией."""
+    total: int = Field(..., description="Всего уведомлений")
+    unread_count: int = Field(..., description="Количество непрочитанных")
+    items: List[NotificationResponse] = Field(..., description="Список уведомлений")
+
+class NotificationSettingsResponse(CamelModel):
+    """Модель текущих настроек пользователя."""
+    locale: str = Field(..., description="Язык локализации")
+    email_enabled: bool = Field(..., description="Включены ли Email-письма")
+    push_enabled: bool = Field(..., description="Включены ли PUSH-уведомления")
+    disabled_services: List[str] = Field(..., description="Массив отключенных сервисов")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class NotificationSettingsUpdate(CamelModel):
+    """Модель для обновления настроек (PATCH)."""
+    locale: Optional[str] = Field(None, max_length=10, description="Язык локализации")
+    email_enabled: Optional[bool] = Field(None, description="Включены ли Email-письма")
+    push_enabled: Optional[bool] = Field(None, description="Включены ли PUSH-уведомления")
+    disabled_services: Optional[List[str]] = Field(None, description="Массив отключенных сервисов")
