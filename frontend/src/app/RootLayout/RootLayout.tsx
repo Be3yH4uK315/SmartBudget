@@ -1,8 +1,11 @@
 import { PropsWithChildren } from 'react'
 import { Box } from '@mui/material'
+import { selectUser, useAppSelector } from '@shared/store'
 import { Header } from './Header'
 
 export const RootLayout = ({ children }: PropsWithChildren) => {
+  const isAuth = useAppSelector(selectUser).isAuth
+
   return (
     <Box
       sx={{
@@ -12,7 +15,7 @@ export const RootLayout = ({ children }: PropsWithChildren) => {
         backgroundColor: 'surface.main',
       }}
     >
-      <Header />
+      {!isAuth && <Header />}
 
       <Box
         sx={{
