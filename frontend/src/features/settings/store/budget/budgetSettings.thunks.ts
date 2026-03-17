@@ -22,7 +22,7 @@ export const getBudgetSettings = createAsyncThunk<
 export const setBudgetSettings = createAsyncThunk<
   void,
   BudgetSettings,
-  { rejectValue: 'cannotGetBudgetData' }
+  { rejectValue: 'cannotSetBudgetData' }
 >('setBudgetSettings', async (payload, { rejectWithValue }) => {
   try {
     const response = await settingsMock.setBudgetSettings(payload)
@@ -33,6 +33,6 @@ export const setBudgetSettings = createAsyncThunk<
   } catch (e: any) {
     showToast({ messageKey: 'cannotSetBudgetSettings', type: 'error' })
 
-    return rejectWithValue('cannotGetBudgetData')
+    return rejectWithValue('cannotSetBudgetData')
   }
 })

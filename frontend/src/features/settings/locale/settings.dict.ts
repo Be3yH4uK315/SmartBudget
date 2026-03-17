@@ -5,24 +5,10 @@ export const settingsDict: LocaleDictionary = {
     Settings: {
       title: 'Настройки',
 
-      RefreshDuration: {
-        title: 'Автоматически завершать сессию',
-        subtitle: 'Если сессия не активна:',
-        week: 'Неделю',
-        oneMonth: '1 месяц',
-        threeMonth: '3 месяца',
-        sixMonth: '6 месяцев',
-      },
-
       Menu: {
         Security: {
           title: 'Безопасность',
           subtitle: 'Пароль и активные сессии',
-        },
-
-        Support: {
-          title: 'Обращения',
-          subtitle: 'Ваши обращения в поддержку',
         },
 
         Notifications: {
@@ -50,6 +36,15 @@ export const settingsDict: LocaleDictionary = {
             confirmPassword: 'Подтвердите пароль',
             passwordsNotMatch: 'Пароли не совпадают',
           },
+        },
+
+        RefreshDuration: {
+          title: 'Автоматически завершать сессию',
+          subtitle: 'Если сессия не активна:',
+          week: 'Неделю',
+          oneMonth: '1 месяц',
+          threeMonth: '3 месяца',
+          sixMonth: '6 месяцев',
         },
 
         Sessions: {
@@ -96,11 +91,6 @@ export const settingsDict: LocaleDictionary = {
           subtitle: 'Password and active sessions',
         },
 
-        Support: {
-          title: 'Support',
-          subtitle: 'Your tickets',
-        },
-
         Notifications: {
           title: 'Notifications',
           subtitle: 'Reaching categories limits, goals etc.',
@@ -126,6 +116,15 @@ export const settingsDict: LocaleDictionary = {
             confirmPassword: 'Confirm password',
             passwordsNotMatch: "The passwords don't match",
           },
+        },
+
+        RefreshDuration: {
+          title: 'Automatically logout',
+          subtitle: 'If session non-active:',
+          week: 'A week',
+          oneMonth: '1 month',
+          threeMonth: '3 months',
+          sixMonth: '6 months',
         },
 
         Sessions: {
