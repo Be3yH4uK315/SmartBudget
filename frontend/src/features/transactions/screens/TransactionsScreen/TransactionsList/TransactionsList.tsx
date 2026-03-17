@@ -2,14 +2,14 @@ import { useCallback, useMemo } from 'react'
 import 'dayjs/locale/ru'
 import { getTransactions } from '@features/transactions/store'
 import { TransactionsBlock, TransactionsFilters } from '@features/transactions/types'
-import { normalizeBlocksList } from '@features/transactions/utils'
 import { Typography } from '@mui/material'
+import { ListFooter, MUIComponents } from '@shared/components/GroupedVirtuoso'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch } from '@shared/store'
+import { normalizeBlocks } from '@shared/utils'
 import dayjs from 'dayjs'
 import { GroupedVirtuoso } from 'react-virtuoso'
 import { TransactionLine } from './TransactionLine'
-import { ListFooter, MUIComponents } from './TransactionsListComponents'
 
 type Props = {
   isLast: boolean
@@ -20,9 +20,9 @@ type Props = {
 
 export const TransactionsList = ({ isLast, isLoading, transactions, appliedFiltersRef }: Props) => {
   const dispatch = useAppDispatch()
-  const translate = useTranslate('Transactions')
+  const translate = useTranslate('ListDate')
 
-  const normalizedBlocks = useMemo(() => normalizeBlocksList(transactions), [transactions])
+  const normalizedBlocks = useMemo(() => normalizeBlocks(transactions), [transactions])
 
   const loadMore = useCallback(() => {
     dispatch(getTransactions(appliedFiltersRef.current))
@@ -52,9 +52,7 @@ export const TransactionsList = ({ isLast, isLoading, transactions, appliedFilte
       groupContent={(index) => (
         <Typography variant="h4">{formatGroupDate(normalizedBlocks.groups[index])}</Typography>
       )}
-      itemContent={(index) => (
-        <TransactionLine transaction={normalizedBlocks.transactions[index]} />
-      )}
+      itemContent={(index) => <TransactionLine transaction={normalizedBlocks.items[index]} />}
     />
   )
 }

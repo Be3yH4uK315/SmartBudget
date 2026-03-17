@@ -11,9 +11,6 @@ export const transactionsDict: LocaleDictionary = {
       emptyCategory: 'Сбросить фильтр',
       categoryFilter: 'Категория',
 
-      today: 'Сегодня',
-      yesterday: 'Вчера',
-
       Filters: {
         selected: 'Выбрано: {{value}}',
         clear: 'Сбросить фильтры',

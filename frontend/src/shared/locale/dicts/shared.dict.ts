@@ -7,6 +7,7 @@ export const sharedDict: LocaleDictionary = {
       budget: 'Бюджет',
       goals: 'Цели',
       transactions: 'Операции',
+      notifications: 'Уведомления',
       settings: 'Настройки',
       signIn: 'Войти',
       logout: 'Выход',
@@ -36,6 +37,11 @@ export const sharedDict: LocaleDictionary = {
       subtitle: 'Возможно, она была удалена, перемещена, или ее адрес указан неверно',
       button: 'Перейти на главную',
     },
+
+    ListDate: {
+      today: 'Сегодня',
+      yesterday: 'Вчера',
+    },
   },
 
   en: {
@@ -44,6 +50,7 @@ export const sharedDict: LocaleDictionary = {
       budget: 'Budget',
       goals: 'Goals',
       transactions: 'Transactions',
+      notifications: 'Notifications',
       settings: 'Settings',
       signIn: 'Sign In',
       logout: 'Logout',

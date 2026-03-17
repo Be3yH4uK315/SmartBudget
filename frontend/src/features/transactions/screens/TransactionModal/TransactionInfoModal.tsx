@@ -58,19 +58,21 @@ export const TransactionInfoModal = ({ transaction, onClose }: Props) => {
 
           <Button onClick={handleChangeCategory}>{translate('changeCategory')}</Button>
 
-          <Box
-            sx={{
-              display: 'flex',
-              whiteSpace: 'pre-wrap',
-              p: 2.5,
-              bgcolor: 'surface.light',
-              width: '60%',
-              minHeight: '150px',
-              borderRadius: '24px',
-            }}
-          >
-            <Typography>{transaction.description}</Typography>
-          </Box>
+          {transaction.description && (
+            <Box
+              sx={{
+                display: 'flex',
+                whiteSpace: 'pre-wrap',
+                p: 2.5,
+                bgcolor: 'surface.light',
+                width: '60%',
+                minHeight: '150px',
+                borderRadius: '24px',
+              }}
+            >
+              <Typography>{transaction.description}</Typography>
+            </Box>
+          )}
         </Stack>
       </Stack>
     </ModalLayout>
