@@ -18,6 +18,8 @@ export const BudgetBlock = React.memo(({ categories, budgetLimit }: Props) => {
 
   const title = categories.length > 0 ? translate('title') : translate('emptyTitle')
 
+  if (!categories.length && budgetLimit === 0) return null
+
   return (
     <StyledPaper
       paperSx={{
