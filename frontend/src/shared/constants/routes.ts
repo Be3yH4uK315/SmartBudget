@@ -7,6 +7,7 @@ export const ROUTES = {
       ARCHIVE: '/goals/archive',
     },
     DASHBOARD: '/main',
+    NOTIFICATIONS: '/notifications',
     SETTINGS: {
       MAIN: '/settings',
       SECURITY: '/settings/security',
