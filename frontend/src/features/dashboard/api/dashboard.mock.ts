@@ -1,58 +1,44 @@
-import { DashboardResponsePayload } from '@features/dashboard/types'
+import { DashboardCategory, DashboardGoal } from '@features/dashboard/types'
+
+const goalNames = ['Новая машина', 'Отпуск', 'Квартира', 'Образование']
+const categoryIds = Array.from({ length: 10 }, (_, i) => i + 1)
 
 class DashboardMock {
-  baseUrl = ''
+  baseUrl = '/dashboard'
 
-  async getDashboardData(): Promise<DashboardResponsePayload> {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+  private goals: DashboardGoal[] = goalNames.map((name, i) => ({
+    name,
+    totalValue: 10000 + i * 5000,
+    currentValue: Math.floor(Math.random() * (10000 + i * 5000)),
+  }))
+
+  private categories: DashboardCategory[] = categoryIds.map((id) => ({
+    categoryId: id,
+    value: Math.floor(Math.random() * 20000),
+    type: Math.random() > 0.5 ? 'income' : 'expense',
+  }))
+
+  private budgetTotalLimit = 100000
+
+  private delay(ms = 500) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  async getDashboardGoals(): Promise<DashboardGoal[]> {
+    console.log('%cMOCK CALL getDashboardGoals', 'color: orange')
+    await this.delay(400)
+    return [...this.goals]
+  }
+
+  async getDashboardBudget(): Promise<{
+    categories: DashboardCategory[]
+    budgetTotalLimit: number
+  }> {
+    console.log('%cMOCK CALL getDashboardBudget', 'color: orange')
+    await this.delay(400)
     return {
-      goals: [
-        { name: 'Квартира', totalValue: 10000000, currentValue: 100 },
-        { name: 'Машина', totalValue: 2000000, currentValue: 200 },
-      ],
-      categories: [
-        {
-          categoryId: 1,
-          value: 100,
-          type: 'income',
-        },
-        {
-          categoryId: 2,
-          value: 200,
-          type: 'expense',
-        },
-        {
-          categoryId: 3,
-          value: 300,
-          type: 'expense',
-        },
-        {
-          categoryId: 4,
-          value: 400,
-          type: 'income',
-        },
-        {
-          categoryId: 5,
-          value: 500,
-          type: 'income',
-        },
-        {
-          categoryId: 6,
-          value: 600,
-          type: 'income',
-        },
-        {
-          categoryId: 7,
-          value: 700,
-          type: 'income',
-        },
-        {
-          categoryId: 8,
-          value: 800,
-          type: 'income',
-        },
-      ],
-      budgetTotalLimit: 20000,
+      categories: [...this.categories],
+      budgetTotalLimit: this.budgetTotalLimit,
     }
   }
 }

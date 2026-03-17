@@ -2,7 +2,7 @@ import { DashboardSliceReducers, DashboardSliceState } from '@features/dashboard
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getDashboardInitialState } from './dashboard.state'
-import { getDashboardData } from './dashboard.thunks'
+import { getDashboardBudget, getDashboardGoals } from './dashboard.thunks'
 
 export const dashboardSlice = createSlice<
   DashboardSliceState,
@@ -16,19 +16,31 @@ export const dashboardSlice = createSlice<
 
   extraReducers: (builder) => {
     builder
-      .addCase(getDashboardData.fulfilled, (state, { payload }) => {
+      .addCase(getDashboardBudget.fulfilled, (state, { payload }) => {
         state.budgetLimit = payload.budgetTotalLimit
         state.categories = payload.categories
-        state.goals = payload.goals
-        state.isLoading = false
+        state.isBudgetLoading = false
       })
 
-      .addCase(getDashboardData.rejected, (state) => {
-        state.isLoading = false
+      .addCase(getDashboardBudget.rejected, (state) => {
+        state.isBudgetLoading = false
       })
 
-      .addCase(getDashboardData.pending, (state) => {
-        state.isLoading = true
+      .addCase(getDashboardBudget.pending, (state) => {
+        state.isBudgetLoading = true
+      })
+
+      .addCase(getDashboardGoals.fulfilled, (state, { payload }) => {
+        state.goals = payload
+        state.isGoalsLoading = false
+      })
+
+      .addCase(getDashboardGoals.rejected, (state) => {
+        state.isGoalsLoading = false
+      })
+
+      .addCase(getDashboardGoals.pending, (state) => {
+        state.isGoalsLoading = true
       })
   },
 })

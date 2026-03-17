@@ -1,6 +1,7 @@
 import { DashboardGoal } from '@features/dashboard/types'
-import { Button, Paper, Stack, Typography } from '@mui/material'
-import { ROUTES } from '@shared/constants/routes'
+import { Button, Stack, Typography } from '@mui/material'
+import { StyledPaper } from '@shared/components'
+import { ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
 import { Goal } from './Goal'
@@ -16,10 +17,9 @@ export const GoalsBlock = ({ goals }: Props) => {
   const title = goals.length > 0 ? translate('title') : translate('emptyTitle')
 
   return (
-    <Paper
-      sx={{
+    <StyledPaper
+      paperSx={{
         p: 3,
-        borderRadius: '24px',
         maxWidth: { xs: 'auto', md: '400px' },
         minWidth: '300px',
       }}
@@ -41,6 +41,6 @@ export const GoalsBlock = ({ goals }: Props) => {
           {translate('createButton')}
         </Button>
       </Stack>
-    </Paper>
+    </StyledPaper>
   )
 }

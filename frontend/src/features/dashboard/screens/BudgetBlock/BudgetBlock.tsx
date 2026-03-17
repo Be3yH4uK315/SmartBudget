@@ -1,10 +1,11 @@
 import React from 'react'
 import { DashboardCategory } from '@features/dashboard/types'
-import { Button, Paper, Stack, Typography } from '@mui/material'
-import { ROUTES } from '@shared/constants/routes'
+import { calcBudgetStats } from '@features/dashboard/utils'
+import { Button, Stack, Typography } from '@mui/material'
+import { PercentLine, StyledPaper } from '@shared/components'
+import { ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { useNavigate } from 'react-router'
-import { PercentLine } from './PercentLine'
 
 type Props = {
   categories: DashboardCategory[]
@@ -18,10 +19,9 @@ export const BudgetBlock = React.memo(({ categories, budgetLimit }: Props) => {
   const title = categories.length > 0 ? translate('title') : translate('emptyTitle')
 
   return (
-    <Paper
-      sx={{
+    <StyledPaper
+      paperSx={{
         p: 3,
-        borderRadius: '24px',
         maxWidth: { xs: 'auto', md: '400px' },
         minWidth: '300px',
       }}
@@ -29,7 +29,9 @@ export const BudgetBlock = React.memo(({ categories, budgetLimit }: Props) => {
       <Stack spacing={1}>
         <Typography variant="h4">{title}</Typography>
 
-        {categories.length > 0 && <PercentLine categories={categories} limit={budgetLimit} />}
+        {categories.length > 0 && (
+          <PercentLine currentValue={calcBudgetStats(categories)} limit={budgetLimit} />
+        )}
 
         {!categories.length && (
           <Button
@@ -41,6 +43,6 @@ export const BudgetBlock = React.memo(({ categories, budgetLimit }: Props) => {
           </Button>
         )}
       </Stack>
-    </Paper>
+    </StyledPaper>
   )
 })
