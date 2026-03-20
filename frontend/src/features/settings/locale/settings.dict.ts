@@ -78,6 +78,36 @@ export const settingsDict: LocaleDictionary = {
           next: 'Следующий',
         },
       },
+
+      Notifications: {
+        title: 'Настройки уведомлений',
+        notificationsStatus: {
+          title: 'Допуск уведомлений',
+          subtitle: 'Разрешить отправку уведомлений (Отображаются в разделе "Уведомления")',
+        },
+
+        pushNotifications: {
+          title: 'Push-уведомления',
+          subtitle: 'Разрешить отправку push-уведомлений',
+        },
+
+        goals: {
+          title: 'Цели',
+          subtitle: 'Уведомлять о достижении цели, дедлайнах, и прочих действиях',
+        },
+
+        transactions: {
+          title: 'Операции',
+          subtitle:
+            'Уведомлять о смене категорий, обнаружении неклассифицированных операциях и т.д.',
+        },
+
+        budget: {
+          title: 'Бюджет и категории',
+          totalLimit: 'Уведомлять о превышении лимита бюджета',
+          categoriesLimit: 'Уведомлять о превышении лимита категорий',
+        },
+      },
     },
   },
 
@@ -137,6 +167,8 @@ export const settingsDict: LocaleDictionary = {
         title: 'Security settings',
         deleteOtherSessions: 'Revoke other sessions',
       },
+
+      Budget: {},
     },
   },
 }
