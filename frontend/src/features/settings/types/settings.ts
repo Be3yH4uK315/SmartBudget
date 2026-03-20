@@ -24,3 +24,25 @@ export type RefreshTokenFormItem = {
   label: string
   value: number
 }
+
+export type NotificationsSettings = {
+  notificationsStatus: boolean
+  pushStatus: boolean
+  goals: boolean
+  transactions: boolean
+  budget: {
+    totalLimit: boolean
+    categoriesLimit: boolean
+  }
+}
+
+export type Option = {
+  title: string
+  isChecked: boolean
+  onClick: () => void
+}
+
+export type ServiceBlock = {
+  title: string
+  options: Option[]
+}
