@@ -15,7 +15,7 @@ export const RootLayout = ({ children }: PropsWithChildren) => {
         backgroundColor: 'surface.main',
       }}
     >
-      {!isAuth && <Header />}
+      {isAuth && <Header />}
 
       <Box
         sx={{
