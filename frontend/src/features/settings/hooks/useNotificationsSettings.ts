@@ -19,10 +19,14 @@ export const useNotificationsSettings = () => {
   const handleChange = useCallback(
     async (path: string[], value: boolean) => {
       if (path[0] === 'pushStatus') {
-        if (value) {
-          await pushApi.enablePushNotifications(userId)
-        } else {
-          await pushApi.unsubscribe(userId)
+        try {
+          if (value) {
+            await pushApi.enablePushNotifications(userId)
+          } else {
+            await pushApi.unsubscribe(userId)
+          }
+        } catch (e: any) {
+          console.log(e)
         }
       }
 
