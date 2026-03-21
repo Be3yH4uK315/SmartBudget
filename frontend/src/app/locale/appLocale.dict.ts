@@ -1,5 +1,6 @@
 import { budgetDict } from '@features/budget/locale'
 import { dashboardDict } from '@features/dashboard/locale'
+import { notificationsDict } from '@features/notifications/locale'
 import { settingsDict } from '@features/settings/locale'
 import { transactionsDict } from '@features/transactions/locale'
 import {
@@ -21,6 +22,7 @@ export const appLocaleDict = mergeLocaleDicts(
   dashboardDict,
   goalsDict,
   monthDict,
+  notificationsDict,
   toastsDict,
   transactionsDict,
   settingsDict,
