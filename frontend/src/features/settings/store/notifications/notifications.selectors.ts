@@ -7,5 +7,7 @@ const sliceStateSelector = createLazySliceStateSelector(
 )
 
 export const selectNotificationsStatus = sliceStateSelector((state) => state.notificationsStatus)
-export const selectNotificationsSettings = sliceStateSelector((state) => state.notificationsSettings)
+export const selectNotificationsSettings = sliceStateSelector(
+  (state) => state.notificationsSettings,
+)
 export const selectNotificationsSettingsIsLoading = sliceStateSelector((state) => state.isLoading)
