@@ -1,6 +1,6 @@
 import React from 'react'
 import { notificationsApi, notificationsMock } from '@features/notifications/api'
-import { Notification } from '@features/notifications/types'
+import { Notification, NotificationType } from '@features/notifications/types'
 import {
   getNotificationOnClickLink,
   isTransactionCategoryChanged,
@@ -25,16 +25,15 @@ export const NotificationItem = React.memo(function NotificationItem({ notificat
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
 
-  const color =
-    notification.type === 'info'
-      ? 'info.light'
-      : notification.type === 'alert'
-        ? 'alert.main'
-        : notification.type === 'success'
-          ? 'success.main'
-          : notification.type === 'warning'
-            ? 'error.main'
-            : 'grayButton.dark'
+  const colorMap: Record<NotificationType, string> = {
+    info: 'info.light',
+    alert: 'alert.main',
+    success: 'success.main',
+    warning: 'error.main',
+    system: 'grayButton.dark',
+  }
+
+  const color = colorMap[notification.type]
 
   const handleClick = async (notification: Notification) => {
     const route = getNotificationOnClickLink(notification)
@@ -62,7 +61,12 @@ export const NotificationItem = React.memo(function NotificationItem({ notificat
   return (
     <StyledPaper
       noElevation
-      paperSx={{ width: '100%', border: '2px solid', borderColor: color, cursor: 'pointer' }}
+      paperSx={{
+        width: '100%',
+        border: '2px solid',
+        borderColor: color,
+        cursor: 'pointer',
+      }}
       onClick={() => handleClick(notification)}
     >
       {!notification.isRead && (
