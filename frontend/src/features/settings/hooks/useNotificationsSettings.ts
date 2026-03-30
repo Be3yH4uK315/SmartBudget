@@ -26,7 +26,7 @@ export const useNotificationsSettings = () => {
             await pushApi.unsubscribe(userId)
           }
         } catch (e: any) {
-          console.log(e)
+          console.error(e)
         }
       }
 
