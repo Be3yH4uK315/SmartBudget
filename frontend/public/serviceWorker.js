@@ -1,18 +1,15 @@
 self.addEventListener('push', function (event) {
-  let data = { title: 'Fallback', body: 'No payload', url: '/' }
-
-  try {
-    data = event.data?.json() || data
-  } catch {
-    console.error('Invalid push payload')
+  const pushData = event.data?.json()
+  if (!pushData) {
+    return
   }
 
   event.waitUntil(
     (async () => {
-      await self.registration.showNotification(data.title, {
-        body: data.body,
+      await self.registration.showNotification(pushData.title, {
+        body: pushData.body,
         icon: '/icon_192.png',
-        data: { url: data.url || '/' },
+        data: { url: pushData.url || '/' },
       })
     })(),
   )
@@ -21,18 +18,21 @@ self.addEventListener('push', function (event) {
 self.addEventListener('notificationclick', function (event) {
   event.notification.close()
 
-  const url = event.notification.data?.url || '/'
-
-  console.log(url)
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
-      for (const client of clientsArr) {
-        if (client.url === url && 'focus' in client) {
-          return client.focus()
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientsArr) => {
+        for (const client of clientsArr) {
+          if (client.url === url && 'focus' in client) {
+            return client.focus()
+          }
         }
-      }
-      return self.clients.openWindow(url)
-    }),
+        return self.clients.openWindow(url)
+      })
+      .catch((e) => {
+        console.error(e)
+      }),
   )
 })
