@@ -6,20 +6,37 @@ import {
   updateNotificationsSettings,
 } from '@features/settings/store/notifications'
 import { mapSettingsToBlocks, updateByPath } from '@features/settings/utils'
-import { useAppDispatch, useAppSelector } from '@shared/store'
+import { pushApi } from '@shared/api/push'
+import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
+import { showToast } from '@shared/utils/toast.helpers'
 
 export const useNotificationsSettings = () => {
   const dispatch = useAppDispatch()
 
   const settings = useAppSelector(selectNotificationsSettings)
   const notificationsStatus = useAppSelector(selectNotificationsStatus)
+  const userId = useAppSelector(selectUser).userId
 
   const handleChange = useCallback(
-    (path: string[], value: boolean) => {
+    async (path: string[], value: boolean) => {
+      if (path[0] === 'pushStatus') {
+        try {
+          if (value) {
+            await pushApi.enablePushNotifications(userId)
+          } else {
+            await pushApi.unsubscribe(userId)
+          }
+        } catch (e: any) {
+          showToast({ messageKey: 'cannotEnablePushNotifications', type: 'error' })
+          return
+        }
+      }
+
       const updated = updateByPath(settings, path, value)
+
       dispatch(updateNotificationsSettings(updated))
     },
-    [dispatch, settings],
+    [dispatch, settings, userId],
   )
 
   const handleToggleStatus = useCallback(() => {

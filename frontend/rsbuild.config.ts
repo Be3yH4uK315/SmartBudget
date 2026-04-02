@@ -4,7 +4,7 @@ import { pluginTypeCheck } from '@rsbuild/plugin-type-check'
 
 export default defineConfig({
   html: {
-    favicon: './public/favicon.ico',
+    favicon: './public/icons/favicon.ico',
     template: './public/index.html',
   },
   output: {

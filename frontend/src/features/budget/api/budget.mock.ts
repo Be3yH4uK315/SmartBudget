@@ -2,7 +2,9 @@ import { BudgetPayload } from '@features/budget/types'
 
 class BudgetMock {
   async getBudgetData(): Promise<BudgetPayload> {
-    return Promise.resolve({
+    await new Promise((r) => setTimeout(r, 800))
+
+    return {
       totalLimit: 12000,
       currentValue: 26000,
       isAutoRenew: true,
@@ -33,7 +35,7 @@ class BudgetMock {
           currentValue: 0,
         },
       ],
-    })
+    }
   }
 }
 
