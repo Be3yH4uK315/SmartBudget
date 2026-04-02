@@ -8,6 +8,7 @@ import {
 import { mapSettingsToBlocks, updateByPath } from '@features/settings/utils'
 import { pushApi } from '@shared/api/push'
 import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
+import { showToast } from '@shared/utils/toast.helpers'
 
 export const useNotificationsSettings = () => {
   const dispatch = useAppDispatch()
@@ -26,7 +27,8 @@ export const useNotificationsSettings = () => {
             await pushApi.unsubscribe(userId)
           }
         } catch (e: any) {
-          console.error(e)
+          showToast({ messageKey: 'cannotEnablePushNotifications', type: 'error' })
+          return
         }
       }
 
