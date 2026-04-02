@@ -1,11 +1,3 @@
-export type DashboardResponsePayload = {
-  goals: DashboardGoal[]
-
-  categories: DashboardCategory[]
-
-  budgetTotalLimit: number
-}
-
 export type DashboardGoal = {
   name: string
 

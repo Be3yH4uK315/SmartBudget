@@ -9,4 +9,6 @@ export const selectCategories = sliceStateSelector((state) => state.categories)
 
 export const selectBudgetLimit = sliceStateSelector((state) => state.budgetLimit)
 
-export const selectIsDashboardLoading = sliceStateSelector((state) => state.isLoading)
+export const selectIsDashboardBudgetLoading = sliceStateSelector((state) => state.isBudgetLoading)
+
+export const selectIsDashboardGoalsLoading = sliceStateSelector((state) => state.isGoalsLoading)

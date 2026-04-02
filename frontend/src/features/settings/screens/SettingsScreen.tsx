@@ -1,5 +1,5 @@
 import { Grid } from '@mui/material'
-import { BudgetIcon, SecurityIcon, SupportIcon } from '@shared/assets/icons'
+import { BudgetIcon, SecurityIcon } from '@shared/assets/icons'
 import { NotificationIcon } from '@shared/assets/icons/NotificationIcon'
 import { IconButton, ScreenContent } from '@shared/components'
 import { ROUTES } from '@shared/constants/routes'
@@ -26,12 +26,6 @@ export default function SettingsScreen() {
       subtitle: translate('Menu.Notifications.subtitle'),
       path: ROUTES.PAGES.SETTINGS.NOTIFICATIONS,
       Icon: <NotificationIcon />,
-    },
-    {
-      title: translate('Menu.Support.title'),
-      subtitle: translate('Menu.Support.subtitle'),
-      path: ROUTES.PAGES.SETTINGS.SUPPORT,
-      Icon: <SupportIcon />,
     },
   ]
 
