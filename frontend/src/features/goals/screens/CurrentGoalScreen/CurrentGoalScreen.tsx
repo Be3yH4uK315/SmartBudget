@@ -12,7 +12,7 @@ import {
   updateGoalStatus,
 } from '@features/goals/store/currentGoal'
 import { ArrowBackOutlined } from '@mui/icons-material'
-import { IconButton as MUIIconButton, Stack, Typography } from '@mui/material'
+import { IconButton as MUIIconButton, Stack, Typography, useTheme } from '@mui/material'
 import {
   IconButton,
   ScreenBackgroundBlock,
@@ -23,7 +23,7 @@ import { MODAL_IDS, ROUTES } from '@shared/constants'
 import { useTransactionFilters, useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
-import { CenterLabel } from '@shared/types/components'
+import { CenterLabel, PieDataItem } from '@shared/types/components'
 import { mapGoalTransaction } from '@shared/utils'
 import { useNavigate, useParams } from 'react-router'
 import { ActionsButtonsBlock } from './ActionsButtonsBlock'
@@ -36,6 +36,7 @@ export default function GoalScreen() {
   const translate = useTranslate('CurrentGoal')
   const navigate = useNavigate()
   const params = useParams()
+  const theme = useTheme()
 
   const goal = useAppSelector(selectCurrentGoal)
   const isLoading = useAppSelector(selectIsCurrentGoalLoading)
@@ -65,6 +66,11 @@ export default function GoalScreen() {
     type: 'amount',
     total: currentValue,
     label: translate(`TransactionsPieBlock.${activeType}`).toLowerCase(),
+  }
+
+  const remainingValue: PieDataItem = {
+    value: targetValue - currentValue,
+    color: theme.palette.grayButton.dark,
   }
 
   const handleOpenModal = () =>
@@ -132,6 +138,7 @@ export default function GoalScreen() {
               pieData={normalizedData}
               centerLabel={centerLabel}
               toggleFilter={toggleFilter}
+              remainingValue={remainingValue}
             />
 
             {finishDate && (
