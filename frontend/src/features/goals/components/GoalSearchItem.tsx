@@ -22,7 +22,7 @@ export const GoalSearchItem = ({ goal }: Props) => {
   const muiTheme = useMUITheme()
 
   const { goalId, name, targetValue, currentValue, status, isArchived } = goal
-  const hoverColor = theme.colorMode === 'light' ? 'surface.dark' : 'surface.light'
+  const hoverColor = theme.colorMode === 'light' ? 'surface.dark' : 'surface.main'
 
   const { pieColor } = STATUS_STYLES[status](muiTheme)
 
@@ -32,8 +32,8 @@ export const GoalSearchItem = ({ goal }: Props) => {
       paperSx={{
         ':hover': { bgcolor: hoverColor },
         cursor: 'pointer',
-        p: 1,
-        px: 2,
+        p: 2,
+        px: 4,
         borderRadius: '12px',
       }}
       onClick={() => navigate(`${ROUTES.PAGES.GOALS.MAIN}/${goalId}`)}
