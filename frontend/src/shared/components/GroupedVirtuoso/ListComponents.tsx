@@ -14,14 +14,18 @@ export const MUIComponents: GroupedVirtuosoProps<unknown, unknown>['components']
       {...props}
       component="div"
       style={{ ...style }}
-      sx={{ padding: 0, margin: 0, maxWidth: '800px' }}
+      sx={{
+        padding: 0,
+        margin: 0,
+        maxWidth: '800px',
+      }}
     >
       {children}
     </List>
   )),
 
   Item: ({ children, ...props }) => (
-    <ListItem component={'div'} {...props} sx={{ px: 0, py: 0 }}>
+    <ListItem component={'div'} {...props} sx={{ px: 0, py: 1 }}>
       {children}
     </ListItem>
   ),

@@ -1,5 +1,5 @@
 import { BudgetSettings } from '@features/budget/types'
-import { changePasswordApiRequest, Session } from '@features/settings/types'
+import { changePasswordApiRequest, NotificationsSettings, Session } from '@features/settings/types'
 
 const delay = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -25,6 +25,18 @@ let sessionsStore: Session[] = [
 let refreshTokenDuration = 30
 
 const budgetStore: Record<string, BudgetSettings> = {}
+
+let notificationsSettingsStore: NotificationsSettings = {
+  notificationsStatus: true,
+  pushStatus: true,
+
+  goals: true,
+  transactions: true,
+  budget: {
+    totalLimit: true,
+    categoriesLimit: false,
+  },
+}
 
 class SettingsApiMock {
   baseUrl = '/settings'
@@ -92,6 +104,28 @@ class SettingsApiMock {
     const dateKey = new Date().toISOString().slice(0, 7)
 
     budgetStore[dateKey] = payload
+  }
+
+  async getNotificationsSettings(): Promise<NotificationsSettings> {
+    await delay()
+    return { ...notificationsSettingsStore }
+  }
+
+  async changeNotificationsStatus(payload: { status: boolean }): Promise<void> {
+    await delay()
+
+    notificationsSettingsStore.notificationsStatus = payload.status
+  }
+
+  async updateNotificationsSettings(
+    payload: Omit<NotificationsSettings, 'notificationsStatus'>,
+  ): Promise<void> {
+    await delay()
+
+    notificationsSettingsStore = {
+      ...notificationsSettingsStore,
+      ...payload,
+    }
   }
 }
 

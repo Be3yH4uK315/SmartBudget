@@ -33,7 +33,12 @@ export const Toast = ({ type, titleKey, messageKey, onClose }: Props) => {
             }}
           />
         }
-        sx={{ alignItems: 'center' }}
+        sx={{
+          alignItems: 'flex-start',
+          width: '100%',
+          maxWidth: '400px',
+          wordBreak: 'break-word',
+        }}
       >
         <AlertTitle>{translate(titleKey ? titleKey : type)}</AlertTitle>
 

@@ -1,5 +1,5 @@
 import { BudgetSettings } from '@features/budget/types'
-import { changePasswordApiRequest, Session } from '@features/settings/types'
+import { changePasswordApiRequest, NotificationsSettings, Session } from '@features/settings/types'
 import { api } from '@shared/api'
 
 class SettingsApi {
@@ -60,6 +60,29 @@ class SettingsApi {
     const url = `${this.baseUrl}/budget`
 
     const response = await api.patch<void>(url, { payload })
+    return response.data
+  }
+
+  async getNotificationsSettings(): Promise<NotificationsSettings> {
+    const url = `${this.baseUrl}/notifications`
+
+    const response = await api.get<NotificationsSettings>(url)
+    return response.data
+  }
+
+  async changeNotificationsStatus(payload: { status: boolean }): Promise<void> {
+    const url = `${this.baseUrl}/notifications/status`
+
+    const response = await api.patch<void>(url, payload)
+    return response.data
+  }
+
+  async updateNotificationsSettings(
+    payload: Omit<NotificationsSettings, 'notificationsStatus'>,
+  ): Promise<void> {
+    const url = `${this.baseUrl}/notifications/`
+
+    const response = await api.patch<void>(url, payload)
     return response.data
   }
 }

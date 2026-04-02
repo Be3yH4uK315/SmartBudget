@@ -5,6 +5,7 @@ export function getDashboardInitialState(): DashboardSliceState {
     goals: [],
     categories: [],
     budgetLimit: 0,
-    isLoading: true,
+    isGoalsLoading: true,
+    isBudgetLoading: true,
   }
 }

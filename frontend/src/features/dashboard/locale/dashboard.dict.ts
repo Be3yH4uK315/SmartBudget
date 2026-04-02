@@ -24,9 +24,9 @@ export const dashboardDict: LocaleDictionary = {
       },
 
       Buttons: {
-        Profile: {
-          title: 'Профиль',
-          subtitle: 'Данные профиля и уведомления',
+        Notifications: {
+          title: 'Уведомления',
+          subtitle: 'Центр уведомлений',
         },
         Security: {
           title: 'Безопасность',

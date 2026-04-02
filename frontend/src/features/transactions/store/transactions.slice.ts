@@ -1,8 +1,12 @@
 import { PAGE_SIZE } from '@features/transactions/constants/transactionsPage'
-import { TransactionsSliceReducers, TransactionsSliceState } from '@features/transactions/types'
-import { groupByDate, mergeTransactionBlocks } from '@features/transactions/utils'
+import {
+  Transaction,
+  TransactionsSliceReducers,
+  TransactionsSliceState,
+} from '@features/transactions/types'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
+import { groupByDate, mergeDateBlocks } from '@shared/utils'
 import { getTransactionsInitialState } from './transactions.state'
 import { changeCategory, getTransactions } from './transactions.thunks'
 
@@ -36,7 +40,7 @@ export const transactionsSlice = createSlice<
         if (state.transactions.length === 0) {
           state.transactions = blocks
         } else {
-          state.transactions = mergeTransactionBlocks({
+          state.transactions = mergeDateBlocks<Transaction>({
             currentBlocks: state.transactions,
             newBlocks: blocks,
           })
@@ -62,7 +66,7 @@ export const transactionsSlice = createSlice<
         const { categoryId, transactionId } = meta.arg
 
         for (const block of state.transactions) {
-          const transaction = block.transactions.find((t) => t.transactionId === transactionId)
+          const transaction = block.items.find((t) => t.transactionId === transactionId)
           if (transaction) {
             transaction.categoryId = categoryId
             break

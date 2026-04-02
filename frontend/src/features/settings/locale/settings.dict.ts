@@ -5,24 +5,10 @@ export const settingsDict: LocaleDictionary = {
     Settings: {
       title: 'Настройки',
 
-      RefreshDuration: {
-        title: 'Автоматически завершать сессию',
-        subtitle: 'Если сессия не активна:',
-        week: 'Неделю',
-        oneMonth: '1 месяц',
-        threeMonth: '3 месяца',
-        sixMonth: '6 месяцев',
-      },
-
       Menu: {
         Security: {
           title: 'Безопасность',
           subtitle: 'Пароль и активные сессии',
-        },
-
-        Support: {
-          title: 'Обращения',
-          subtitle: 'Ваши обращения в поддержку',
         },
 
         Notifications: {
@@ -50,6 +36,15 @@ export const settingsDict: LocaleDictionary = {
             confirmPassword: 'Подтвердите пароль',
             passwordsNotMatch: 'Пароли не совпадают',
           },
+        },
+
+        RefreshDuration: {
+          title: 'Автоматически завершать сессию',
+          subtitle: 'Если сессия не активна:',
+          week: 'Неделю',
+          oneMonth: '1 месяц',
+          threeMonth: '3 месяца',
+          sixMonth: '6 месяцев',
         },
 
         Sessions: {
@@ -83,6 +78,36 @@ export const settingsDict: LocaleDictionary = {
           next: 'Следующий',
         },
       },
+
+      Notifications: {
+        title: 'Настройки уведомлений',
+        notificationsStatus: {
+          title: 'Допуск уведомлений',
+          subtitle: 'Разрешить отправку уведомлений (Отображаются в разделе "Уведомления")',
+        },
+
+        pushNotifications: {
+          title: 'Push-уведомления',
+          subtitle: 'Разрешить отправку push-уведомлений',
+        },
+
+        goals: {
+          title: 'Цели',
+          subtitle: 'Уведомлять о достижении цели, дедлайнах, и прочих действиях',
+        },
+
+        transactions: {
+          title: 'Операции',
+          subtitle:
+            'Уведомлять о смене категорий, обнаружении неклассифицированных операциях и т.д.',
+        },
+
+        budget: {
+          title: 'Бюджет и категории',
+          totalLimit: 'Уведомлять о превышении лимита бюджета',
+          categoriesLimit: 'Уведомлять о превышении лимита категорий',
+        },
+      },
     },
   },
 
@@ -94,11 +119,6 @@ export const settingsDict: LocaleDictionary = {
         Security: {
           title: 'Security',
           subtitle: 'Password and active sessions',
-        },
-
-        Support: {
-          title: 'Support',
-          subtitle: 'Your tickets',
         },
 
         Notifications: {
@@ -128,6 +148,15 @@ export const settingsDict: LocaleDictionary = {
           },
         },
 
+        RefreshDuration: {
+          title: 'Automatically logout',
+          subtitle: 'If session non-active:',
+          week: 'A week',
+          oneMonth: '1 month',
+          threeMonth: '3 months',
+          sixMonth: '6 months',
+        },
+
         Sessions: {
           title: 'Active sessions',
           current: 'Current session',
@@ -138,6 +167,8 @@ export const settingsDict: LocaleDictionary = {
         title: 'Security settings',
         deleteOtherSessions: 'Revoke other sessions',
       },
+
+      Budget: {},
     },
   },
 }

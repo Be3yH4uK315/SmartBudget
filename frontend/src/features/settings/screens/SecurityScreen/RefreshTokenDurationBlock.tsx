@@ -13,7 +13,7 @@ import { useAppDispatch, useAppSelector } from '@shared/store'
 
 export const RefreshTokenDurationBlock = () => {
   const dispatch = useAppDispatch()
-  const translate = useTranslate('Settings.RefreshDuration')
+  const translate = useTranslate('Settings.Security.RefreshDuration')
 
   const checkedDuration = useAppSelector(selectRefreshTokenDuration)
   const isLoading = useAppSelector(selectIsRefreshLoading)

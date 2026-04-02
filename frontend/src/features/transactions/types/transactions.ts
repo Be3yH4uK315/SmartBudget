@@ -36,7 +36,7 @@ export type ChangeCategoryRequest = {
 
 export type TransactionsBlock = {
   date: string
-  transactions: Transaction[]
+  items: Transaction[]
 }
 
 export type TransactionsFilters = {
