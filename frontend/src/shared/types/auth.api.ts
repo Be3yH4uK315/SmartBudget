@@ -35,7 +35,7 @@ export type CompleteRegistration = {
   token: string
   password: string
   name: string
-  country: string
+  language: string
 }
 
 export type Login = {
