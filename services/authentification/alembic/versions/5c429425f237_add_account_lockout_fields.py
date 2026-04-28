@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -21,7 +20,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Добавляем флаг блокировки аккаунта
-    op.add_column('users', sa.Column('is_locked', sa.Boolean(), nullable=False))
+    op.add_column(
+        'users',
+        sa.Column(
+            'is_locked',
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
+    )
+    op.alter_column('users', 'is_locked', server_default=None)
     
     # Добавляем время окончания блокировки
     op.add_column('users', sa.Column('locked_until', sa.DateTime(timezone=True), nullable=True))

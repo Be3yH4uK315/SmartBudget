@@ -1,6 +1,6 @@
 from app.infrastructure.db import models
 from app.domain.schemas.dtos import UserDTO
-from app.domain.schemas.api import Gender, UserRole
+from app.domain.schemas.api import Gender, Language, UserRole
 
 def user_to_dto(user: models.User) -> UserDTO:
     """Безопасный mapper ORM → DTO."""
@@ -8,7 +8,7 @@ def user_to_dto(user: models.User) -> UserDTO:
         user_id=user.user_id,
         email=user.email,
         name=user.name,
-        country=user.country,
+        language=Language(user.language),
         role=UserRole(user.role),
         gender=Gender(user.gender) if user.gender else None,
         is_active=user.is_active,

@@ -19,8 +19,8 @@ class User(Base):
     email = Column(String(255), nullable=False)
     password_hash = Column(String, nullable=False)
     name = Column(String(255), nullable=False)
-    country = Column(String(100), nullable=False)
-    gender = Column(String(20), nullable=False) 
+    language = Column(String(2), nullable=False)
+    gender = Column(String(20), nullable=True)
     retention_days = Column(Integer, default=30, nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
     is_locked = Column(Boolean, default=False, nullable=False)
@@ -49,6 +49,10 @@ class User(Base):
             f"role IN ({', '.join(str(r.value) for r in schemas.UserRole)})",
             name="ck_users_role_allowed",
         ),
+        CheckConstraint(
+            "language IN ('ru', 'en')",
+            name="ck_users_language_allowed",
+        ),
     )
 
     @validates("email")
@@ -63,11 +67,11 @@ class User(Base):
             raise ValueError("Name must be at least 2 characters")
         return value.strip()
 
-    @validates("country")
-    def validate_country(self, _, value: str) -> str:
-        if not value:
-            raise ValueError("Country is required")
-        return value.strip()
+    @validates("language")
+    def validate_language(self, _, value: str) -> str:
+        if value not in {lang.value for lang in schemas.Language}:
+            raise ValueError("Language must be one of: ru, en")
+        return value
 
 
 class Session(Base):

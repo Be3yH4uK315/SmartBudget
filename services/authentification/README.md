@@ -309,7 +309,7 @@ Body: {
   "token": "xxx",
   "password": "SecurePass123!",
   "name": "John Doe",
-  "country": "Russia"
+  "language": "en"
 }
 Response: { "status": "success", "action": "complete_registration" }
 ```
@@ -370,6 +370,11 @@ GET /api/v1/auth/me
 Получить информацию о текущем пользователе
 Headers: Authorization: Bearer {access_token}
 Response: { "id": "uuid", "email": "...", "name": "...", "role": 0 }
+
+PATCH /api/v1/auth/language
+Обновить язык интерфейса пользователя
+Body: { "language": "ru" }
+Allowed values: "ru", "en"
 
 GET /api/v1/auth/sessions
 Получить список всех активных сессий пользователя

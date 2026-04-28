@@ -54,6 +54,14 @@ class UserRepository(BaseRepository):
             .values(retention_days=days, updated_at=time.utc_now())
         )
 
+    async def update_language(self, user_id: UUID, language: str) -> None:
+        """Обновляет язык интерфейса пользователя."""
+        await self.db.execute(
+            update(models.User)
+            .where(models.User.user_id == user_id)
+            .values(language=language, updated_at=time.utc_now())
+        )
+
     async def update_profile_data(self, user_id: UUID, name: str | None, gender: str | None) -> None:
         """Обновляет основные данные профиля."""
         values = {"updated_at": time.utc_now()}

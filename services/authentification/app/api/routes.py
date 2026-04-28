@@ -266,6 +266,20 @@ async def update_profile(
     await profile_service.update_profile(user.user_id, body)
     return schemas.UnifiedResponse(status="success", action="updateProfile", detail="Profile updated successfully.")
 
+@router.patch(
+    "/language",
+    status_code=200,
+    response_model=schemas.UnifiedResponse,
+    summary="Обновление языка интерфейса пользователя"
+)
+async def update_language(
+    body: schemas.UpdateLanguageRequest = Body(...),
+    profile_service: ProfileService = Depends(dependencies.get_profile_service),
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+):
+    await profile_service.update_language(user.user_id, body)
+    return schemas.UnifiedResponse(status="success", action="updateLanguage", detail="Language updated successfully.")
+
 @router.post(
     "/me/email/request", 
     status_code=200, 

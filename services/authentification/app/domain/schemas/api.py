@@ -1,6 +1,6 @@
 from enum import Enum, IntEnum
 from pydantic import Field, EmailStr
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 from uuid import UUID
 
@@ -16,6 +16,10 @@ class Gender(str, Enum):
     MALE = "male"
     FEMALE = "female"
 
+class Language(str, Enum):
+    RU = "ru"
+    EN = "en"
+
 class VerifyEmailRequest(CamelModel):
     email: EmailStr = Field(..., description="Email для верификации")
 
@@ -25,8 +29,8 @@ class VerifyLinkRequest(CamelModel):
 class CompleteRegistrationRequest(CamelModel):
     email: EmailStr = Field(..., description="Email пользователя")
     name: str = Field(..., max_length=255, description="Имя пользователя")
-    gender: Gender = Field(None, description="Пол пользователя")
-    country: str = Field(..., description="Страна")
+    gender: Optional[Gender] = Field(None, description="Пол пользователя")
+    language: Language = Field(..., description="Язык интерфейса")
     token: str = Field(..., description="Токен верификации")
     password: str = Field(..., min_length=8, description="Пароль")
 
@@ -50,11 +54,14 @@ class TokenValidateRequest(CamelModel):
     token: str = Field(..., description="JWT токен")
 
 class UpdateRetentionRequest(CamelModel):
-    days: int = Field(..., description="Новый срок жизни сессий (7, 30, 90, 180)")
+    days: Literal[7, 30, 90, 180] = Field(..., description="Новый срок жизни сессий (7, 30, 90, 180)")
 
 class UpdateProfileRequest(CamelModel):
     name: str = Field(..., min_length=2, max_length=255, description="Новое имя")
     gender: Optional[Gender] = Field(None, description="Пол пользователя")
+
+class UpdateLanguageRequest(CamelModel):
+    language: Language = Field(..., description="Язык интерфейса")
 
 class InitiateEmailChangeRequest(CamelModel):
     new_email: EmailStr = Field(..., description="Новый email")
@@ -72,7 +79,7 @@ class UserInfo(CamelModel):
     user_id: UUID = Field(..., description="ID пользователя")
     email: EmailStr = Field(..., description="Email")
     name: str = Field(..., description="Имя")
-    country: str = Field(..., description="Страна")
+    language: Language = Field(..., description="Язык интерфейса")
     role: UserRole = Field(..., description="Роль")
     last_login: Optional[datetime] = Field(None, description="Дата последнего входа")
     retention_days: int = Field(..., description="Настройка срока жизни сессии")

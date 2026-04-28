@@ -3,15 +3,15 @@ from datetime import datetime
 from typing import Optional
 
 from app.core.schemas import CamelModel
-from app.domain.schemas.api import Gender, UserRole
+from app.domain.schemas.api import Gender, Language, UserRole
 
 class UserDTO(CamelModel):
     user_id: UUID
     email: str
     name: str
-    country: str
+    language: Language
     role: UserRole
-    gender: Gender = None
+    gender: Optional[Gender] = None
     is_active: bool
     last_login: Optional[datetime]
     retention_days: int
@@ -31,4 +31,3 @@ class SessionDTO(CamelModel):
     last_activity: datetime
     expires_at: datetime
     created_at: datetime
-
