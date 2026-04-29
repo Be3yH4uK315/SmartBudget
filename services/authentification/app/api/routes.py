@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response, status
 from fastapi.responses import ORJSONResponse
 from fastapi_limiter.depends import RateLimiter
+from redis.asyncio import Redis
 from functools import lru_cache
 from sqlalchemy import text
 
@@ -42,7 +43,6 @@ async def readiness_check(request: Request) -> Response:
         "db": "unknown",
         "redis": "unknown",
         "arq": "unknown",
-        "kafka": "unknown",
     }
     has_error = False
 
@@ -71,19 +71,16 @@ async def readiness_check(request: Request) -> Response:
             health_status["arq"] = "failed"
             has_error = True
 
-    kafka_producer = getattr(app.state, "kafka_producer", None)
-    if not kafka_producer:
-        health_status["kafka"] = "disconnected"
+    redis_pool = getattr(app.state, "redis_pool", None)
+    if not redis_pool:
+        health_status["redis"] = "disconnected"
         has_error = True
     else:
         try:
-            if kafka_producer._is_running:
-                health_status["kafka"] = "ok"
-            else:
-                health_status["kafka"] = "not_running"
-                has_error = True
+            await Redis(connection_pool=redis_pool).ping()
+            health_status["redis"] = "ok"
         except Exception:
-            health_status["kafka"] = "failed"
+            health_status["redis"] = "failed"
             has_error = True
 
     if has_error:
