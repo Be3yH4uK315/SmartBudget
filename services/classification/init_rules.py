@@ -3,7 +3,7 @@ import logging
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from app import settings
+from app.core.config import settings
 from app.infrastructure.db import models
 
 logging.basicConfig(level=logging.INFO)
@@ -99,7 +99,7 @@ MCC_GENERIC = {
 
 async def init_all_rules():
     """Инициализирует все правила в БД."""
-    engine = create_async_engine(settings.settings.DB.DB_URL)
+    engine = create_async_engine(settings.DB.DB_URL)
     db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async with db_session_maker() as session:

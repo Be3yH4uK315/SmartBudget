@@ -1,6 +1,9 @@
 import asyncio
 import logging
-from uuid import UUID
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any
+from uuid import NAMESPACE_URL, UUID, uuid5
 from redis.asyncio import Redis
 
 from app.core.config import settings
@@ -13,6 +16,34 @@ from app.services.ml.pipeline import MLPipeline
 from app.services.classification.rules import ruleManager
 
 logger = logging.getLogger(__name__)
+
+UNCATEGORIZED_CATEGORY_ID = 1
+
+
+def _notification_event_id(event_name: str, key: UUID | str) -> UUID:
+    return uuid5(NAMESPACE_URL, f"smartbudget:notifications:{event_name}:{key}")
+
+
+def _notification_event(
+    event_name: str,
+    user_id: UUID,
+    payload: dict[str, Any],
+    event_id: UUID,
+) -> dict[str, Any]:
+    return {
+        "eventId": str(event_id),
+        "eventName": event_name,
+        "userId": str(user_id),
+        "payload": payload,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _decimal_to_float(value: Decimal | int | float | None) -> float:
+    if value is None:
+        return 0.0
+    return float(value)
+
 
 class ClassificationService:
     """Сервис классификации."""
@@ -80,7 +111,7 @@ class ClassificationService:
 
             results_data = await asyncio.gather(*[_classify(ev) for ev in new_events])
             
-            for res_model, outbox_data in results_data:
+            for res_model, outbox_data, notification_event in results_data:
                 await self.uow.results.upsert(res_model)
                 
                 self.uow.outbox.add_event(
@@ -88,6 +119,12 @@ class ClassificationService:
                     outbox_data, 
                     "transaction.classified"
                 )
+                if notification_event:
+                    self.uow.outbox.add_event(
+                        settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
+                        notification_event,
+                        notification_event["eventName"],
+                    )
                 
                 resp = api_schemas.CategorizationResultResponse(
                     transaction_id=res_model.transaction_id,
@@ -131,8 +168,8 @@ class ClassificationService:
                     final_ver = ml_ver
 
         if final_cat_id is None:
-            other = await self.uow.categories.get_by_id(1)
-            final_cat_id = 1
+            other = await self.uow.categories.get_by_id(UNCATEGORIZED_CATEGORY_ID)
+            final_cat_id = UNCATEGORIZED_CATEGORY_ID
             final_cat_name = other.name if other else "Other"
             final_source = ClassificationSource.RULES
             final_conf = 0.0
@@ -154,8 +191,24 @@ class ClassificationService:
             "category_id": final_cat_id,
             "category_name": final_cat_name
         }
+
+        notification_event = None
+        if (
+            final_cat_id == UNCATEGORIZED_CATEGORY_ID
+            and final_conf == 0.0
+            and event.user_id
+        ):
+            notification_event = _notification_event(
+                "transaction.unclassified.found",
+                event.user_id,
+                {"value": _decimal_to_float(event.value)},
+                event_id=_notification_event_id(
+                    "transaction.unclassified.found",
+                    event.transaction_id,
+                ),
+            )
         
-        return result, outbox_data
+        return result, outbox_data, notification_event
     
     async def get_classification(self, tx_id: UUID) -> api_schemas.CategorizationResultResponse:
         """Получает результат классификации по ID транзакции."""
@@ -168,11 +221,11 @@ class ClassificationService:
             if not res:
                 raise ClassificationResultNotFoundError("Not found")
             
-            resp = api_schemas.CategorizationResultResponse.from_orm(res)
+            resp = api_schemas.CategorizationResultResponse.model_validate(res)
             await self.redis.set(cache_key, resp.model_dump_json(), ex=3600)
             return resp
     
-    async def submit_feedback(self, body: api_schemas.FeedbackRequest) -> tuple[dict, Category]:
+    async def submit_feedback(self, body: api_schemas.FeedbackRequest) -> tuple[dict, Category, dict[str, Any] | None]:
         """Обрабатывает обратную связь пользователя."""
         async with self.uow:
             existing = await self.uow.results.get_by_transaction_id(body.transaction_id)
@@ -191,6 +244,7 @@ class ClassificationService:
             )
             self.uow.feedback.create(feedback)
 
+            old_category_id = existing.category_id
             old_name = existing.category_name
             existing.source = ClassificationSource.MANUAL
             existing.category_id = body.correct_category_id
@@ -210,9 +264,30 @@ class ClassificationService:
                 "transaction.updated"
             )
 
+            notification_event = None
+            if body.user_id:
+                notification_event = _notification_event(
+                    "transaction.category.changed",
+                    body.user_id,
+                    {
+                        "transactionId": str(body.transaction_id),
+                        "oldCategory": old_category_id,
+                        "newCategory": body.correct_category_id,
+                    },
+                    event_id=_notification_event_id(
+                        "transaction.category.changed",
+                        f"{body.transaction_id}:{old_category_id}:{body.correct_category_id}",
+                    ),
+                )
+                self.uow.outbox.add_event(
+                    settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
+                    notification_event,
+                    notification_event["eventName"],
+                )
+
             await self.redis.delete(f"classification:{body.transaction_id}")
             
-            return event_data, correct_cat
+            return event_data, correct_cat, notification_event
     
     async def classify_transaction(self, event: TransactionNeedCategoryEvent) -> None:
         """Обработка одной транзакции. Вызывается из потребителя Kafka."""
@@ -220,7 +295,7 @@ class ClassificationService:
         if existing:
             return
 
-        result_model, outbox_payload = await self._calculate_classification(event)
+        result_model, outbox_payload, notification_event = await self._calculate_classification(event)
         
         await self.uow.results.upsert(result_model)
         
@@ -229,6 +304,12 @@ class ClassificationService:
             outbox_payload, 
             "transaction.classified"
         )
+        if notification_event:
+            self.uow.outbox.add_event(
+                settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
+                notification_event,
+                notification_event["eventName"],
+            )
         
         resp = api_schemas.CategorizationResultResponse(
             transaction_id=result_model.transaction_id,

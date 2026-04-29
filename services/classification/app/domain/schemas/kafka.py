@@ -1,14 +1,19 @@
 from datetime import datetime
-from pydantic import BaseModel
+from decimal import Decimal
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from typing import Optional
 from uuid import UUID
 
 class TransactionNeedCategoryEvent(BaseModel):
-    transaction_id: UUID
-    account_id: Optional[UUID] = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    transaction_id: UUID = Field(validation_alias=AliasChoices("transaction_id", "transactionId"))
+    user_id: Optional[UUID] = Field(default=None, validation_alias=AliasChoices("user_id", "userId"))
+    account_id: Optional[UUID] = Field(default=None, validation_alias=AliasChoices("account_id", "accountId"))
     merchant: str
     mcc: Optional[int] = None
     description: Optional[str] = None
+    value: Optional[Decimal] = None
 
 class ClassificationClassifiedEvent(BaseModel):
     transaction_id: UUID

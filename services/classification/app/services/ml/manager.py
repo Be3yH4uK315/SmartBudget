@@ -64,6 +64,7 @@ class ModelManager:
                         if self._artifacts:
                             logger.warning("No active model in DB. Unloading current.")
                             self._artifacts = None
+                        self.last_check = now
                         return
 
                     current_ver = self._artifacts.version if self._artifacts else None

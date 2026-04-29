@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '03965c515779001'
-down_revision: Union[str, Sequence[str], None] = "8bd009546353"
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -118,7 +118,7 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('training_dataset_id')
     )
-    op.create_index('ix_training_datasets_status_created', 'training_datasets', ['created_at', 'status'], unique=False, postgresql_where=sa.text("status = 'ready'"))
+    op.create_index('ix_training_datasets_status_created', 'training_datasets', ['created_at', 'status'], unique=False, postgresql_where=sa.text("status = 'READY'"))
     op.create_index('ix_training_datasets_version', 'training_datasets', ['version'], unique=True)
     op.execute("""
     INSERT INTO categories (category_id, name, description, keywords) VALUES

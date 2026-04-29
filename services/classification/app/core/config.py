@@ -17,6 +17,8 @@ class KafkaSettings(BaseSettings):
     TOPIC_CLASSIFIED: str
     TOPIC_UPDATED: str
     TOPIC_CLASSIFICATION_EVENTS: str
+    TOPIC_NOTIFICATION_EVENTS: str = "notification.events"
+    TOPIC_NEED_CATEGORY_DLQ: str = "classification.dlq"
 
 class MLSettings(BaseSettings):
     MODEL_PATH: str

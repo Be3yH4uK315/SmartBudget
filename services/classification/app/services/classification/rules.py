@@ -34,7 +34,7 @@ class RuleManager:
     async def check_for_updates(self, db_session_maker):
         """Проверяет и обновляет правила, если прошло достаточно времени."""
         now = datetime.now()
-        if (now - self.last_check).total_seconds() < self.update_interval_seconds and self._mcc_rules:
+        if (now - self.last_check).total_seconds() < self.update_interval_seconds:
             return
 
         try:

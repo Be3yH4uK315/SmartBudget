@@ -120,7 +120,7 @@ async def process_batch(
 
                 try:
                     success = await dlq_producer.send_event(
-                        topic=f"{message.topic}.dlq",
+                        topic=settings.KAFKA.TOPIC_NEED_CATEGORY_DLQ,
                         value=message.value,
                         key=message.key,
                         headers=headers,
