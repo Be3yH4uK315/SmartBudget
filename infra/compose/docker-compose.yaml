@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api_gateway:
     image: nginx:alpine
@@ -14,6 +12,8 @@ services:
       class_service:
         condition: service_healthy
       goals_service:
+        condition: service_healthy
+      notification_service:
         condition: service_healthy
     networks:
       - smartbudget-net
@@ -63,8 +63,10 @@ services:
         condition: service_healthy
     environment:
       KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
+      KAFKA_LISTENERS: ${KAFKA_LISTENERS}
       KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
@@ -126,7 +128,7 @@ services:
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
       "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/auth/health/ready"]
       interval: 10s
       retries: 3
       timeout: 5s
@@ -150,7 +152,7 @@ services:
       - ../../services/authentification:/app
       - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
-    command: arq app.worker.WorkerSettings
+    command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
@@ -231,7 +233,7 @@ services:
     command: arq app.worker.WorkerSettings
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      test: ["CMD", "python", "-c", "from app.worker import WorkerSettings; print(WorkerSettings.redis_settings.queue_name)"]
       interval: 30s
       retries: 3
       start_period: 30s
@@ -258,55 +260,55 @@ services:
     command: python run_consumers.py
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      test: ["CMD", "python", "-c", "from app import settings; print(settings.settings.kafka.topic_need_category)"]
       interval: 30s
       retries: 3
       start_period: 30s
     networks:
       - smartbudget-net
 
-  transactions_postgres:
-    image: postgres:16
-    container_name: transactions_postgres
-    environment:
-      POSTGRES_USER: ${TRANS_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${TRANS_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${TRANS_POSTGRES_DB}
-    ports:
-      - "5435:5432"
-    volumes:
-      - pg_data_transactions:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      retries: 10
-      timeout: 5s
-    networks:
-      - smartbudget-net
+  # transactions_postgres:
+  #   image: postgres:16
+  #   container_name: transactions_postgres
+  #   environment:
+  #     POSTGRES_USER: ${TRANS_POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${TRANS_POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${TRANS_POSTGRES_DB}
+  #   ports:
+  #     - "5435:5432"
+  #   volumes:
+  #     - pg_data_transactions:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 5s
+  #     retries: 10
+  #     timeout: 5s
+  #   networks:
+  #     - smartbudget-net
 
-  transactions:
-    build:
-      context: ../../services/transactions/SmartBudget.transactions/
-      dockerfile: Dockerfile
-    container_name: transactions
-    environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
-      ASPNETCORE_URLS: ${ASPNETCORE_URLS}
-      DATABASE_DSN: ${DATABASE_DSN}
-      KAFKA_BOOTSTRAP_SERVERS: ${TRANSACTION_KAFKA_BOOTSTRAP_SERVERS}
-      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
-      USERS_ACTIVE_TOPIC: ${USERS_ACTIVE_TOPIC}
-      TRANSACTION_CLASSIFIED_TOPIC: ${TRANSACTION_CLASSIFIED_TOPIC}
-      BANK_POLL_INTERVAL: ${BANK_POLL_INTERVAL}
-    ports:
-      - "8082:8080"
-    depends_on:
-      transactions_postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    networks:
-      - smartbudget-net
+  # transactions:
+  #   build:
+  #     context: ../../services/transactions/SmartBudget.transactions/
+  #     dockerfile: Dockerfile
+  #   container_name: transactions
+  #   environment:
+  #     ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+  #     ASPNETCORE_URLS: ${ASPNETCORE_URLS}
+  #     DATABASE_DSN: ${DATABASE_DSN}
+  #     KAFKA_BOOTSTRAP_SERVERS: ${TRANSACTION_KAFKA_BOOTSTRAP_SERVERS}
+  #     KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
+  #     USERS_ACTIVE_TOPIC: ${USERS_ACTIVE_TOPIC}
+  #     TRANSACTION_CLASSIFIED_TOPIC: ${TRANSACTION_CLASSIFIED_TOPIC}
+  #     BANK_POLL_INTERVAL: ${BANK_POLL_INTERVAL}
+  #   ports:
+  #     - "8082:8080"
+  #   depends_on:
+  #     transactions_postgres:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #   networks:
+  #     - smartbudget-net
 
   goals_postgres:
     image: postgres:16
@@ -353,7 +355,7 @@ services:
         gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
       "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/goals/health/ready"]
       interval: 10s
       retries: 3
       timeout: 5s
@@ -375,7 +377,7 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
-    command: arq app.worker.WorkerSettings
+    command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
@@ -399,7 +401,107 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
-    command: python run_consumer.py
+    command: python -m app.run_consumer
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+
+  notification_postgres:
+    image: postgres:16
+    env_file:
+      - ../../infra/.env
+    container_name: notification_postgres
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_POSTGRES_DB}
+    ports:
+      - "5437:5432"
+    volumes:
+      - pg_data_notification:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  notification_service:
+    build:
+      context: ../../services/notifications/
+    env_file:
+      - ../../services/notifications/.env
+    container_name: notification_service
+    ports:
+      - "8003:8000"
+    depends_on:
+      notification_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/notifications:/app
+    restart: unless-stopped
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/notifications/health/ready"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  notification_worker:
+    build:
+      context: ../../services/notifications/
+    env_file:
+      - ../../services/notifications/.env
+    container_name: notification_worker
+    depends_on:
+      notification_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/notifications:/app
+    command: arq app.workers.main.WorkerSettings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+
+  notification_consumer:
+    build:
+      context: ../../services/notifications/
+    env_file:
+      - ../../services/notifications/.env
+    container_name: notification_consumer
+    depends_on:
+      notification_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/notifications:/app
+    command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
@@ -412,7 +514,8 @@ volumes:
   pg_data_auth:
   pg_data_class:
   pg_data_goals:
-  pg_data_transactions:
+  # pg_data_transactions:
+  pg_data_notification:
   geoip_data:
   models_data:
   datasets_data:
