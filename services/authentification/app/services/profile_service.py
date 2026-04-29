@@ -56,7 +56,40 @@ class ProfileService:
             
             await self.uow.refresh(user)
             user_dto = user_to_dto(user)
-            await self.notifier.notify_profile_updated(str(user_id))
+            await self.notifier.notify_profile_updated(
+                str(user_id),
+                email=user_dto.email,
+                language=user_dto.language.value,
+            )
+            await self.uow.commit()
+
+        await self.session_service.invalidate_user_cache(user_id)
+        await self.session_service.cache_user_data(user_dto)
+
+        return user_dto
+
+    async def update_language(
+        self,
+        user_id: UUID,
+        body: api_schemas.UpdateLanguageRequest
+    ) -> UserDTO:
+        """Обновление языка интерфейса."""
+        async with self.uow:
+            user = await self.uow.users.get_by_id(user_id)
+            if not user:
+                raise exceptions.UserNotFoundError("User not found")
+
+            if user.language == body.language.value:
+                return user_to_dto(user)
+
+            await self.uow.users.update_language(user_id, body.language.value)
+            await self.uow.refresh(user)
+            user_dto = user_to_dto(user)
+            await self.notifier.notify_profile_updated(
+                str(user_id),
+                email=user_dto.email,
+                language=user_dto.language.value,
+            )
             await self.uow.commit()
 
         await self.session_service.invalidate_user_cache(user_id)

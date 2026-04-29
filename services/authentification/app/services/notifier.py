@@ -105,6 +105,7 @@ class AuthNotifier:
             k_schemas.AuthEventTypes.USER_REGISTERED,
             user_id=str(user.user_id),
             email=user.email,
+            language=user.language.value,
             name=user.name,
             ip=ip,
             location=location,
@@ -196,12 +197,20 @@ class AuthNotifier:
             session_id=session_id,
         )
 
-    async def notify_profile_updated(self, user_id: str) -> None:
+    async def notify_profile_updated(
+        self,
+        user_id: str,
+        email: str | None = None,
+        language: str | None = None,
+    ) -> None:
         """Событие: обновление профиля пользователя."""
-        await self._save_event(
-            k_schemas.AuthEventTypes.PROFILE_UPDATED,
-            user_id=user_id
-        )
+        payload = {"user_id": user_id}
+        if email:
+            payload["email"] = email
+        if language:
+            payload["language"] = language
+
+        await self._save_event(k_schemas.AuthEventTypes.PROFILE_UPDATED, **payload)
 
     async def notify_email_changed(self, user_id: str, old_email: str, new_email: str) -> None:
         """Событие: смена email пользователя."""

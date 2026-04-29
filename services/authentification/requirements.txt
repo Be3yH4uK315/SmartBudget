@@ -33,4 +33,4 @@ pydantic-settings>=2.2.1
 
 # --- Monitoring & Limiting ---
 prometheus-fastapi-instrumentator>=7.0.0
-fastapi-limiter>=0.1.6
+fastapi-limiter==0.1.6

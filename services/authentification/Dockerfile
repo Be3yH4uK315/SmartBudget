@@ -42,5 +42,6 @@ USER appuser
 
 ENV PYTHONPATH=/app
 ENV PATH="/home/appuser/.local/bin:$PATH"
+ENV HOME=/tmp
 
 CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]
