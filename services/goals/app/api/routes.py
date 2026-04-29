@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, status
 from fastapi.responses import ORJSONResponse
@@ -90,17 +90,6 @@ async def get_main_goals(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.get_main_goals(user_id)
-
-@router.get(
-    "/dashboard",
-    response_model=List[schemas.DashboardGoalResponse],
-    summary="Получение целей для dashboard",
-)
-async def get_dashboard_goals(
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: GoalService = Depends(dependencies.get_goal_service),
-):
-    return await service.get_dashboard_goals(user_id)
 
 @router.get(
     "/",

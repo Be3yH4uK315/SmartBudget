@@ -42,6 +42,7 @@ async def readiness_check(request: Request) -> Response:
         has_error = True
     else:
         try:
+            await arq_pool.ping()
             health_status["arq"] = "ok"
         except Exception:
             health_status["arq"] = "failed"
@@ -62,12 +63,6 @@ async def readiness_check(request: Request) -> Response:
     response_model=list[schemas.NotificationResponse],
     response_model_exclude_none=True,
     summary="Получить список уведомлений",
-)
-@router.get(
-    "/",
-    response_model=list[schemas.NotificationResponse],
-    response_model_exclude_none=True,
-    include_in_schema=False,
 )
 async def get_notifications(
     is_read: Optional[bool] = Query(None, description="Фильтр по статусу прочтения"),
@@ -163,7 +158,6 @@ async def unsubscribe_push(
 
 
 @router.patch("", summary="Отметить все уведомления пользователя прочитанными")
-@router.patch("/", include_in_schema=False)
 async def mark_all_as_read_by_contract(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -183,12 +177,20 @@ async def mark_as_read_by_contract(
 # --- WEBSOCKETS ---
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = Query(..., description="JWT Токен или ID юзера")):
+async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(None, description="User ID для локального dev-доступа")):
     """
     WebSocket для real-time уведомлений (колокольчика).
     """
-    # TODO: Здесь интеграция с verify_token. Пока считаем токен == user_id.
-    user_id = token 
+    user_id = websocket.headers.get("x-user-id")
+    if not user_id and token:
+        try:
+            user_id = str(UUID(token))
+        except ValueError:
+            user_id = None
+
+    if not user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
     
     await ws_manager.connect(websocket, user_id)
     try:

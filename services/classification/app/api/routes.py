@@ -1,6 +1,8 @@
 import logging
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Body, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Body, Path, Request, Response, status
+from fastapi.responses import ORJSONResponse
+from redis.asyncio import Redis
 from sqlalchemy import text
 
 from app.core.exceptions import ClassificationResultNotFoundError, CategoryNotFoundError
@@ -11,48 +13,81 @@ from app.services.classification.service import ClassificationService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.get("/health", response_model=schemas.HealthResponse)
-async def health_check(request: Request):
-    """Проверка здоровья."""
-    health = {"db": "unknown", "redis": "unknown"}
-    status = "healthy"
-    code = 200
+async def _collect_readiness_components(request: Request) -> tuple[dict[str, str], bool]:
+    app = request.app
+    health_status = {
+        "db": "unknown",
+        "redis": "unknown",
+        "arq": "unknown",
+    }
+    has_error = False
 
-    try:
-        if getattr(request.app.state, "engine", None):
-            async with request.app.state.engine.connect() as conn:
+    engine = getattr(app.state, "engine", None)
+    if not engine:
+        health_status["db"] = "disconnected"
+        has_error = True
+    else:
+        try:
+            async with engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
-            health["db"] = "ok"
-        else:
-            health["db"] = "disconnected"
-            status = "unhealthy"
-            code = 503
-    except Exception as e:
-        health["db"] = f"error: {str(e)}"
-        status = "unhealthy"
-        code = 503
+            health_status["db"] = "ok"
+        except Exception:
+            health_status["db"] = "failed"
+            has_error = True
 
-    try:
-        pool = getattr(request.app.state, "redis_pool", None)
-        if pool:
-            import redis.asyncio as aioredis
-            r = aioredis.Redis(connection_pool=pool)
-            await r.ping()
-            await r.aclose()
-            health["redis"] = "ok"
-        else:
-            health["redis"] = "disconnected"
-            status = "unhealthy"
-            code = 503
-    except Exception as e:
-        health["redis"] = f"error: {str(e)}"
-        status = "unhealthy"
-        code = 503
+    redis_pool = getattr(app.state, "redis_pool", None)
+    if not redis_pool:
+        health_status["redis"] = "disconnected"
+        has_error = True
+    else:
+        redis_client = Redis(connection_pool=redis_pool)
+        try:
+            await redis_client.ping()
+            health_status["redis"] = "ok"
+        except Exception:
+            health_status["redis"] = "failed"
+            has_error = True
+        finally:
+            await redis_client.aclose(close_connection_pool=False)
 
-    if code != 200:
-        raise HTTPException(status_code=code, detail={"status": status, "details": health})
-    
-    return schemas.HealthResponse(status=status, details=health)
+    arq_pool = getattr(app.state, "arq_pool", None)
+    if not arq_pool:
+        health_status["arq"] = "disconnected"
+        has_error = True
+    else:
+        try:
+            await arq_pool.ping()
+            health_status["arq"] = "ok"
+        except Exception:
+            health_status["arq"] = "failed"
+            has_error = True
+
+    return health_status, has_error
+
+@router.get(
+    "/health/live",
+    status_code=status.HTTP_200_OK,
+    summary="Liveness probe",
+)
+async def liveness_check() -> dict[str, str]:
+    """Легкая проверка."""
+    return {"status": "ok"}
+
+@router.get(
+    "/health/ready",
+    status_code=status.HTTP_200_OK,
+    summary="Readiness probe",
+)
+async def readiness_check(request: Request) -> Response:
+    """Тяжелая проверка. Проверяет зависимости."""
+    health_status, has_error = await _collect_readiness_components(request)
+    if has_error:
+        return ORJSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "not_ready", "components": health_status},
+        )
+
+    return ORJSONResponse(content={"status": "ready", "components": health_status})
 
 @router.get(
     "/classification/{transaction_id}",

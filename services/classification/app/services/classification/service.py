@@ -265,7 +265,7 @@ class ClassificationService:
             )
 
             notification_event = None
-            if body.user_id:
+            if body.user_id and old_category_id != body.correct_category_id:
                 notification_event = _notification_event(
                     "transaction.category.changed",
                     body.user_id,

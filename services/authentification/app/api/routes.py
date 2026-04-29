@@ -76,12 +76,15 @@ async def readiness_check(request: Request) -> Response:
         health_status["redis"] = "disconnected"
         has_error = True
     else:
+        redis_client = Redis(connection_pool=redis_pool)
         try:
-            await Redis(connection_pool=redis_pool).ping()
+            await redis_client.ping()
             health_status["redis"] = "ok"
         except Exception:
             health_status["redis"] = "failed"
             has_error = True
+        finally:
+            await redis_client.aclose(close_connection_pool=False)
 
     if has_error:
         return ORJSONResponse(
