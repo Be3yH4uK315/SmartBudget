@@ -3,7 +3,7 @@ from typing import Any
 from jinja2 import Environment
 
 from app.infrastructure.external.smtp import send_email
-from app.infrastructure.external.fcm import send_push_notifications
+from app.infrastructure.external.web_push import send_web_push_notifications
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ async def send_email_task(
 
 
 async def send_push_task(
-    ctx: dict, user_id: Any, fcm_tokens: list[str], locale: str,
+    ctx: dict, user_id: Any, push_subscriptions: list[dict], locale: str,
     title_key: str, message_key: str, props: dict
 ) -> None:
     """Фоновая задача отправки PUSH-уведомления на устройства."""
@@ -53,8 +53,8 @@ async def send_push_task(
     title = title_tpl.format_map(safe_props)
     body = message_tpl.format_map(safe_props)
 
-    await send_push_notifications(
-        tokens=fcm_tokens,
+    await send_web_push_notifications(
+        subscriptions=push_subscriptions,
         title=title,
         body=body,
         data=props

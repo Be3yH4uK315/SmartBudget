@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
-from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import ORJSONResponse
 from sqlalchemy import text
 
@@ -57,7 +57,18 @@ async def readiness_check(request: Request) -> Response:
 
 # --- УВЕДОМЛЕНИЯ (NOTIFICATIONS) ---
 
-@router.get("/", response_model=schemas.PaginatedNotifications, summary="Получить список уведомлений (с пагинацией)")
+@router.get(
+    "",
+    response_model=list[schemas.NotificationResponse],
+    response_model_exclude_none=True,
+    summary="Получить список уведомлений",
+)
+@router.get(
+    "/",
+    response_model=list[schemas.NotificationResponse],
+    response_model_exclude_none=True,
+    include_in_schema=False,
+)
 async def get_notifications(
     is_read: Optional[bool] = Query(None, description="Фильтр по статусу прочтения"),
     limit: int = Query(20, ge=1, le=100),
@@ -110,6 +121,63 @@ async def update_settings(
     service: NotificationService = Depends(dependencies.get_notification_service),
 ):
     return await service.update_settings(user_id, request)
+
+
+@router.patch("/settings/status", response_model=schemas.NotificationSettingsResponse, summary="Включить/выключить уведомления")
+async def update_notifications_status(
+    payload: Any = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: NotificationService = Depends(dependencies.get_notification_service),
+):
+    if isinstance(payload, bool):
+        notifications_status = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("status"), bool):
+        notifications_status = payload["status"]
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Payload must be boolean or object with boolean 'status'",
+        )
+
+    return await service.update_notifications_status(user_id, notifications_status)
+
+
+# --- BROWSER PUSH ---
+
+@router.post("/push/subscribe", summary="Сохранить browser push подписку")
+async def subscribe_push(
+    request: schemas.PushSubscribeRequest = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: NotificationService = Depends(dependencies.get_notification_service),
+):
+    return await service.subscribe_push(user_id, request.subscription)
+
+
+@router.post("/push/unsubscribe", summary="Удалить browser push подписку")
+async def unsubscribe_push(
+    request: schemas.PushUnsubscribeRequest = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: NotificationService = Depends(dependencies.get_notification_service),
+):
+    return await service.unsubscribe_push(user_id, request.endpoint)
+
+
+@router.patch("", summary="Отметить все уведомления пользователя прочитанными")
+@router.patch("/", include_in_schema=False)
+async def mark_all_as_read_by_contract(
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: NotificationService = Depends(dependencies.get_notification_service),
+):
+    return await service.mark_all_as_read(user_id)
+
+
+@router.patch("/{notification_id}", summary="Отметить одно уведомление прочитанным")
+async def mark_as_read_by_contract(
+    notification_id: UUID = Path(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: NotificationService = Depends(dependencies.get_notification_service),
+):
+    return await service.mark_as_read(user_id, notification_id)
 
 
 # --- WEBSOCKETS ---

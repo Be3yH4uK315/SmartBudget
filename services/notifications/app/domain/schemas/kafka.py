@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -24,6 +24,8 @@ class IncomingNotificationEvent(CamelModel):
 class AuthUserEventPayload(CamelModel):
     """Полезная нагрузка события от Auth-сервиса."""
     email: str = Field(..., description="Email пользователя")
+    locale: Optional[str] = Field(None, description="Локаль пользователя")
+    language: Optional[str] = Field(None, description="Язык пользователя")
 
 class AuthUserEvent(CamelModel):
     """Событие создания/обновления профиля из сервиса Auth."""
@@ -32,3 +34,15 @@ class AuthUserEvent(CamelModel):
     user_id: UUID
     payload: AuthUserEventPayload
     timestamp: datetime
+
+class AuthOutboxEvent(CamelModel):
+    """Фактический формат событий auth-сервиса из outbox."""
+    event_type: str = Field(..., description="Тип auth-события")
+    user_id: Optional[UUID] = Field(None, description="ID пользователя")
+    email: Optional[str] = Field(None, description="Email пользователя")
+    new_email: Optional[str] = Field(None, description="Новый email пользователя")
+    language: Optional[str] = Field(None, description="Язык пользователя")
+    locale: Optional[str] = Field(None, description="Локаль пользователя")
+    ip: Optional[str] = Field(None, description="IP адрес")
+    location: Optional[str] = Field(None, description="Геолокация")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="Дополнительная нагрузка")

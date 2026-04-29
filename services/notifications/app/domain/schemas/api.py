@@ -18,7 +18,7 @@ class CamelModel(BaseModel):
 class NotificationResponse(CamelModel):
     """Модель одного уведомления в списке."""
     id: UUID = Field(..., description="ID уведомления")
-    created_at: datetime = Field(..., description="Время создания")
+    date: datetime = Field(..., description="Время создания")
     title_key: str = Field(..., description="Ключ перевода заголовка")
     message_key: str = Field(..., description="Ключ перевода текста")
     type: NotificationType = Field(..., description="Тип уведомления")
@@ -26,26 +26,40 @@ class NotificationResponse(CamelModel):
     service: NotificationServiceType = Field(..., description="Сервис-отправитель")
     props: Optional[Dict[str, Any]] = Field(None, description="Переменные для шаблона")
 
-    model_config = ConfigDict(from_attributes=True)
-
 class PaginatedNotifications(CamelModel):
     """Ответ для списка уведомлений с пагинацией."""
     total: int = Field(..., description="Всего уведомлений")
     unread_count: int = Field(..., description="Количество непрочитанных")
     items: List[NotificationResponse] = Field(..., description="Список уведомлений")
 
-class NotificationSettingsResponse(CamelModel):
-    """Модель текущих настроек пользователя."""
-    locale: str = Field(..., description="Язык локализации")
-    email_enabled: bool = Field(..., description="Включены ли Email-письма")
-    push_enabled: bool = Field(..., description="Включены ли PUSH-уведомления")
-    disabled_services: List[str] = Field(..., description="Массив отключенных сервисов")
+class BudgetNotificationSettings(CamelModel):
+    total_limit: bool = Field(..., description="Уведомления по общему бюджету")
+    categories_limit: bool = Field(..., description="Уведомления по лимитам категорий")
 
-    model_config = ConfigDict(from_attributes=True)
+class NotificationSettingsResponse(CamelModel):
+    """Модель текущих настроек пользователя для фронта."""
+    notifications_status: bool = Field(..., description="Включены ли уведомления в общем")
+    push_status: bool = Field(..., description="Включены ли PUSH-уведомления")
+    goals: bool = Field(..., description="Уведомления целей")
+    transactions: bool = Field(..., description="Уведомления транзакций")
+    budget: BudgetNotificationSettings = Field(..., description="Настройки бюджетных уведомлений")
 
 class NotificationSettingsUpdate(CamelModel):
-    """Модель для обновления настроек (PATCH)."""
-    locale: Optional[str] = Field(None, max_length=10, description="Язык локализации")
-    email_enabled: Optional[bool] = Field(None, description="Включены ли Email-письма")
-    push_enabled: Optional[bool] = Field(None, description="Включены ли PUSH-уведомления")
-    disabled_services: Optional[List[str]] = Field(None, description="Массив отключенных сервисов")
+    """Полное обновление настроек уведомлений."""
+    push_status: bool = Field(..., description="Включены ли PUSH-уведомления")
+    goals: bool = Field(..., description="Уведомления целей")
+    transactions: bool = Field(..., description="Уведомления транзакций")
+    budget: BudgetNotificationSettings = Field(..., description="Настройки бюджетных уведомлений")
+
+class WebPushSubscription(CamelModel):
+    endpoint: str = Field(..., description="Browser push endpoint")
+    expiration_time: Optional[int] = Field(None, description="Subscription expiration time")
+    keys: Dict[str, str] = Field(..., description="Browser push encryption keys")
+
+class PushSubscribeRequest(CamelModel):
+    user_id: Optional[str] = Field(None, description="Frontend user id; authoritative user id comes from gateway header")
+    subscription: WebPushSubscription = Field(..., description="Browser push subscription")
+
+class PushUnsubscribeRequest(CamelModel):
+    user_id: Optional[str] = Field(None, description="Frontend user id; authoritative user id comes from gateway header")
+    endpoint: str = Field(..., description="Browser push endpoint")

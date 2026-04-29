@@ -22,11 +22,18 @@ class AppSettings(BaseSettings):
     FRONTEND_URL: str
 
 class SmtpSettings(BaseSettings):
-    HOST: str = "localhost"
-    PORT: int = 1025
-    USER: str = ""
-    PASS: str = ""
-    FROM_EMAIL: str = "noreply@smartbudget.com"
+    SMTP_ENABLED: bool = False
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 1025
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@smartbudget.com"
+    SMTP_FROM_NAME: str = "SmartBudget"
+
+class PushSettings(BaseSettings):
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_CLAIMS_SUB: str = "mailto:noreply@smartbudget.com"
 
 class Settings(BaseSettings):
     DB: DBSettings
@@ -34,6 +41,7 @@ class Settings(BaseSettings):
     ARQ: ArqSettings
     APP: AppSettings
     SMTP: SmtpSettings
+    PUSH: PushSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",

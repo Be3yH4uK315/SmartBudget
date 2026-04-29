@@ -3,6 +3,8 @@ import json
 import logging
 from pathlib import Path
 from typing import List
+from datetime import datetime, timezone
+from uuid import NAMESPACE_URL, uuid5
 from aiokafka import AIOKafkaConsumer
 
 from app.core import metrics
@@ -78,44 +80,50 @@ async def process_batch(
     arq_pool,
     dlq_producer: KafkaProducerWrapper,
 ) -> None:
-    async with UnitOfWork(db_session_maker) as uow:
-        service = NotificationService(uow, arq_pool)
+    for message in messages:
+        req_id: str | None = None
+        if message.headers:
+            for key, val in message.headers:
+                if key == "X-Request-ID":
+                    req_id = val.decode("utf-8")
+                    break
+        set_request_id(req_id)
 
-        for message in messages:
-            req_id: str | None = None
-            if message.headers:
-                for key, val in message.headers:
-                    if key == "X-Request-ID":
-                        req_id = val.decode("utf-8")
-                        break
-            set_request_id(req_id)
+        try:
+            data = json.loads(message.value)
+            service = NotificationService(UnitOfWork(db_session_maker), arq_pool)
+
+            if topic == settings.KAFKA.KAFKA_TOPIC_AUTH:
+                event = k_schemas.AuthOutboxEvent(**data)
+                event_id = uuid5(
+                    NAMESPACE_URL,
+                    f"{topic}:{message.partition}:{message.offset}",
+                )
+                timestamp = datetime.fromtimestamp(
+                    (message.timestamp or 0) / 1000,
+                    tz=timezone.utc,
+                )
+                await service.process_auth_outbox_event(event, event_id, timestamp)
+            else:
+                event = k_schemas.IncomingNotificationEvent(**data)
+                await service.process_incoming_event(event)
+
+        except Exception as e:
+            logger.error("Processing failed for message %s. Sending to DLQ. Reason: %s", message.offset, e)
+            metrics.KAFKA_DLQ_ERRORS.labels(topic=topic, reason=type(e).__name__).inc()
+
+            headers = [("error", str(e).encode("utf-8"))]
+            if req_id:
+                headers.append(("X-Request-ID", req_id.encode("utf-8")))
 
             try:
-                data = json.loads(message.value)
-                
-                if topic == settings.KAFKA.KAFKA_TOPIC_AUTH:
-                    event = k_schemas.AuthUserEvent(**data)
-                    await service.process_auth_event(event)
-                else:
-                    event = k_schemas.IncomingNotificationEvent(**data)
-                    await service.process_incoming_event(event)
-
-            except Exception as e:
-                logger.error("Processing failed for message %s. Sending to DLQ. Reason: %s", message.offset, e)
-                metrics.KAFKA_DLQ_ERRORS.labels(topic=topic, reason=type(e).__name__).inc()
-
-                headers = [("error", str(e).encode("utf-8"))]
-                if req_id:
-                    headers.append(("X-Request-ID", req_id.encode("utf-8")))
-
-                try:
-                    await dlq_producer.send_event(
-                        topic=settings.KAFKA.KAFKA_TOPIC_DLQ,
-                        value=message.value,
-                        key=message.key,
-                        headers=headers,
-                        wait=True,
-                    )
-                except Exception as dlq_error:
-                    logger.critical("CRITICAL: Failed to send to DLQ. Stopping consumer. Error: %s", dlq_error)
-                    raise dlq_error
+                await dlq_producer.send_event(
+                    topic=settings.KAFKA.KAFKA_TOPIC_DLQ,
+                    value=message.value,
+                    key=message.key,
+                    headers=headers,
+                    wait=True,
+                )
+            except Exception as dlq_error:
+                logger.critical("CRITICAL: Failed to send to DLQ. Stopping consumer. Error: %s", dlq_error)
+                raise dlq_error

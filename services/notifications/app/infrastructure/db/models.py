@@ -11,10 +11,11 @@ class UserNotificationSettings(Base):
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
     locale = Column(String(10), default="ru", nullable=False)
+    notifications_enabled = Column(Boolean, default=True, nullable=False)
     email_enabled = Column(Boolean, default=True, nullable=False)
     push_enabled = Column(Boolean, default=True, nullable=False)
     disabled_services = Column(ARRAY(String), default=list, nullable=False)
-    fcm_tokens = Column(JSONB, default=list, nullable=False)
+    push_subscriptions = Column(JSONB, default=list, nullable=False)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(

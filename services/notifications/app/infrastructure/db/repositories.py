@@ -3,9 +3,8 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, select, update, insert
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.db import models
@@ -20,12 +19,14 @@ class NotificationRepository:
 
     async def create(self, data: dict) -> models.Notification | None:
         """Создает новое уведомление. Возвращает None, если такой event_id уже есть (защита от дублей)."""
-        stmt = insert(models.Notification).values(**data).returning(models.Notification)
-        try:
-            result = await self.db.execute(stmt)
-            return result.scalar_one_or_none()
-        except IntegrityError:
-            return None
+        stmt = (
+            pg_insert(models.Notification)
+            .values(**data)
+            .on_conflict_do_nothing(index_elements=["event_id"])
+            .returning(models.Notification)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def get_paginated(
         self, 
@@ -68,11 +69,10 @@ class NotificationRepository:
             .where(
                 models.Notification.id == notification_id,
                 models.Notification.user_id == user_id,
-                models.Notification.is_read == False
             )
             .values(
                 is_read=True, 
-                read_at=datetime.now(timezone.utc)
+                read_at=func.coalesce(models.Notification.read_at, datetime.now(timezone.utc))
             )
         )
         result = await self.db.execute(stmt)
@@ -107,18 +107,40 @@ class SettingsRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def upsert_profile(self, user_id: UUID, email: str) -> models.UserNotificationSettings:
+    async def get_by_email(self, email: str) -> models.UserNotificationSettings | None:
+        """Получает настройки по email без учета регистра."""
+        stmt = select(models.UserNotificationSettings).where(
+            func.lower(models.UserNotificationSettings.email) == email.lower()
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def upsert_profile(
+        self,
+        user_id: UUID,
+        email: str,
+        locale: str | None = None,
+    ) -> models.UserNotificationSettings:
         """
         Создает профиль настроек или обновляет email, если профиль уже существует.
         Используется при обработке событий из сервиса Auth (регистрация / смена почты).
         """
-        stmt = pg_insert(models.UserNotificationSettings).values(
-            user_id=user_id,
-            email=email
-        )
+        values = {
+            "user_id": user_id,
+            "email": email,
+        }
+        update_values = {
+            "email": email,
+            "updated_at": func.now(),
+        }
+        if locale:
+            values["locale"] = locale
+            update_values["locale"] = locale
+
+        stmt = pg_insert(models.UserNotificationSettings).values(**values)
         stmt = stmt.on_conflict_do_update(
             index_elements=['user_id'],
-            set_={'email': email, 'updated_at': func.now()}
+            set_=update_values,
         ).returning(models.UserNotificationSettings)
         
         result = await self.db.execute(stmt)
@@ -137,3 +159,51 @@ class SettingsRepository:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def add_push_subscription(
+        self,
+        user_id: UUID,
+        subscription: dict,
+    ) -> models.UserNotificationSettings | None:
+        settings = await self.get_by_user_id(user_id)
+        if not settings:
+            return None
+
+        endpoint = subscription.get("endpoint")
+        subscriptions = [
+            item
+            for item in (settings.push_subscriptions or [])
+            if item.get("endpoint") != endpoint
+        ]
+        subscriptions.append(subscription)
+
+        return await self.update_settings(
+            user_id,
+            {
+                "push_subscriptions": subscriptions,
+                "push_enabled": True,
+            },
+        )
+
+    async def remove_push_subscription(
+        self,
+        user_id: UUID,
+        endpoint: str,
+    ) -> models.UserNotificationSettings | None:
+        settings = await self.get_by_user_id(user_id)
+        if not settings:
+            return None
+
+        subscriptions = [
+            item
+            for item in (settings.push_subscriptions or [])
+            if item.get("endpoint") != endpoint
+        ]
+
+        return await self.update_settings(
+            user_id,
+            {
+                "push_subscriptions": subscriptions,
+                "push_enabled": bool(subscriptions),
+            },
+        )

@@ -25,10 +25,11 @@ def upgrade() -> None:
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('locale', sa.String(length=10), nullable=False),
+    sa.Column('notifications_enabled', sa.Boolean(), nullable=False),
     sa.Column('email_enabled', sa.Boolean(), nullable=False),
     sa.Column('push_enabled', sa.Boolean(), nullable=False),
     sa.Column('disabled_services', postgresql.ARRAY(sa.String()), nullable=False),
-    sa.Column('fcm_tokens', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+    sa.Column('push_subscriptions', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('user_id')
