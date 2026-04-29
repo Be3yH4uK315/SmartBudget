@@ -195,21 +195,6 @@ class GoalService:
             ]
         )
 
-    async def get_dashboard_goals(
-        self,
-        user_id: UUID,
-    ) -> list[api_schemas.DashboardGoalResponse]:
-        async with self.uow:
-            goals = await self.uow.goals.get_main_goals(user_id)
-
-        return [
-            api_schemas.DashboardGoalResponse(
-                name=goal.name,
-                total_value=goal.target_value,
-                current_value=goal.current_value,
-            )
-            for goal in goals
-        ]
 
     async def search_goals(
         self,
