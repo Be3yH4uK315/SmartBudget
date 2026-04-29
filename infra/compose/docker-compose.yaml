@@ -509,6 +509,206 @@ services:
       retries: 3
     networks:
       - smartbudget-net
+  
+  notification_postgres:
+    image: postgres:16
+    env_file:
+      - ../../infra/.env
+    container_name: notification_postgres
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_POSTGRES_DB}
+    ports:
+      - "5437:5432"
+    volumes:
+      - pg_data_notification:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  notification_service:
+    build:
+      context: ../../services/notification/
+    env_file:
+      - ../../services/notification/.env
+    container_name: notification_service
+    ports:
+      - "8003:8000"
+    depends_on:
+      notification_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/notification:/app
+    restart: unless-stopped
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/notifications/health/live"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  notification_worker:
+    build:
+      context: ../../services/notification/
+    env_file:
+      - ../../services/notification/.env
+    container_name: notification_worker
+    depends_on:
+      notification_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/notification:/app
+    command: arq app.workers.main_worker.WorkerSettings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+
+  notification_consumer:
+    build:
+      context: ../../services/notification/
+    env_file:
+      - ../../services/notification/.env
+    container_name: notification_consumer
+    depends_on:
+      notification_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/notification:/app
+    command: python -m app.run_consumer
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+
+  notification_postgres:
+    image: postgres:16
+    env_file:
+      - ../../infra/.env
+    container_name: notification_postgres
+    environment:
+      POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_POSTGRES_DB}
+    ports:
+      - "5437:5432"
+    volumes:
+      - pg_data_notification:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  notification_service:
+    build:
+      context: ../../services/notifications/
+    env_file:
+      - ../../services/notifications/.env
+    container_name: notification_service
+    ports:
+      - "8003:8000"
+    depends_on:
+      notification_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/notifications:/app
+    restart: unless-stopped
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/notifications/health/live"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  notification_worker:
+    build:
+      context: ../../services/notifications/
+    env_file:
+      - ../../services/notifications/.env
+    container_name: notification_worker
+    depends_on:
+      notification_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/notifications:/app
+    command: arq app.workers.main.WorkerSettings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
+
+  notification_consumer:
+    build:
+      context: ../../services/notifications/
+    env_file:
+      - ../../services/notifications/.env
+    container_name: notification_consumer
+    depends_on:
+      notification_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/notifications:/app
+    command: python -m app.run_consumer
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+    networks:
+      - smartbudget-net
 
 volumes:
   pg_data_auth:

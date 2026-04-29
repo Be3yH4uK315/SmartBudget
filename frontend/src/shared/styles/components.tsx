@@ -1,3 +1,4 @@
+import { KeyboardArrowDownOutlined } from '@mui/icons-material'
 import { ThemeOptions } from '@mui/material'
 import NeueRegular from '@shared/assets/fonts/Neue Haas Unica W1G Light.ttf'
 import TinkoffSansBold from '@shared/assets/fonts/TinkoffSans-Bold.ttf'
@@ -177,11 +178,21 @@ export const components: ThemeOptions['components'] = {
   },
 
   MuiTooltip: {
+    defaultProps: {
+      arrow: true,
+    },
     styleOverrides: {
       tooltip: ({ theme: { palette, typography } }) => ({
         color: palette.text.primary,
-        backgroundColor: palette.gray.dark,
+        textAlign: 'center',
+        backgroundColor: palette.surface.light,
+        border: '2px solid',
+        borderColor: palette.primary.main,
+        borderRadius: '12px',
         ...typography.caption,
+      }),
+      arrow: ({ theme: { palette } }) => ({
+        color: palette.primary.main,
       }),
     },
   },
@@ -247,19 +258,6 @@ export const components: ThemeOptions['components'] = {
   MuiTextField: {
     styleOverrides: {
       root: ({ theme }) => ({
-        '& .MuiOutlinedInput-root': {
-          height: '56px',
-          '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: theme.palette.primary.main,
-            borderWidth: '2px',
-            borderRadius: '12px',
-          },
-          '&:hover:not(.Mui-focused)': {
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.primary.light,
-            },
-          },
-        },
         '& .MuiInputLabel-outlined': {
           color: theme.palette.text.primary,
           '&.Mui-focused': {
@@ -267,6 +265,53 @@ export const components: ThemeOptions['components'] = {
           },
         },
       }),
+    },
+  },
+
+  MuiSelect: {
+    defaultProps: {
+      IconComponent: KeyboardArrowDownOutlined,
+    },
+    styleOverrides: {
+      select: ({ theme }) => ({
+        display: 'flex',
+        alignItems: 'center',
+        paddingLeft: theme.spacing(2),
+      }),
+
+      icon: ({ theme }) => ({
+        color: theme.palette.gray.main,
+      }),
+    },
+  },
+
+  MuiOutlinedInput: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        height: 56,
+        borderRadius: 12,
+
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.main,
+          borderWidth: 2,
+        },
+
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.light,
+        },
+
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.main,
+        },
+
+        '&:hover': {
+          backgroundColor: 'transparent',
+        },
+      }),
+
+      // input: ({ theme }) => ({
+      //   padding: theme.spacing(2),
+      // }),
     },
   },
 
@@ -371,6 +416,48 @@ export const components: ThemeOptions['components'] = {
       root: ({ theme }) => ({
         ...theme.typography.h2,
         padding: 0,
+      }),
+    },
+  },
+
+  MuiToggleButtonGroup: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        border: `1px solid`,
+        borderRadius: '12px',
+        borderColor: theme.palette.primary.main,
+        gap: 0,
+      }),
+      grouped: {
+        border: 0,
+      },
+    },
+  },
+
+  MuiToggleButton: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        textTransform: 'none',
+        borderRadius: '12px',
+        padding: theme.spacing(1, 2),
+        border: `1px solid`,
+        borderColor: theme.palette.primary.main,
+        color: theme.palette.text.primary,
+
+        '&.Mui-selected': {
+          backgroundColor: theme.palette.primary.main,
+          color: '#333',
+
+          '&:hover': {
+            backgroundColor: theme.palette.primary.light,
+          },
+        },
+
+        '&.Mui-disabled': {
+          opacity: 0.4,
+          backgroundColor: theme.palette.gray.light,
+          color: theme.palette.text.disabled,
+        },
       }),
     },
   },

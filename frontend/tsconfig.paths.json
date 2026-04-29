@@ -4,7 +4,11 @@
       "@app": ["src/app"],
       "@app/*": ["src/app/*"],
 
+      "@features/budget/*": ["src/features/budget/*"],
       "@features/dashboard/*": ["src/features/dashboard/*"],
+      "@features/goals/*": ["src/features/goals/*"],
+      "@features/notifications/*": ["src/features/notifications/*"],
+      "@features/settings/*": ["src/features/settings/*"],
       "@features/transactions/*": ["src/features/transactions/*"],
 
       "@shared/api/*": ["src/shared/api/*"],
@@ -14,6 +18,7 @@
       "@shared/components/*": ["src/shared/components/*"],
       "@shared/components": ["src/shared/components"],
       "@shared/constants/*": ["src/shared/constants/*"],
+      "@shared/constants": ["src/shared/constants"],
       "@shared/hooks": ["src/shared/hooks"],
       "@shared/locale/*": ["src/shared/locale/*"],
       "@shared/screens/*": ["src/shared/screens/*"],

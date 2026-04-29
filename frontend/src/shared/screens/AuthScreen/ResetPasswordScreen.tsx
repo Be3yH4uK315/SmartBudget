@@ -27,7 +27,7 @@ const ResetPasswordScreen = () => {
       authApi.completeReset({
         email,
         token,
-        new_password: password,
+        newPassword: password,
       }),
     )
   }

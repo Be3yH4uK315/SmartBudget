@@ -1,11 +1,3 @@
-export type DashboardResponsePayload = {
-  goals: DashboardGoal[]
-
-  categories: DashboardCategory[]
-
-  budgetTotalLimit: number
-}
-
 export type DashboardGoal = {
   name: string
 
@@ -19,17 +11,5 @@ export type DashboardCategory = {
 
   value: number
 
-  type: string
+  type: 'income' | 'expense'
 }
-
-export type normalizedCategory = {
-  value: number
-
-  label: string
-
-  color: string
-
-  lightColor: string
-}
-
-export type FilterType = 'income' | 'expense'

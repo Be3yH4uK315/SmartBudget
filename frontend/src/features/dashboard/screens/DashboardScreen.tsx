@@ -1,71 +1,94 @@
 import { useEffect, useMemo } from 'react'
+import { BudgetBlock, DashboardScreenSkeleton, GoalsBlock } from '@features/dashboard/screens'
 import {
-  BudgetBlock,
-  DashboardScreenSkeleton,
-  GoalsBlock,
-  TransactionsBlock,
-} from '@features/dashboard/screens'
-import {
-  getDashboardData,
+  getDashboardBudget,
+  getDashboardGoals,
   selectBudgetLimit,
   selectCategories,
   selectGoals,
-  selectIsDashboardLoading,
+  selectIsDashboardBudgetLoading,
+  selectIsDashboardGoalsLoading,
 } from '@features/dashboard/store'
+import {
+  AccountBalanceWalletOutlined,
+  LockOutlined,
+  NotificationsOutlined,
+  OutlinedFlagOutlined,
+} from '@mui/icons-material'
 import { Stack } from '@mui/material'
-import { BudgetIcon, GoalIcon, ProfileIcon, SecurityIcon } from '@shared/assets/icons'
-import { IconButtonsBlock, ScreenContent, withAuth } from '@shared/components'
-import { useTranslate } from '@shared/hooks'
+import { IconButtonsBlock, ScreenContent, TransactionsPieBlock, withAuth } from '@shared/components'
+import { ROUTES } from '@shared/constants'
+import { useTransactionFilters, useTranslate } from '@shared/hooks'
 import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
 import { IconButtonItem } from '@shared/types'
+import { CenterLabel } from '@shared/types/components'
+import { mapDashboardCategory } from '@shared/utils'
+import dayjs from 'dayjs'
 
-export default withAuth(function DashboardScreen() {
+export default function DashboardScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Dashboard')
+  const translateMonth = useTranslate('Month')
 
   const goals = useAppSelector(selectGoals)
   const { name: username } = useAppSelector(selectUser)
   const categories = useAppSelector(selectCategories)
   const budgetLimit = useAppSelector(selectBudgetLimit)
-  const isLoading = useAppSelector(selectIsDashboardLoading)
+  const isBudgetLoading = useAppSelector(selectIsDashboardBudgetLoading)
+  const isGoalsLoading = useAppSelector(selectIsDashboardGoalsLoading)
 
   const ButtonsBlock = useMemo<IconButtonItem[]>(
     () => [
       {
-        Icon: <BudgetIcon />,
+        Icon: <AccountBalanceWalletOutlined />,
         title: translate('Buttons.Budget.title'),
         subtitle: translate('Buttons.Budget.subtitle'),
-        path: '/settings/budget',
+        path: ROUTES.PAGES.SETTINGS.BUDGET,
       },
       {
-        Icon: <GoalIcon />,
+        Icon: <OutlinedFlagOutlined />,
         title: translate('Buttons.Goals.title'),
         subtitle: translate('Buttons.Goals.subtitle'),
-        path: '/goals',
+        path: ROUTES.PAGES.GOALS.MAIN,
       },
       {
-        Icon: <ProfileIcon />,
-        title: translate('Buttons.Profile.title'),
-        subtitle: translate('Buttons.Profile.subtitle'),
-        path: '/settings/profile',
+        Icon: <NotificationsOutlined />,
+        title: translate('Buttons.Notifications.title'),
+        subtitle: translate('Buttons.Notifications.subtitle'),
+        path: ROUTES.PAGES.NOTIFICATIONS,
       },
       {
-        Icon: <SecurityIcon />,
+        Icon: <LockOutlined />,
         title: translate('Buttons.Security.title'),
         subtitle: translate('Buttons.Security.subtitle'),
-        path: '/settings/security',
+        path: ROUTES.PAGES.SETTINGS.SECURITY,
       },
     ],
     [translate],
   )
 
+  const { activeType, toggleFilter, normalizedData, total } = useTransactionFilters(
+    categories,
+    mapDashboardCategory,
+    'expense',
+  )
+
+  const transactionsBlockTitle = `${translate('TransactionsPieBlock.title')} ${translateMonth(`${dayjs().month()}`)}`
+
+  const centerLabel: CenterLabel = {
+    type: 'amount',
+    total: total,
+    label: translate(`TransactionsPieBlock.${activeType}`).toLowerCase(),
+  }
+
   useEffect(() => {
-    dispatch(getDashboardData())
+    dispatch(getDashboardBudget())
+    dispatch(getDashboardGoals())
   }, [dispatch])
 
   return (
     <ScreenContent
-      isLoading={isLoading}
+      isLoading={isBudgetLoading || isGoalsLoading}
       ContentSkeleton={DashboardScreenSkeleton}
       title={translate('greeting', { name: username })}
     >
@@ -81,17 +104,19 @@ export default withAuth(function DashboardScreen() {
         </Stack>
 
         <Stack spacing={2} sx={{ flex: { md: '1 1 0%' }, maxWidth: '920px' }}>
-          {/* <SearchBar/> */}
-
-          {/* <StoriesBlock/> */}
-
           <IconButtonsBlock buttons={ButtonsBlock.slice(0, 2)} />
 
-          <TransactionsBlock categories={categories} />
+          <TransactionsPieBlock
+            title={transactionsBlockTitle}
+            activeType={activeType}
+            pieData={normalizedData}
+            centerLabel={centerLabel}
+            toggleFilter={toggleFilter}
+          />
 
           <IconButtonsBlock buttons={ButtonsBlock.slice(2, 4)} />
         </Stack>
       </Stack>
     </ScreenContent>
   )
-})
+}

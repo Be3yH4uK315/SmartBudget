@@ -8,7 +8,9 @@ export type DashboardSliceState = {
 
   budgetLimit: number
 
-  isLoading: boolean
+  isGoalsLoading: boolean
+
+  isBudgetLoading: boolean
 }
 
 export type DashboardSliceReducers = SliceCaseReducers<DashboardSliceState>

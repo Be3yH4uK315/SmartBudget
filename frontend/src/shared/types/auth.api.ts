@@ -1,9 +1,10 @@
 export type SignInAction =
   | 'sign_in'
   | 'sign_up'
-  | 'reset_password'
-  | 'complete_registration'
-  | 'complete_reset'
+  | 'resetPassword'
+  | 'completeRegistration'
+  | 'completeReset'
+  | 'login'
 
 export type VerifyMode = 'signup' | 'reset' | null
 
@@ -26,7 +27,7 @@ export type VerifyEmail = {
 export type VerifyLink = {
   token: string
   email: string
-  token_type: string
+  tokenType: string
 }
 
 export type CompleteRegistration = {
@@ -49,5 +50,5 @@ export type ResetPassword = {
 export type CompleteReset = {
   email: string
   token: string
-  new_password: string
+  newPassword: string
 }

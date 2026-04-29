@@ -1,27 +1,34 @@
 import { useMemo, useState } from 'react'
-import { CategoryOption } from '@features/transactions/components'
-import {
-  CATEGORIES_ICONS_MAP,
-  CATEGORY_IDS,
-} from '@features/transactions/constants/categoriesIcons'
-import { changeCategory, selectCategoryByTransactionId } from '@features/transactions/store'
+import { changeCategory, selectIsCategoryChanging } from '@features/transactions/store'
+import { Category, Transaction } from '@features/transactions/types'
 import { ArrowBackOutlined } from '@mui/icons-material'
-import { Button, IconButton, MenuItem, Select, Stack, Typography } from '@mui/material'
-import { MODAL_IDS } from '@shared/constants/modals'
+import {
+  Button,
+  CircularProgress,
+  IconButton,
+  MenuItem,
+  Select,
+  Stack,
+  Typography,
+} from '@mui/material'
+import { CategoryOption } from '@shared/components'
+import { CATEGORIES_ICONS_MAP, CATEGORY_IDS, MODAL_IDS } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
-import { ModalLayout } from '@shared/screens/ModalProvider/ModalLayout'
+import ModalLayout from '@shared/screens/ModalProvider'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { openModal } from '@shared/store/modal'
 
 type Props = {
-  transactionId: string
+  transaction: Transaction
 }
 
-export const ChangeCategoryModal = ({ transactionId }: Props) => {
+export const ChangeCategoryModal = ({ transaction }: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions.Modal.ChangeCategory')
   const translateCategory = useTranslate('Categories')
-  const currentCategory = useAppSelector(selectCategoryByTransactionId(transactionId!))
+
+  const isCategoryChanging = useAppSelector(selectIsCategoryChanging)
+  const currentCategory = transaction.categoryId
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
 
@@ -35,22 +42,23 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
   const handleConfirm = async () => {
     await dispatch(
       changeCategory({
-        transactionId: transactionId!,
-        categoryId: Number(selectedCategory),
+        transactionId: transaction.transactionId,
+        categoryId: selectedCategory as Category,
       }),
-    )
-    openPrev()
+    ).unwrap()
+
+    openPrev({ ...transaction, categoryId: selectedCategory as Category })
   }
 
-  const openPrev = () =>
+  const openPrev = (transaction: Transaction) =>
     dispatch(
-      openModal({ id: MODAL_IDS.TRANSACTION_INFO_MODAL, props: { transactionId: transactionId } }),
+      openModal({ id: MODAL_IDS.TRANSACTION_INFO_MODAL, props: { transaction: transaction } }),
     )
 
   return (
     <ModalLayout>
       <IconButton
-        onClick={openPrev}
+        onClick={() => openPrev(transaction)}
         sx={{
           position: 'absolute',
           top: 12,
@@ -94,11 +102,15 @@ export const ChangeCategoryModal = ({ transactionId }: Props) => {
 
         <Button
           variant="yellow"
-          disabled={!selectedCategory}
+          disabled={!selectedCategory || isCategoryChanging}
           onClick={handleConfirm}
           sx={{ width: '50%' }}
         >
-          {translate('confirm')}
+          {isCategoryChanging ? (
+            <CircularProgress size={20} sx={{ color: '#333' }} />
+          ) : (
+            translate('confirm')
+          )}
         </Button>
       </Stack>
     </ModalLayout>

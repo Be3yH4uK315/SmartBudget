@@ -1,18 +1,31 @@
-import { dashboardApi } from '@features/dashboard/api'
-import { DashboardResponsePayload } from '@features/dashboard/types'
+import { dashboardApi, dashboardMock } from '@features/dashboard/api'
+import { DashboardCategory, DashboardGoal } from '@features/dashboard/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { dashboardMock } from '../api/dashboard.mock'
 
-export const getDashboardData = createAsyncThunk<
-  DashboardResponsePayload,
+export const getDashboardGoals = createAsyncThunk<
+  DashboardGoal[],
   void,
-  { rejectValue: 'cannotGetDashboardData' }
->('getDashboardData', async (_, { rejectWithValue }) => {
+  { rejectValue: 'cannotGetDashboardGoals' }
+>('getDashboardGoals', async (_, { rejectWithValue }) => {
   try {
-    const response = await dashboardMock.getDashboardData()
+    const response = await dashboardMock.getDashboardGoals()
 
     return response
   } catch (e: any) {
-    return rejectWithValue('cannotGetDashboardData')
+    return rejectWithValue('cannotGetDashboardGoals')
+  }
+})
+
+export const getDashboardBudget = createAsyncThunk<
+  { categories: DashboardCategory[]; budgetTotalLimit: number },
+  void,
+  { rejectValue: 'cannotGetDashboardBudget' }
+>('getDashboardBudget', async (_, { rejectWithValue }) => {
+  try {
+    const response = await dashboardMock.getDashboardBudget()
+
+    return response
+  } catch (e: any) {
+    return rejectWithValue('cannotGetDashboardBudget')
   }
 })

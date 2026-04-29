@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { authApi } from '@shared/api/auth'
 import { ROUTES } from '@shared/constants/routes'
+import { dispatch, getUserInfo } from '@shared/store'
 import { AuthStep, ErrorCode, VerifyMode } from '@shared/types'
 import { useNavigate } from 'react-router'
 
@@ -52,7 +53,7 @@ export function useAuthFlow() {
         } else if (res.action === 'sign_up') {
           setVerifyMode('signup')
           pushStep('verifyEmail')
-        } else if (res.action === 'reset_password') {
+        } else if (res.action === 'resetPassword') {
           setVerifyMode('reset')
           pushStep('verifyEmail')
         }
@@ -68,6 +69,7 @@ export function useAuthFlow() {
       try {
         const res = await authApi.login({ email: normalizedEmail, password })
         if (res) {
+          await dispatch(getUserInfo())
           navigate(ROUTES.PAGES.DASHBOARD)
           return
         }
@@ -114,7 +116,7 @@ export function useAuthFlow() {
     try {
       const res = await authApi.verifyEmail({ email: normalizedEmail })
       if (res.action === 'sign_up') setVerifyMode('signup')
-      if (res.action === 'reset_password') setVerifyMode('reset')
+      if (res.action === 'resetPassword') setVerifyMode('reset')
     } finally {
       setIsResending(false)
     }

@@ -1,16 +1,43 @@
-import { TempAddPayload, Transaction } from '@features/transactions/types'
+import { PAGE_SIZE } from '@features/transactions/constants'
+import { Transaction, TransactionsFilters } from '@features/transactions/types'
 import { api } from '@shared/api'
+import { SEARCH_LIMIT } from '@shared/constants'
 
 class TransactionsApi {
   baseUrl = '/transactions'
 
-  async getTransactions(offset: number, categoryId: number | null): Promise<Transaction[]> {
+  async getTransactions(offset: number, filters?: TransactionsFilters): Promise<Transaction[]> {
     const url = `${this.baseUrl}`
-    const params = {
-      offset,
-      categoryId: categoryId,
+
+    const params: Record<string, string> = {
+      offset: String(offset),
+      limit: String(PAGE_SIZE),
+      ...(filters?.categoryIds?.length ? { categoryId: filters.categoryIds.join(',') } : {}),
+      ...(filters?.dateFrom ? { dateFrom: filters.dateFrom } : {}),
+      ...(filters?.dateTo ? { dateTo: filters.dateTo } : {}),
+      ...(filters?.type ? { type: filters.type } : {}),
+      ...(filters?.valueFrom !== undefined ? { valueFrom: String(filters.valueFrom) } : {}),
+      ...(filters?.valueTo !== undefined ? { valueTo: String(filters.valueTo) } : {}),
     }
+
     const response = await api.get<Transaction[]>(url, { params })
+
+    return response.data
+  }
+
+  searchTransactions = async (
+    query: string,
+    signal: AbortSignal,
+    limit?: number,
+  ): Promise<Transaction[]> => {
+    const url = `${this.baseUrl}/search`
+
+    const params: Record<string, string> = {
+      limit: limit ? String(limit) : String(SEARCH_LIMIT),
+      query: query,
+    }
+
+    const response = await api.get<Transaction[]>(url, { params, signal })
 
     return response.data
   }
@@ -20,22 +47,6 @@ class TransactionsApi {
     const response = await api.patch(url, payload.categoryId)
 
     return response.data
-  }
-
-  /** Временный эндпоинт для тестов */
-  async addTransaction(payload: TempAddPayload): Promise<{ transactionId: string }> {
-    const url = `${this.baseUrl}/edit`
-    const response = await api.post<{ transactionId: string }>(url, payload)
-
-    return response.data
-  }
-
-  /** Временный эндпоинт для тестов */
-  async deleteTransaction(transactionId: string): Promise<number> {
-    const url = `${this.baseUrl}/edit/${transactionId}`
-    const response = await api.delete<Transaction[]>(url)
-
-    return response.status
   }
 }
 
