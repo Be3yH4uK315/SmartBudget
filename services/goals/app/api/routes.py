@@ -5,7 +5,6 @@ from fastapi.responses import ORJSONResponse
 from sqlalchemy import text
 
 from app.api import dependencies
-from app.domain.enums import GoalPriority
 from app.domain.schemas import api as schemas
 from app.services.service import GoalService
 from app.api.dependencies import GoalFilters
@@ -31,9 +30,7 @@ async def readiness_check(request: Request) -> Response:
     app = request.app
     health_status = {
         "db": "unknown",
-        "redis": "unknown",
         "arq": "unknown",
-        "kafka": "unknown",
     }
     has_error = False
 
@@ -60,21 +57,6 @@ async def readiness_check(request: Request) -> Response:
             health_status["arq"] = "ok"
         except Exception:
             health_status["arq"] = "failed"
-            has_error = True
-
-    kafka_producer = getattr(app.state, "kafka_producer", None)
-    if not kafka_producer:
-        health_status["kafka"] = "disconnected"
-        has_error = True
-    else:
-        try:
-            if kafka_producer._is_running:
-                health_status["kafka"] = "ok"
-            else:
-                health_status["kafka"] = "not_running"
-                has_error = True
-        except Exception:
-            health_status["kafka"] = "failed"
             has_error = True
 
     if has_error:
@@ -110,6 +92,17 @@ async def get_main_goals(
     return await service.get_main_goals(user_id)
 
 @router.get(
+    "/dashboard",
+    response_model=List[schemas.DashboardGoalResponse],
+    summary="Получение целей для dashboard",
+)
+async def get_dashboard_goals(
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    return await service.get_dashboard_goals(user_id)
+
+@router.get(
     "/",
     response_model=List[schemas.AllGoalsResponse],
     summary="Получение списка целей с фильтрами",
@@ -127,6 +120,19 @@ async def get_goals(
         priorities=filters.priorities_list,
         is_archived=filters.is_archived
     )
+
+@router.get(
+    "/search",
+    response_model=List[schemas.GoalSearchResponse],
+    summary="Поиск целей",
+)
+async def search_goals(
+    query: str = Query(..., min_length=1, max_length=255),
+    limit: int = Query(10, ge=1, le=100),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    return await service.search_goals(user_id, query, limit)
 
 @router.get(
     "/{goal_id}",
@@ -152,6 +158,18 @@ async def update_goal(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.update_goal(user_id, goal_id, request)
+
+@router.patch(
+    "/{goal_id}/archive",
+    response_model=schemas.GoalArchiveResponse,
+    summary="Переключение архивного статуса цели",
+)
+async def update_archived_status(
+    goal_id: UUID = Path(..., description="ID цели"),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    return await service.toggle_archive_status(user_id, goal_id)
 
 @router.post(
     "/{goal_id}/close",
