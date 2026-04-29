@@ -32,6 +32,7 @@ class AppSettings(BaseSettings):
     PROMETHEUS_PORT: int
     LOG_LEVEL: str
     TZ: str
+    RULES_RELOAD_INTERVAL_SECONDS: int = 30
 
 class Settings(BaseSettings):
     DB: DBSettings

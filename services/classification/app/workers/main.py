@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 from arq.connections import RedisSettings
 from arq.cron import cron
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
@@ -17,6 +18,15 @@ from app.workers.ml_tasks import (
 from app.workers.system_tasks import run_outbox_processor, cleanup_sessions_task
 
 logger = logging.getLogger(__name__)
+HEALTH_FILE = Path("/tmp/healthy")
+
+async def keep_alive_task() -> None:
+    while True:
+        try:
+            HEALTH_FILE.touch(exist_ok=True)
+        except OSError:
+            pass
+        await asyncio.sleep(5)
 
 async def on_startup(ctx):
     setup_logging()
@@ -35,6 +45,7 @@ async def on_startup(ctx):
             await asyncio.sleep(2)
     ctx["kafka_producer"] = kafka
     ctx['outbox_task'] = asyncio.create_task(run_outbox_processor(ctx))
+    ctx["health_task"] = asyncio.create_task(keep_alive_task())
     logger.info("Worker startup complete.")
 
 async def on_shutdown(ctx):
@@ -44,6 +55,12 @@ async def on_shutdown(ctx):
         ctx['outbox_task'].cancel()
         try:
             await ctx['outbox_task']
+        except asyncio.CancelledError:
+            pass
+    if ctx.get("health_task"):
+        ctx["health_task"].cancel()
+        try:
+            await ctx["health_task"]
         except asyncio.CancelledError:
             pass
     if ctx.get("kafka_producer"):
