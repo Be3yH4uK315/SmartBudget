@@ -230,10 +230,10 @@ services:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
-    command: arq app.worker.WorkerSettings
+    command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "from app.worker import WorkerSettings; print(WorkerSettings.redis_settings.queue_name)"]
+      test: ["CMD", "python", "-c", "from app.workers.main import WorkerSettings; print(WorkerSettings.queue_name)"]
       interval: 30s
       retries: 3
       start_period: 30s
@@ -257,10 +257,10 @@ services:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
-    command: python run_consumers.py
+    command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "from app import settings; print(settings.settings.kafka.topic_need_category)"]
+      test: ["CMD", "python", "-c", "from app.core.config import settings; print(settings.KAFKA.TOPIC_NEED_CATEGORY)"]
       interval: 30s
       retries: 3
       start_period: 30s
