@@ -4,6 +4,7 @@ import signal
 
 from app.core.logging import setup_logging
 from app.core.database import get_db_engine, get_session_factory
+from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.consumer import consume_loop
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 
@@ -34,6 +35,8 @@ async def main() -> None:
 
     try:
         await dlq_producer.start()
+        async with UnitOfWork(db_session_maker) as uow:
+            await uow.goals.ensure_current_partition()
 
         consumer_task = asyncio.create_task(
             consume_loop(

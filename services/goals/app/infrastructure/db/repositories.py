@@ -6,7 +6,6 @@ from typing import Any, Optional
 from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy import (
-    and_,
     case,
     delete,
     func,
@@ -76,6 +75,26 @@ class GoalRepository:
         )
 
         result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def search_goals(
+        self,
+        user_id: UUID,
+        query: str,
+        limit: int = 10,
+    ) -> list[models.Goal]:
+        """Поиск целей пользователя по названию."""
+        stmt = (
+            select(models.Goal)
+            .where(
+                models.Goal.user_id == user_id,
+                models.Goal.name.ilike(f"%{query}%"),
+            )
+            .order_by(models.Goal.updated_at.desc(), models.Goal.goal_id.asc())
+            .limit(limit)
+        )
+
+        result = await self.db.execute(stmt)
         return result.scalars().all()
 
     async def get_all_goals(
@@ -423,21 +442,11 @@ class GoalRepository:
         Получает цели, срок которых истекает в течение недели после check_date,
         которые ещё не проверялись.
         """
-        check_datetime_start = datetime.combine(
-            check_date,
-            datetime.min.time(),
-        ).replace(tzinfo=timezone.utc)
-
         query = (
             select(models.Goal)
             .outerjoin(
                 models.GoalNotification,
-                and_(
-                    models.Goal.goal_id
-                    == models.GoalNotification.goal_id,
-                    models.GoalNotification.last_checked_date
-                    >= check_datetime_start,
-                ),
+                models.Goal.goal_id == models.GoalNotification.goal_id,
             )
             .where(
                 models.Goal.status == GoalStatus.ONGOING.value,
@@ -449,6 +458,46 @@ class GoalRepository:
             )
             .limit(limit)
         )
+
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def get_goals_without_income_batch(
+        self,
+        period_start: datetime,
+        period_end: datetime,
+        limit: int = 100,
+        last_id: UUID | None = None,
+    ) -> list[models.Goal]:
+        """
+        Получает ongoing-цели, которые существовали весь предыдущий месяц,
+        но не имели income-транзакций за этот период.
+        """
+        income_exists = (
+            select(models.ProcessedTransaction.transaction_id)
+            .where(
+                models.ProcessedTransaction.goal_id == models.Goal.goal_id,
+                models.ProcessedTransaction.transaction_type == TransactionType.INCOME.value,
+                models.ProcessedTransaction.created_at >= period_start,
+                models.ProcessedTransaction.created_at < period_end,
+            )
+            .exists()
+        )
+
+        query = (
+            select(models.Goal)
+            .where(
+                models.Goal.status == GoalStatus.ONGOING.value,
+                models.Goal.is_archived.is_(False),
+                models.Goal.created_at < period_start,
+                ~income_exists,
+            )
+            .order_by(models.Goal.goal_id.asc())
+            .limit(limit)
+        )
+
+        if last_id:
+            query = query.where(models.Goal.goal_id > last_id)
 
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -477,19 +526,25 @@ class GoalRepository:
 
         await self.db.execute(stmt)
 
+    async def reset_notification_state(self, goal_id: UUID) -> None:
+        """Сбрасывает состояние deadline-уведомлений по цели."""
+        await self.db.execute(
+            delete(models.GoalNotification).where(
+                models.GoalNotification.goal_id == goal_id
+            )
+        )
+
     def _prepare_outbox_event(
         self,
         topic: str,
         event_data: dict,
     ) -> dict:
         """Готовит данные для вставки в outbox_events."""
-        payload = event_data.get("payload", event_data)
-
         event_type = event_data.get("event_type")
-        if not event_type and isinstance(payload, dict):
-            event_type = payload.get("event_type", "unknown")
+        if not event_type:
+            event_type = event_data.get("eventName", "unknown")
 
-        clean_payload = serialization.recursive_normalize(payload)
+        clean_payload = serialization.recursive_normalize(event_data)
         current_trace_id = get_request_id()
 
         return {

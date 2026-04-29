@@ -1,7 +1,7 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from app.core import config, exceptions, metrics
 from app.domain.enums import (
@@ -29,6 +29,67 @@ def _create_outbox_event(
         "event_type": event_type.value,
         **kwargs,
     }
+
+def _notification_event_id(
+    event_name: str,
+    goal_id: UUID | str,
+    occurrence_key: str | None = None,
+) -> UUID:
+    key = f"smartbudget:notifications:{event_name}:{goal_id}"
+    if occurrence_key:
+        key = f"{key}:{occurrence_key}"
+    return uuid5(NAMESPACE_URL, key)
+
+def _create_notification_event(
+    event_name: str,
+    user_id: UUID,
+    payload: dict,
+    event_id: UUID | None = None,
+) -> dict:
+    """Создает событие для notification service."""
+    return {
+        "eventId": str(event_id or uuid4()),
+        "eventName": event_name,
+        "userId": str(user_id),
+        "payload": payload,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+def _decimal_to_float(value: Decimal | int | float | None) -> float:
+    if value is None:
+        return 0.0
+    return float(value)
+
+def _goal_current_percent(goal: models.Goal) -> float:
+    if not goal.target_value:
+        return 0.0
+
+    percent = (goal.current_value / goal.target_value) * Decimal("100")
+    return float(min(percent, Decimal("100")).quantize(Decimal("0.01")))
+
+def _goal_recommended_payment(goal: models.Goal) -> float:
+    if goal.created_at is None:
+        goal.created_at = datetime.now(timezone.utc)
+
+    value = goal.calculate_recommended_payment()
+    return _decimal_to_float(value)
+
+def _previous_month_period(today: date) -> tuple[datetime, datetime, str]:
+    current_month_start = datetime(
+        today.year,
+        today.month,
+        1,
+        tzinfo=timezone.utc,
+    )
+    previous_month_last_day = current_month_start - timedelta(days=1)
+    previous_month_start = datetime(
+        previous_month_last_day.year,
+        previous_month_last_day.month,
+        1,
+        tzinfo=timezone.utc,
+    )
+    month_key = previous_month_start.strftime("%Y-%m")
+    return previous_month_start, current_month_start, month_key
 
 class GoalService:
     """Сервис для управления целями."""
@@ -77,6 +138,19 @@ class GoalService:
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
                 event_data=event_data,
             )
+            await self.uow.goals.add_outbox_event(
+                topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
+                event_data=_create_notification_event(
+                    "goal.created",
+                    user_id,
+                    {
+                        "goalId": str(goal.goal_id),
+                        "name": goal.name,
+                        "recommendedPayment": _goal_recommended_payment(goal),
+                    },
+                    event_id=_notification_event_id("goal.created", goal.goal_id),
+                ),
+            )
 
         metrics.GOALS_CREATED_TOTAL.inc()
         return api_schemas.CreateGoalResponse(goal_id=goal.goal_id)
@@ -120,6 +194,44 @@ class GoalService:
                 for goal in goals
             ]
         )
+
+    async def get_dashboard_goals(
+        self,
+        user_id: UUID,
+    ) -> list[api_schemas.DashboardGoalResponse]:
+        async with self.uow:
+            goals = await self.uow.goals.get_main_goals(user_id)
+
+        return [
+            api_schemas.DashboardGoalResponse(
+                name=goal.name,
+                total_value=goal.target_value,
+                current_value=goal.current_value,
+            )
+            for goal in goals
+        ]
+
+    async def search_goals(
+        self,
+        user_id: UUID,
+        query: str,
+        limit: int,
+    ) -> list[api_schemas.GoalSearchResponse]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            return []
+
+        async with self.uow:
+            goals = await self.uow.goals.search_goals(
+                user_id,
+                normalized_query,
+                limit,
+            )
+
+        return [
+            api_schemas.GoalSearchResponse.model_validate(goal)
+            for goal in goals
+        ]
 
     async def get_all_goals(
         self,
@@ -189,14 +301,31 @@ class GoalService:
                 changes_for_kafka[field] = db_value
 
             if changes_for_db:
+                previous_status = goal.status
                 goal = await self.uow.goals.update_fields(
                     user_id,
                     goal_id,
                     changes_for_db,
                 )
 
+                if "finish_date" in changes_for_db:
+                    await self.uow.goals.reset_notification_state(goal_id)
+                    if (
+                        goal.status == GoalStatus.EXPIRED.value
+                        and goal.finish_date
+                        and goal.finish_date > _get_utc_today()
+                    ):
+                        goal = await self.uow.goals.update_fields(
+                            user_id,
+                            goal_id,
+                            {"status": GoalStatus.ONGOING.value},
+                        )
+
                 if "is_archived" not in changes_for_db:
                     await self._check_and_process_achievement_in_uow(goal)
+
+                if goal.status != previous_status:
+                    changes_for_kafka["status"] = goal.status
 
             if changes_for_kafka:
                 event = _create_outbox_event(
@@ -239,7 +368,7 @@ class GoalService:
         self,
         user_id: UUID,
         goal_id: UUID,
-    ) -> api_schemas.GoalResponse:
+    ) -> api_schemas.GoalStatusResponse:
         """Восстанавливает цель из закрытого состояния."""
         async with self.uow:
             goal = await self.uow.goals.get_by_id(user_id, goal_id)
@@ -261,6 +390,29 @@ class GoalService:
             goal_id,
             new_status,
         )
+
+    async def toggle_archive_status(
+        self,
+        user_id: UUID,
+        goal_id: UUID,
+    ) -> api_schemas.GoalArchiveResponse:
+        async with self.uow:
+            goal = await self.uow.goals.get_by_id(user_id, goal_id)
+            if not goal:
+                raise exceptions.GoalNotFoundError("Goal not found")
+
+            if goal.status not in {GoalStatus.CLOSED.value, GoalStatus.ACHIEVED.value}:
+                raise exceptions.InvalidGoalDataError(
+                    "Only closed or achieved goals can be archived"
+                )
+
+            updated = await self.uow.goals.update_fields(
+                user_id,
+                goal_id,
+                {"is_archived": not goal.is_archived},
+            )
+
+        return api_schemas.GoalArchiveResponse(is_archived=updated.is_archived)
 
     async def _change_status_logic(
         self,
@@ -343,6 +495,14 @@ class GoalService:
                     topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
                     event_data=event_achieved,
                 )
+                await self._add_goal_notification_event(
+                    "goal.achieved",
+                    achieved_goal,
+                    {
+                        "goalId": str(achieved_goal.goal_id),
+                        "name": achieved_goal.name,
+                    },
+                )
 
                 metrics.GOAL_ACHIEVEMENT_TIME.observe(
                     (
@@ -362,6 +522,8 @@ class GoalService:
                         "Goal %s reverted to ONGOING",
                         reverted_goal.goal_id,
                     )
+                else:
+                    await self._add_almost_achieved_notification_in_uow(goal)
 
     async def _check_and_process_achievement_in_uow(
         self,
@@ -379,6 +541,14 @@ class GoalService:
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
                 event_data=event,
             )
+            await self._add_goal_notification_event(
+                "goal.achieved",
+                goal,
+                {
+                    "goalId": str(goal.goal_id),
+                    "name": goal.name,
+                },
+            )
 
             metrics.GOAL_ACHIEVEMENT_TIME.observe(
                 (
@@ -392,6 +562,9 @@ class GoalService:
                 "Goal %s reverted to ONGOING",
                 goal.goal_id,
             )
+            return True
+
+        if await self._add_almost_achieved_notification_in_uow(goal):
             return True
 
         return False
@@ -442,6 +615,20 @@ class GoalService:
                             ),
                         }
                     )
+                    outbox_events.append(
+                        {
+                            "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
+                            "payload": _create_notification_event(
+                                "goal.expired",
+                                goal.user_id,
+                                {
+                                    "goalId": str(goal.goal_id),
+                                    "name": goal.name,
+                                },
+                                event_id=_notification_event_id("goal.expired", goal.goal_id),
+                            ),
+                        }
+                    )
 
                     expired_goal_ids.append(goal.goal_id)
 
@@ -481,6 +668,25 @@ class GoalService:
                             ),
                         }
                     )
+                    outbox_events.append(
+                        {
+                            "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
+                            "payload": _create_notification_event(
+                                "goal.deadline_approaching",
+                                goal.user_id,
+                                {
+                                    "goalId": str(goal.goal_id),
+                                    "name": goal.name,
+                                    "daysLeft": goal.days_left,
+                                    "currentPercent": _goal_current_percent(goal),
+                                },
+                                event_id=_notification_event_id(
+                                    "goal.deadline_approaching",
+                                    goal.goal_id,
+                                ),
+                            ),
+                        }
+                    )
                     checked_ids.append(goal.goal_id)
 
                 if outbox_events:
@@ -488,3 +694,88 @@ class GoalService:
 
                 if checked_ids:
                     await self.uow.goals.update_last_checked(checked_ids)
+
+        await self._check_missed_monthly_payments(today, batch_size)
+
+    async def _check_missed_monthly_payments(
+        self,
+        today: date,
+        batch_size: int,
+    ) -> None:
+        if today.day != 1:
+            return
+
+        period_start, period_end, month_key = _previous_month_period(today)
+        last_id: UUID | None = None
+
+        while True:
+            async with self.uow:
+                batch = await self.uow.goals.get_goals_without_income_batch(
+                    period_start=period_start,
+                    period_end=period_end,
+                    limit=batch_size,
+                    last_id=last_id,
+                )
+
+                if not batch:
+                    break
+
+                last_id = batch[-1].goal_id
+                outbox_events = [
+                    {
+                        "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
+                        "payload": _create_notification_event(
+                            "goal.payment_missed",
+                            goal.user_id,
+                            {
+                                "goalId": str(goal.goal_id),
+                                "name": goal.name,
+                            },
+                            event_id=_notification_event_id(
+                                "goal.payment_missed",
+                                goal.goal_id,
+                                month_key,
+                            ),
+                        ),
+                    }
+                    for goal in batch
+                ]
+
+                await self.uow.goals.add_outbox_events(outbox_events)
+
+    async def _add_almost_achieved_notification_in_uow(
+        self,
+        goal: models.Goal,
+    ) -> bool:
+        if goal.status != GoalStatus.ONGOING.value:
+            return False
+
+        current_percent = _goal_current_percent(goal)
+        if current_percent < 80:
+            return False
+
+        await self._add_goal_notification_event(
+            "goal.almost_achieved",
+            goal,
+            {
+                "goalId": str(goal.goal_id),
+                "name": goal.name,
+            },
+        )
+        return True
+
+    async def _add_goal_notification_event(
+        self,
+        event_name: str,
+        goal: models.Goal,
+        payload: dict,
+    ) -> None:
+        await self.uow.goals.add_outbox_event(
+            topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
+            event_data=_create_notification_event(
+                event_name,
+                goal.user_id,
+                payload,
+                event_id=_notification_event_id(event_name, goal.goal_id),
+            ),
+        )

@@ -96,6 +96,7 @@ async def process_batch(
     """Обрабатывает пакет сообщений из Kafka."""
     async with UnitOfWork(db_session_maker) as uow:
         service = GoalService(uow)
+        await uow.goals.ensure_current_partition()
 
         for message in messages:
             req_id: str | None = None
