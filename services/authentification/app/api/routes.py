@@ -228,7 +228,8 @@ async def complete_reset(
     return schemas.UnifiedResponse(status="success", action="completeReset", detail="Password reset completed.")
 
 
-@router.post("/change-password", 
+@router.post(
+    "/change-password", 
     status_code=200, 
     response_model=schemas.UnifiedResponse,
     summary="Смена пароля пользователя"
@@ -242,7 +243,8 @@ async def change_password(
     return schemas.UnifiedResponse(status="success", action="changePassword", detail="Password changed.")
 
 
-@router.get("/me", 
+@router.get(
+    "/me", 
     status_code=200, 
     response_model=schemas.UserInfo,
     summary="Получение информации о текущем пользователе"
@@ -253,7 +255,8 @@ async def get_current_user_info(
     return user
 
 
-@router.patch("/me/profile",
+@router.patch(
+    "/me/profile",
     status_code=200, 
     response_model=schemas.UnifiedResponse,
     summary="Обновление профиля пользователя"
@@ -353,7 +356,8 @@ async def get_retention_settings(
     return schemas.RetentionInfo(days=user.retention_days)
 
 
-@router.get("/sessions", 
+@router.get(
+    "/sessions", 
     status_code=200, 
     response_model=schemas.AllSessionsResponse,
     summary="Получение всех сессий пользователя"
@@ -368,7 +372,8 @@ async def get_all_user_sessions(
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
-@router.delete("/sessions/{sessionId}", 
+@router.delete(
+    "/sessions/{sessionId}", 
     status_code=200, 
     response_model=schemas.UnifiedResponse,
     summary="Ревокация сессии пользователя по ID"
@@ -446,7 +451,10 @@ async def get_jwks(
 def _get_cached_jwks(service: TokenService):
     return service.get_jwks()
 
-@router.get("/gateway-verify", include_in_schema=False)
+@router.get(
+    "/gateway-verify", 
+    include_in_schema=False
+)
 async def gateway_verify(
     request: Request, 
     token_service: TokenService = Depends(dependencies.get_token_service),

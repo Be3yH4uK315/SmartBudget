@@ -45,10 +45,11 @@ class PasswordService:
                 ex=settings.JWT.EMAIL_TOKEN_EXPIRE_SECONDS,
             )
 
-            await self.notifier.send_password_reset_email(
-                email,
-                token,
-            )
+            async with self.uow:
+                await self.notifier.send_password_reset_email(
+                    email,
+                    token,
+                )
         else:
             await asyncio.sleep(0.05)
 

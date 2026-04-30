@@ -36,13 +36,19 @@ async def on_startup(ctx):
     ctx["db_engine"] = engine
     ctx["db_session_maker"] = session_factory
     kafka = KafkaProducerWrapper()
+    last_error: Exception | None = None
     for i in range(5):
         try:
             await kafka.start()
             break
         except Exception as e:
+            last_error = e
             logger.warning(f"Kafka producer init retry {i}: {e}")
             await asyncio.sleep(2)
+
+    if not kafka._is_running:
+        raise RuntimeError("Kafka producer failed to start") from last_error
+
     ctx["kafka_producer"] = kafka
     ctx['outbox_task'] = asyncio.create_task(run_outbox_processor(ctx))
     ctx["health_task"] = asyncio.create_task(keep_alive_task())

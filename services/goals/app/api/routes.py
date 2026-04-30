@@ -68,7 +68,7 @@ async def readiness_check(request: Request) -> Response:
     return ORJSONResponse(content={"status": "ready", "components": health_status})
 
 @router.post(
-    "/",
+    "",
     response_model=schemas.CreateGoalResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Создание цели",
@@ -92,7 +92,7 @@ async def get_main_goals(
     return await service.get_main_goals(user_id)
 
 @router.get(
-    "/",
+    "",
     response_model=List[schemas.AllGoalsResponse],
     summary="Получение списка целей с фильтрами",
 )

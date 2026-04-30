@@ -13,11 +13,19 @@ router = APIRouter(tags=["Notifications"])
 
 # --- ПРОБЫ ЗДОРОВЬЯ (HEALTH CHECKS) ---
 
-@router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
+@router.get(
+    "/health/live",
+    status_code=status.HTTP_200_OK,
+    summary="Liveness probe"
+)
 async def liveness_check() -> dict:
     return {"status": "ok"}
 
-@router.get("/health/ready", status_code=status.HTTP_200_OK, summary="Readiness probe")
+@router.get(
+    "/health/ready", 
+    status_code=status.HTTP_200_OK, 
+    summary="Readiness probe"
+)
 async def readiness_check(request: Request) -> Response:
     app = request.app
     health_status = {"db": "unknown", "arq": "unknown"}
@@ -74,7 +82,10 @@ async def get_notifications(
     return await service.get_paginated_notifications(user_id, is_read, limit, offset)
 
 
-@router.get("/unread-count", summary="Получить количество непрочитанных (для бейджа)")
+@router.get(
+    "/unread-count", 
+    summary="Получить количество непрочитанных (для бейджа)"
+)
 async def get_unread_count(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -82,7 +93,10 @@ async def get_unread_count(
     return await service.get_unread_count(user_id)
 
 
-@router.patch("/{notification_id}/read", summary="Отметить одно уведомление прочитанным")
+@router.patch(
+    "/{notification_id}/read", 
+    summary="Отметить одно уведомление прочитанным"
+)
 async def mark_as_read(
     notification_id: UUID = Path(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -91,7 +105,10 @@ async def mark_as_read(
     return await service.mark_as_read(user_id, notification_id)
 
 
-@router.post("/read-all", summary="Отметить все уведомления пользователя прочитанными")
+@router.post(
+    "/read-all", 
+    summary="Отметить все уведомления пользователя прочитанными"
+)
 async def mark_all_as_read(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -101,7 +118,11 @@ async def mark_all_as_read(
 
 # --- НАСТРОЙКИ (SETTINGS) ---
 
-@router.get("/settings", response_model=schemas.NotificationSettingsResponse, summary="Получить настройки уведомлений")
+@router.get(
+    "/settings", 
+    response_model=schemas.NotificationSettingsResponse, 
+    summary="Получить настройки уведомлений"
+)
 async def get_settings(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -109,7 +130,11 @@ async def get_settings(
     return await service.get_settings(user_id)
 
 
-@router.patch("/settings", response_model=schemas.NotificationSettingsResponse, summary="Обновить настройки уведомлений")
+@router.patch(
+    "/settings", 
+    response_model=schemas.NotificationSettingsResponse, 
+    summary="Обновить настройки уведомлений"
+)
 async def update_settings(
     request: schemas.NotificationSettingsUpdate = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -118,7 +143,11 @@ async def update_settings(
     return await service.update_settings(user_id, request)
 
 
-@router.patch("/settings/status", response_model=schemas.NotificationSettingsResponse, summary="Включить/выключить уведомления")
+@router.patch(
+    "/settings/status", 
+    response_model=schemas.NotificationSettingsResponse, 
+    summary="Включить/выключить уведомления"
+)
 async def update_notifications_status(
     payload: Any = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -139,7 +168,10 @@ async def update_notifications_status(
 
 # --- BROWSER PUSH ---
 
-@router.post("/push/subscribe", summary="Сохранить browser push подписку")
+@router.post(
+    "/push/subscribe", 
+    summary="Сохранить browser push подписку"
+)
 async def subscribe_push(
     request: schemas.PushSubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -148,7 +180,10 @@ async def subscribe_push(
     return await service.subscribe_push(user_id, request.subscription)
 
 
-@router.post("/push/unsubscribe", summary="Удалить browser push подписку")
+@router.post(
+    "/push/unsubscribe", 
+    summary="Удалить browser push подписку"
+)
 async def unsubscribe_push(
     request: schemas.PushUnsubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -157,7 +192,10 @@ async def unsubscribe_push(
     return await service.unsubscribe_push(user_id, request.endpoint)
 
 
-@router.patch("", summary="Отметить все уведомления пользователя прочитанными")
+@router.patch(
+    "/read-all", 
+    summary="Отметить все уведомления пользователя прочитанными"
+)
 async def mark_all_as_read_by_contract(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -165,7 +203,10 @@ async def mark_all_as_read_by_contract(
     return await service.mark_all_as_read(user_id)
 
 
-@router.patch("/{notification_id}", summary="Отметить одно уведомление прочитанным")
+@router.patch(
+    "/{notification_id}", 
+    summary="Отметить одно уведомление прочитанным"
+)
 async def mark_as_read_by_contract(
     notification_id: UUID = Path(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),

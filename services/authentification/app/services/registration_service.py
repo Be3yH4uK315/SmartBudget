@@ -44,7 +44,8 @@ class RegistrationService:
         redis_key = redis_keys.get_verify_email_key(email)
         
         await self.redis.set(redis_key, hashed_token, ex=settings.JWT.EMAIL_TOKEN_EXPIRE_SECONDS)
-        await self.notifier.send_verification_email(email, token)
+        async with self.uow:
+            await self.notifier.send_verification_email(email, token)
 
         return "sign_up"
 
