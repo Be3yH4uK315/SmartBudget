@@ -2,7 +2,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from uuid import UUID
 
-class FeedbackRequest(BaseModel):
+def to_camel(string: str) -> str:
+    parts = string.split("_")
+    return parts[0] + "".join(word.capitalize() for word in parts[1:])
+
+class CamelModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class FeedbackRequest(CamelModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
     correct_category_id: int = Field(..., description="ID категории, которую указал юзер")
     user_id: Optional[UUID] = Field(None, description="ID пользователя (если есть)")
@@ -15,7 +25,7 @@ class FeedbackRequest(BaseModel):
             raise ValueError('Category ID must be non-negative')
         return v
 
-class CategorizationResultResponse(BaseModel):
+class CategorizationResultResponse(CamelModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
     category_id: int = Field(..., description="ID присвоенной категории")
     category_name: str = Field(..., description="Имя присвоенной категории")
@@ -23,7 +33,11 @@ class CategorizationResultResponse(BaseModel):
     source: str = Field(..., description="Источник (rules, ml, manual)")
     model_version: Optional[str] = Field(None, description="Версия модели, если source=ml")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
 
     @field_validator('confidence')
     @classmethod

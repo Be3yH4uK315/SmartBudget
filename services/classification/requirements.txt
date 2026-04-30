@@ -4,6 +4,7 @@ uvicorn
 pydantic-settings
 sqlalchemy[asyncio]
 alembic
+orjson>=3.9.15
 arq==0.26.3
 redis>=4.2.0,<6.0.0
 aiokafka
