@@ -30,6 +30,8 @@ class UnitOfWork:
                 await self._session.commit()
         finally:
             await self._session.close()
+            self._session = None
+            self._repositories = {}
     
     @property
     def session(self):

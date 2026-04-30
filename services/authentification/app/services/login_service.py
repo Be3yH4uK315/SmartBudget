@@ -120,11 +120,13 @@ class LoginService:
                         extra={"user_id": user_id_str},
                     )
 
-            await self.notifier.notify_login_failed(
-                body.email,
-                ip,
-                location,
-            )
+            async with self.uow:
+                await self.notifier.notify_login_failed(
+                    body.email,
+                    ip,
+                    location,
+                )
+                await self.uow.commit()
             raise exceptions.InvalidCredentialsError(
                 "Invalid credentials"
             )
