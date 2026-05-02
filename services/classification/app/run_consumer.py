@@ -7,6 +7,7 @@ from app.core.database import get_db_engine, get_session_factory
 from app.core.redis import close_redis_pool, create_redis_pool
 from app.infrastructure.kafka.consumer import consume_loop
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
+from init_rules import seed_rules_if_empty
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ async def main():
     
     engine = get_db_engine()
     session_maker = get_session_factory(engine)
+    await seed_rules_if_empty(session_maker)
     
     redis_pool = await create_redis_pool()
     redis_client = Redis(connection_pool=redis_pool, decode_responses=True)

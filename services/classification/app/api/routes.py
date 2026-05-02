@@ -95,11 +95,12 @@ async def readiness_check(request: Request) -> Response:
 )
 async def get_classification_result(
     transaction_id: UUID = Path(..., description="ID транзакции"),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: ClassificationService = Depends(dependencies.get_classification_service)
 ):
     """Получает результат классификации по ID транзакции (с кэшированием в Redis)."""
     try:
-        return await service.get_classification(transaction_id)
+        return await service.get_classification(user_id, transaction_id)
     except ClassificationResultNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -109,10 +110,11 @@ async def get_classification_result(
 )
 async def submit_feedback(
     body: schemas.FeedbackRequest = Body(...),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: ClassificationService = Depends(dependencies.get_classification_service),
 ):
     try:
-        await service.submit_feedback(body)
+        await service.submit_feedback(user_id, body)
         return schemas.UnifiedSuccessResponse(ok=True, detail="Feedback accepted")
     except (ClassificationResultNotFoundError, CategoryNotFoundError) as e:
         raise HTTPException(status_code=404, detail=str(e))

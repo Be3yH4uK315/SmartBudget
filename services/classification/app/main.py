@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
@@ -14,6 +13,7 @@ from app.api.routes import router as api_router
 
 from app.services.ml.manager import modelManager
 from app.services.classification.rules import ruleManager
+from init_rules import seed_rules_if_empty
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"ARQ Pool init failed (is Redis ready?): {e}")
     
     logger.info("Pre-loading models and rules...")
+    await seed_rules_if_empty(session_factory)
     await modelManager.check_for_updates(session_factory)
     await ruleManager.check_for_updates(session_factory)
 

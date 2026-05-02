@@ -67,6 +67,7 @@ def upgrade() -> None:
     op.create_index('ix_rules_priority', 'rules', ['priority'], unique=False)
     op.create_table('classification_results',
         sa.Column('classification_result_id', sa.UUID(), nullable=False),
+        sa.Column('user_id', sa.UUID(), nullable=True),
         sa.Column('transaction_id', sa.UUID(), nullable=False),
         sa.Column('category_id', sa.Integer(), nullable=False),
         sa.Column('category_name', sa.String(length=255), nullable=False),
@@ -83,6 +84,8 @@ def upgrade() -> None:
     )
     op.create_index('ix_classification_results_source', 'classification_results', ['source'], unique=False)
     op.create_index('ix_classification_results_transaction_id', 'classification_results', ['transaction_id'], unique=True)
+    op.create_index('ix_classification_results_user_id', 'classification_results', ['user_id'], unique=False)
+    op.create_index('ix_classification_results_user_transaction', 'classification_results', ['user_id', 'transaction_id'], unique=False)
     op.create_table('feedback',
         sa.Column('feedback_id', sa.UUID(), nullable=False),
         sa.Column('transaction_id', sa.UUID(), nullable=False),

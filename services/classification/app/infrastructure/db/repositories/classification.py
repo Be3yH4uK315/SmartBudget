@@ -14,12 +14,26 @@ class ClassificationResultRepository(BaseRepository):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_user_result(
+        self,
+        user_id: UUID,
+        tx_id: UUID,
+    ) -> ClassificationResult | None:
+        """Получает результат классификации только для владельца транзакции."""
+        stmt = select(ClassificationResult).where(
+            ClassificationResult.user_id == user_id,
+            ClassificationResult.transaction_id == tx_id,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def upsert(self, result: ClassificationResult) -> ClassificationResult:
         """Использует ON CONFLICT для атомарного upsert."""
         insert_stmt = (
             insert(ClassificationResult)
             .values(
                 transaction_id=result.transaction_id,
+                user_id=result.user_id,
                 category_id=result.category_id,
                 category_name=result.category_name,
                 confidence=result.confidence,
@@ -33,6 +47,7 @@ class ClassificationResultRepository(BaseRepository):
                 index_elements=[ClassificationResult.transaction_id],
                 set_={
                     "category_id": result.category_id,
+                    "user_id": result.user_id,
                     "category_name": result.category_name,
                     "confidence": result.confidence,
                     "source": result.source,

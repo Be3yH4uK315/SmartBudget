@@ -45,6 +45,10 @@ def _decimal_to_float(value: Decimal | int | float | None) -> float:
     return float(value)
 
 
+def _classification_cache_key(user_id: UUID, transaction_id: UUID) -> str:
+    return f"classification:{user_id}:{transaction_id}"
+
+
 class ClassificationService:
     """Сервис классификации."""
     def __init__(
@@ -134,11 +138,12 @@ class ClassificationService:
                     source=res_model.source.value,
                     model_version=res_model.model_version
                 )
-                await self.redis.set(
-                    f"classification:{res_model.transaction_id}", 
-                    resp.model_dump_json(), 
-                    ex=3600
-                )
+                if res_model.user_id:
+                    await self.redis.set(
+                        _classification_cache_key(res_model.user_id, res_model.transaction_id),
+                        resp.model_dump_json(),
+                        ex=3600
+                    )
 
     async def _calculate_classification(self, event: TransactionNeedCategoryEvent):
         """Внутренняя логика классификации одной транзакции."""
@@ -176,6 +181,7 @@ class ClassificationService:
 
         result = ClassificationResult(
             transaction_id=event.transaction_id,
+            user_id=event.user_id,
             category_id=final_cat_id,
             category_name=final_cat_name,
             confidence=final_conf,
@@ -210,14 +216,18 @@ class ClassificationService:
         
         return result, outbox_data, notification_event
     
-    async def get_classification(self, tx_id: UUID) -> api_schemas.CategorizationResultResponse:
+    async def get_classification(
+        self,
+        user_id: UUID,
+        tx_id: UUID,
+    ) -> api_schemas.CategorizationResultResponse:
         """Получает результат классификации по ID транзакции."""
-        cache_key = f"classification:{tx_id}"
+        cache_key = _classification_cache_key(user_id, tx_id)
         if cached := await self.redis.get(cache_key):
              return api_schemas.CategorizationResultResponse.model_validate_json(cached)
         
         async with self.uow:
-            res = await self.uow.results.get_by_transaction_id(tx_id)
+            res = await self.uow.results.get_user_result(user_id, tx_id)
             if not res:
                 raise ClassificationResultNotFoundError("Not found")
             
@@ -225,10 +235,14 @@ class ClassificationService:
             await self.redis.set(cache_key, resp.model_dump_json(), ex=3600)
             return resp
     
-    async def submit_feedback(self, body: api_schemas.FeedbackRequest) -> tuple[dict, Category, dict[str, Any] | None]:
+    async def submit_feedback(
+        self,
+        user_id: UUID,
+        body: api_schemas.FeedbackRequest,
+    ) -> tuple[dict, Category, dict[str, Any] | None]:
         """Обрабатывает обратную связь пользователя."""
         async with self.uow:
-            existing = await self.uow.results.get_by_transaction_id(body.transaction_id)
+            existing = await self.uow.results.get_user_result(user_id, body.transaction_id)
             if not existing:
                 raise ClassificationResultNotFoundError("Transaction not found")
             
@@ -239,7 +253,7 @@ class ClassificationService:
             feedback = Feedback(
                 transaction_id=body.transaction_id,
                 correct_category_id=body.correct_category_id,
-                user_id=body.user_id,
+                user_id=user_id,
                 comment=body.comment
             )
             self.uow.feedback.create(feedback)
@@ -265,10 +279,10 @@ class ClassificationService:
             )
 
             notification_event = None
-            if body.user_id and old_category_id != body.correct_category_id:
+            if old_category_id != body.correct_category_id:
                 notification_event = _notification_event(
                     "transaction.category.changed",
-                    body.user_id,
+                    user_id,
                     {
                         "transactionId": str(body.transaction_id),
                         "oldCategory": old_category_id,
@@ -285,7 +299,7 @@ class ClassificationService:
                     notification_event["eventName"],
                 )
 
-            await self.redis.delete(f"classification:{body.transaction_id}")
+            await self.redis.delete(_classification_cache_key(user_id, body.transaction_id))
             
             return event_data, correct_cat, notification_event
     
@@ -319,8 +333,9 @@ class ClassificationService:
             source=result_model.source.value,
             model_version=result_model.model_version
         )
-        await self.redis.set(
-            f"classification:{result_model.transaction_id}", 
-            resp.model_dump_json(), 
-            ex=3600
-        )
+        if result_model.user_id:
+            await self.redis.set(
+                _classification_cache_key(result_model.user_id, result_model.transaction_id),
+                resp.model_dump_json(),
+                ex=3600
+            )

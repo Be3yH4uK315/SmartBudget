@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.core.config import settings
@@ -97,8 +97,121 @@ MCC_GENERIC = {
     2: [5499], # Misc Food
 }
 
+async def _populate_rules(session) -> int:
+    total_rules = 0
+
+    # -----------------------------------------------------
+    # СЛОЙ 1: REGEX (Самый высокий приоритет: 5-15)
+    # -----------------------------------------------------
+    logger.info("Generating Regex Rules...")
+    for category_id, pattern in REGEX_RULES_LIST:
+        rule = models.Rule(
+            category_id=category_id,
+            name=f"RX: {pattern[:20]}",
+            pattern=pattern,
+            pattern_type=models.RulePatternType.REGEX,
+            priority=10,
+            mcc=None
+        )
+        session.add(rule)
+        total_rules += 1
+
+    # -----------------------------------------------------
+    # СЛОЙ 2: BRAND KEYWORDS (Средний приоритет: 40)
+    # -----------------------------------------------------
+    logger.info("Generating Keyword Rules from Categories...")
+    result = await session.execute(select(models.Category))
+    categories = result.scalars().all()
+
+    for category in categories:
+        if not category.keywords:
+            continue
+
+        for keyword in category.keywords:
+            keyword_clean = keyword.lower().strip()
+
+            if len(keyword_clean) < 3:
+                continue
+            if keyword_clean in DANGEROUS_KEYWORDS:
+                logger.warning(f"Skipping dangerous keyword: {keyword_clean}")
+                continue
+
+            rule = models.Rule(
+                category_id=category.category_id,
+                name=f"KW: {keyword_clean}",
+                pattern=keyword_clean,
+                pattern_type=models.RulePatternType.CONTAINS,
+                priority=40,
+                mcc=None
+            )
+            session.add(rule)
+            total_rules += 1
+
+    # -----------------------------------------------------
+    # СЛОЙ 3: SPECIFIC MCC (Приоритет: 60)
+    # -----------------------------------------------------
+    logger.info("Generating Specific MCC Rules...")
+    for category_id, codes in MCC_SPECIFIC.items():
+        for code in codes:
+            rule = models.Rule(
+                category_id=category_id,
+                name=f"MCC (Spec): {code}",
+                pattern=str(code),
+                pattern_type=models.RulePatternType.MCC,
+                priority=60,
+                mcc=code
+            )
+            session.add(rule)
+            total_rules += 1
+
+    # -----------------------------------------------------
+    # СЛОЙ 4: GENERIC MCC (Приоритет: 100)
+    # -----------------------------------------------------
+    logger.info("Generating Generic MCC Rules...")
+    for category_id, codes in MCC_GENERIC.items():
+        for code in codes:
+            rule = models.Rule(
+                category_id=category_id,
+                name=f"MCC (Gen): {code}",
+                pattern=str(code),
+                pattern_type=models.RulePatternType.MCC,
+                priority=100,
+                mcc=code
+            )
+            session.add(rule)
+            total_rules += 1
+
+    return total_rules
+
+
+async def seed_rules_if_empty(session_factory=None) -> int:
+    """Создаёт дефолтные правила, только если таблица rules пустая."""
+    owns_engine = session_factory is None
+    engine = None
+    if session_factory is None:
+        engine = create_async_engine(settings.DB.DB_URL)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    try:
+        async with session_factory() as session:
+            result = await session.execute(select(func.count()).select_from(models.Rule))
+            rules_count = result.scalar_one()
+            if rules_count:
+                logger.info("Classification rules already initialized: %s", rules_count)
+                return 0
+
+            logger.info("Classification rules table is empty. Seeding default rules...")
+            total_rules = await _populate_rules(session)
+            await session.commit()
+            logger.info("Created %s default classification rules.", total_rules)
+            return total_rules
+    finally:
+        if owns_engine and engine is not None:
+            await engine.dispose()
+
+
 async def init_all_rules():
-    """Инициализирует все правила в БД."""
+    """Полностью пересоздаёт правила в БД. Используется как ручной скрипт."""
     engine = create_async_engine(settings.DB.DB_URL)
     db_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -109,89 +222,7 @@ async def init_all_rules():
         await session.execute(delete(models.Rule))
         await session.commit()
 
-        total_rules = 0
-
-        # -----------------------------------------------------
-        # СЛОЙ 1: REGEX (Самый высокий приоритет: 5-15)
-        # -----------------------------------------------------
-        logger.info("Generating Regex Rules...")
-        for category_id, pattern in REGEX_RULES_LIST:
-            rule = models.Rule(
-                category_id=category_id,
-                name=f"RX: {pattern[:20]}",
-                pattern=pattern,
-                pattern_type=models.RulePatternType.REGEX,
-                priority=10,
-                mcc=None
-            )
-            session.add(rule)
-            total_rules += 1
-
-        # -----------------------------------------------------
-        # СЛОЙ 2: BRAND KEYWORDS (Средний приоритет: 40)
-        # -----------------------------------------------------
-        logger.info("Generating Keyword Rules from Categories...")
-        result = await session.execute(select(models.Category))
-        categories = result.scalars().all()
-
-        for category in categories:
-            if not category.keywords:
-                continue
-            
-            for keyword in category.keywords:
-                keyword_clean = keyword.lower().strip()
-
-                if len(keyword_clean) < 3: 
-                    continue
-                if keyword_clean in DANGEROUS_KEYWORDS:
-                    logger.warning(f"Skipping dangerous keyword: {keyword_clean}")
-                    continue
-
-                rule = models.Rule(
-                    category_id=category.category_id,
-                    name=f"KW: {keyword_clean}",
-                    pattern=keyword_clean,
-                    pattern_type=models.RulePatternType.CONTAINS,
-                    priority=40,
-                    mcc=None
-                )
-                session.add(rule)
-                total_rules += 1
-
-        # -----------------------------------------------------
-        # СЛОЙ 3: SPECIFIC MCC (Приоритет: 60)
-        # -----------------------------------------------------
-        logger.info("Generating Specific MCC Rules...")
-        for category_id, codes in MCC_SPECIFIC.items():
-            for code in codes:
-                rule = models.Rule(
-                    category_id=category_id,
-                    name=f"MCC (Spec): {code}",
-                    pattern=str(code),
-                    pattern_type=models.RulePatternType.MCC,
-                    priority=60, 
-                    mcc=code
-                )
-                session.add(rule)
-                total_rules += 1
-
-        # -----------------------------------------------------
-        # СЛОЙ 4: GENERIC MCC (Приоритет: 100)
-        # -----------------------------------------------------
-        logger.info("Generating Generic MCC Rules...")
-        for category_id, codes in MCC_GENERIC.items():
-            for code in codes:
-                rule = models.Rule(
-                    category_id=category_id,
-                    name=f"MCC (Gen): {code}",
-                    pattern=str(code),
-                    pattern_type=models.RulePatternType.MCC,
-                    priority=100,
-                    mcc=code
-                )
-                session.add(rule)
-                total_rules += 1
-
+        total_rules = await _populate_rules(session)
         await session.commit()
         logger.info(f"--- SUCCESS: Created {total_rules} high-quality rules. ---")
 
