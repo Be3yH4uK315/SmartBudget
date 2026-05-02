@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]==0.30.6
+gunicorn
+asyncpg
+alembic
+orjson
+pydantic-settings
+sqlalchemy[asyncpg]
+aiokafka
+prometheus-client
+greenlet
