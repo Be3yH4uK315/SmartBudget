@@ -13,7 +13,7 @@
 | Сервис | Язык | Назначение |
 |---------|------|------------|
 | **Authentification** | Python (FastAPI) | Аутентификация, JWT, JWKS, refresh токены |
-| **Transactions** | C# (ASP.NET Core) | Управление транзакциями |
+| **Transactions** | Python (FastAPI) | Управление транзакциями |
 | **Classification** | Python (FastAPI) | Классификация транзакций |
 | **Budget** | C# (ASP.NET Core) | Управление бюджетом и лимитами |
 | **Goals** | Python (FastAPI) | Финансовые цели и прогресс |

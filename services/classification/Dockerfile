@@ -39,6 +39,7 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
+ENV HOME=/tmp
 ENV PYTHONPATH=/app
 ENV MODEL_PATH=/models
 ENV PATH="/home/appuser/.local/bin:$PATH"

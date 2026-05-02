@@ -95,56 +95,54 @@ async def process_batch(
 ) -> None:
     """Обрабатывает пакет сообщений из Kafka."""
     async with UnitOfWork(db_session_maker) as uow:
-        service = GoalService(uow)
         await uow.goals.ensure_current_partition()
 
-        for message in messages:
-            req_id: str | None = None
-            if message.headers:
-                for key, val in message.headers:
-                    if key == "X-Request-ID":
-                        req_id = val.decode("utf-8")
-                        break
-            set_request_id(req_id)
+    service = GoalService(UnitOfWork(db_session_maker))
+
+    for message in messages:
+        req_id: str | None = None
+        if message.headers:
+            for key, val in message.headers:
+                if key == "X-Request-ID":
+                    req_id = val.decode("utf-8")
+                    break
+        set_request_id(req_id)
+
+        try:
+            data = json.loads(message.value)
+            event = schemas.TransactionEvent(**data)
+            await service.update_goal_balance(event)
+
+        except Exception as e:
+            logger.error(
+                "Processing failed for message %s. Sending to DLQ. Reason: %s",
+                message.offset,
+                e,
+            )
+
+            metrics.KAFKA_DLQ_ERRORS.labels(
+                topic=message.topic,
+                reason=type(e).__name__,
+            ).inc()
+
+            headers = [("error", str(e).encode("utf-8"))]
+            if req_id:
+                headers.append(("X-Request-ID", req_id.encode("utf-8")))
 
             try:
-                async with uow.make_savepoint():
-                    data = json.loads(message.value)
-                    event = schemas.TransactionEvent(**data)
-                    await service.update_goal_balance(event)
-
-            except Exception as e:
-                logger.error(
-                    "Processing failed for message %s. Sending to DLQ. Reason: %s",
-                    message.offset,
-                    e,
+                success = await dlq_producer.send_event(
+                    topic=settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DLQ,
+                    value=message.value,
+                    key=message.key,
+                    headers=headers,
+                    wait=True,
                 )
-                
-                metrics.KAFKA_DLQ_ERRORS.labels(
-                    topic=message.topic,
-                    reason=type(e).__name__,
-                ).inc()
+                if not success:
+                    raise RuntimeError("DLQ refused message")
 
-                headers = [("error", str(e).encode("utf-8"))]
-                if req_id:
-                    headers.append(("X-Request-ID", req_id.encode("utf-8")))
-
-                try:
-                    success = await dlq_producer.send_event(
-                        topic=settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DLQ,
-                        value=message.value,
-                        key=message.key,
-                        headers=headers,
-                        wait=True,
-                    )
-                    if not success:
-                        raise RuntimeError("DLQ refused message")
-                        
-                except Exception as dlq_error:
-                    logger.critical(
-                        "CRITICAL: Failed to send to DLQ. Stopping consumer. Error: %s",
-                        dlq_error
-                    )
-                    raise dlq_error 
-
-        await uow.commit()
+            except Exception as dlq_error:
+                logger.critical(
+                    "CRITICAL: Failed to send to DLQ. Stopping consumer. Error: %s",
+                    dlq_error,
+                )
+                raise dlq_error

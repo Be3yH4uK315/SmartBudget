@@ -57,6 +57,8 @@ def upgrade() -> None:
     op.create_table('processed_goal_transactions',
     sa.Column('transaction_id', sa.UUID(), nullable=False),
     sa.Column('goal_id', sa.UUID(), nullable=False),
+    sa.Column('amount', sa.DECIMAL(precision=12, scale=2), nullable=False),
+    sa.Column('transaction_type', sa.String(length=50), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('transaction_id', 'created_at'),
     postgresql_partition_by='RANGE (created_at)'
