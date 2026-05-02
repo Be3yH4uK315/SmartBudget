@@ -37,6 +37,7 @@ COPY --chown=appuser:appgroup ./alembic /app/alembic
 
 USER appuser
 
+ENV HOME=/tmp
 ENV PYTHONPATH=/app
 ENV PATH="/home/appuser/.local/bin:$PATH"
 
