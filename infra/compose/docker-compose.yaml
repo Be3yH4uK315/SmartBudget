@@ -42,8 +42,8 @@ services:
       - ../../infra/.env
     container_name: zookeeper
     environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
-      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT:-2181}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME:-2000}
     ports:
       - "2181:2181"
     healthcheck:
@@ -64,16 +64,16 @@ services:
       zookeeper:
         condition: service_healthy
     environment:
-      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
-      KAFKA_LISTENERS: ${KAFKA_LISTENERS}
-      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
-      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
-      ALLOW_PLAINTEXT_LISTENER: ${ALLOW_PLAINTEXT_LISTENER}
+      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT:-zookeeper:2181}
+      KAFKA_LISTENERS: ${KAFKA_LISTENERS:-INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS:-INTERNAL://kafka:29092,EXTERNAL://localhost:9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:-INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME:-INTERNAL}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR:-1}
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR:-1}
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR:-1}
+      ALLOW_PLAINTEXT_LISTENER: ${ALLOW_PLAINTEXT_LISTENER:-yes}
     ports:
       - "9092:9092"
     healthcheck:
@@ -89,9 +89,9 @@ services:
     image: postgres:16
     container_name: auth_postgres
     environment:
-      POSTGRES_USER: ${AUTH_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      POSTGRES_USER: ${AUTH_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB:-auth_db}
     ports:
       - "5433:5432"
     volumes:
@@ -106,7 +106,8 @@ services:
 
   auth_service:
     build:
-      context: ../../services/authentification/
+      context: ../..
+      dockerfile: services/authentification/Dockerfile
     env_file:
       - ../../services/authentification/.env
     container_name: auth_service
@@ -121,7 +122,6 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/authentification:/app
-      - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
     restart: unless-stopped
     command: >
@@ -139,7 +139,8 @@ services:
 
   auth_worker:
     build:
-      context: ../../services/authentification/
+      context: ../..
+      dockerfile: services/authentification/Dockerfile
     env_file:
       - ../../services/authentification/.env
     container_name: auth_worker
@@ -152,7 +153,6 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/authentification:/app
-      - geoip_data:/geoip
       - ../../services/authentification/certs:/app/certs
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
@@ -167,9 +167,9 @@ services:
     image: postgres:16
     container_name: class_postgres
     environment:
-      POSTGRES_USER: ${CLASS_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${CLASS_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${CLASS_POSTGRES_DB}
+      POSTGRES_USER: ${CLASS_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${CLASS_POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${CLASS_POSTGRES_DB:-class_db}
     ports:
       - "5434:5432"
     volumes:
@@ -184,7 +184,8 @@ services:
 
   class_service:
     build:
-      context: ../../services/classification/
+      context: ../..
+      dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_service
@@ -217,7 +218,8 @@ services:
 
   class_worker:
     build:
-      context: ../../services/classification/
+      context: ../..
+      dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_worker
@@ -244,7 +246,8 @@ services:
 
   class_consumers:
     build:
-      context: ../../services/classification/
+      context: ../..
+      dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_consumers
@@ -273,9 +276,9 @@ services:
     image: postgres:16
     container_name: transactions_postgres
     environment:
-      POSTGRES_USER: ${TRANS_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${TRANS_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${TRANS_POSTGRES_DB}
+      POSTGRES_USER: ${TRANS_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${TRANS_POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${TRANS_POSTGRES_DB:-transactions_db}
     ports:
       - "5435:5432"
     volumes:
@@ -290,7 +293,8 @@ services:
 
   transactions_service:
     build:
-      context: ../../services/transactions/
+      context: ../..
+      dockerfile: services/transactions/Dockerfile
     env_file:
       - ../../services/transactions/.env
     container_name: transactions_service
@@ -320,7 +324,8 @@ services:
 
   transactions_consumer:
     build:
-      context: ../../services/transactions/
+      context: ../..
+      dockerfile: services/transactions/Dockerfile
     env_file:
       - ../../services/transactions/.env
     container_name: transactions_consumer
@@ -341,15 +346,41 @@ services:
     networks:
       - smartbudget-net
 
+  transactions_worker:
+    build:
+      context: ../..
+      dockerfile: services/transactions/Dockerfile
+    env_file:
+      - ../../services/transactions/.env
+    container_name: transactions_worker
+    depends_on:
+      transactions_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - ../../services/transactions:/app
+    command: arq app.workers.main.WorkerSettings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "find /tmp/healthy -mmin -1 | grep -q ."]
+      interval: 20s
+      retries: 3
+      start_period: 30s
+    networks:
+      - smartbudget-net
+
   goals_postgres:
     image: postgres:16
     env_file:
       - ../../infra/.env
     container_name: goals_postgres
     environment:
-      POSTGRES_USER: ${GOALS_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${GOALS_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${GOALS_POSTGRES_DB}
+      POSTGRES_USER: ${GOALS_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${GOALS_POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${GOALS_POSTGRES_DB:-goals_db}
     ports:
       - "5436:5432"
     volumes:
@@ -364,7 +395,8 @@ services:
 
   goals_service:
     build:
-      context: ../../services/goals/
+      context: ../..
+      dockerfile: services/goals/Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_service
@@ -395,7 +427,8 @@ services:
 
   goals_worker:
     build:
-      context: ../../services/goals/
+      context: ../..
+      dockerfile: services/goals/Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_worker
@@ -419,7 +452,8 @@ services:
 
   goals_consumer:
     build:
-      context: ../../services/goals/
+      context: ../..
+      dockerfile: services/goals/Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_consumer
@@ -447,9 +481,9 @@ services:
       - ../../infra/.env
     container_name: notification_postgres
     environment:
-      POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${NOTIFICATION_POSTGRES_DB}
+      POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${NOTIFICATION_POSTGRES_DB:-notification_db}
     ports:
       - "5437:5432"
     volumes:
@@ -464,7 +498,8 @@ services:
 
   notification_service:
     build:
-      context: ../../services/notifications/
+      context: ../..
+      dockerfile: services/notifications/Dockerfile
     env_file:
       - ../../services/notifications/.env
     container_name: notification_service
@@ -495,7 +530,8 @@ services:
 
   notification_worker:
     build:
-      context: ../../services/notifications/
+      context: ../..
+      dockerfile: services/notifications/Dockerfile
     env_file:
       - ../../services/notifications/.env
     container_name: notification_worker
@@ -519,7 +555,8 @@ services:
 
   notification_consumer:
     build:
-      context: ../../services/notifications/
+      context: ../..
+      dockerfile: services/notifications/Dockerfile
     env_file:
       - ../../services/notifications/.env
     container_name: notification_consumer

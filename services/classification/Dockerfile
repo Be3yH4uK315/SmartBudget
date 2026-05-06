@@ -5,14 +5,15 @@ FROM python:${PYTHON_VERSION}-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /app
+WORKDIR /build/services/classification
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/classification/requirements.txt .
+COPY shared/python /build/shared/python
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /tmp/wheels -r requirements.txt
 
 FROM python:${PYTHON_VERSION}-slim
@@ -34,7 +35,10 @@ RUN mkdir -p /app/datasets /models /app/ml_models \
 COPY --from=builder /tmp/wheels /tmp/wheels
 RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
 
-COPY . /app
+COPY services/classification/app /app/app
+COPY services/classification/alembic.ini /app/alembic.ini
+COPY services/classification/alembic /app/alembic
+COPY services/classification/init_rules.py /app/init_rules.py
 RUN chown -R appuser:appgroup /app
 
 USER appuser
