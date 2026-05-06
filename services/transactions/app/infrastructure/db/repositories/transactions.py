@@ -25,6 +25,20 @@ class TransactionRepository:
         )
         return result.scalar_one_or_none() is not None
 
+    async def get_existing_transaction_ids(
+        self,
+        transaction_ids: list[UUID],
+    ) -> set[UUID]:
+        if not transaction_ids:
+            return set()
+
+        result = await self.db.execute(
+            select(models.Transaction.transaction_id).where(
+                models.Transaction.transaction_id.in_(transaction_ids),
+            )
+        )
+        return set(result.scalars().all())
+
     async def get_by_transaction_id(
         self,
         transaction_id: UUID,

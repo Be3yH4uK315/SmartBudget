@@ -186,7 +186,12 @@ class NotificationService:
     ) -> list[api_schemas.NotificationResponse]:
         """Получает историю уведомлений для UI."""
         async with self.uow:
-            notifications, _ = await self.uow.notifications.get_paginated(user_id, is_read, limit, offset)
+            notifications = await self.uow.notifications.list_paginated(
+                user_id,
+                is_read,
+                limit,
+                offset,
+            )
 
         return [self._notification_to_response(n) for n in notifications]
 

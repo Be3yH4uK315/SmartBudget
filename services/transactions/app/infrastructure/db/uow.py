@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
 from typing import Self
 
-from app.infrastructure.db.repositories.transactions import TransactionRepository
+from app.infrastructure.db.repositories import OutboxRepository, TransactionRepository
 
 
 class UnitOfWork:
+    """
+    Паттерн Unit of Work.
+    Управляет жизненным циклом сессии и транзакцией.
+    """
+
     def __init__(self, session_factory):
         self.session_factory = session_factory
         self._session = None
@@ -52,6 +57,11 @@ class UnitOfWork:
             raise RuntimeError("UoW not started")
         await self._session.rollback()
 
+    async def refresh(self, instance: object, attribute_names: list[str] | None = None) -> None:
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.refresh(instance, attribute_names)
+
     @asynccontextmanager
     async def make_savepoint(self):
         if self._session is None:
@@ -69,3 +79,7 @@ class UnitOfWork:
     @property
     def transactions(self) -> TransactionRepository:
         return self._get_repository(TransactionRepository)
+
+    @property
+    def outbox(self) -> OutboxRepository:
+        return self._get_repository(OutboxRepository)

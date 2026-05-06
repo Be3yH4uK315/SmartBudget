@@ -1,29 +1,35 @@
+from contextlib import asynccontextmanager
 from typing import Self
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.infrastructure.db.repositories import (
-    rules, ml, classification, outbox
+    CategoryRepository,
+    ClassificationResultRepository,
+    DatasetRepository,
+    FeedbackRepository,
+    ModelRepository,
+    OutboxRepository,
+    RuleRepository,
 )
+
 
 class UnitOfWork:
     """
-    Паттерн Unit of Work. Инкапсулирует работу с транзакциями.
+    Паттерн Unit of Work.
+    Управляет жизненным циклом сессии и транзакцией.
     """
+
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self.session_factory = session_factory
         self._session: AsyncSession | None = None
-
-        self._categories = None
-        self._rules = None
-        self._results = None
-        self._feedback = None
-        self._models = None
-        self._datasets = None
-        self._outbox = None
+        self._committed = False
+        self._repositories: dict[type, object] = {}
 
     async def __aenter__(self) -> Self:
         self._session = self.session_factory()
-        self._reset_repositories()
+        self._committed = False
+        self._repositories = {}
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -32,86 +38,80 @@ class UnitOfWork:
         try:
             if exc_type:
                 await self._session.rollback()
-            else:
+            elif not self._committed:
                 await self._session.commit()
         finally:
             await self._session.close()
             self._session = None
-            self._reset_repositories()
-    
-    async def commit(self):
-        """Фиксирует текущую транзакцию."""
-        if self._session:
-            await self._session.commit()
+            self._repositories = {}
 
-    async def rollback(self):
-        """Откатывает текущую транзакцию."""
-        if self._session:
-            await self._session.rollback()
-
-    async def close(self):
-        """Закрывает сессию."""
-        if self._session:
-            await self._session.close()
-    
-    def make_savepoint(self):
-        """Создает вложенную транзакцию (SAVEPOINT)."""
-        if not self._session:
-            raise RuntimeError("Session is not active. Use 'async with uow:' first.")
-        return self._session.begin_nested()
-
-    def _ensure_session(self) -> AsyncSession:
+    @property
+    def session(self) -> AsyncSession:
+        """Возвращает текущую сессию SQLAlchemy."""
         if self._session is None:
             raise RuntimeError("UoW not started. Use 'async with uow: ...'")
         return self._session
 
-    def _reset_repositories(self) -> None:
-        self._categories = None
-        self._rules = None
-        self._results = None
-        self._feedback = None
-        self._models = None
-        self._datasets = None
-        self._outbox = None
+    async def commit(self) -> None:
+        """Ручной коммит транзакции."""
+        await self.session.commit()
+        self._committed = True
+
+    async def rollback(self) -> None:
+        """Ручной откат транзакции."""
+        await self.session.rollback()
+
+    async def flush(self) -> None:
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.flush()
+
+    async def refresh(
+        self,
+        instance: object,
+        attribute_names: list[str] | None = None,
+    ) -> None:
+        """Метод для обновления состояния объекта из базы данных."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.refresh(instance, attribute_names)
+
+    @asynccontextmanager
+    async def make_savepoint(self):
+        """Создает точку сохранения (вложенную транзакцию)."""
+        async with self.session.begin_nested():
+            yield
+
+    def _get_repository(self, repo_cls):
+        """Инициализация репозитория."""
+        if repo_cls not in self._repositories:
+            self._repositories[repo_cls] = repo_cls(self.session)
+        return self._repositories[repo_cls]
 
     @property
-    def categories(self) -> rules.CategoryRepository:
-        if not self._categories:
-            self._categories = rules.CategoryRepository(self._ensure_session())
-        return self._categories
-    
-    @property
-    def rules(self) -> rules.RuleRepository:
-        if not self._rules:
-            self._rules = rules.RuleRepository(self._ensure_session())
-        return self._rules
+    def categories(self) -> CategoryRepository:
+        return self._get_repository(CategoryRepository)
 
     @property
-    def results(self) -> classification.ClassificationResultRepository:
-        if not self._results:
-            self._results = classification.ClassificationResultRepository(self._ensure_session())
-        return self._results
+    def rules(self) -> RuleRepository:
+        return self._get_repository(RuleRepository)
 
     @property
-    def feedback(self) -> classification.FeedbackRepository:
-        if not self._feedback:
-            self._feedback = classification.FeedbackRepository(self._ensure_session())
-        return self._feedback
-    
-    @property
-    def models(self) -> ml.ModelRepository:
-        if not self._models:
-            self._models = ml.ModelRepository(self._ensure_session())
-        return self._models
+    def results(self) -> ClassificationResultRepository:
+        return self._get_repository(ClassificationResultRepository)
 
     @property
-    def datasets(self) -> ml.DatasetRepository:
-        if not self._datasets:
-            self._datasets = ml.DatasetRepository(self._ensure_session())
-        return self._datasets
+    def feedback(self) -> FeedbackRepository:
+        return self._get_repository(FeedbackRepository)
 
     @property
-    def outbox(self) -> outbox.OutboxRepository:
-        if not self._outbox:
-            self._outbox = outbox.OutboxRepository(self._ensure_session())
-        return self._outbox
+    def models(self) -> ModelRepository:
+        return self._get_repository(ModelRepository)
+
+    @property
+    def datasets(self) -> DatasetRepository:
+        return self._get_repository(DatasetRepository)
+
+    @property
+    def outbox(self) -> OutboxRepository:
+        return self._get_repository(OutboxRepository)

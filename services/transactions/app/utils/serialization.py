@@ -3,6 +3,8 @@ from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
+import orjson
+
 
 def to_jsonable(value):
     if isinstance(value, UUID):
@@ -20,3 +22,7 @@ def to_jsonable(value):
     if isinstance(value, dict):
         return {key: to_jsonable(item) for key, item in value.items()}
     return value
+
+
+def to_json_bytes(value) -> bytes:
+    return orjson.dumps(to_jsonable(value))

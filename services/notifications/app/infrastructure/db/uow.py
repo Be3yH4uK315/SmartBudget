@@ -3,6 +3,7 @@ from typing import Self
 
 from app.infrastructure.db.repositories import NotificationRepository, SettingsRepository
 
+
 class UnitOfWork:
     """
     Паттерн Unit of Work.
@@ -53,6 +54,17 @@ class UnitOfWork:
         if self._session is None:
             raise RuntimeError("UoW not started")
         await self._session.rollback()
+
+    async def flush(self) -> None:
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.flush()
+
+    async def refresh(self, instance: object, attribute_names: list[str] | None = None) -> None:
+        """Метод для обновления состояния объекта из базы данных."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+        await self._session.refresh(instance, attribute_names)
 
     @asynccontextmanager
     async def make_savepoint(self):
