@@ -2,62 +2,45 @@ from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, status
 from fastapi.responses import ORJSONResponse
-from sqlalchemy import text
 
-from app.api import dependencies
+from app.api import dependencies, health_helpers
 from app.domain.schemas import api as schemas
 from app.services.service import GoalService
 from app.api.dependencies import GoalFilters
 
 router = APIRouter(tags=["Goals"])
 
-@router.get(
-    "/health/live",
-    status_code=status.HTTP_200_OK,
-    summary="Liveness probe"
-)
+
+@router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
 async def liveness_check() -> dict:
     """Легкая проверка."""
     return {"status": "ok"}
 
-@router.get(
-    "/health/ready",
-    status_code=status.HTTP_200_OK,
-    summary="Readiness probe"
-)
+
+@router.get("/health/ready", status_code=status.HTTP_200_OK, summary="Readiness probe")
 async def readiness_check(request: Request) -> Response:
     """Тяжелая проверка. Проверяет зависимости."""
     app = request.app
-    health_status = {
-        "db": "unknown",
-        "arq": "unknown",
-    }
+    health_status = {}
     has_error = False
 
     engine = getattr(app.state, "engine", None)
-    if not engine:
-        health_status["db"] = "disconnected"
+    db_status, db_ok = await health_helpers.get_db_health(engine)
+    health_status["db"] = db_status
+    if not db_ok:
         has_error = True
-    else:
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            health_status["db"] = "ok"
-        except Exception:
-            health_status["db"] = "failed"
-            has_error = True
+
+    redis_pool = getattr(app.state, "redis_pool", None)
+    redis_status, redis_ok = await health_helpers.get_redis_health(redis_pool)
+    health_status["redis"] = redis_status
+    if not redis_ok:
+        has_error = True
 
     arq_pool = getattr(app.state, "arq_pool", None)
-    if not arq_pool:
-        health_status["arq"] = "disconnected"
+    arq_status, arq_ok = await health_helpers.get_arq_health(arq_pool)
+    health_status["arq"] = arq_status
+    if not arq_ok:
         has_error = True
-    else:
-        try:
-            await arq_pool.ping()
-            health_status["arq"] = "ok"
-        except Exception:
-            health_status["arq"] = "failed"
-            has_error = True
 
     if has_error:
         return ORJSONResponse(
@@ -66,6 +49,7 @@ async def readiness_check(request: Request) -> Response:
         )
 
     return ORJSONResponse(content={"status": "ready", "components": health_status})
+
 
 @router.post(
     "",
@@ -80,6 +64,7 @@ async def create_goal(
 ):
     return await service.create_goal(user_id, request)
 
+
 @router.get(
     "/main",
     response_model=schemas.MainGoalsResponse,
@@ -90,6 +75,7 @@ async def get_main_goals(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.get_main_goals(user_id)
+
 
 @router.get(
     "",
@@ -107,8 +93,9 @@ async def get_goals(
         offset=filters.offset,
         tags=filters.tags_list,
         priorities=filters.priorities_list,
-        is_archived=filters.is_archived
+        is_archived=filters.is_archived,
     )
+
 
 @router.get(
     "/search",
@@ -123,6 +110,7 @@ async def search_goals(
 ):
     return await service.search_goals(user_id, query, limit)
 
+
 @router.get(
     "/{goal_id}",
     response_model=schemas.GoalResponse,
@@ -134,6 +122,7 @@ async def get_goal(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.get_goal_details(user_id, goal_id)
+
 
 @router.patch(
     "/{goal_id}",
@@ -148,6 +137,7 @@ async def update_goal(
 ):
     return await service.update_goal(user_id, goal_id, request)
 
+
 @router.patch(
     "/{goal_id}/archive",
     response_model=schemas.GoalArchiveResponse,
@@ -160,6 +150,7 @@ async def update_archived_status(
 ):
     return await service.toggle_archive_status(user_id, goal_id)
 
+
 @router.post(
     "/{goal_id}/close",
     response_model=schemas.GoalStatusResponse,
@@ -171,6 +162,7 @@ async def close_goal(
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     return await service.close_goal(user_id, goal_id)
+
 
 @router.post(
     "/{goal_id}/restore",

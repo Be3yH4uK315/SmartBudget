@@ -1,10 +1,21 @@
 from typing import Any, Optional
 from uuid import UUID
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.responses import ORJSONResponse
-from sqlalchemy import text
 
-from app.api import dependencies
+from app.api import dependencies, health_helpers
 from app.domain.schemas import api as schemas
 from app.services.service import NotificationService
 from app.api.websockets import ws_manager
@@ -13,48 +24,35 @@ router = APIRouter(tags=["Notifications"])
 
 # --- ПРОБЫ ЗДОРОВЬЯ (HEALTH CHECKS) ---
 
-@router.get(
-    "/health/live",
-    status_code=status.HTTP_200_OK,
-    summary="Liveness probe"
-)
+
+@router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
 async def liveness_check() -> dict:
     return {"status": "ok"}
 
-@router.get(
-    "/health/ready", 
-    status_code=status.HTTP_200_OK, 
-    summary="Readiness probe"
-)
+
+@router.get("/health/ready", status_code=status.HTTP_200_OK, summary="Readiness probe")
 async def readiness_check(request: Request) -> Response:
     app = request.app
-    health_status = {"db": "unknown", "arq": "unknown"}
+    health_status = {}
     has_error = False
 
     engine = getattr(app.state, "engine", None)
-    if not engine:
-        health_status["db"] = "disconnected"
+    db_status, db_ok = await health_helpers.get_db_health(engine)
+    health_status["db"] = db_status
+    if not db_ok:
         has_error = True
-    else:
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            health_status["db"] = "ok"
-        except Exception:
-            health_status["db"] = "failed"
-            has_error = True
+
+    redis_pool = getattr(app.state, "redis_pool", None)
+    redis_status, redis_ok = await health_helpers.get_redis_health(redis_pool)
+    health_status["redis"] = redis_status
+    if not redis_ok:
+        has_error = True
 
     arq_pool = getattr(app.state, "arq_pool", None)
-    if not arq_pool:
-        health_status["arq"] = "disconnected"
+    arq_status, arq_ok = await health_helpers.get_arq_health(arq_pool)
+    health_status["arq"] = arq_status
+    if not arq_ok:
         has_error = True
-    else:
-        try:
-            await arq_pool.ping()
-            health_status["arq"] = "ok"
-        except Exception:
-            health_status["arq"] = "failed"
-            has_error = True
 
     if has_error:
         return ORJSONResponse(
@@ -65,6 +63,7 @@ async def readiness_check(request: Request) -> Response:
 
 
 # --- УВЕДОМЛЕНИЯ (NOTIFICATIONS) ---
+
 
 @router.get(
     "",
@@ -82,10 +81,7 @@ async def get_notifications(
     return await service.get_paginated_notifications(user_id, is_read, limit, offset)
 
 
-@router.get(
-    "/unread-count", 
-    summary="Получить количество непрочитанных (для бейджа)"
-)
+@router.get("/unread-count", summary="Получить количество непрочитанных (для бейджа)")
 async def get_unread_count(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -94,8 +90,7 @@ async def get_unread_count(
 
 
 @router.patch(
-    "/{notification_id}/read", 
-    summary="Отметить одно уведомление прочитанным"
+    "/{notification_id}/read", summary="Отметить одно уведомление прочитанным"
 )
 async def mark_as_read(
     notification_id: UUID = Path(...),
@@ -105,10 +100,7 @@ async def mark_as_read(
     return await service.mark_as_read(user_id, notification_id)
 
 
-@router.post(
-    "/read-all", 
-    summary="Отметить все уведомления пользователя прочитанными"
-)
+@router.post("/read-all", summary="Отметить все уведомления пользователя прочитанными")
 async def mark_all_as_read(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -118,10 +110,11 @@ async def mark_all_as_read(
 
 # --- НАСТРОЙКИ (SETTINGS) ---
 
+
 @router.get(
-    "/settings", 
-    response_model=schemas.NotificationSettingsResponse, 
-    summary="Получить настройки уведомлений"
+    "/settings",
+    response_model=schemas.NotificationSettingsResponse,
+    summary="Получить настройки уведомлений",
 )
 async def get_settings(
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -131,9 +124,9 @@ async def get_settings(
 
 
 @router.patch(
-    "/settings", 
-    response_model=schemas.NotificationSettingsResponse, 
-    summary="Обновить настройки уведомлений"
+    "/settings",
+    response_model=schemas.NotificationSettingsResponse,
+    summary="Обновить настройки уведомлений",
 )
 async def update_settings(
     request: schemas.NotificationSettingsUpdate = Body(...),
@@ -144,9 +137,9 @@ async def update_settings(
 
 
 @router.patch(
-    "/settings/status", 
-    response_model=schemas.NotificationSettingsResponse, 
-    summary="Включить/выключить уведомления"
+    "/settings/status",
+    response_model=schemas.NotificationSettingsResponse,
+    summary="Включить/выключить уведомления",
 )
 async def update_notifications_status(
     payload: Any = Body(...),
@@ -168,10 +161,8 @@ async def update_notifications_status(
 
 # --- BROWSER PUSH ---
 
-@router.post(
-    "/push/subscribe", 
-    summary="Сохранить browser push подписку"
-)
+
+@router.post("/push/subscribe", summary="Сохранить browser push подписку")
 async def subscribe_push(
     request: schemas.PushSubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -180,10 +171,7 @@ async def subscribe_push(
     return await service.subscribe_push(user_id, request.subscription)
 
 
-@router.post(
-    "/push/unsubscribe", 
-    summary="Удалить browser push подписку"
-)
+@router.post("/push/unsubscribe", summary="Удалить browser push подписку")
 async def unsubscribe_push(
     request: schemas.PushUnsubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -192,10 +180,7 @@ async def unsubscribe_push(
     return await service.unsubscribe_push(user_id, request.endpoint)
 
 
-@router.patch(
-    "/read-all", 
-    summary="Отметить все уведомления пользователя прочитанными"
-)
+@router.patch("/read-all", summary="Отметить все уведомления пользователя прочитанными")
 async def mark_all_as_read_by_contract(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -203,10 +188,7 @@ async def mark_all_as_read_by_contract(
     return await service.mark_all_as_read(user_id)
 
 
-@router.patch(
-    "/{notification_id}", 
-    summary="Отметить одно уведомление прочитанным"
-)
+@router.patch("/{notification_id}", summary="Отметить одно уведомление прочитанным")
 async def mark_as_read_by_contract(
     notification_id: UUID = Path(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -217,8 +199,12 @@ async def mark_as_read_by_contract(
 
 # --- WEBSOCKETS ---
 
+
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(None, description="User ID для локального dev-доступа")):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str | None = Query(None, description="User ID для локального dev-доступа"),
+):
     """
     WebSocket для real-time уведомлений (колокольчика).
     """
@@ -232,7 +218,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(Non
     if not user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
-    
+
     await ws_manager.connect(websocket, user_id)
     try:
         while True:

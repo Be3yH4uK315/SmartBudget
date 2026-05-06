@@ -1,10 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import ORJSONResponse
 from prometheus_client import make_asgi_app
 from arq import create_pool
 from arq.connections import RedisSettings
+from redis.asyncio import ConnectionPool
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
@@ -17,25 +20,67 @@ from app.api.routes import router as notification_router
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Управление ресурсами приложения."""
-    logger.info("Application startup initiated")
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Управление ресурсами приложения уведомлений."""
+    logger.info("=== Application Startup ===")
 
     engine = get_db_engine()
     app.state.engine = engine
     app.state.db_session_maker = get_session_factory(engine)
+    logger.info("Database initialized")
 
-    app.state.arq_pool = await create_pool(
-        RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
-        default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
-    )
+    redis_pool = None
+    try:
+        redis_pool = ConnectionPool.from_url(
+            settings.ARQ.REDIS_URL,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+        app.state.redis_pool = redis_pool
+        logger.info("Redis pool initialized")
+    except Exception as e:
+        logger.error(f"Redis pool initialization failed: {e}")
+
+    arq_pool = None
+    try:
+        arq_pool = await create_pool(
+            RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
+            default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
+        )
+        app.state.arq_pool = arq_pool
+        logger.info("ARQ pool initialized")
+    except Exception as e:
+        logger.error(f"ARQ pool initialization failed: {e}")
+
     yield
-    logger.info("Application shutdown initiated")
 
-    await app.state.arq_pool.close()
-    await engine.dispose()
-    logger.info("Application shutdown complete")
+    logger.info("=== Application Shutdown ===")
+
+    if arq_pool:
+        try:
+            await arq_pool.close()
+            logger.info("ARQ pool closed")
+        except Exception as e:
+            logger.error(f"Error closing ARQ pool: {e}")
+
+    if redis_pool:
+        try:
+            await redis_pool.disconnect()
+            logger.info("Redis pool closed")
+        except Exception as e:
+            logger.error(f"Error closing Redis pool: {e}")
+
+    if engine:
+        try:
+            await engine.dispose()
+            logger.info("Database connection closed")
+        except Exception as e:
+            logger.error(f"Error disposing engine: {e}")
+
+    logger.info("=== Application Shutdown Complete ===")
+
 
 app = FastAPI(
     title="Notification Service",
@@ -46,33 +91,51 @@ app = FastAPI(
     openapi_url="/api/v1/notifications/openapi.json",
 )
 
+
 @app.middleware("http")
-async def tracing_middleware(request: Request, call_next):
-    req_id = request.headers.get("X-Request-ID") or request.headers.get("X-Correlation-ID")
+async def tracing_middleware(request: Request, call_next) -> Response:
+    """Middleware для трассировки запросов по Request ID."""
+    req_id = request.headers.get("X-Request-ID") or request.headers.get(
+        "X-Correlation-ID"
+    )
     final_id = set_request_id(req_id)
     response: Response = await call_next(request)
     response.headers["X-Request-ID"] = final_id
     return response
 
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_error_handler(
+    request: Request, exc: SQLAlchemyError
+) -> ORJSONResponse:
+    """Обработчик ошибок базы данных."""
+    logger.error("Database error: %s", exc, exc_info=True)
+    return ORJSONResponse(
+        status_code=500,
+        content={"detail": "Internal database error"},
+    )
+
 
 @app.exception_handler(exceptions.NotificationServiceError)
-async def service_exception_handler(request: Request, exc: exceptions.NotificationServiceError):
+async def service_exception_handler(
+    request: Request, exc: exceptions.NotificationServiceError
+) -> ORJSONResponse:
+    """Обработчик ошибок сервиса уведомлений."""
     status_code = 400
     if isinstance(exc, exceptions.NotificationNotFoundError):
         status_code = 404
     logger.warning("Service error: %s: %s", type(exc).__name__, exc)
     return ORJSONResponse(status_code=status_code, content={"detail": str(exc)})
 
-@app.exception_handler(SQLAlchemyError)
-async def db_error_handler(request: Request, exc: SQLAlchemyError):
-    logger.error("Database error: %s", exc, exc_info=True)
-    return ORJSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 @app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
+async def general_exception_handler(request: Request, exc: Exception) -> ORJSONResponse:
+    """Обработчик всех необработанных исключений."""
     logger.critical("Unhandled exception: %s", exc, exc_info=True)
     return ORJSONResponse(status_code=500, content={"detail": "Internal server error"})
 
+
 app.include_router(notification_router, prefix="/api/v1/notifications")
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)

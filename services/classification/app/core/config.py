@@ -1,18 +1,33 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-class DBSettings(BaseSettings):
-    DB_URL: str
-    DB_POOL_SIZE: int
-    DB_MAX_OVERFLOW: int
+from smartbudget_shared.config import (
+    DBSettings as SharedDBSettings,
+    ArqSettings as SharedArqSettings,
+    AppSettings as SharedAppSettings,
+)
 
-class ArqSettings(BaseSettings):
-    REDIS_URL: str
-    ARQ_QUEUE_NAME: str
-    REDIS_MAX_CONNECTIONS: int
+
+class DBSettings(SharedDBSettings):
+    """Настройки базы данных, унаследованные от общей конфигурации."""
+
+    pass
+
+
+class ArqSettings(SharedArqSettings):
+    """Настройки ARQ, унаследованные от общей конфигурации."""
+
+    REDIS_MAX_CONNECTIONS: int = 50
+
 
 class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_GROUP_ID: str
+    KAFKA_TOPIC: str | None = None
+    KAFKA_DLQ_TOPIC: str | None = None
+    KAFKA_AUTO_OFFSET_RESET: str = "latest"
+    KAFKA_ENABLE_AUTO_COMMIT: bool = False
+    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
+    KAFKA_BATCH_SIZE: int = 100
     TOPIC_NEED_CATEGORY: str
     TOPIC_CLASSIFIED: str
     TOPIC_UPDATED: str
@@ -20,19 +35,29 @@ class KafkaSettings(BaseSettings):
     TOPIC_NOTIFICATION_EVENTS: str = "notification.events"
     TOPIC_NEED_CATEGORY_DLQ: str = "classification.dlq"
 
+    @property
+    def consumer_topic(self) -> str:
+        return self.KAFKA_TOPIC or self.TOPIC_NEED_CATEGORY
+
+    @property
+    def dlq_topic(self) -> str:
+        return self.KAFKA_DLQ_TOPIC or self.TOPIC_NEED_CATEGORY_DLQ
+
+
 class MLSettings(BaseSettings):
     MODEL_PATH: str
     DATASET_PATH: str
     ML_CONFIDENCE_THRESHOLD_ACCEPT: float
     ML_CONFIDENCE_THRESHOLD_AUDIT: float
 
-class AppSettings(BaseSettings):
-    ENV: str
+
+class AppSettings(SharedAppSettings):
+    """Настройки приложения, унаследованные от общей конфигурации."""
+
     FRONTEND_URL: str
     PROMETHEUS_PORT: int
-    LOG_LEVEL: str
-    TZ: str
     RULES_RELOAD_INTERVAL_SECONDS: int = 30
+
 
 class Settings(BaseSettings):
     DB: DBSettings
@@ -45,7 +70,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
-        extra="ignore"
+        extra="ignore",
     )
+
 
 settings = Settings()
