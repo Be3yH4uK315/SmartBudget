@@ -1,18 +1,37 @@
-fastapi
+# --- Core dependencies (shared) ---
+fastapi>=0.110.0
 uvicorn[standard]==0.30.6
-gunicorn
-asyncpg
-alembic
+gunicorn>=21.2.0
+python-multipart>=0.0.9
+orjson>=3.9.15
+watchfiles>=0.21.0
+
+# --- Database & Migrations ---
+sqlalchemy>=2.0.29
+asyncpg>=0.29.0
+alembic>=1.13.1
+greenlet>=3.0.0
+
+# --- Redis, Tasks & Messaging ---
 redis==5.0.1
-orjson
-pydantic-settings
-sqlalchemy[asyncpg]
 arq==0.27.0
-prometheus-client
-prometheus-fastapi-instrumentator
-aiokafka
-aiosmtplib
-pywebpush
-jinja2
+aiokafka>=0.10.0
+
+# --- Monitoring & Instrumentation ---
+prometheus-client>=0.18.0
+prometheus-fastapi-instrumentator>=6.1.0
+-e ../../shared/python
+
+# --- Settings & Validation ---
+pydantic-settings>=2.0.0
+pydantic>=2.0.0
+
+# --- Utilities ---
+python-dotenv>=1.0.0
+
+# --- Email & Notifications (notifications service specific) ---
+aiosmtplib>=3.0.1
+pywebpush>=1.14.0
+jinja2>=3.1.0
 websockets==12.0
 wsproto==1.2.0

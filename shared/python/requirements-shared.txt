@@ -1,4 +1,6 @@
-# --- Core dependencies (shared) ---
+# --- Shared dependencies for all SmartBudget services ---
+
+# --- Core Framework & Server ---
 fastapi>=0.110.0
 uvicorn[standard]==0.30.6
 gunicorn>=21.2.0
@@ -20,7 +22,6 @@ aiokafka>=0.10.0
 # --- Monitoring & Instrumentation ---
 prometheus-client>=0.18.0
 prometheus-fastapi-instrumentator>=6.1.0
--e ../../shared/python
 
 # --- Settings & Validation ---
 pydantic-settings>=2.0.0
@@ -28,15 +29,3 @@ pydantic>=2.0.0
 
 # --- Utilities ---
 python-dotenv>=1.0.0
-
-# --- Auth & Security (authentication service specific) ---
-pyjwt>=2.8.0
-bcrypt>=4.1.2
-cryptography>=42.0.5
-fastapi-limiter==0.1.6
-
-# --- Email & Geo ---
-dadata>=21.10.1
-user-agents>=2.2.0
-aiosmtplib>=3.0.1
-email-validator>=2.1.1
