@@ -2,20 +2,21 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import List
+from typing import Any
+
 from aiokafka import AIOKafkaConsumer
 
 from app.core.config import settings
 from app.domain.schemas.kafka import TransactionNeedCategoryEvent
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
+from app.services.classification.rules import ruleManager
 from app.services.classification.service import ClassificationService
 from app.services.ml.manager import modelManager
-from app.services.classification.rules import ruleManager
 
 logger = logging.getLogger(__name__)
 HEALTH_FILE = Path("/tmp/healthy")
-BATCH_SIZE = 100
+
 
 async def keep_alive_task() -> None:
     while True:
@@ -25,115 +26,202 @@ async def keep_alive_task() -> None:
             pass
         await asyncio.sleep(5)
 
-async def consume_loop(
-    redis_client,
-    db_session_maker,
-    dlq_producer: KafkaProducerWrapper,
-) -> None:
-    """Основной цикл потребителя."""
-    logger.info("Initializing consumer...")
-    consumer = AIOKafkaConsumer(
-        settings.KAFKA.TOPIC_NEED_CATEGORY,
-        bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
-        group_id=settings.KAFKA.KAFKA_GROUP_ID,
-        enable_auto_commit=False,
-        auto_offset_reset="latest",
-        max_poll_records=BATCH_SIZE,
-    )
 
-    await consumer.start()
-    logger.info("Kafka consumer started")
-    health_task = asyncio.create_task(keep_alive_task())
+def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | None:
+    if not headers:
+        return None
 
-    try:
-        while True:
-            await modelManager.check_for_updates(db_session_maker)
-            await ruleManager.check_for_updates(db_session_maker)
+    for key, value in headers:
+        if key == "X-Request-ID":
+            return value.decode("utf-8")
+    return None
 
-            result = await consumer.getmany(
-                timeout_ms=1000,
-                max_records=BATCH_SIZE,
+
+class KafkaConsumerWorker:
+    """
+    Рабочий класс для потребления сообщений из Kafka, 
+    классификации транзакций и обработки ошибок с отправкой в DLQ
+    """
+
+    def __init__(
+        self,
+        redis_client: Any,
+        db_session_maker: Any,
+        dlq_producer: KafkaProducerWrapper,
+    ) -> None:
+        self.redis_client = redis_client
+        self.db_session_maker = db_session_maker
+        self.dlq_producer = dlq_producer
+        self.consumer: AIOKafkaConsumer | None = None
+        self.health_task: asyncio.Task | None = None
+
+    @property
+    def topic(self) -> str:
+        return settings.KAFKA.consumer_topic
+
+    @property
+    def group_id(self) -> str:
+        return settings.KAFKA.KAFKA_GROUP_ID
+
+    def _build_consumer(self) -> AIOKafkaConsumer:
+        return AIOKafkaConsumer(
+            self.topic,
+            bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
+            group_id=self.group_id,
+            enable_auto_commit=settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT,
+            auto_offset_reset=settings.KAFKA.KAFKA_AUTO_OFFSET_RESET,
+            security_protocol=settings.KAFKA.KAFKA_SECURITY_PROTOCOL,
+            max_poll_records=settings.KAFKA.KAFKA_BATCH_SIZE,
+        )
+
+    async def run(self) -> None:
+        self.consumer = self._build_consumer()
+
+        try:
+            await self.consumer.start()
+            self.health_task = asyncio.create_task(keep_alive_task())
+            logger.info(
+                "Kafka worker started",
+                extra={"topic": self.topic, "group_id": self.group_id},
             )
 
-            for tp, messages in result.items():
-                if not messages:
-                    continue
+            while True:
+                await modelManager.check_for_updates(self.db_session_maker)
+                await ruleManager.check_for_updates(self.db_session_maker)
 
-                await process_batch(
-                    messages,
-                    redis_client,
-                    db_session_maker,
-                    dlq_producer,
+                batches = await self.consumer.getmany(
+                    timeout_ms=1000,
+                    max_records=settings.KAFKA.KAFKA_BATCH_SIZE,
                 )
 
-            await consumer.commit()
+                for _, messages in batches.items():
+                    if messages:
+                        await self.process_batch(messages)
 
-    except asyncio.CancelledError:
-        logger.info("Kafka consumer loop cancelled")
-    except Exception as e:
-        logger.critical("Fatal consumer error: %s", e, exc_info=True)
-    finally:
-        health_task.cancel()
-        await consumer.stop()
+                if batches and not settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT:
+                    await self.consumer.commit()
 
-async def process_batch(
-    messages: List,
-    redis_client,
-    db_session_maker,
+        except asyncio.CancelledError:
+            logger.info(
+                "Kafka worker shutdown requested",
+                extra={"topic": self.topic, "group_id": self.group_id},
+            )
+            raise
+        except Exception:
+            logger.exception(
+                "Kafka worker failed",
+                extra={"topic": self.topic, "group_id": self.group_id},
+            )
+            raise
+        finally:
+            await self.shutdown()
+
+    async def shutdown(self) -> None:
+        if self.health_task:
+            self.health_task.cancel()
+            try:
+                await self.health_task
+            except asyncio.CancelledError:
+                pass
+
+        if self.consumer:
+            await self.consumer.stop()
+            logger.info(
+                "Kafka worker stopped",
+                extra={"topic": self.topic, "group_id": self.group_id},
+            )
+
+    async def process_batch(self, messages: list[Any]) -> None:
+        pipeline = modelManager.get_pipeline()
+        rules = ruleManager.get_rules()
+
+        async with UnitOfWork(self.db_session_maker) as uow:
+            service = ClassificationService(uow, self.redis_client, pipeline, rules)
+
+            for message in messages:
+                await self.handle_message(message, service, uow)
+
+            await uow.commit()
+
+    async def handle_message(
+        self,
+        message: Any,
+        service: ClassificationService,
+        uow: UnitOfWork,
+    ) -> None:
+        logger.info(
+            "Kafka message received",
+            extra={
+                "topic": message.topic,
+                "partition": message.partition,
+                "offset": message.offset,
+            },
+        )
+
+        req_id = _request_id_from_headers(message.headers)
+
+        try:
+            async with uow.make_savepoint():
+                payload = json.loads(message.value)
+                event = TransactionNeedCategoryEvent.model_validate(payload)
+                await self.process_event(event, service)
+
+            logger.info(
+                "Kafka message processed",
+                extra={"topic": message.topic, "offset": message.offset},
+            )
+        except Exception as exc:
+            logger.exception(
+                "Kafka message processing failed",
+                extra={"topic": message.topic, "offset": message.offset},
+            )
+            await self.send_to_dlq(message, exc, req_id)
+
+    async def process_event(
+        self,
+        event: TransactionNeedCategoryEvent,
+        service: ClassificationService,
+    ) -> None:
+        await service.classify_transaction(event)
+
+    async def send_to_dlq(
+        self,
+        message: Any,
+        exc: Exception,
+        request_id: str | None,
+    ) -> None:
+        headers = [("error", str(exc).encode("utf-8"))]
+        if request_id:
+            headers.append(("X-Request-ID", request_id.encode("utf-8")))
+
+        success = await self.dlq_producer.send_event(
+            topic=settings.KAFKA.dlq_topic,
+            value=message.value,
+            key=message.key,
+            headers=headers,
+            wait=True,
+        )
+        if not success:
+            logger.critical(
+                "Kafka DLQ publish failed",
+                extra={"topic": message.topic, "offset": message.offset},
+            )
+            raise RuntimeError("DLQ refused message")
+
+        logger.warning(
+            "Kafka message sent to DLQ",
+            extra={
+                "topic": message.topic,
+                "offset": message.offset,
+                "dlq_topic": settings.KAFKA.dlq_topic,
+            },
+        )
+
+
+async def consume_loop(
+    redis_client: Any,
+    db_session_maker: Any,
     dlq_producer: KafkaProducerWrapper,
 ) -> None:
-    """Обрабатывает пакет сообщений."""
-    pipeline = modelManager.get_pipeline()
-    rules = ruleManager.get_rules()
-
-    async with UnitOfWork(db_session_maker) as uow:
-        service = ClassificationService(uow, redis_client, pipeline, rules)
-
-        for message in messages:
-            req_id: str | None = None
-            if message.headers:
-                for key, val in message.headers:
-                    if key == "X-Request-ID":
-                        req_id = val.decode("utf-8")
-                        break
-
-            try:
-                async with uow.make_savepoint():
-                    try:
-                        data = json.loads(message.value)
-                        event = TransactionNeedCategoryEvent(**data)
-                    except Exception as json_err:
-                        raise ValueError(f"JSON Error: {json_err}")
-
-                    await service.classify_transaction(event)
-
-            except Exception as e:
-                logger.error(
-                    "Processing failed for message %s. Sending to DLQ. Reason: %s",
-                    message.offset,
-                    e,
-                )
-
-                headers = [("error", str(e).encode("utf-8"))]
-                if req_id:
-                    headers.append(("X-Request-ID", req_id.encode("utf-8")))
-
-                try:
-                    success = await dlq_producer.send_event(
-                        topic=settings.KAFKA.TOPIC_NEED_CATEGORY_DLQ,
-                        value=message.value,
-                        key=message.key,
-                        headers=headers,
-                        wait=True,
-                    )
-                    if not success:
-                        raise RuntimeError("DLQ refused message")
-
-                except Exception as dlq_error:
-                    logger.critical(
-                        "CRITICAL: Failed to send to DLQ. Stopping consumer. Error: %s",
-                        dlq_error
-                    )
-                    raise dlq_error 
-
-        await uow.commit()
+    worker = KafkaConsumerWorker(redis_client, db_session_maker, dlq_producer)
+    await worker.run()

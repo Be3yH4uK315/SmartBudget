@@ -54,7 +54,7 @@ async def process_outbox_batch(ctx) -> int:
     await touch_health_file()
 
     async with UnitOfWork(db_maker) as uow:
-        events = await uow.goals.get_pending_outbox_events(limit=200)
+        events = await uow.outbox.get_pending_events(limit=200)
 
         if not events:
             return 0
@@ -134,7 +134,7 @@ async def process_outbox_batch(ctx) -> int:
                     event.next_retry_at = now + timedelta(seconds=delay)
 
         if successful_ids:
-            await uow.goals.delete_outbox_events(successful_ids)
+            await uow.outbox.delete_events(successful_ids)
 
         await uow.commit()
         return len(successful_ids)
