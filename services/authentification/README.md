@@ -105,8 +105,9 @@ Sessions)  Tokens)      user.login, etc)  Tasks)
    - Управление сессиями и токенами
    - Отправка Kafka событий
 
-3. **Repository Layer** (`infrastructure/db/repositories.py`)
+3. **Repository Layer** (`infrastructure/db/repositories/`)
    - CRUD операции с пользователями и сессиями
+   - Outbox репозиторий для Kafka событий
    - SQLAlchemy ORM запросы
    - Unit of Work паттерн
 
@@ -460,7 +461,7 @@ authentification/
 │   │   ├── db/
 │   │   │   ├── base.py               # Base ORM model
 │   │   │   ├── models.py             # SQLAlchemy models (User, Session)
-│   │   │   ├── repositories.py       # CRUD operations (UserRepo, SessionRepo)
+│   │   │   ├── repositories/         # CRUD/outbox repositories
 │   │   │   └── uow.py                # Unit of Work паттерн
 │   │   └── kafka/
 │   │       └── producer.py           # Kafka producer для событий
