@@ -4,7 +4,7 @@ FROM python:${PYTHON_VERSION}-slim as builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /tmp
+WORKDIR /build/services/notifications
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/notifications/requirements.txt .
+COPY shared/python /build/shared/python
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /tmp/wheels -r requirements.txt
 
 FROM python:${PYTHON_VERSION}-slim
@@ -30,10 +31,10 @@ RUN addgroup --system appgroup && adduser --system --group appuser
 COPY --from=builder /tmp/wheels /tmp/wheels
 RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
 
-COPY --chown=appuser:appgroup ./app /app/app
-COPY --chown=appuser:appgroup ./i18n /app/i18n
-COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini
-COPY --chown=appuser:appgroup ./alembic /app/alembic
+COPY --chown=appuser:appgroup services/notifications/app /app/app
+COPY --chown=appuser:appgroup services/notifications/i18n /app/i18n
+COPY --chown=appuser:appgroup services/notifications/alembic.ini /app/alembic.ini
+COPY --chown=appuser:appgroup services/notifications/alembic /app/alembic
 
 USER appuser
 

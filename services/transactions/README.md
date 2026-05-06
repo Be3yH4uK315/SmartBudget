@@ -11,8 +11,8 @@ FastAPI-сервис транзакций.
 - `GET /{transaction_id}` - транзакция по `transactionId`
 - `POST /manual` - ручное создание транзакции
 - `POST /import/mock` - импорт одного объекта или массива транзакций
-- `PATCH /edit/{transaction_id}` - смена категории, принимает `{ "categoryId": 2 }`, число или `null`
-- `DELETE /edit/{transaction_id}` - удаление транзакции
+- `PATCH /{transaction_id}` - смена категории, принимает `{ "categoryId": 2 }`, число или `null`
+- `DELETE /{transaction_id}` - удаление транзакции
 - `GET /goals/{account_id}` - агрегация транзакций цели по месяцам
 - `GET /health`, `/health/live`, `/health/ready` - health checks
 
@@ -22,7 +22,13 @@ API Gateway. Если `POST /import/mock` вызывается с `X-User-Id`, �
 
 ## Kafka
 
-Публикует:
+API-слой не отправляет Kafka-события напрямую. События сохраняются в
+`outbox_events` в той же транзакции БД, что и изменение `transactions`.
+Контейнер `transactions_worker` вычитывает outbox и отправляет события в
+Kafka с retry/backoff. `transactions_consumer` отвечает только за входящие
+Kafka-события классификации.
+
+Публикует через outbox:
 
 - `transaction.new`
 - `transaction.imported`
@@ -46,6 +52,8 @@ KAFKA__KAFKA_BOOTSTRAP_SERVERS=kafka:29092
 KAFKA__KAFKA_GROUP_ID=transactions-service
 APP__GOAL_CATEGORY_ID=24
 KAFKA__KAFKA_TOPIC_NOTIFICATION_EVENTS=notification.events
+ARQ__REDIS_URL=redis://redis_cache:6379/0
+ARQ__ARQ_QUEUE_NAME=transactions_tasks
 ```
 
 ## Локальный запуск
@@ -62,5 +70,11 @@ uvicorn app.main:app --reload --port 8000
 python -m app.run_consumer
 ```
 
-В `infra/compose/docker-compose.yaml` consumer запускается отдельным
-контейнером `transactions_consumer`, как в других Python-сервисах проекта.
+Отдельный worker outbox:
+
+```bash
+arq app.workers.main.WorkerSettings
+```
+
+В `infra/compose/docker-compose.yaml` consumer и worker запускаются отдельными
+контейнерами `transactions_consumer` и `transactions_worker`.

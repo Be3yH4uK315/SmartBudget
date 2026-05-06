@@ -129,7 +129,7 @@ async def process_outbox_task(ctx) -> int:
     await touch_health_file()
     
     async with UnitOfWork(db_maker) as uow:
-        events = await uow.users.get_pending_outbox_events(limit=200)
+        events = await uow.outbox.get_pending_events(limit=200)
         
         if not events: 
             return 0
@@ -180,7 +180,7 @@ async def process_outbox_task(ctx) -> int:
                 uow.session.add(event)
 
         if successful_ids:
-            await uow.users.delete_outbox_events(successful_ids)
+            await uow.outbox.delete_events(successful_ids)
             logger.info(f"Processed {len(successful_ids)} outbox events")
 
         await uow.commit()
@@ -211,7 +211,7 @@ async def cleanup_failed_outbox_task(ctx) -> None:
 
     try:
         async with UnitOfWork(db_maker) as uow:
-            deleted_count = await uow.users.delete_old_failed_events(retention_days=7)
+            deleted_count = await uow.outbox.delete_old_failed_events(retention_days=7)
             
             if deleted_count > 0:
                 logger.info(f"Cleaned up {deleted_count} old failed outbox events")

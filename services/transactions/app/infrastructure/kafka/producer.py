@@ -62,3 +62,65 @@ class KafkaProducerWrapper:
         except Exception as exc:
             logger.error("Kafka send error to %s: %s", topic, exc, exc_info=True)
             return False
+
+    async def send_event(
+        self,
+        topic: str,
+        value: bytes,
+        key: bytes | None = None,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> bool:
+        if not self._is_running:
+            logger.error("Kafka producer is not running")
+            return False
+
+        try:
+            await asyncio.wait_for(
+                self.producer.send_and_wait(
+                    topic=topic,
+                    key=key,
+                    value=value,
+                    headers=headers,
+                ),
+                timeout=SEND_TIMEOUT,
+            )
+            return True
+        except Exception as exc:
+            logger.error("Kafka send error to %s: %s", topic, exc, exc_info=True)
+            return False
+
+    async def send_batch(self, events: list[dict[str, Any]]) -> list[bool]:
+        if not self._is_running:
+            logger.error("Kafka producer is not running")
+            return [False] * len(events)
+
+        futures: list[asyncio.Future] = []
+        for event in events:
+            try:
+                futures.append(
+                    self.producer.send(
+                        topic=event["topic"],
+                        key=event.get("key"),
+                        value=event["value"],
+                        headers=event.get("headers"),
+                    )
+                )
+            except Exception as exc:
+                future = asyncio.get_running_loop().create_future()
+                future.set_exception(exc)
+                futures.append(future)
+
+        try:
+            await asyncio.wait_for(self.producer.flush(), timeout=SEND_TIMEOUT)
+        except Exception as exc:
+            logger.error("Kafka flush failed: %s", exc, exc_info=True)
+
+        results = await asyncio.gather(*futures, return_exceptions=True)
+        statuses: list[bool] = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error("Kafka batch send error: %s", result, exc_info=True)
+                statuses.append(False)
+            else:
+                statuses.append(True)
+        return statuses

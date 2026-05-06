@@ -49,10 +49,16 @@ async def on_startup(ctx: dict) -> None:
 
 async def on_shutdown(ctx: dict) -> None:
     """Очистка ресурсов при завершении работы воркера."""
-    logger.info("Shutting down Notification Arq Worker...")
+    logger.info("ARQ worker shutting down")
     health_task = ctx.get("health_task")
     if health_task:
         health_task.cancel()
+        try:
+            await health_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("ARQ worker stopped")
+
 
 class WorkerSettings:
     """Настройки воркера ARQ."""

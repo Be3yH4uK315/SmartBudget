@@ -5,7 +5,7 @@ FROM python:${PYTHON_VERSION}-slim as builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /tmp
+WORKDIR /build/services/authentification
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/authentification/requirements.txt .
+COPY shared/python /build/shared/python
 
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /tmp/wheels -r requirements.txt
 
@@ -33,10 +34,10 @@ RUN addgroup --system appgroup && adduser --system --group appuser
 COPY --from=builder /tmp/wheels /tmp/wheels
 RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
 
-COPY --chown=appuser:appgroup ./app /app/app
-COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini
-COPY --chown=appuser:appgroup ./alembic /app/alembic
-COPY --chown=appuser:appgroup ./certs /app/certs
+COPY --chown=appuser:appgroup services/authentification/app /app/app
+COPY --chown=appuser:appgroup services/authentification/alembic.ini /app/alembic.ini
+COPY --chown=appuser:appgroup services/authentification/alembic /app/alembic
+COPY --chown=appuser:appgroup services/authentification/certs /app/certs
 
 USER appuser
 

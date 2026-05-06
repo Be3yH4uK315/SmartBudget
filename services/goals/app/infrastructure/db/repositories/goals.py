@@ -2,8 +2,8 @@ import logging
 import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Optional
-from uuid import UUID, uuid4
+from typing import Optional
+from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy import (
     case,
@@ -13,17 +13,14 @@ from sqlalchemy import (
     select,
     text,
     update,
-    or_,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError, DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import exceptions
-from app.core.context import get_request_id
 from app.domain.enums import GoalPriority, GoalStatus, TransactionType
 from app.infrastructure.db import models
-from app.utils import serialization
 
 logger = logging.getLogger(__name__)
 
@@ -533,95 +530,3 @@ class GoalRepository:
                 models.GoalNotification.goal_id == goal_id
             )
         )
-
-    def _prepare_outbox_event(
-        self,
-        topic: str,
-        event_data: dict,
-    ) -> dict:
-        """Готовит данные для вставки в outbox_events."""
-        event_type = event_data.get("event_type")
-        if not event_type:
-            event_type = event_data.get("eventName", "unknown")
-
-        clean_payload = serialization.recursive_normalize(event_data)
-        current_trace_id = get_request_id()
-
-        return {
-            "event_id": uuid4(),
-            "topic": topic,
-            "event_type": event_type,
-            "payload": clean_payload,
-            "status": "pending",
-            "retry_count": 0,
-            "created_at": datetime.now(timezone.utc),
-            "trace_id": current_trace_id,
-            "next_retry_at": None,
-        }
-
-    async def add_outbox_events(
-        self,
-        events: list[dict[str, Any]],
-    ) -> None:
-        """Добавляет несколько событий в outbox_events."""
-        if not events:
-            return
-
-        clean_events = [
-            self._prepare_outbox_event(
-                e["topic"],
-                e.get("payload", e),
-            )
-            for e in events
-        ]
-
-        stmt = insert(models.OutboxEvent).values(clean_events)
-        await self.db.execute(stmt)
-
-    async def add_outbox_event(
-        self,
-        topic: str,
-        event_data: dict,
-    ) -> None:
-        """Добавляет одно событие в outbox_events."""
-        await self.add_outbox_events(
-            [{"topic": topic, "payload": event_data}]
-        )
-
-    async def get_pending_outbox_events(
-        self,
-        limit: int = 100,
-    ) -> list[models.OutboxEvent]:
-        """Берёт события, готовые к отправке."""
-        now = datetime.now(timezone.utc)
-
-        query = (
-            select(models.OutboxEvent)
-            .where(
-                models.OutboxEvent.status == "pending",
-                or_(
-                    models.OutboxEvent.next_retry_at.is_(None),
-                    models.OutboxEvent.next_retry_at <= now,
-                ),
-            )
-            .order_by(models.OutboxEvent.created_at.asc())
-            .limit(limit)
-            .with_for_update(skip_locked=True)
-        )
-
-        result = await self.db.execute(query)
-        return result.scalars().all()
-
-    async def delete_outbox_events(
-        self,
-        event_ids: list[UUID],
-    ) -> None:
-        """Удаляет успешно отправленные события из outbox_events."""
-        if not event_ids:
-            return
-
-        stmt = delete(models.OutboxEvent).where(
-            models.OutboxEvent.event_id.in_(event_ids)
-        )
-
-        await self.db.execute(stmt)

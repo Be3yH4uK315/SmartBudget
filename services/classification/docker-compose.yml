@@ -86,8 +86,8 @@ services:
 
   categorization_service:
     build:
-      context: ../../services/classification/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_service_dev
@@ -120,8 +120,8 @@ services:
 
   categorization_worker:
     build:
-      context: ../../services/classification/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_worker_dev
@@ -144,8 +144,8 @@ services:
 
   categorization_consumers:
     build:
-      context: ../../services/classification/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
     container_name: class_consumers_dev

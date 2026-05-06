@@ -43,7 +43,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_transactions_user_id"), "transactions", ["user_id"], unique=False)
-    op.create_index(op.f("ix_transactions_transaction_id"), "transactions", ["transaction_id"], unique=False)
+    op.create_index(op.f("ix_transactions_transaction_id"), "transactions", ["transaction_id"], unique=True)
     op.create_index(op.f("ix_transactions_account_id"), "transactions", ["account_id"], unique=False)
     op.create_index(op.f("ix_transactions_category_id"), "transactions", ["category_id"], unique=False)
     op.create_index("ix_transactions_user_created", "transactions", ["user_id", "created_at"], unique=False)
@@ -53,9 +53,27 @@ def upgrade() -> None:
         ["user_id", "category_id", "type", "created_at"],
         unique=False,
     )
+    op.create_table(
+        "outbox_events",
+        sa.Column("event_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("topic", sa.String(length=255), nullable=False),
+        sa.Column("event_type", sa.String(length=255), nullable=False),
+        sa.Column("payload", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("retry_count", sa.Integer(), nullable=False),
+        sa.Column("status", sa.String(length=50), nullable=False),
+        sa.Column("trace_id", sa.String(length=255), nullable=True),
+        sa.Column("next_retry_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("event_id"),
+    )
+    op.create_index("ix_outbox_created_at_status", "outbox_events", ["created_at", "status"], unique=False)
+    op.create_index("ix_outbox_processing", "outbox_events", ["status", "next_retry_at"], unique=False)
 
 
 def downgrade() -> None:
+    op.drop_index("ix_outbox_processing", table_name="outbox_events")
+    op.drop_index("ix_outbox_created_at_status", table_name="outbox_events")
+    op.drop_table("outbox_events")
     op.drop_index("ix_transactions_filters", table_name="transactions")
     op.drop_index("ix_transactions_user_created", table_name="transactions")
     op.drop_index(op.f("ix_transactions_category_id"), table_name="transactions")

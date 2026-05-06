@@ -20,13 +20,9 @@ async def get_uow(request: Request) -> UnitOfWork:
 
 
 def get_transaction_service(
-    request: Request,
     uow: UnitOfWork = Depends(get_uow),
 ) -> TransactionService:
-    return TransactionService(
-        uow,
-        getattr(request.app.state, "kafka_producer", None),
-    )
+    return TransactionService(uow)
 
 
 async def get_current_user_id(request: Request) -> UUID:

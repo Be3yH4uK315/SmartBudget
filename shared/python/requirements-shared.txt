@@ -1,0 +1,31 @@
+# --- Shared dependencies for all SmartBudget services ---
+
+# --- Core Framework & Server ---
+fastapi>=0.110.0
+uvicorn[standard]==0.30.6
+gunicorn>=21.2.0
+python-multipart>=0.0.9
+orjson>=3.9.15
+watchfiles>=0.21.0
+
+# --- Database & Migrations ---
+sqlalchemy>=2.0.29
+asyncpg>=0.29.0
+alembic>=1.13.1
+greenlet>=3.0.0
+
+# --- Redis, Tasks & Messaging ---
+redis==5.0.1
+arq==0.27.0
+aiokafka>=0.10.0
+
+# --- Monitoring & Instrumentation ---
+prometheus-client>=0.18.0
+prometheus-fastapi-instrumentator>=6.1.0
+
+# --- Settings & Validation ---
+pydantic-settings>=2.0.0
+pydantic>=2.0.0
+
+# --- Utilities ---
+python-dotenv>=1.0.0

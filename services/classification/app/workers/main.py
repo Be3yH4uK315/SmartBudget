@@ -1,24 +1,26 @@
 import asyncio
 import logging
 from pathlib import Path
+
 from arq.connections import RedisSettings
 from arq.cron import cron
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
-from app.core.logging import setup_logging
 from app.core.database import get_db_engine
+from app.core.logging import setup_logging
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 
 from app.workers.ml_tasks import (
-    build_dataset_task, 
-    retrain_model_task, 
-    promote_model_task
+    build_dataset_task,
+    promote_model_task,
+    retrain_model_task,
 )
 from app.workers.system_tasks import run_outbox_processor, cleanup_sessions_task
 
 logger = logging.getLogger(__name__)
 HEALTH_FILE = Path("/tmp/healthy")
+
 
 async def keep_alive_task() -> None:
     while True:
@@ -28,68 +30,90 @@ async def keep_alive_task() -> None:
             pass
         await asyncio.sleep(5)
 
-async def on_startup(ctx):
+
+async def on_startup(ctx) -> None:
+    """Инициализация ресурсов ARQ worker при запуске."""
     setup_logging()
-    
+    logger.info("ARQ worker starting")
+
     engine = get_db_engine()
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
     ctx["db_engine"] = engine
     ctx["db_session_maker"] = session_factory
+
     kafka = KafkaProducerWrapper()
     last_error: Exception | None = None
-    for i in range(5):
+    for attempt in range(1, 6):
         try:
             await kafka.start()
             break
-        except Exception as e:
-            last_error = e
-            logger.warning(f"Kafka producer init retry {i}: {e}")
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Kafka producer start retry failed",
+                extra={"attempt": attempt},
+                exc_info=True,
+            )
             await asyncio.sleep(2)
 
     if not kafka._is_running:
         raise RuntimeError("Kafka producer failed to start") from last_error
 
     ctx["kafka_producer"] = kafka
-    ctx['outbox_task'] = asyncio.create_task(run_outbox_processor(ctx))
+    ctx["outbox_task"] = asyncio.create_task(run_outbox_processor(ctx))
     ctx["health_task"] = asyncio.create_task(keep_alive_task())
-    logger.info("Worker startup complete.")
+    logger.info("ARQ worker started")
 
-async def on_shutdown(ctx):
-    logger.info("Worker shutting down...")
-    
-    if ctx.get('outbox_task'):
-        ctx['outbox_task'].cancel()
+
+async def on_shutdown(ctx) -> None:
+    """Закрытие ресурсов ARQ worker при остановке."""
+    logger.info("ARQ worker shutting down")
+
+    if ctx.get("outbox_task"):
+        ctx["outbox_task"].cancel()
         try:
-            await ctx['outbox_task']
+            await ctx["outbox_task"]
         except asyncio.CancelledError:
             pass
+
     if ctx.get("health_task"):
         ctx["health_task"].cancel()
         try:
             await ctx["health_task"]
         except asyncio.CancelledError:
             pass
+
     if ctx.get("kafka_producer"):
         await ctx["kafka_producer"].stop()
+
     if ctx.get("db_engine"):
         await ctx["db_engine"].dispose()
 
+    logger.info("ARQ worker stopped")
+
+
 class WorkerSettings:
+    """Настройки ARQ worker."""
+
     functions = [
         build_dataset_task,
         retrain_model_task,
         promote_model_task,
-        cleanup_sessions_task
+        cleanup_sessions_task,
     ]
     on_startup = on_startup
     on_shutdown = on_shutdown
-    
+
     redis_settings = RedisSettings.from_dsn(settings.ARQ.REDIS_URL)
     queue_name = settings.ARQ.ARQ_QUEUE_NAME
-    
+
     cron_jobs = [
         cron(build_dataset_task, weekday=6, hour=0, minute=0),
         cron(retrain_model_task, weekday=6, hour=2, minute=0),
         cron(promote_model_task, weekday=6, hour=3, minute=0),
-        cron(cleanup_sessions_task, minute=30)
+        cron(cleanup_sessions_task, minute=30),
     ]

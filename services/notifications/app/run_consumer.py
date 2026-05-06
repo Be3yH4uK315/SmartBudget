@@ -1,71 +1,83 @@
 import asyncio
 import logging
 import signal
+
 from arq import create_pool
 from arq.connections import RedisSettings
 
 from app.core.config import settings
-from app.core.logging import setup_logging
 from app.core.database import get_db_engine, get_session_factory
-from app.infrastructure.kafka.consumer import consume_loop
+from app.core.logging import setup_logging
+from app.infrastructure.kafka.consumer import KafkaConsumerWorker
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
-async def main() -> None:
-    logger.info("Starting Notification Kafka Consumer Service...")
 
-    engine = get_db_engine()
-    db_session_maker = get_session_factory(engine)
-    dlq_producer = KafkaProducerWrapper()
-    
-    arq_pool = await create_pool(
-        RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
-        default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
-    )
-
-    stop_event = asyncio.Event()
-
+def _install_signal_handlers(stop_event: asyncio.Event) -> None:
     def signal_handler() -> None:
-        logger.info("Received shutdown signal. Stopping consumer loop gracefully...")
+        logger.info("Received shutdown signal. Stopping Kafka worker...")
         stop_event.set()
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, signal_handler)
 
-    consumer_task = None
+
+async def main() -> None:
+    logger.info("Starting Kafka consumer service")
+
+    engine = get_db_engine()
+    db_session_maker = get_session_factory(engine)
+    dlq_producer = KafkaProducerWrapper()
+
+    arq_pool = await create_pool(
+        RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
+        default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
+    )
+
+    stop_event = asyncio.Event()
+    _install_signal_handlers(stop_event)
+    worker = KafkaConsumerWorker(db_session_maker, arq_pool, dlq_producer)
+    worker_task: asyncio.Task | None = None
+    stop_task: asyncio.Task | None = None
 
     try:
         await dlq_producer.start()
-
-        consumer_task = asyncio.create_task(
-            consume_loop(
-                db_session_maker=db_session_maker,
-                arq_pool=arq_pool,
-                dlq_producer=dlq_producer,
-            )
+        worker_task = asyncio.create_task(worker.run())
+        stop_task = asyncio.create_task(stop_event.wait())
+        done, _ = await asyncio.wait(
+            {worker_task, stop_task},
+            return_when=asyncio.FIRST_COMPLETED,
         )
-        await stop_event.wait()
+
+        if worker_task in done:
+            await worker_task
 
     except asyncio.CancelledError:
-        logger.info("Main task cancelled")
-    except Exception as exc:
-        logger.critical("Main loop failed: %s", exc, exc_info=True)
+        logger.info("Kafka consumer service cancelled")
+        raise
+    except Exception:
+        logger.exception("Kafka consumer service failed")
+        raise
     finally:
-        logger.info("Shutting down consumer resources...")
-        if consumer_task:
-            consumer_task.cancel()
+        logger.info("Shutting down Kafka consumer resources")
+
+        if worker_task and not worker_task.done():
+            worker_task.cancel()
             try:
-                await consumer_task
+                await worker_task
             except asyncio.CancelledError:
                 pass
+
+        if stop_task and not stop_task.done():
+            stop_task.cancel()
 
         await dlq_producer.stop()
         await arq_pool.close()
         await engine.dispose()
-        logger.info("Shutdown complete.")
+        logger.info("Kafka consumer service stopped")
 
 if __name__ == "__main__":
     asyncio.run(main())

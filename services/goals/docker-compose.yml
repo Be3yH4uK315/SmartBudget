@@ -87,8 +87,8 @@ services:
 
   goals_service:
     build:
-      context: ../../services/goals/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/goals/Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_service_dev
@@ -119,8 +119,8 @@ services:
 
   goals_worker:
     build:
-      context: ../../services/goals/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/goals/Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_worker_dev
@@ -145,8 +145,8 @@ services:
 
   goals_consumer:
     build:
-      context: ../../services/goals/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/goals/Dockerfile
     env_file:
       - ../../services/goals/.env
     container_name: goals_consumer_dev

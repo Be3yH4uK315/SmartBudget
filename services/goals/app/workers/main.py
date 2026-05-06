@@ -1,4 +1,6 @@
 import asyncio
+import logging
+
 from arq.connections import RedisSettings
 from arq.cron import cron
 
@@ -12,9 +14,13 @@ from app.workers.tasks import (
     cleanup_transactions_task,
 )
 
+logger = logging.getLogger(__name__)
+
+
 async def on_startup(ctx):
     """Инициализация контекста воркера."""
     setup_logging()
+    logger.info("ARQ worker starting")
 
     engine = get_db_engine()
     ctx["db_engine"] = engine
@@ -25,9 +31,13 @@ async def on_startup(ctx):
     ctx["kafka_producer"] = kafka
 
     ctx["outbox_task"] = asyncio.create_task(run_outbox_loop(ctx))
+    logger.info("ARQ worker started")
+
 
 async def on_shutdown(ctx):
     """Очистка ресурсов при завершении работы воркера."""
+    logger.info("ARQ worker shutting down")
+
     if ctx.get("outbox_task"):
         ctx["outbox_task"].cancel()
         try:
@@ -41,8 +51,12 @@ async def on_shutdown(ctx):
     if ctx.get("db_engine"):
         await ctx["db_engine"].dispose()
 
+    logger.info("ARQ worker stopped")
+
+
 class WorkerSettings:
     """Настройки воркера ARQ."""
+
     functions = [
         check_goals_deadlines_task,
         cleanup_transactions_task,

@@ -1,12 +1,20 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    Query,
+    Body,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import ORJSONResponse
 from fastapi_limiter.depends import RateLimiter
-from redis.asyncio import Redis
 from functools import lru_cache
-from sqlalchemy import text
 
-from app.api import dependencies, middleware
+from app.api import dependencies, middleware, health_helpers
 from app.core import exceptions, config
 from app.infrastructure.db import models
 from app.domain.schemas import api as schemas
@@ -22,69 +30,37 @@ from app.utils import cookies
 router = APIRouter(tags=["auth"])
 settings = config.settings
 
-@router.get(
-    "/health/live",
-    status_code=status.HTTP_200_OK,
-    summary="Liveness probe"
-)
+
+@router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
 async def liveness_check() -> dict:
     """Легкая проверка."""
     return {"status": "ok"}
 
-@router.get(
-    "/health/ready",
-    status_code=status.HTTP_200_OK,
-    summary="Readiness probe"
-)
+
+@router.get("/health/ready", status_code=status.HTTP_200_OK, summary="Readiness probe")
 async def readiness_check(request: Request) -> Response:
     """Тяжелая проверка. Проверяет зависимости."""
     app = request.app
-    health_status = {
-        "db": "unknown",
-        "redis": "unknown",
-        "arq": "unknown",
-    }
+    health_status = {}
     has_error = False
 
     engine = getattr(app.state, "engine", None)
-    if not engine:
-        health_status["db"] = "disconnected"
+    db_status, db_ok = await health_helpers.get_db_health(engine)
+    health_status["db"] = db_status
+    if not db_ok:
         has_error = True
-    else:
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            health_status["db"] = "ok"
-        except Exception:
-            health_status["db"] = "failed"
-            has_error = True
-
-    arq_pool = getattr(app.state, "arq_pool", None)
-    if not arq_pool:
-        health_status["arq"] = "disconnected"
-        has_error = True
-    else:
-        try:
-            await arq_pool.ping()
-            health_status["arq"] = "ok"
-        except Exception:
-            health_status["arq"] = "failed"
-            has_error = True
 
     redis_pool = getattr(app.state, "redis_pool", None)
-    if not redis_pool:
-        health_status["redis"] = "disconnected"
+    redis_status, redis_ok = await health_helpers.get_redis_health(redis_pool)
+    health_status["redis"] = redis_status
+    if not redis_ok:
         has_error = True
-    else:
-        redis_client = Redis(connection_pool=redis_pool)
-        try:
-            await redis_client.ping()
-            health_status["redis"] = "ok"
-        except Exception:
-            health_status["redis"] = "failed"
-            has_error = True
-        finally:
-            await redis_client.aclose(close_connection_pool=False)
+
+    arq_pool = getattr(app.state, "arq_pool", None)
+    arq_status, arq_ok = await health_helpers.get_arq_health(arq_pool)
+    health_status["arq"] = arq_status
+    if not arq_ok:
+        has_error = True
 
     if has_error:
         return ORJSONResponse(
@@ -94,16 +70,17 @@ async def readiness_check(request: Request) -> Response:
 
     return ORJSONResponse(content={"status": "ready", "components": health_status})
 
+
 @router.post(
     "/verify-email",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Начало верификации email"
+    summary="Начало верификации email",
 )
 async def verify_email(
     body: schemas.VerifyEmailRequest = Body(...),
-    reg_service: RegistrationService = Depends(dependencies.get_registration_service)
+    reg_service: RegistrationService = Depends(dependencies.get_registration_service),
 ):
     action = await reg_service.start_email_verification(body.email)
     detail = "Complete sign in." if action == "sign_in" else "Verification email sent."
@@ -115,78 +92,86 @@ async def verify_email(
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Проверка верификационной или сбросной ссылки"
+    summary="Проверка верификационной или сбросной ссылки",
 )
 async def verify_link(
     token: str = Query(...),
     email: str = Query(...),
     tokenType: str = Query(...),
     reg_service: RegistrationService = Depends(dependencies.get_registration_service),
-    pwd_service: PasswordService = Depends(dependencies.get_password_service)
+    pwd_service: PasswordService = Depends(dependencies.get_password_service),
 ):
-    if tokenType == 'verification':
+    if tokenType == "verification":
         await reg_service.validate_email_verification_token(token, email)
-    elif tokenType == 'reset':
+    elif tokenType == "reset":
         await pwd_service.validate_password_reset_token(token, email)
     else:
         raise HTTPException(status_code=400, detail="Invalid token type")
 
-    return schemas.UnifiedResponse(status="success", action="verify_link", detail="Token validated.")
+    return schemas.UnifiedResponse(
+        status="success", action="verify_link", detail="Token validated."
+    )
 
 
 @router.post(
-    "/complete-registration", 
-    status_code=200, 
+    "/complete-registration",
+    status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Завершение регистрации пользователя"
+    summary="Завершение регистрации пользователя",
 )
 async def complete_registration(
     response: Response,
     body: schemas.CompleteRegistrationRequest = Body(...),
     reg_service: RegistrationService = Depends(dependencies.get_registration_service),
     ip: str = Depends(dependencies.get_real_ip),
-    user_agent: str | None = Header(None, alias="User-Agent")
+    user_agent: str | None = Header(None, alias="User-Agent"),
 ):
-    _user, _session, access_token, refresh_token = await reg_service.complete_registration(
-        body, ip, user_agent or "Unknown"
+    _user, _session, access_token, refresh_token = (
+        await reg_service.complete_registration(body, ip, user_agent or "Unknown")
     )
     cookies.set_auth_cookies(response, access_token, refresh_token)
-    return schemas.UnifiedResponse(status="success", action="completeRegistration", detail="Registration completed.")
+    return schemas.UnifiedResponse(
+        status="success",
+        action="completeRegistration",
+        detail="Registration completed.",
+    )
 
 
 @router.post(
-    "/login", 
-    status_code=200, 
+    "/login",
+    status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Аутентификация пользователя"
+    summary="Аутентификация пользователя",
 )
 async def login(
     response: Response,
     body: schemas.LoginRequest = Body(...),
     login_service: LoginService = Depends(dependencies.get_login_service),
     ip: str = Depends(dependencies.get_real_ip),
-    user_agent: str | None = Header(None, alias="User-Agent")
+    user_agent: str | None = Header(None, alias="User-Agent"),
 ):
-    _user, _session, access_token, refresh_token = await login_service.authenticate_user(
-        body, ip, user_agent or "Unknown"
+    _user, _session, access_token, refresh_token = (
+        await login_service.authenticate_user(body, ip, user_agent or "Unknown")
     )
     cookies.set_auth_cookies(response, access_token, refresh_token)
-    return schemas.UnifiedResponse(status="success", action="login", detail="Login successful.")
+    return schemas.UnifiedResponse(
+        status="success", action="login", detail="Login successful."
+    )
 
 
 @router.post(
-    "/logout", 
+    "/logout",
     status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Выход пользователя из системы"
+    summary="Выход пользователя из системы",
 )
 async def logout(
     response: Response,
     request: Request,
     login_service: LoginService = Depends(dependencies.get_login_service),
-    user_id: str | None = Depends(dependencies.get_user_id_from_expired_token)
+    user_id: str | None = Depends(dependencies.get_user_id_from_expired_token),
 ):
     refresh_token = request.cookies.get("refresh_token")
     if user_id and refresh_token:
@@ -196,151 +181,168 @@ async def logout(
             middleware.logger.warning(f"Failed to revoke session during logout: {e}")
 
     cookies.delete_auth_cookies(response)
-    return schemas.UnifiedResponse(status="success", action="logout", detail="Logout successful.")
+    return schemas.UnifiedResponse(
+        status="success", action="logout", detail="Logout successful."
+    )
 
 
 @router.post(
-    "/reset-password", 
-    status_code=200, 
+    "/reset-password",
+    status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Начало сброса пароля пользователя"
+    summary="Начало сброса пароля пользователя",
 )
 async def reset_password(
     body: schemas.ResetPasswordRequest = Body(...),
-    pwd_service: PasswordService = Depends(dependencies.get_password_service)
+    pwd_service: PasswordService = Depends(dependencies.get_password_service),
 ):
     await pwd_service.start_password_reset(body.email)
-    return schemas.UnifiedResponse(status="success", action="resetPassword", detail="Reset email sent.")
+    return schemas.UnifiedResponse(
+        status="success", action="resetPassword", detail="Reset email sent."
+    )
 
 
 @router.post(
-    "/complete-reset", 
+    "/complete-reset",
     status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Завершение сброса пароля пользователя"
+    summary="Завершение сброса пароля пользователя",
 )
 async def complete_reset(
     body: schemas.CompleteResetRequest = Body(...),
-    pwd_service: PasswordService = Depends(dependencies.get_password_service)
+    pwd_service: PasswordService = Depends(dependencies.get_password_service),
 ):
     await pwd_service.complete_password_reset(body)
-    return schemas.UnifiedResponse(status="success", action="completeReset", detail="Password reset completed.")
+    return schemas.UnifiedResponse(
+        status="success", action="completeReset", detail="Password reset completed."
+    )
 
 
 @router.post(
-    "/change-password", 
-    status_code=200, 
+    "/change-password",
+    status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Смена пароля пользователя"
+    summary="Смена пароля пользователя",
 )
 async def change_password(
     body: schemas.ChangePasswordRequest = Body(...),
     pwd_service: PasswordService = Depends(dependencies.get_password_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     await pwd_service.change_password(user.user_id, body)
-    return schemas.UnifiedResponse(status="success", action="changePassword", detail="Password changed.")
+    return schemas.UnifiedResponse(
+        status="success", action="changePassword", detail="Password changed."
+    )
 
 
 @router.get(
-    "/me", 
-    status_code=200, 
+    "/me",
+    status_code=200,
     response_model=schemas.UserInfo,
-    summary="Получение информации о текущем пользователе"
+    summary="Получение информации о текущем пользователе",
 )
 async def get_current_user_info(
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     return user
 
 
 @router.patch(
     "/me/profile",
-    status_code=200, 
+    status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Обновление профиля пользователя"
+    summary="Обновление профиля пользователя",
 )
 async def update_profile(
     body: schemas.UpdateProfileRequest = Body(...),
     profile_service: ProfileService = Depends(dependencies.get_profile_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     await profile_service.update_profile(user.user_id, body)
-    return schemas.UnifiedResponse(status="success", action="updateProfile", detail="Profile updated successfully.")
+    return schemas.UnifiedResponse(
+        status="success", action="updateProfile", detail="Profile updated successfully."
+    )
+
 
 @router.patch(
     "/language",
     status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Обновление языка интерфейса пользователя"
+    summary="Обновление языка интерфейса пользователя",
 )
 async def update_language(
     body: schemas.UpdateLanguageRequest = Body(...),
     profile_service: ProfileService = Depends(dependencies.get_profile_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     await profile_service.update_language(user.user_id, body)
-    return schemas.UnifiedResponse(status="success", action="updateLanguage", detail="Language updated successfully.")
+    return schemas.UnifiedResponse(
+        status="success",
+        action="updateLanguage",
+        detail="Language updated successfully.",
+    )
+
 
 @router.post(
-    "/me/email/request", 
-    status_code=200, 
+    "/me/email/request",
+    status_code=200,
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Инициация смены email пользователя"
+    summary="Инициация смены email пользователя",
 )
 async def request_email_change(
     body: schemas.InitiateEmailChangeRequest = Body(...),
     profile_service: ProfileService = Depends(dependencies.get_profile_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     await profile_service.initiate_email_change(user.user_id, body)
     return schemas.UnifiedResponse(
-        status="success", 
-        action="requestEmailChange", 
-        detail=f"Confirmation email sent to {body.new_email}."
+        status="success",
+        action="requestEmailChange",
+        detail=f"Confirmation email sent to {body.new_email}.",
     )
 
+
 @router.post(
-    "/me/email/confirm", 
-    status_code=200, 
+    "/me/email/confirm",
+    status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Подтверждение смены email пользователя"
+    summary="Подтверждение смены email пользователя",
 )
 async def confirm_email_change(
     response: Response,
     body: schemas.ConfirmEmailChangeRequest = Body(...),
-    profile_service: ProfileService = Depends(dependencies.get_profile_service)
+    profile_service: ProfileService = Depends(dependencies.get_profile_service),
 ):
     await profile_service.confirm_email_change(body)
     cookies.delete_auth_cookies(response)
-    
+
     return schemas.UnifiedResponse(
-        status="success", 
-        action="confirmEmailChange", 
-        detail="Email successfully changed. Please log in with your new email."
+        status="success",
+        action="confirmEmailChange",
+        detail="Email successfully changed. Please log in with your new email.",
     )
 
 
 @router.patch(
-    "/me/retention", 
-    status_code=200, 
+    "/me/retention",
+    status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Обновление настроек хранения сессий пользователя"
+    summary="Обновление настроек хранения сессий пользователя",
 )
 async def update_retention_settings(
     body: schemas.UpdateRetentionRequest,
     session_service: SessionService = Depends(dependencies.get_session_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     await session_service.update_user_retention_settings(user.user_id, body.days)
-    
+
     return schemas.UnifiedResponse(
-        status="success", 
-        action="updateRetention", 
-        detail=f"Session retention updated to {body.days} days."
+        status="success",
+        action="updateRetention",
+        detail=f"Session retention updated to {body.days} days.",
     )
 
 
@@ -348,117 +350,129 @@ async def update_retention_settings(
     "/me/retention",
     status_code=200,
     response_model=schemas.RetentionInfo,
-    summary="Получение настроек хранения сессий пользователя"
+    summary="Получение настроек хранения сессий пользователя",
 )
 async def get_retention_settings(
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     return schemas.RetentionInfo(days=user.retention_days)
 
 
 @router.get(
-    "/sessions", 
-    status_code=200, 
+    "/sessions",
+    status_code=200,
     response_model=schemas.AllSessionsResponse,
-    summary="Получение всех сессий пользователя"
+    summary="Получение всех сессий пользователя",
 )
 async def get_all_user_sessions(
     request: Request,
     session_service: SessionService = Depends(dependencies.get_session_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     current_refresh_token = request.cookies.get("refresh_token")
-    sessions_list = await session_service.get_all_sessions(user.user_id, current_refresh_token)
+    sessions_list = await session_service.get_all_sessions(
+        user.user_id, current_refresh_token
+    )
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
 @router.delete(
-    "/sessions/{sessionId}", 
-    status_code=200, 
+    "/sessions/{sessionId}",
+    status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Ревокация сессии пользователя по ID"
+    summary="Ревокация сессии пользователя по ID",
 )
 async def revoke_session(
     sessionId: str,
     session_service: SessionService = Depends(dependencies.get_session_service),
-    user: dtos.UserDTO = Depends(dependencies.get_current_active_user)
+    user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
     await session_service.revoke_session(user.user_id, UUID(sessionId))
-    return schemas.UnifiedResponse(status="success", action="revokeSession", detail="Session has been revoked.")
+    return schemas.UnifiedResponse(
+        status="success", action="revokeSession", detail="Session has been revoked."
+    )
 
 
 @router.post(
-    "/sessions/logout-others", 
+    "/sessions/logout-others",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Ревокация всех других сессий пользователя"
+    summary="Ревокация всех других сессий пользователя",
 )
 async def revoke_other_sessions(
     request: Request,
     session_service: SessionService = Depends(dependencies.get_session_service),
-    user: models.User = Depends(dependencies.get_current_active_user)
+    user: models.User = Depends(dependencies.get_current_active_user),
 ):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     await session_service.revoke_other_sessions(user.user_id, refresh_token)
-    return schemas.UnifiedResponse(status="success", action="revokeOtherSessions", detail="All other sessions have been revoked.")
+    return schemas.UnifiedResponse(
+        status="success",
+        action="revokeOtherSessions",
+        detail="All other sessions have been revoked.",
+    )
 
 
 @router.post(
-    "/validate-token", 
+    "/validate-token",
     status_code=200,
     response_model=schemas.UnifiedResponse,
-    summary="Валидация access токена пользователя"
+    summary="Валидация access токена пользователя",
 )
 async def validate_token(
     body: schemas.TokenValidateRequest = Body(...),
-    session_service: SessionService = Depends(dependencies.get_session_service)
+    session_service: SessionService = Depends(dependencies.get_session_service),
 ):
     await session_service.validate_access_token(body.token)
-    return schemas.UnifiedResponse(status="success", action="validateToken", detail="Token valid.")
+    return schemas.UnifiedResponse(
+        status="success", action="validateToken", detail="Token valid."
+    )
 
 
 @router.post(
-    "/refresh", 
-    status_code=200, 
+    "/refresh",
+    status_code=200,
     dependencies=[Depends(RateLimiter(times=30, seconds=60))],
     response_model=schemas.UnifiedResponse,
-    summary="Обновление access и refresh токенов пользователя"
+    summary="Обновление access и refresh токенов пользователя",
 )
 async def refresh(
     response: Response,
     request: Request,
-    session_service: SessionService = Depends(dependencies.get_session_service)
+    session_service: SessionService = Depends(dependencies.get_session_service),
 ):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Missing refresh token")
-    
-    new_access_token, new_refresh_token = await session_service.refresh_session(refresh_token)
+
+    new_access_token, new_refresh_token = await session_service.refresh_session(
+        refresh_token
+    )
     cookies.set_auth_cookies(response, new_access_token, new_refresh_token)
-    return schemas.UnifiedResponse(status="success", action="refresh", detail="Tokens refreshed.")
+    return schemas.UnifiedResponse(
+        status="success", action="refresh", detail="Tokens refreshed."
+    )
+
 
 @router.get("/.well-known/jwks.json")
-async def get_jwks(
-    token_service: TokenService = Depends(dependencies.get_token_service)
-):
-    return _get_cached_jwks(token_service)
+async def get_jwks():
+    return _get_cached_jwks()
+
 
 @lru_cache(maxsize=1)
-def _get_cached_jwks(service: TokenService):
-    return service.get_jwks()
+def _get_cached_jwks():
+    return TokenService().get_jwks()
 
-@router.get(
-    "/gateway-verify", 
-    include_in_schema=False
-)
+
+@router.get("/gateway-verify", include_in_schema=False)
 async def gateway_verify(
-    request: Request, 
+    request: Request,
     token_service: TokenService = Depends(dependencies.get_token_service),
-    session_service: SessionService = Depends(dependencies.get_session_service)
+    session_service: SessionService = Depends(dependencies.get_session_service),
 ):
     """Легковесный эндпоинт для API Gateway."""
     access_token = request.cookies.get("access_token")
@@ -467,15 +481,15 @@ async def gateway_verify(
 
     try:
         payload = await token_service.decode_token(access_token, verify_exp=True)
-        
+
         user_id = payload.get("sub")
         session_id = payload.get("sid")
 
         if not user_id or not session_id:
-             return Response(status_code=401)
+            return Response(status_code=401)
 
         is_valid = await session_service.verify_session_fast(session_id)
-        
+
         if not is_valid:
             return Response(status_code=401)
 

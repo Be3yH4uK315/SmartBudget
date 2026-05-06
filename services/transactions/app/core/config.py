@@ -1,15 +1,25 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from smartbudget_shared.config import (
+    DBSettings as SharedDBSettings,
+    ArqSettings as SharedArqSettings,
+    AppSettings as SharedAppSettings,
+)
 
-class DBSettings(BaseSettings):
-    DB_URL: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/transactions"
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 10
+
+class DBSettings(SharedDBSettings):
+    """Настройки базы данных, унаследованные от общей конфигурации."""
+
+    pass
 
 
 class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     KAFKA_GROUP_ID: str = "transactions-service"
+    KAFKA_AUTO_OFFSET_RESET: str = "earliest"
+    KAFKA_ENABLE_AUTO_COMMIT: bool = False
+    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
+    KAFKA_BATCH_SIZE: int = 100
     KAFKA_TOPIC_TRANSACTION_NEW: str = "transaction.new"
     KAFKA_TOPIC_TRANSACTION_IMPORTED: str = "transaction.imported"
     KAFKA_TOPIC_TRANSACTION_GOAL: str = "transaction.goal"
@@ -20,17 +30,31 @@ class KafkaSettings(BaseSettings):
     KAFKA_TOPIC_BUDGET_EVENTS: str = "budget.transactions.events"
     KAFKA_TOPIC_NOTIFICATION_EVENTS: str = "notification.events"
 
+    @property
+    def consumer_topics(self) -> tuple[str, str]:
+        return (
+            self.KAFKA_TOPIC_TRANSACTION_CLASSIFIED,
+            self.KAFKA_TOPIC_TRANSACTION_UPDATED,
+        )
 
-class AppSettings(BaseSettings):
-    LOG_LEVEL: str = "INFO"
-    TZ: str = "UTC"
+
+class ArqSettings(SharedArqSettings):
+    """Настройки ARQ, унаследованные от общей конфигурации."""
+
+    pass
+
+
+class AppSettings(SharedAppSettings):
+    """Настройки приложения, унаследованные от общей конфигурации."""
+
     GOAL_CATEGORY_ID: int = 24
 
 
 class Settings(BaseSettings):
-    DB: DBSettings = DBSettings()
-    KAFKA: KafkaSettings = KafkaSettings()
-    APP: AppSettings = AppSettings()
+    DB: DBSettings
+    KAFKA: KafkaSettings
+    ARQ: ArqSettings
+    APP: AppSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",

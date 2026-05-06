@@ -103,8 +103,9 @@ PostgreSQL   Redis            Kafka          Arq
    - Расчет метрик и рекомендаций
    - Создание Kafka событий
 
-3. **Repository Layer** (`infrastructure/db/repositories.py`)
+3. **Repository Layer** (`infrastructure/db/repositories/`)
    - CRUD операции с целями
+   - Outbox репозиторий для Kafka событий
    - Unit of Work паттерн для транзакций
    - SQLAlchemy ORM запросы
 
@@ -490,7 +491,7 @@ goals/
 │   │   ├── db/
 │   │   │   ├── base.py                 # Base ORM model
 │   │   │   ├── models.py               # SQLAlchemy models (Goal, etc)
-│   │   │   ├── repositories.py         # CRUD operations
+│   │   │   ├── repositories/           # CRUD/outbox repositories
 │   │   │   └── uow.py                  # Unit of Work паттерн
 │   │   └── kafka/
 │   │       ├── consumer.py             # Kafka consumer для обработки событий

@@ -1,6 +1,12 @@
+from contextlib import asynccontextmanager
 from typing import Self
-from app.infrastructure.db.repositories.user import UserRepository
-from app.infrastructure.db.repositories.session import SessionRepository
+
+from app.infrastructure.db.repositories import (
+    OutboxRepository,
+    SessionRepository,
+    UserRepository,
+)
+
 
 class UnitOfWork:
     """
@@ -64,6 +70,15 @@ class UnitOfWork:
             raise RuntimeError("UoW not started")
         await self._session.refresh(instance, attribute_names)
 
+    @asynccontextmanager
+    async def make_savepoint(self):
+        """Создает точку сохранения (вложенную транзакцию)."""
+        if self._session is None:
+            raise RuntimeError("UoW not started")
+
+        async with self._session.begin_nested():
+            yield
+
     def _get_repository(self, repo_cls):
         """Инициализация репозитория."""
         if self._session is None:
@@ -80,3 +95,7 @@ class UnitOfWork:
     @property
     def sessions(self) -> SessionRepository:
         return self._get_repository(SessionRepository)
+
+    @property
+    def outbox(self) -> OutboxRepository:
+        return self._get_repository(OutboxRepository)

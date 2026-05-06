@@ -1,9 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import ORJSONResponse
 from prometheus_client import make_asgi_app
+from arq import create_pool
+from arq.connections import RedisSettings
+from redis.asyncio import ConnectionPool
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routes import router as transactions_router
@@ -11,37 +15,67 @@ from app.core import exceptions
 from app.core.context import set_request_id
 from app.core.database import get_db_engine, get_session_factory
 from app.core.logging import setup_logging
-from app.infrastructure.kafka.producer import KafkaProducerWrapper
+from app.core.config import settings
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("Application startup initiated")
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Управление ресурсами приложения."""
+    logger.info("=== Application Startup ===")
 
     engine = get_db_engine()
     app.state.engine = engine
     app.state.db_session_maker = get_session_factory(engine)
-    app.state.kafka_producer = None
+    logger.info("Database initialized")
 
-    producer = KafkaProducerWrapper()
+    redis_pool = None
     try:
-        await producer.start()
-        app.state.kafka_producer = producer
-    except Exception as exc:
-        logger.error("Kafka producer startup failed: %s", exc, exc_info=True)
+        redis_pool = ConnectionPool.from_url(settings.ARQ.REDIS_URL)
+        app.state.redis_pool = redis_pool
+        logger.info("Redis pool initialized")
+    except Exception as e:
+        logger.error(f"Redis pool initialization failed: {e}")
+
+    arq_pool = None
+    try:
+        arq_pool = await create_pool(
+            RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
+            default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
+        )
+        app.state.arq_pool = arq_pool
+        logger.info("ARQ pool initialized")
+    except Exception as e:
+        logger.error(f"ARQ pool initialization failed: {e}")
 
     yield
 
-    logger.info("Application shutdown initiated")
+    logger.info("=== Application Shutdown ===")
 
-    if app.state.kafka_producer:
-        await app.state.kafka_producer.stop()
+    if arq_pool:
+        try:
+            await arq_pool.close()
+            logger.info("ARQ pool closed")
+        except Exception as e:
+            logger.error(f"Error closing ARQ pool: {e}")
 
-    await engine.dispose()
-    logger.info("Application shutdown complete")
+    if redis_pool:
+        try:
+            await redis_pool.disconnect()
+            logger.info("Redis pool closed")
+        except Exception as e:
+            logger.error(f"Error closing Redis pool: {e}")
+
+    if engine:
+        try:
+            await engine.dispose()
+            logger.info("Database connection closed")
+        except Exception as e:
+            logger.error(f"Error disposing engine: {e}")
+
+    logger.info("=== Application Shutdown Complete ===")
 
 
 app = FastAPI(
@@ -55,20 +89,21 @@ app = FastAPI(
 
 
 @app.middleware("http")
-async def tracing_middleware(request: Request, call_next):
-    req_id = request.headers.get("X-Request-ID") or request.headers.get("X-Correlation-ID")
+async def tracing_middleware(request: Request, call_next) -> Response:
+    """Middleware для трассировки запросов по Request ID."""
+    req_id = request.headers.get("X-Request-ID") or request.headers.get(
+        "X-Correlation-ID"
+    )
     final_id = set_request_id(req_id)
     response: Response = await call_next(request)
     response.headers["X-Request-ID"] = final_id
     return response
 
 
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
-
-
 @app.exception_handler(exceptions.TransactionServiceError)
-async def service_exception_handler(request: Request, exc: exceptions.TransactionServiceError):
+async def service_exception_handler(
+    request: Request, exc: exceptions.TransactionServiceError
+):
     status_code = 400
     if isinstance(exc, exceptions.TransactionNotFoundError):
         status_code = 404
@@ -92,3 +127,6 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(transactions_router, prefix="/api/v1/transactions")
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)

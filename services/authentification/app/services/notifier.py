@@ -30,9 +30,10 @@ class AuthNotifier:
             **kwargs,
         }
 
-        await self.uow.users.add_outbox_event(
+        self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_AUTH_EVENTS_TOPIC,
-            event_data=payload,
+            payload=payload,
+            event_type=event_type.value,
         )
 
     async def enrich_session(

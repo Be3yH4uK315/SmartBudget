@@ -1,11 +1,20 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import ORJSONResponse
-from sqlalchemy import text
 
-from app.api import dependencies
+from app.api import dependencies, health_helpers
 from app.domain.schemas import api as schemas
 from app.services.service import TransactionService
 
@@ -27,30 +36,26 @@ async def liveness_check() -> dict:
     summary="Readiness probe",
 )
 async def readiness_check(request: Request) -> Response:
-    health_status = {
-        "db": "unknown",
-        "kafka": "unknown",
-    }
+    app = request.app
+    health_status = {}
     has_error = False
 
-    engine = getattr(request.app.state, "engine", None)
-    if not engine:
-        health_status["db"] = "disconnected"
+    engine = getattr(app.state, "engine", None)
+    db_status, db_ok = await health_helpers.get_db_health(engine)
+    health_status["db"] = db_status
+    if not db_ok:
         has_error = True
-    else:
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            health_status["db"] = "ok"
-        except Exception:
-            health_status["db"] = "failed"
-            has_error = True
 
-    producer = getattr(request.app.state, "kafka_producer", None)
-    if producer and getattr(producer, "_is_running", False):
-        health_status["kafka"] = "ok"
-    else:
-        health_status["kafka"] = "disconnected"
+    redis_pool = getattr(app.state, "redis_pool", None)
+    redis_status, redis_ok = await health_helpers.get_redis_health(redis_pool)
+    health_status["redis"] = redis_status
+    if not redis_ok:
+        has_error = True
+
+    arq_pool = getattr(app.state, "arq_pool", None)
+    arq_status, arq_ok = await health_helpers.get_arq_health(arq_pool)
+    health_status["arq"] = arq_status
+    if not arq_ok:
         has_error = True
 
     if has_error:
@@ -148,8 +153,7 @@ async def import_mock_transactions(
     raw_items = payload if isinstance(payload, list) else [payload]
     try:
         items = [
-            schemas.ImportTransactionItem.model_validate(item)
-            for item in raw_items
+            schemas.ImportTransactionItem.model_validate(item) for item in raw_items
         ]
     except Exception as exc:
         raise HTTPException(
@@ -173,7 +177,7 @@ def _parse_patch_category(payload: Any) -> int | None:
 
 
 @router.patch(
-    "/edit/{transaction_id}",
+    "/{transaction_id}",
     summary="Изменить категорию транзакции",
 )
 async def patch_category(
@@ -190,7 +194,7 @@ async def patch_category(
 
 
 @router.delete(
-    "/edit/{transaction_id}",
+    "/{transaction_id}",
     status_code=status.HTTP_200_OK,
     summary="Удалить транзакцию",
 )

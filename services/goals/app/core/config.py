@@ -1,12 +1,27 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-class DBSettings(BaseSettings):
-    DB_URL: str
-    DB_POOL_SIZE: int
-    DB_MAX_OVERFLOW: int
+from smartbudget_shared.config import (
+    DBSettings as SharedDBSettings,
+    ArqSettings as SharedArqSettings,
+    AppSettings as SharedAppSettings,
+)
+
+
+class DBSettings(SharedDBSettings):
+    """Настройки базы данных, унаследованные от общей конфигурации."""
+
+    pass
+
 
 class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_GROUP_ID: str | None = None
+    KAFKA_TOPIC: str | None = None
+    KAFKA_DLQ_TOPIC: str | None = None
+    KAFKA_AUTO_OFFSET_RESET: str = "earliest"
+    KAFKA_ENABLE_AUTO_COMMIT: bool = False
+    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
+    KAFKA_BATCH_SIZE: int = 100
     KAFKA_GOALS_GROUP_ID: str
     KAFKA_TOPIC_TRANSACTION_GOAL: str
     KAFKA_TOPIC_BUDGET_EVENTS: str
@@ -14,14 +29,30 @@ class KafkaSettings(BaseSettings):
     KAFKA_TOPIC_NOTIFICATION_EVENTS: str = "notification.events"
     KAFKA_TOPIC_TRANSACTION_DLQ: str
 
-class ArqSettings(BaseSettings):
-    REDIS_URL: str
-    ARQ_QUEUE_NAME: str
+    @property
+    def consumer_group_id(self) -> str:
+        return self.KAFKA_GROUP_ID or self.KAFKA_GOALS_GROUP_ID
 
-class AppSettings(BaseSettings):
-    LOG_LEVEL: str
-    TZ: str
+    @property
+    def consumer_topic(self) -> str:
+        return self.KAFKA_TOPIC or self.KAFKA_TOPIC_TRANSACTION_GOAL
+
+    @property
+    def dlq_topic(self) -> str:
+        return self.KAFKA_DLQ_TOPIC or self.KAFKA_TOPIC_TRANSACTION_DLQ
+
+
+class ArqSettings(SharedArqSettings):
+    """Настройки ARQ, унаследованные от общей конфигурации."""
+
+    pass
+
+
+class AppSettings(SharedAppSettings):
+    """Настройки приложения, унаследованные от общей конфигурации."""
+
     FRONTEND_URL: str
+
 
 class Settings(BaseSettings):
     DB: DBSettings
@@ -33,6 +64,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
+        extra="ignore",
     )
+
 
 settings = Settings()

@@ -134,13 +134,13 @@ class GoalService:
                 priority=goal.priority,
             )
 
-            await self.uow.goals.add_outbox_event(
+            self.uow.outbox.add_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                event_data=event_data,
+                payload=event_data,
             )
-            await self.uow.goals.add_outbox_event(
+            self.uow.outbox.add_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-                event_data=_create_notification_event(
+                payload=_create_notification_event(
                     "goal.created",
                     user_id,
                     {
@@ -319,9 +319,9 @@ class GoalService:
                     changes=changes_for_kafka,
                 )
 
-                await self.uow.goals.add_outbox_event(
+                self.uow.outbox.add_event(
                     topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                    event_data=event,
+                    payload=event,
                 )
 
             net_change = await self.uow.goals.get_net_change_for_current_month(goal_id)
@@ -417,9 +417,9 @@ class GoalService:
                 goal_id=str(goal_id),
                 changes={"status": new_status.value},
             )
-            await self.uow.goals.add_outbox_event(
+            self.uow.outbox.add_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                event_data=event,
+                payload=event,
             )
 
         return api_schemas.GoalStatusResponse(status=new_status)
@@ -457,9 +457,9 @@ class GoalService:
                 status=goal.status,
             )
 
-            await self.uow.goals.add_outbox_event(
+            self.uow.outbox.add_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-                event_data=update_event,
+                payload=update_event,
             )
 
             achieved_goal = (
@@ -476,9 +476,9 @@ class GoalService:
                     days_left=0,
                 )
 
-                await self.uow.goals.add_outbox_event(
+                self.uow.outbox.add_event(
                     topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                    event_data=event_achieved,
+                    payload=event_achieved,
                 )
                 await self._add_goal_notification_event(
                     "goal.achieved",
@@ -522,9 +522,9 @@ class GoalService:
                 days_left=0,
             )
 
-            await self.uow.goals.add_outbox_event(
+            self.uow.outbox.add_event(
                 topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                event_data=event,
+                payload=event,
             )
             await self._add_goal_notification_event(
                 "goal.achieved",
@@ -618,7 +618,7 @@ class GoalService:
                     expired_goal_ids.append(goal.goal_id)
 
                 if outbox_events:
-                    await self.uow.goals.add_outbox_events(outbox_events)
+                    self.uow.outbox.add_events(outbox_events)
 
                 if expired_goal_ids:
                     await self.uow.goals.bulk_update_status(
@@ -675,7 +675,7 @@ class GoalService:
                     checked_ids.append(goal.goal_id)
 
                 if outbox_events:
-                    await self.uow.goals.add_outbox_events(outbox_events)
+                    self.uow.outbox.add_events(outbox_events)
 
                 if checked_ids:
                     await self.uow.goals.update_last_checked(checked_ids)
@@ -726,7 +726,7 @@ class GoalService:
                     for goal in batch
                 ]
 
-                await self.uow.goals.add_outbox_events(outbox_events)
+                self.uow.outbox.add_events(outbox_events)
 
     async def _add_almost_achieved_notification_in_uow(
         self,
@@ -755,9 +755,9 @@ class GoalService:
         goal: models.Goal,
         payload: dict,
     ) -> None:
-        await self.uow.goals.add_outbox_event(
+        self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-            event_data=_create_notification_event(
+            payload=_create_notification_event(
                 event_name,
                 goal.user_id,
                 payload,

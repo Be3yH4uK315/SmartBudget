@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 from typing import Self
 
-from app.infrastructure.db.repositories import GoalRepository
+from app.infrastructure.db.repositories import GoalRepository, OutboxRepository
+
 
 class UnitOfWork:
     """
@@ -86,3 +87,7 @@ class UnitOfWork:
     @property
     def goals(self) -> GoalRepository:
         return self._get_repository(GoalRepository)
+
+    @property
+    def outbox(self) -> OutboxRepository:
+        return self._get_repository(OutboxRepository)
