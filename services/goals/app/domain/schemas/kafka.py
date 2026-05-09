@@ -1,12 +1,15 @@
 from datetime import datetime
-from uuid import UUID
 from decimal import Decimal
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import TransactionType
 
 
 class TransactionEvent(BaseModel):
+    """Событие создания или обновления транзакции цели."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     transaction_id: UUID = Field(..., description="ID транзакции")
@@ -18,6 +21,8 @@ class TransactionEvent(BaseModel):
 
 
 class TransactionDeletedEvent(BaseModel):
+    """Событие удаления транзакции цели."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     transaction_id: UUID = Field(..., description="ID транзакции")

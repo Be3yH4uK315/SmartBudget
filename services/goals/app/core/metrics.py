@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Gauge, Histogram
 
 GOALS_CREATED_TOTAL = Counter(
     "goals_created_total",
@@ -9,10 +9,10 @@ GOAL_ACHIEVEMENT_TIME = Histogram(
     "goal_achievement_time_seconds",
     "Time taken to achieve a goal in seconds",
     buckets=[
-        86_400,      # 1 день
-        604_800,     # 1 неделя
-        2_592_000,   # 1 месяц
-        7_776_000,   # 3 месяца
+        86_400,  # 1 день
+        604_800,  # 1 неделя
+        2_592_000,  # 1 месяц
+        7_776_000,  # 3 месяца
         15_552_000,  # 6 месяцев
     ],
 )

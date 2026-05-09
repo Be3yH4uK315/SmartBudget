@@ -1,55 +1,13 @@
-from typing import List
 from uuid import UUID
-from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, status
-from fastapi.responses import ORJSONResponse
 
-from app.api import dependencies, health_helpers
+from fastapi import APIRouter, Body, Depends, Path, Query, status
+
+from app.api import dependencies
+from app.api.dependencies import GoalFilters
 from app.domain.schemas import api as schemas
 from app.services.service import GoalService
-from app.api.dependencies import GoalFilters
 
 router = APIRouter(tags=["Goals"])
-dashboard_router = APIRouter(tags=["Goals Dashboard"])
-
-
-@router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
-async def liveness_check() -> dict:
-    """Легкая проверка."""
-    return {"status": "ok"}
-
-
-@router.get("/health/ready", status_code=status.HTTP_200_OK, summary="Readiness probe")
-async def readiness_check(request: Request) -> Response:
-    """Тяжелая проверка. Проверяет зависимости."""
-    app = request.app
-    health_status = {}
-    has_error = False
-
-    engine = getattr(app.state, "engine", None)
-    db_status, db_ok = await health_helpers.get_db_health(engine)
-    health_status["db"] = db_status
-    if not db_ok:
-        has_error = True
-
-    redis_pool = getattr(app.state, "redis_pool", None)
-    redis_status, redis_ok = await health_helpers.get_redis_health(redis_pool)
-    health_status["redis"] = redis_status
-    if not redis_ok:
-        has_error = True
-
-    arq_pool = getattr(app.state, "arq_pool", None)
-    arq_status, arq_ok = await health_helpers.get_arq_health(arq_pool)
-    health_status["arq"] = arq_status
-    if not arq_ok:
-        has_error = True
-
-    if has_error:
-        return ORJSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"status": "not_ready", "components": health_status},
-        )
-
-    return ORJSONResponse(content={"status": "ready", "components": health_status})
 
 
 @router.post(
@@ -63,24 +21,13 @@ async def create_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Создает новую цель пользователя."""
     return await service.create_goal(user_id, request)
-
-
-@dashboard_router.get(
-    "/goals",
-    response_model=schemas.MainGoalsResponse,
-    summary="Получение целей для главного экрана",
-)
-async def get_main_goals(
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: GoalService = Depends(dependencies.get_goal_service),
-):
-    return await service.get_main_goals(user_id)
 
 
 @router.get(
     "",
-    response_model=List[schemas.AllGoalsResponse],
+    response_model=list[schemas.AllGoalsResponse],
     summary="Получение списка целей с фильтрами",
 )
 async def get_goals(
@@ -88,6 +35,7 @@ async def get_goals(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Возвращает список целей пользователя с фильтрацией."""
     return await service.get_all_goals(
         user_id=user_id,
         limit=filters.limit,
@@ -100,7 +48,7 @@ async def get_goals(
 
 @router.get(
     "/search",
-    response_model=List[schemas.GoalSearchResponse],
+    response_model=list[schemas.GoalSearchResponse],
     summary="Поиск целей",
 )
 async def search_goals(
@@ -109,6 +57,7 @@ async def search_goals(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Ищет цели пользователя по текстовому запросу."""
     return await service.search_goals(user_id, query, limit)
 
 
@@ -122,6 +71,7 @@ async def get_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Возвращает детальную информацию по цели."""
     return await service.get_goal_details(user_id, goal_id)
 
 
@@ -136,6 +86,7 @@ async def update_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Обновляет поля цели."""
     return await service.update_goal(user_id, goal_id, request)
 
 
@@ -149,6 +100,7 @@ async def update_archived_status(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Переключает архивный статус цели."""
     return await service.toggle_archive_status(user_id, goal_id)
 
 
@@ -162,6 +114,7 @@ async def close_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Принудительно закрывает цель."""
     return await service.close_goal(user_id, goal_id)
 
 
@@ -175,4 +128,5 @@ async def restore_goal(
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
+    """Восстанавливает закрытую цель."""
     return await service.restore_goal(user_id, goal_id)

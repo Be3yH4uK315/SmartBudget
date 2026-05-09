@@ -1,7 +1,9 @@
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
+from uuid import UUID
 
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
@@ -9,18 +11,28 @@ from app.services.service import GoalService
 from app.utils.serialization import to_json_bytes
 
 logger = logging.getLogger(__name__)
+
 HEALTH_FILE = Path("/tmp/healthy")
 
+OUTBOX_BATCH_LIMIT = 200
+OUTBOX_IDLE_SLEEP_SECONDS = 0.5
+OUTBOX_ERROR_SLEEP_SECONDS = 5.0
+OUTBOX_MAX_RETRIES = 5
+PARTITION_RETENTION_MONTHS = 3
+REQUEST_ID_HEADER = "X-Request-ID"
+
+
 async def touch_health_file() -> None:
-    """Обновляет файл здоровья для k8s/docker."""
+    """Обновляет health-файл worker-процесса."""
     try:
         HEALTH_FILE.touch()
     except OSError:
-        pass
+        logger.debug("Failed to touch worker health file", exc_info=True)
 
-async def run_outbox_loop(ctx) -> None:
-    """Бесконечный цикл обработки Outbox с Backoff."""
-    logger.info("Starting Outbox Loop")
+
+async def run_outbox_loop(ctx: dict[str, Any]) -> None:
+    """Запускает постоянный цикл публикации outbox-событий в Kafka."""
+    logger.info("Outbox worker started")
 
     while True:
         try:
@@ -29,74 +41,48 @@ async def run_outbox_loop(ctx) -> None:
             if processed_count > 0:
                 continue
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(OUTBOX_IDLE_SLEEP_SECONDS)
 
         except asyncio.CancelledError:
-            logger.info("Outbox loop cancelled")
+            logger.info("Outbox worker stopped")
             break
 
-        except Exception as e:
-            logger.error(
-                "Error in outbox loop: %s",
-                e,
-                exc_info=True,
-            )
-            await asyncio.sleep(5.0)
+        except Exception as exc:
+            logger.error("Outbox worker failed: %s", exc, exc_info=True)
+            await asyncio.sleep(OUTBOX_ERROR_SLEEP_SECONDS)
 
-async def process_outbox_batch(ctx) -> int:
-    """Обрабатывает пачку событий."""
-    db_maker = ctx.get("db_session_maker")
-    kafka: KafkaProducerWrapper = ctx.get("kafka_producer")
 
-    if not db_maker or not kafka:
+async def process_outbox_batch(ctx: dict[str, Any]) -> int:
+    """Публикует одну пачку pending outbox-событий."""
+    db_session_maker = ctx.get("db_session_maker")
+    kafka_producer: KafkaProducerWrapper | None = ctx.get("kafka_producer")
+
+    if not db_session_maker or not kafka_producer:
+        logger.warning("Outbox processing skipped: dependencies are missing")
         return 0
 
     await touch_health_file()
 
-    async with UnitOfWork(db_maker) as uow:
-        events = await uow.outbox.get_pending_events(limit=200)
+    async with UnitOfWork(db_session_maker) as uow:
+        events = await uow.outbox.get_pending_events(limit=OUTBOX_BATCH_LIMIT)
 
         if not events:
             return 0
 
-        batch_data = []
+        batch_data: list[dict[str, Any]] = []
         events_map = []
 
         for event in events:
             try:
-                msg_bytes = to_json_bytes(event.payload)
-
-                key_val = (
-                    event.payload.get("goal_id")
-                    or event.payload.get("user_id")
-                )
-                key = (
-                    str(key_val).encode("utf-8")
-                    if key_val
-                    else None
-                )
-
-                headers = []
-                if event.trace_id:
-                    headers.append(
-                        ("X-Request-ID", event.trace_id.encode("utf-8"))
-                    )
-
-                batch_data.append(
-                    {
-                        "topic": event.topic,
-                        "value": msg_bytes,
-                        "key": key,
-                        "headers": headers,
-                    }
-                )
+                batch_data.append(_build_kafka_batch_item(event))
                 events_map.append(event)
 
-            except Exception as e:
+            except Exception as exc:
                 logger.error(
-                    "Serialization error for event %s: %s",
+                    "Serialization error for outbox event %s: %s",
                     event.event_id,
-                    e,
+                    exc,
+                    exc_info=True,
                 )
                 event.status = "failed"
                 event.retry_count += 1
@@ -105,75 +91,99 @@ async def process_outbox_batch(ctx) -> int:
             await uow.commit()
             return 0
 
-        results = await kafka.send_batch(batch_data)
-
-        successful_ids = []
-        res_idx = 0
-        now = datetime.now(timezone.utc)
-
-        for event in events_map:
-            if event.status == "failed":
-                continue
-
-            success = results[res_idx]
-            res_idx += 1
-
-            if success:
-                successful_ids.append(event.event_id)
-            else:
-                event.retry_count += 1
-
-                if event.retry_count >= 5:
-                    event.status = "failed"
-                    logger.error(
-                        "Event %s failed permanently after 5 retries",
-                        event.event_id,
-                    )
-                else:
-                    delay = 5 ** event.retry_count
-                    event.next_retry_at = now + timedelta(seconds=delay)
+        results = await kafka_producer.send_batch(batch_data)
+        successful_ids = _apply_outbox_results(events_map, results)
 
         if successful_ids:
             await uow.outbox.delete_events(successful_ids)
 
         await uow.commit()
+
         return len(successful_ids)
 
-async def cleanup_transactions_task(ctx) -> None:
-    """Очистка старых обработанных транзакций целей."""
-    db_maker = ctx.get("db_session_maker")
-    if not db_maker:
-        return
 
-    try:
-        async with UnitOfWork(db_maker) as uow:
-            await uow.goals.ensure_current_partition()
-            await uow.goals.drop_old_partitions(retention_months=3)
-
-        logger.info("Partition maintenance completed")
-
-    except Exception as e:
-        logger.error(
-            "Partition maintenance failed: %s",
-            e,
-        )
-
-async def check_goals_deadlines_task(ctx) -> None:
-    """Проверка сроков целей и отправка уведомлений."""
-    db_maker = ctx.get("db_session_maker")
-    if not db_maker:
+async def cleanup_transactions_task(ctx: dict[str, Any]) -> None:
+    """Создает актуальные партиции и удаляет старые партиции транзакций целей."""
+    db_session_maker = ctx.get("db_session_maker")
+    if not db_session_maker:
+        logger.warning("Partition maintenance skipped: db_session_maker is missing")
         return
 
     await touch_health_file()
 
     try:
-        async with UnitOfWork(db_maker) as uow:
+        async with UnitOfWork(db_session_maker) as uow:
+            await uow.goals.ensure_current_partition()
+            await uow.goals.drop_old_partitions(
+                retention_months=PARTITION_RETENTION_MONTHS,
+            )
+
+        logger.info("Partition maintenance completed")
+
+    except Exception as exc:
+        logger.error("Partition maintenance failed: %s", exc, exc_info=True)
+
+
+async def check_goals_deadlines_task(ctx: dict[str, Any]) -> None:
+    """Проверяет сроки целей и создает outbox-события уведомлений."""
+    db_session_maker = ctx.get("db_session_maker")
+    if not db_session_maker:
+        logger.warning("Deadline check skipped: db_session_maker is missing")
+        return
+
+    await touch_health_file()
+
+    try:
+        async with UnitOfWork(db_session_maker) as uow:
             service = GoalService(uow)
             await service.check_deadlines()
 
-    except Exception as e:
-        logger.error(
-            "Deadline check failed: %s",
-            e,
-            exc_info=True,
-        )
+        logger.info("Deadline check completed")
+
+    except Exception as exc:
+        logger.error("Deadline check failed: %s", exc, exc_info=True)
+
+
+def _build_kafka_batch_item(event) -> dict[str, Any]:
+    """Формирует элемент batch-отправки в Kafka из outbox-события."""
+    message_bytes = to_json_bytes(event.payload)
+
+    key_value = event.payload.get("goal_id") or event.payload.get("user_id")
+    key = str(key_value).encode("utf-8") if key_value else None
+
+    headers: list[tuple[str, bytes]] = []
+    if event.trace_id:
+        headers.append((REQUEST_ID_HEADER, event.trace_id.encode("utf-8")))
+
+    return {
+        "topic": event.topic,
+        "value": message_bytes,
+        "key": key,
+        "headers": headers,
+    }
+
+
+def _apply_outbox_results(events: list, results: list[bool]) -> list[UUID]:
+    """Применяет результаты отправки Kafka batch к outbox-событиям."""
+    successful_ids: list[UUID] = []
+    now = datetime.now(timezone.utc)
+
+    for event, success in zip(events, results, strict=False):
+        if success:
+            successful_ids.append(event.event_id)
+            continue
+
+        event.retry_count += 1
+
+        if event.retry_count >= OUTBOX_MAX_RETRIES:
+            event.status = "failed"
+            logger.error(
+                "Outbox event %s failed permanently after %s retries",
+                event.event_id,
+                OUTBOX_MAX_RETRIES,
+            )
+        else:
+            delay_seconds = OUTBOX_MAX_RETRIES**event.retry_count
+            event.next_retry_at = now + timedelta(seconds=delay_seconds)
+
+    return successful_ids

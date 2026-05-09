@@ -1,27 +1,31 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from smartbudget_shared.config import (
-    DBSettings as SharedDBSettings,
-    ArqSettings as SharedArqSettings,
     AppSettings as SharedAppSettings,
+    ArqSettings as SharedArqSettings,
+    DBSettings as SharedDBSettings,
 )
 
 
 class DBSettings(SharedDBSettings):
-    """Настройки базы данных, унаследованные от общей конфигурации."""
+    """Настройки базы данных."""
 
     pass
 
 
 class KafkaSettings(BaseSettings):
+    """Настройки Kafka для goals service."""
+
     KAFKA_BOOTSTRAP_SERVERS: str
+
     KAFKA_GROUP_ID: str | None = None
     KAFKA_TOPIC: str | None = None
     KAFKA_DLQ_TOPIC: str | None = None
+
     KAFKA_AUTO_OFFSET_RESET: str
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
+
     KAFKA_GOALS_GROUP_ID: str
     KAFKA_TOPIC_TRANSACTION_GOAL: str
     KAFKA_TOPIC_TRANSACTION_DELETED: str
@@ -32,34 +36,43 @@ class KafkaSettings(BaseSettings):
 
     @property
     def consumer_group_id(self) -> str:
+        """Возвращает group id consumer-а."""
         return self.KAFKA_GROUP_ID or self.KAFKA_GOALS_GROUP_ID
 
     @property
     def consumer_topic(self) -> str:
+        """Возвращает основной topic входящих событий транзакций."""
         return self.KAFKA_TOPIC or self.KAFKA_TOPIC_TRANSACTION_GOAL
 
     @property
     def consumer_topics(self) -> tuple[str, str]:
-        return (self.consumer_topic, self.KAFKA_TOPIC_TRANSACTION_DELETED)
+        """Возвращает topics, которые читает goals consumer."""
+        return (
+            self.consumer_topic,
+            self.KAFKA_TOPIC_TRANSACTION_DELETED,
+        )
 
     @property
     def dlq_topic(self) -> str:
+        """Возвращает DLQ topic."""
         return self.KAFKA_DLQ_TOPIC or self.KAFKA_TOPIC_TRANSACTION_DLQ
 
 
 class ArqSettings(SharedArqSettings):
-    """Настройки ARQ, унаследованные от общей конфигурации."""
+    """Настройки ARQ."""
 
     pass
 
 
 class AppSettings(SharedAppSettings):
-    """Настройки приложения, унаследованные от общей конфигурации."""
+    """Настройки приложения."""
 
     FRONTEND_URL: str
 
 
 class Settings(BaseSettings):
+    """Корневая конфигурация goals service."""
+
     DB: DBSettings
     KAFKA: KafkaSettings
     ARQ: ArqSettings
