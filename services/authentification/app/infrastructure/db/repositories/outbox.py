@@ -22,12 +22,9 @@ class OutboxRepository:
         event_type: str | None = None,
     ) -> models.OutboxEvent:
         clean_payload = serialization.recursive_normalize(payload)
-        resolved_event_type = (
-            event_type
-            or clean_payload.get("event_type")
-            or clean_payload.get("event")
-            or "unknown"
-        )
+        resolved_event_type = event_type or clean_payload.get("event_type")
+        if not resolved_event_type:
+            raise ValueError("event_type is required for outbox events")
         now = time.utc_now()
 
         return models.OutboxEvent(

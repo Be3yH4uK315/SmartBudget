@@ -88,7 +88,7 @@ class Session(Base):
     user_agent = Column(String, nullable=False)
     device_name = Column(String, nullable=False)
     ip = Column(String, nullable=False)
-    location = Column(String, nullable=False)
+    location = Column(String, nullable=True)
     revoked = Column(Boolean, default=False, nullable=False)
     refresh_fingerprint = Column(String(64), nullable=False, unique=True)
     last_activity = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)

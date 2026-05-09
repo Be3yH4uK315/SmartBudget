@@ -122,7 +122,7 @@ class SessionService:
         user_agent: str,
         device_name: str,
         ip: str,
-        location: str,
+        location: str | None,
     ) -> tuple[str, str, models.Session]:
         """Создаёт ORM-сессию и токены."""
         refresh_token = str(uuid4())

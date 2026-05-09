@@ -11,12 +11,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from arq import create_pool
 from arq.connections import RedisSettings
 from prometheus_fastapi_instrumentator import Instrumentator
+from smartbudget_shared.request_logging import setup_request_logging
 
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.database import get_db_engine, get_session_factory
 from app.core import exceptions
-from app.api.routes import router as auth_router
+from app.api.routes import (
+    router as auth_router,
+    settings_router as auth_settings_router,
+    user_router,
+)
 from app.api import dependencies
 
 setup_logging()
@@ -138,24 +143,9 @@ app = FastAPI(
     docs_url="/api/v1/auth/docs",
     openapi_url="/api/v1/auth/openapi.json",
 )
+setup_request_logging(app)
 
 Instrumentator().instrument(app).expose(app)
-
-
-@app.middleware("http")
-async def tracing_middleware(request: Request, call_next):
-    """Middleware для трассировки запросов по Request ID."""
-    req_id = request.headers.get("X-Request-ID") or request.headers.get(
-        "X-Correlation-ID"
-    )
-    if not req_id:
-        import uuid
-
-        req_id = str(uuid.uuid4())
-
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = req_id
-    return response
 
 
 @app.exception_handler(exceptions.AuthServiceError)
@@ -212,3 +202,5 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(auth_router, prefix="/api/v1/auth")
+app.include_router(user_router, prefix="/api/v1/user")
+app.include_router(auth_settings_router, prefix="/api/v1/settings")

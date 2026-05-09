@@ -47,7 +47,12 @@ class SessionRepository(BaseRepository):
         )
         await self.db.execute(stmt)
 
-    async def update_enrichment_data(self, session_id: UUID, location: str, device_name: str) -> None:
+    async def update_enrichment_data(
+        self,
+        session_id: UUID,
+        location: str | None,
+        device_name: str,
+    ) -> None:
         """Обновляет обогащенные данные сессии (локация + устройство)."""
         stmt = (
             update(models.Session)

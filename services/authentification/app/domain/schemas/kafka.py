@@ -1,10 +1,8 @@
 from enum import Enum
-from pydantic import Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Literal
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
-
-from app.core.schemas import CamelModel
 
 class KafkaTopics(str, Enum):
     AUTH_EVENTS = "auth.events"
@@ -26,9 +24,13 @@ class AuthEventTypes(str, Enum):
     EMAIL_CHANGE_STARTED = "user.email_change_started"
     EMAIL_CHANGED = "user.email_changed"
 
-class BaseAuthEvent(CamelModel):
-    event: AuthEventTypes
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class BaseAuthEvent(BaseModel):
+    event_type: AuthEventTypes
+    timestamp: datetime = Field(default_factory=utc_now)
 
 class UserEvent(BaseAuthEvent):
     user_id: Optional[UUID] = None
@@ -37,7 +39,8 @@ class UserEvent(BaseAuthEvent):
     location: Optional[str] = None
 
 class UserRegisteredEvent(UserEvent):
-    event: Literal[AuthEventTypes.USER_REGISTERED]
+    event_type: Literal[AuthEventTypes.USER_REGISTERED]
     user_id: UUID
     email: EmailStr
     name: str
+    language: str

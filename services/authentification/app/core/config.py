@@ -71,6 +71,11 @@ class AppSettings(SharedAppSettings):
     TZ: str
     DUMMY_HASH: str
 
+    @field_validator("FRONTEND_URL", mode="before")
+    @classmethod
+    def normalize_frontend_url(cls, value: str) -> str:
+        return value.rstrip("/")
+
     @field_validator("DUMMY_HASH", mode="before")
     @classmethod
     def generate_dummy_hash(cls, v: str | None) -> str:

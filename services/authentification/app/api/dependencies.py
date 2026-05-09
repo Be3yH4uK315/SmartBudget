@@ -178,7 +178,7 @@ async def get_user_id_from_expired_token(
     request: Request,
     token_service: TokenService = Depends(get_token_service)
 ) -> str | None:
-    """Извлекает userId из access_token, игнорируя срок его действия."""
+    """Извлекает user_id из access_token, игнорируя срок его действия."""
     token = request.cookies.get("access_token")
     if not token:
         return None

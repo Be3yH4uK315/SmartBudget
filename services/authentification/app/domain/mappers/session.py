@@ -9,7 +9,7 @@ def session_to_dto(session: models.Session) -> SessionDTO:
         user_agent=session.user_agent,
         device_name=session.device_name,
         ip=session.ip,
-        location=session.location,
+        location=session.location or "Unknown",
         revoked=session.revoked,
         refresh_fingerprint=session.refresh_fingerprint,
         last_activity=session.last_activity,

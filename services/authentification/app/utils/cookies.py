@@ -7,7 +7,7 @@ def set_auth_cookies(
     refresh_token: str
 ):
     """Хелпер для установки httpOnly cookie."""
-    secure = settings.APP.ENV == 'prod' and settings.APP.FRONTEND_URL.startswith("https://")
+    secure = (settings.APP.ENV == 'prod')
     samesite = "none" if secure else "lax"
     response.set_cookie(
         key="access_token",
@@ -30,7 +30,7 @@ def set_auth_cookies(
 
 def delete_auth_cookies(response: Response):
     """Хелпер для удаления auth cookie."""
-    secure = settings.APP.ENV == 'prod' and settings.APP.FRONTEND_URL.startswith("https://")
+    secure = (settings.APP.ENV == 'prod')
     samesite = "none" if secure else "lax"
     response.delete_cookie("access_token", httponly=True, secure=secure, samesite=samesite, path='/')
     response.delete_cookie("refresh_token", httponly=True, secure=secure, samesite=samesite, path='/')

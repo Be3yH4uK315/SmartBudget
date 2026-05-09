@@ -28,6 +28,8 @@ from app.services.profile_service import ProfileService
 from app.utils import cookies
 
 router = APIRouter(tags=["auth"])
+user_router = APIRouter(tags=["user"])
+settings_router = APIRouter(tags=["auth settings"])
 settings = config.settings
 
 
@@ -219,7 +221,7 @@ async def complete_reset(
     )
 
 
-@router.post(
+@settings_router.post(
     "/change-password",
     status_code=200,
     response_model=schemas.UnifiedResponse,
@@ -236,7 +238,7 @@ async def change_password(
     )
 
 
-@router.get(
+@user_router.get(
     "/me",
     status_code=200,
     response_model=schemas.UserInfo,
@@ -248,7 +250,7 @@ async def get_current_user_info(
     return user
 
 
-@router.patch(
+@user_router.patch(
     "/me/profile",
     status_code=200,
     response_model=schemas.UnifiedResponse,
@@ -265,7 +267,7 @@ async def update_profile(
     )
 
 
-@router.patch(
+@user_router.patch(
     "/language",
     status_code=200,
     response_model=schemas.UnifiedResponse,
@@ -284,7 +286,7 @@ async def update_language(
     )
 
 
-@router.post(
+@user_router.post(
     "/me/email/request",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
@@ -304,7 +306,7 @@ async def request_email_change(
     )
 
 
-@router.post(
+@user_router.post(
     "/me/email/confirm",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
@@ -326,8 +328,8 @@ async def confirm_email_change(
     )
 
 
-@router.patch(
-    "/me/retention",
+@settings_router.patch(
+    "/sessions/retention",
     status_code=200,
     response_model=schemas.UnifiedResponse,
     summary="Обновление настроек хранения сессий пользователя",
@@ -346,8 +348,8 @@ async def update_retention_settings(
     )
 
 
-@router.get(
-    "/me/retention",
+@settings_router.get(
+    "/sessions/retention",
     status_code=200,
     response_model=schemas.RetentionInfo,
     summary="Получение настроек хранения сессий пользователя",
@@ -358,7 +360,7 @@ async def get_retention_settings(
     return schemas.RetentionInfo(days=user.retention_days)
 
 
-@router.get(
+@settings_router.get(
     "/sessions",
     status_code=200,
     response_model=schemas.AllSessionsResponse,
@@ -376,7 +378,7 @@ async def get_all_user_sessions(
     return schemas.AllSessionsResponse(sessions=sessions_list)
 
 
-@router.delete(
+@settings_router.delete(
     "/sessions/{sessionId}",
     status_code=200,
     response_model=schemas.UnifiedResponse,
@@ -393,7 +395,7 @@ async def revoke_session(
     )
 
 
-@router.post(
+@settings_router.post(
     "/sessions/logout-others",
     status_code=200,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],

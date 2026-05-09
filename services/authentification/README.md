@@ -235,11 +235,15 @@ JWT_ALGORITHM=RS256
 GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
 
 # --- Frontend
-FRONTEND_URL=http://localhost:3000
+APP__FRONTEND_URL=http://127.0.0.1:3000
 
 # --- Prometheus
 PROMETHEUS_PORT=9090
 ```
+
+`APP__FRONTEND_URL` используется для ссылок в письмах регистрации, сброса
+пароля и подтверждения смены email. Значение должно совпадать с основным
+frontend URL в `infra/.env` (`FRONTEND_URL`).
 
 ## 🚀 Запуск
 
@@ -355,7 +359,7 @@ Body: {
   "new_password": "NewPass123!"
 }
 
-POST /api/v1/auth/change-password
+POST /api/v1/settings/change-password
 Изменить пароль для залогиненного пользователя
 Headers: Authorization: Bearer {access_token}
 Body: {
@@ -367,17 +371,17 @@ Body: {
 ### Управление Сессиями
 
 ```
-GET /api/v1/auth/me
+GET /api/v1/user/me
 Получить информацию о текущем пользователе
 Headers: Authorization: Bearer {access_token}
 Response: { "id": "uuid", "email": "...", "name": "...", "role": 0 }
 
-PATCH /api/v1/auth/language
+PATCH /api/v1/user/language
 Обновить язык интерфейса пользователя
 Body: { "language": "ru" }
 Allowed values: "ru", "en"
 
-GET /api/v1/auth/sessions
+GET /api/v1/settings/sessions
 Получить список всех активных сессий пользователя
 Headers: Authorization: Bearer {access_token}
 Response: [
@@ -391,11 +395,11 @@ Response: [
   }
 ]
 
-DELETE /api/v1/auth/sessions/{session_id}
+DELETE /api/v1/settings/sessions/{session_id}
 Завершить конкретную сессию
 Headers: Authorization: Bearer {access_token}
 
-POST /api/v1/auth/sessions/logout-others
+POST /api/v1/settings/sessions/logout-others
 Завершить все другие сессии кроме текущей
 Headers: Authorization: Bearer {access_token}
 ```
