@@ -22,12 +22,9 @@ class OutboxRepository:
         payload: dict[str, Any],
         event_type: str | None = None,
     ) -> models.OutboxEvent:
-        resolved_event_type = (
-            event_type
-            or payload.get("event_type")
-            or payload.get("eventName")
-            or "unknown"
-        )
+        resolved_event_type = event_type or payload.get("event_type")
+        if not resolved_event_type:
+            raise ValueError("event_type is required for outbox events")
 
         return models.OutboxEvent(
             event_id=uuid4(),

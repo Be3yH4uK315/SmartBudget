@@ -9,12 +9,14 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from redis.asyncio import ConnectionPool
 from sqlalchemy.exc import SQLAlchemyError
+from smartbudget_shared.request_logging import setup_request_logging
 
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.database import get_db_engine, get_session_factory
 from app.core.context import set_request_id
 from app.core import exceptions
+from app.api.routes import dashboard_router as goals_dashboard_router
 from app.api.routes import router as goals_router
 
 setup_logging()
@@ -90,22 +92,7 @@ app = FastAPI(
     docs_url="/api/v1/goals/docs",
     openapi_url="/api/v1/goals/openapi.json",
 )
-
-
-@app.middleware("http")
-async def tracing_middleware(
-    request: Request,
-    call_next,
-):
-    """Middleware для установки и передачи Request ID."""
-    req_id = request.headers.get("X-Request-ID") or request.headers.get(
-        "X-Correlation-ID"
-    )
-    final_id = set_request_id(req_id)
-    response: Response = await call_next(request)
-    response.headers["X-Request-ID"] = final_id
-
-    return response
+setup_request_logging(app, set_request_id)
 
 
 metrics_app = make_asgi_app()
@@ -173,4 +160,8 @@ async def general_exception_handler(
 app.include_router(
     goals_router,
     prefix="/api/v1/goals",
+)
+app.include_router(
+    goals_dashboard_router,
+    prefix="/api/v1/dashboard",
 )

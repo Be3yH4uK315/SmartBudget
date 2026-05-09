@@ -48,9 +48,9 @@ def _create_notification_event(
 ) -> dict:
     """Создает событие для notification service."""
     return {
-        "eventId": str(event_id or uuid4()),
-        "eventName": event_name,
-        "userId": str(user_id),
+        "event_id": str(event_id or uuid4()),
+        "event_type": event_name,
+        "user_id": str(user_id),
         "payload": payload,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -61,10 +61,10 @@ def _decimal_to_float(value: Decimal | int | float | None) -> float:
     return float(value)
 
 def _goal_current_percent(goal: models.Goal) -> float:
-    if not goal.target_value:
+    if not goal.target_amount:
         return 0.0
 
-    percent = (goal.current_value / goal.target_value) * Decimal("100")
+    percent = (goal.current_amount / goal.target_amount) * Decimal("100")
     return float(min(percent, Decimal("100")).quantize(Decimal("0.01")))
 
 def _goal_recommended_payment(goal: models.Goal) -> float:
@@ -112,8 +112,8 @@ class GoalService:
             goal_id=uuid4(),
             user_id=user_id,
             name=request.name.strip(),
-            target_value=request.target_value,
-            current_value=Decimal("0"),
+            target_amount=request.target_amount,
+            current_amount=Decimal("0"),
             finish_date=request.finish_date,
             status=GoalStatus.ONGOING.value,
             tags=request.tags,
@@ -129,7 +129,7 @@ class GoalService:
                 goal_id=str(goal.goal_id),
                 user_id=str(user_id),
                 name=goal.name,
-                target_value=goal.target_value,
+                target_amount=goal.target_amount,
                 finish_date=goal.finish_date,
                 priority=goal.priority,
             )
@@ -144,9 +144,9 @@ class GoalService:
                     "goal.created",
                     user_id,
                     {
-                        "goalId": str(goal.goal_id),
+                        "goal_id": str(goal.goal_id),
                         "name": goal.name,
-                        "recommendedPayment": _goal_recommended_payment(goal),
+                        "recommended_payment": _goal_recommended_payment(goal),
                     },
                     event_id=_notification_event_id("goal.created", goal.goal_id),
                 ),
@@ -367,7 +367,7 @@ class GoalService:
             if goal.finish_date and goal.finish_date < today:
                 new_status = GoalStatus.EXPIRED
 
-            if goal.current_value >= goal.target_value:
+            if goal.current_amount >= goal.target_amount:
                 new_status = GoalStatus.ACHIEVED
 
         return await self._change_status_logic(
@@ -429,8 +429,8 @@ class GoalService:
         event: k_schemas.TransactionEvent,
     ) -> None:
         """Обновляет баланс цели на основе транзакции."""
-        value_change = event.value * (
-            Decimal(1) if event.type == TransactionType.INCOME else Decimal(-1)
+        value_change = event.amount * (
+            Decimal(1) if event.transaction_type == TransactionType.INCOME else Decimal(-1)
         )
 
         async with self.uow:
@@ -439,8 +439,9 @@ class GoalService:
                 goal_id=event.goal_id,
                 amount_delta=value_change,
                 transaction_id=event.transaction_id,
-                raw_amount=event.value,
-                transaction_type=event.type.value
+                raw_amount=event.amount,
+                transaction_type=event.transaction_type.value,
+                occurred_at=event.occurred_at,
             )
 
             if goal is None:
@@ -453,7 +454,7 @@ class GoalService:
             update_event = _create_outbox_event(
                 GoalEventType.UPDATED,
                 goal_id=str(goal.goal_id),
-                current_value=goal.current_value,
+                current_amount=goal.current_amount,
                 status=goal.status,
             )
 
@@ -484,7 +485,7 @@ class GoalService:
                     "goal.achieved",
                     achieved_goal,
                     {
-                        "goalId": str(achieved_goal.goal_id),
+                        "goal_id": str(achieved_goal.goal_id),
                         "name": achieved_goal.name,
                     },
                 )
@@ -510,6 +511,71 @@ class GoalService:
                 else:
                     await self._add_almost_achieved_notification_in_uow(goal)
 
+    async def rollback_goal_transaction(
+        self,
+        event: k_schemas.TransactionDeletedEvent,
+    ) -> None:
+        """Откатывает баланс цели при удалении транзакции."""
+        async with self.uow:
+            goal = await self.uow.goals.rollback_transaction(
+                user_id=event.user_id,
+                transaction_id=event.transaction_id,
+            )
+            if goal is None:
+                logger.info(
+                    "Goal transaction %s skipped for rollback.",
+                    event.transaction_id,
+                )
+                return
+
+            update_event = _create_outbox_event(
+                GoalEventType.UPDATED,
+                goal_id=str(goal.goal_id),
+                current_amount=goal.current_amount,
+                status=goal.status,
+            )
+            self.uow.outbox.add_event(
+                topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                payload=update_event,
+            )
+
+            achieved_goal = await self.uow.goals.mark_achieved_atomically(
+                event.user_id,
+                goal.goal_id,
+            )
+            if achieved_goal:
+                event_achieved = _create_outbox_event(
+                    GoalEventType.ALERT,
+                    goal_id=str(achieved_goal.goal_id),
+                    days_left=0,
+                )
+                self.uow.outbox.add_event(
+                    topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                    payload=event_achieved,
+                )
+                await self._add_goal_notification_event(
+                    "goal.achieved",
+                    achieved_goal,
+                    {
+                        "goal_id": str(achieved_goal.goal_id),
+                        "name": achieved_goal.name,
+                    },
+                )
+                return
+
+            reverted_goal = await self.uow.goals.revert_achievement_atomically(
+                event.user_id,
+                goal.goal_id,
+            )
+            if reverted_goal:
+                logger.info(
+                    "Goal %s reverted to ONGOING after transaction rollback",
+                    reverted_goal.goal_id,
+                )
+                return
+
+            await self._add_almost_achieved_notification_in_uow(goal)
+
     async def _check_and_process_achievement_in_uow(
         self,
         goal: models.Goal,
@@ -530,7 +596,7 @@ class GoalService:
                 "goal.achieved",
                 goal,
                 {
-                    "goalId": str(goal.goal_id),
+                    "goal_id": str(goal.goal_id),
                     "name": goal.name,
                 },
             )
@@ -607,7 +673,7 @@ class GoalService:
                                 "goal.expired",
                                 goal.user_id,
                                 {
-                                    "goalId": str(goal.goal_id),
+                                    "goal_id": str(goal.goal_id),
                                     "name": goal.name,
                                 },
                                 event_id=_notification_event_id("goal.expired", goal.goal_id),
@@ -660,10 +726,10 @@ class GoalService:
                                 "goal.deadline_approaching",
                                 goal.user_id,
                                 {
-                                    "goalId": str(goal.goal_id),
+                                    "goal_id": str(goal.goal_id),
                                     "name": goal.name,
-                                    "daysLeft": goal.days_left,
-                                    "currentPercent": _goal_current_percent(goal),
+                                    "days_left": goal.days_left,
+                                    "current_percent": _goal_current_percent(goal),
                                 },
                                 event_id=_notification_event_id(
                                     "goal.deadline_approaching",
@@ -713,7 +779,7 @@ class GoalService:
                             "goal.payment_missed",
                             goal.user_id,
                             {
-                                "goalId": str(goal.goal_id),
+                                "goal_id": str(goal.goal_id),
                                 "name": goal.name,
                             },
                             event_id=_notification_event_id(
@@ -743,7 +809,7 @@ class GoalService:
             "goal.almost_achieved",
             goal,
             {
-                "goalId": str(goal.goal_id),
+                "goal_id": str(goal.goal_id),
                 "name": goal.name,
             },
         )

@@ -56,8 +56,8 @@ class GoalRepository:
     async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
         """Получение основных целей пользователя (до 5 штук с наименьшим остатком)."""
         remaining_amount = (
-            models.Goal.target_value
-            - models.Goal.current_value
+            models.Goal.target_amount
+            - models.Goal.current_amount
         )
 
         query = (
@@ -122,8 +122,8 @@ class GoalRepository:
 
         completion_percentage = case(
             (
-                models.Goal.target_value > 0,
-                models.Goal.current_value / models.Goal.target_value,
+                models.Goal.target_amount > 0,
+                models.Goal.current_amount / models.Goal.target_amount,
             ),
             else_=0,
         )
@@ -173,7 +173,7 @@ class GoalRepository:
             )
         ).where(
             models.ProcessedTransaction.goal_id == goal_id,
-            models.ProcessedTransaction.created_at >= start_of_month
+            models.ProcessedTransaction.occurred_at >= start_of_month
         )
         
         result = await self.db.execute(query)
@@ -188,7 +188,8 @@ class GoalRepository:
         amount_delta: Decimal,
         transaction_id: UUID,
         raw_amount: Decimal,
-        transaction_type: str
+        transaction_type: str,
+        occurred_at: datetime,
     ) -> models.Goal | None:
         """Обновляет баланс цели."""
 
@@ -196,7 +197,8 @@ class GoalRepository:
             transaction_id=transaction_id,
             goal_id=goal_id,
             amount=raw_amount,
-            transaction_type=transaction_type
+            transaction_type=transaction_type,
+            occurred_at=occurred_at,
         )
 
         try:
@@ -213,7 +215,7 @@ class GoalRepository:
 
         new_value = sa.func.greatest(
             Decimal(0),
-            models.Goal.current_value + amount_delta,
+            models.Goal.current_amount + amount_delta,
         )
 
         query = (
@@ -226,13 +228,76 @@ class GoalRepository:
                     GoalStatus.ACHIEVED.value
                 ])
             )
-            .values(current_value=new_value)
+            .values(current_amount=new_value)
             .execution_options(synchronize_session=False)
             .returning(models.Goal)
         )
 
         result = await self.db.execute(query)
-        return result.scalar_one_or_none()
+        goal = result.scalar_one_or_none()
+        if goal is None:
+            await self.db.execute(
+                delete(models.ProcessedTransaction).where(
+                    models.ProcessedTransaction.transaction_id == transaction_id,
+                )
+            )
+        return goal
+
+    async def rollback_transaction(
+        self,
+        user_id: UUID,
+        transaction_id: UUID,
+    ) -> models.Goal | None:
+        """Откатывает обработанную goal-транзакцию."""
+        result = await self.db.execute(
+            select(models.ProcessedTransaction)
+            .where(models.ProcessedTransaction.transaction_id == transaction_id)
+            .with_for_update()
+        )
+        processed = result.scalar_one_or_none()
+        if processed is None:
+            return None
+
+        amount_delta = (
+            -processed.amount
+            if processed.transaction_type == TransactionType.INCOME.value
+            else processed.amount
+        )
+
+        new_value = sa.func.greatest(
+            Decimal(0),
+            models.Goal.current_amount + amount_delta,
+        )
+
+        query = (
+            update(models.Goal)
+            .where(
+                models.Goal.goal_id == processed.goal_id,
+                models.Goal.user_id == user_id,
+                models.Goal.status.in_([
+                    GoalStatus.ONGOING.value,
+                    GoalStatus.ACHIEVED.value,
+                ]),
+            )
+            .values(
+                current_amount=new_value,
+                updated_at=func.now(),
+            )
+            .execution_options(synchronize_session=False)
+            .returning(models.Goal)
+        )
+
+        update_result = await self.db.execute(query)
+        goal = update_result.scalar_one_or_none()
+        if goal is None:
+            return None
+
+        await self.db.execute(
+            delete(models.ProcessedTransaction).where(
+                models.ProcessedTransaction.transaction_id == transaction_id,
+            )
+        )
+        return goal
 
     async def update_fields(
         self,
@@ -271,8 +336,8 @@ class GoalRepository:
                 models.Goal.goal_id == goal_id,
                 models.Goal.user_id == user_id,
                 models.Goal.status == GoalStatus.ONGOING.value,
-                models.Goal.current_value
-                >= models.Goal.target_value,
+                models.Goal.current_amount
+                >= models.Goal.target_amount,
             )
             .values(
                 status=GoalStatus.ACHIEVED.value,
@@ -296,8 +361,8 @@ class GoalRepository:
                 models.Goal.goal_id == goal_id,
                 models.Goal.user_id == user_id,
                 models.Goal.status == GoalStatus.ACHIEVED.value,
-                models.Goal.current_value
-                < models.Goal.target_value,
+                models.Goal.current_amount
+                < models.Goal.target_amount,
             )
             .values(
                 status=GoalStatus.ONGOING.value,
@@ -475,8 +540,8 @@ class GoalRepository:
             .where(
                 models.ProcessedTransaction.goal_id == models.Goal.goal_id,
                 models.ProcessedTransaction.transaction_type == TransactionType.INCOME.value,
-                models.ProcessedTransaction.created_at >= period_start,
-                models.ProcessedTransaction.created_at < period_end,
+                models.ProcessedTransaction.occurred_at >= period_start,
+                models.ProcessedTransaction.occurred_at < period_end,
             )
             .exists()
         )
@@ -510,7 +575,7 @@ class GoalRepository:
             [
                 {
                     "goal_id": goal_id,
-                    "last_checked_date": func.now(),
+                    "last_checked_at": func.now(),
                 }
                 for goal_id in goal_ids
             ]
@@ -518,7 +583,7 @@ class GoalRepository:
 
         stmt = stmt.on_conflict_do_update(
             index_elements=["goal_id"],
-            set_={"last_checked_date": func.now()},
+            set_={"last_checked_at": func.now()},
         )
 
         await self.db.execute(stmt)

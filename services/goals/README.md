@@ -198,7 +198,7 @@ ARQ__ARQ_QUEUE_NAME=goals_tasks
 # --- Приложение
 APP__LOG_LEVEL=INFO
 APP__TZ=UTC
-APP__FRONTEND_URL=http://localhost:3000
+APP__FRONTEND_URL=http://127.0.0.1:3000
 ```
 
 ### Переменные из infra/.env
@@ -317,7 +317,7 @@ Response: {
 ### Получение Целей Главного Экрана
 
 ```
-GET /api/v1/goals/main
+GET /api/v1/dashboard/goals
 Получение целей для главного экрана с дополнительной информацией
 
 Headers: X-User-Id: {user_id}

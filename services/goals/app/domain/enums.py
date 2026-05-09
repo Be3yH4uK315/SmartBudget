@@ -20,6 +20,6 @@ class TransactionType(str, Enum):
     EXPENSE = "expense"
 
 class GoalPriority(str, Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"

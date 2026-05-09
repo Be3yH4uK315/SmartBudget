@@ -19,7 +19,7 @@ class CamelModel(BaseModel):
 
 class CreateGoalRequest(CamelModel):
     name: str = Field(..., max_length=255, description="Название цели")
-    target_value: Decimal = Field(..., gt=0, description="Целевая сумма")
+    target_amount: Decimal = Field(..., gt=0, description="Целевая сумма")
     finish_date: Optional[date] = Field(
         None,
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
@@ -33,8 +33,8 @@ class CreateGoalResponse(CamelModel):
 class GoalResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID цели")
     name: str = Field(..., description="Название цели")
-    target_value: Decimal = Field(..., description="Целевая сумма")
-    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    target_amount: Decimal = Field(..., description="Целевая сумма")
+    current_amount: Decimal = Field(..., description="Текущая накопленная сумма")
     finish_date: Optional[date] = Field(
         None,
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
@@ -56,8 +56,8 @@ class GoalResponse(CamelModel):
 
 class MainGoalInfo(CamelModel):
     name: str = Field(..., description="Название цели")
-    target_value: Decimal = Field(..., description="Целевая сумма")
-    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    target_amount: Decimal = Field(..., description="Целевая сумма")
+    current_amount: Decimal = Field(..., description="Текущая накопленная сумма")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -67,21 +67,11 @@ class MainGoalInfo(CamelModel):
 class MainGoalsResponse(CamelModel):
     goals: list[MainGoalInfo]
 
-class DashboardGoalResponse(CamelModel):
-    name: str = Field(..., description="Название цели")
-    total_value: Decimal = Field(..., description="Целевая сумма")
-    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        json_encoders={Decimal: float},
-    )
-
 class AllGoalsResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID цели")
     name: str = Field(..., description="Название цели")
-    target_value: Decimal = Field(..., description="Целевая сумма")
-    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    target_amount: Decimal = Field(..., description="Целевая сумма")
+    current_amount: Decimal = Field(..., description="Текущая накопленная сумма")
     finish_date: Optional[date] = Field(
         None,
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
@@ -98,7 +88,7 @@ class AllGoalsResponse(CamelModel):
 
 class GoalPatchRequest(CamelModel):
     name: Optional[str] = Field(None, max_length=255, description="Название цели")
-    target_value: Optional[Decimal] = Field(None, gt=0, description="Целевая сумма")
+    target_amount: Optional[Decimal] = Field(None, gt=0, description="Целевая сумма")
     finish_date: Optional[date] = Field(
         None,
         description="Дата достижения 'YYYY-MM-DD' (null для бессрочных)",
@@ -116,8 +106,8 @@ class GoalArchiveResponse(CamelModel):
 class GoalSearchResponse(CamelModel):
     goal_id: UUID = Field(..., description="ID цели")
     name: str = Field(..., description="Название цели")
-    target_value: Decimal = Field(..., description="Целевая сумма")
-    current_value: Decimal = Field(..., description="Текущая накопленная сумма")
+    target_amount: Decimal = Field(..., description="Целевая сумма")
+    current_amount: Decimal = Field(..., description="Текущая накопленная сумма")
     status: GoalStatus = Field(..., description="Статус цели")
     is_archived: bool = Field(..., description="В архиве ли цель")
 

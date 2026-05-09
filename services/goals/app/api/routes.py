@@ -9,6 +9,7 @@ from app.services.service import GoalService
 from app.api.dependencies import GoalFilters
 
 router = APIRouter(tags=["Goals"])
+dashboard_router = APIRouter(tags=["Goals Dashboard"])
 
 
 @router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
@@ -65,8 +66,8 @@ async def create_goal(
     return await service.create_goal(user_id, request)
 
 
-@router.get(
-    "/main",
+@dashboard_router.get(
+    "/goals",
     response_model=schemas.MainGoalsResponse,
     summary="Получение целей для главного экрана",
 )

@@ -55,12 +55,16 @@ class KafkaConsumerWorker:
         return settings.KAFKA.consumer_topic
 
     @property
+    def topics(self) -> tuple[str, str]:
+        return settings.KAFKA.consumer_topics
+
+    @property
     def group_id(self) -> str:
         return settings.KAFKA.consumer_group_id
 
     def _build_consumer(self) -> AIOKafkaConsumer:
         return AIOKafkaConsumer(
-            self.topic,
+            *self.topics,
             bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
             group_id=self.group_id,
             enable_auto_commit=settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT,
@@ -77,7 +81,7 @@ class KafkaConsumerWorker:
             self.health_task = asyncio.create_task(keep_alive_task())
             logger.info(
                 "Kafka worker started",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
             while True:
@@ -106,13 +110,13 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
         finally:
@@ -130,7 +134,7 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
     async def process_batch(self, messages: list[Any]) -> None:
@@ -156,8 +160,12 @@ class KafkaConsumerWorker:
 
         try:
             payload = json.loads(message.value)
-            event = schemas.TransactionEvent.model_validate(payload)
-            await self.process_event(event, service)
+            if message.topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DELETED:
+                event = schemas.TransactionDeletedEvent.model_validate(payload)
+                await self.process_deleted_event(event, service)
+            else:
+                event = schemas.TransactionEvent.model_validate(payload)
+                await self.process_event(event, service)
             logger.info(
                 "Kafka message processed",
                 extra={"topic": message.topic, "offset": message.offset},
@@ -179,6 +187,13 @@ class KafkaConsumerWorker:
         service: GoalService,
     ) -> None:
         await service.update_goal_balance(event)
+
+    async def process_deleted_event(
+        self,
+        event: schemas.TransactionDeletedEvent,
+        service: GoalService,
+    ) -> None:
+        await service.rollback_goal_transaction(event)
 
     async def send_to_dlq(
         self,

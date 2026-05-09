@@ -31,8 +31,8 @@ class Goal(Base):
     )
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     name = Column(String(255), nullable=False)
-    target_value = Column(DECIMAL(12, 2), nullable=False)
-    current_value = Column(DECIMAL(12, 2), nullable=False, default=0)
+    target_amount = Column(DECIMAL(18, 2), nullable=False)
+    current_amount = Column(DECIMAL(18, 2), nullable=False, default=0)
     finish_date = Column(Date, nullable=True)
     tags = Column(ARRAY(String), nullable=False, default=list)
     priority = Column(String(20), nullable=True)
@@ -67,24 +67,24 @@ class Goal(Base):
         Index("ix_goals_main_filter", "user_id", "is_archived", "status", "priority"),
     )
 
-    @validates("target_value", "current_value")
+    @validates("target_amount", "current_amount")
     def validate_decimals(self, key, value):
         if not isinstance(value, Decimal):
             value = Decimal(str(value))
 
-        if key == "target_value" and value <= 0:
-            raise ValueError("target_value must be positive")
+        if key == "target_amount" and value <= 0:
+            raise ValueError("target_amount must be positive")
 
-        if key == "current_value" and value < 0:
-            raise ValueError("current_value must be non-negative")
+        if key == "current_amount" and value < 0:
+            raise ValueError("current_amount must be non-negative")
 
         return value
 
     @property
     def remaining_amount(self) -> Decimal:
-        if self.current_value >= self.target_value:
+        if self.current_amount >= self.target_amount:
             return Decimal("0.00")
-        return self.target_value - self.current_value
+        return self.target_amount - self.current_amount
 
     @property
     def days_left(self) -> int | None:
@@ -107,7 +107,7 @@ class Goal(Base):
         if self.finish_date <= today:
             return Decimal("0.00")
 
-        if self.current_value >= self.target_value:
+        if self.current_amount >= self.target_amount:
             return Decimal("0.00")
 
         last_day_of_month = calendar.monthrange(today.year, today.month)[1]
@@ -120,10 +120,10 @@ class Goal(Base):
             if self.created_at.date() > start_of_month:
                 calc_start_date = self.created_at.date()
 
-            balance_at_start = self.current_value - net_change_this_month
+            balance_at_start = self.current_amount - net_change_this_month
             balance_at_start = max(balance_at_start, Decimal("0.00"))
 
-            remaining_at_start = self.target_value - balance_at_start
+            remaining_at_start = self.target_amount - balance_at_start
             if remaining_at_start <= 0:
                 return Decimal("0.00")
 
@@ -131,7 +131,7 @@ class Goal(Base):
                 self.finish_date - calc_start_date
             ).days
             if total_days_remaining_from_start <= 0:
-                return self.target_value - self.current_value
+                return self.target_amount - self.current_amount
 
             daily_rate = (
                 remaining_at_start / Decimal(total_days_remaining_from_start)
@@ -169,7 +169,7 @@ class Goal(Base):
     def check_achievement(self) -> bool:
         if (
             self.status == GoalStatus.ONGOING.value
-            and self.current_value >= self.target_value
+            and self.current_amount >= self.target_amount
         ):
             self.status = GoalStatus.ACHIEVED.value
             self.updated_at = datetime.now(timezone.utc)
@@ -179,7 +179,7 @@ class Goal(Base):
     def revert_achievement_if_needed(self) -> bool:
         if (
             self.status == GoalStatus.ACHIEVED.value
-            and self.current_value < self.target_value
+            and self.current_amount < self.target_amount
         ):
             self.status = GoalStatus.ONGOING.value
             self.updated_at = datetime.now(timezone.utc)
@@ -194,7 +194,7 @@ class GoalNotification(Base):
         ForeignKey("goals.goal_id", ondelete="CASCADE"),
         primary_key=True,
     )
-    last_checked_date = Column(DateTime(timezone=True), nullable=True)
+    last_checked_at = Column(DateTime(timezone=True), nullable=True)
 
     goal = relationship("Goal", back_populates="notification_state")
 
@@ -202,6 +202,7 @@ class ProcessedTransaction(Base):
     __tablename__ = "processed_goal_transactions"
 
     __table_args__ = (
+        Index("ix_processed_goal_transactions_goal_occurred", "goal_id", "occurred_at"),
         {"postgresql_partition_by": "RANGE (created_at)"},
     )
 
@@ -211,8 +212,9 @@ class ProcessedTransaction(Base):
         nullable=False,
     )
     goal_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    amount = Column(DECIMAL(12, 2), nullable=False)
+    amount = Column(DECIMAL(18, 2), nullable=False)
     transaction_type = Column(String(50), nullable=False)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

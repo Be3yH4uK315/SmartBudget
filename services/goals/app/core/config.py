@@ -18,15 +18,16 @@ class KafkaSettings(BaseSettings):
     KAFKA_GROUP_ID: str | None = None
     KAFKA_TOPIC: str | None = None
     KAFKA_DLQ_TOPIC: str | None = None
-    KAFKA_AUTO_OFFSET_RESET: str = "earliest"
-    KAFKA_ENABLE_AUTO_COMMIT: bool = False
-    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
-    KAFKA_BATCH_SIZE: int = 100
+    KAFKA_AUTO_OFFSET_RESET: str
+    KAFKA_ENABLE_AUTO_COMMIT: bool
+    KAFKA_SECURITY_PROTOCOL: str
+    KAFKA_BATCH_SIZE: int
     KAFKA_GOALS_GROUP_ID: str
     KAFKA_TOPIC_TRANSACTION_GOAL: str
+    KAFKA_TOPIC_TRANSACTION_DELETED: str
     KAFKA_TOPIC_BUDGET_EVENTS: str
     KAFKA_TOPIC_BUDGET_NOTIFICATION: str
-    KAFKA_TOPIC_NOTIFICATION_EVENTS: str = "notification.events"
+    KAFKA_TOPIC_NOTIFICATION_EVENTS: str
     KAFKA_TOPIC_TRANSACTION_DLQ: str
 
     @property
@@ -36,6 +37,10 @@ class KafkaSettings(BaseSettings):
     @property
     def consumer_topic(self) -> str:
         return self.KAFKA_TOPIC or self.KAFKA_TOPIC_TRANSACTION_GOAL
+
+    @property
+    def consumer_topics(self) -> tuple[str, str]:
+        return (self.consumer_topic, self.KAFKA_TOPIC_TRANSACTION_DELETED)
 
     @property
     def dlq_topic(self) -> str:
