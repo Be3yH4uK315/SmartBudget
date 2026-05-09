@@ -1,33 +1,41 @@
 from uuid import UUID
 from sqlalchemy import select
 
-from app.infrastructure.db.models import Model, TrainingDataset, TrainingDatasetStatus
+from app.infrastructure.db.models import (
+    ClassificationModel,
+    TrainingDataset,
+    TrainingDatasetStatus,
+)
 from app.infrastructure.db.repositories.base import BaseRepository
 
 class ModelRepository(BaseRepository):
-    async def get_active_model(self) -> Model | None:
+    async def get_active_model(self) -> ClassificationModel | None:
         """Получает активную модель."""
-        stmt = select(Model).where(Model.is_active == True)
+        stmt = select(ClassificationModel).where(ClassificationModel.is_active == True)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
         
-    async def get_latest_candidate(self) -> Model | None:
+    async def get_latest_candidate(self) -> ClassificationModel | None:
         """Получает последнюю кандидат-модель."""
         stmt = (
-            select(Model)
-            .where(Model.is_active == False)
-            .order_by(Model.created_at.desc())
+            select(ClassificationModel)
+            .where(ClassificationModel.is_active == False)
+            .order_by(ClassificationModel.created_at.desc())
             .limit(1)
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    def create(self, model: Model) -> Model:
+    def create(self, model: ClassificationModel) -> ClassificationModel:
         """Создает новую модель."""
         self.db.add(model)
         return model
 
-    def promote(self, candidate: Model, active: Model | None):
+    def promote(
+        self,
+        candidate: ClassificationModel,
+        active: ClassificationModel | None,
+    ):
         """Переводит кандидат в активные, деактивирует старую."""
         if active:
             active.is_active = False

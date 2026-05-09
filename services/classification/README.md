@@ -173,7 +173,7 @@ KAFKA__KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 KAFKA__KAFKA_GROUP_ID=classification-group
 KAFKA__TOPIC_NEED_CATEGORY=transaction.need_category
 KAFKA__TOPIC_CLASSIFIED=transaction.classified
-KAFKA__TOPIC_UPDATED=transaction.updated
+KAFKA__TOPIC_CATEGORY_UPDATED=transaction.category_updated
 KAFKA__TOPIC_CLASSIFICATION_EVENTS=budget.classification.events
 ```
 
@@ -190,7 +190,7 @@ ML__ML_CONFIDENCE_THRESHOLD_AUDIT=0.4
 
 ```env
 APP__ENV=development
-APP__FRONTEND_URL=http://localhost:3000
+APP__FRONTEND_URL=http://127.0.0.1:3000
 APP__PROMETHEUS_PORT=8001
 APP__LOG_LEVEL=INFO
 APP__TZ=UTC
@@ -283,11 +283,10 @@ GET /classification/{transaction_id}
 {
   "transactionId": "550e8400-e29b-41d4-a716-446655440000",
   "categoryId": 123,
-  "categoryName": "Groceries",
+  "categoryNameSnapshot": "Groceries",
   "confidence": 0.92,
   "source": "rule-based",
-  "timestamp": "2026-01-10T12:00:00Z",
-  "metadata": {}
+  "modelVersion": null
 }
 ```
 
@@ -308,8 +307,7 @@ POST /feedback
 ```json
 {
   "transactionId": "550e8400-e29b-41d4-a716-446655440000",
-  "categoryId": 123,
-  "feedbackType": "correct",
+  "correctCategoryId": 123,
   "comment": "Great classification!"
 }
 ```
@@ -340,13 +338,12 @@ POST /feedback
 
 ```json
 {
-  "transactionId": "550e8400-e29b-41d4-a716-446655440000",
-  "amount": 50.00,
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "amount": "50.00",
   "description": "STARBUCKS COFFEE",
-  "merchantMCC": "5812",
-  "userId": "user-123",
-  "timestamp": "2026-01-10T12:00:00Z",
-  "metadata": {}
+  "merchant": "STARBUCKS",
+  "mcc": 5812
 }
 ```
 
@@ -354,12 +351,12 @@ POST /feedback
 
 ```json
 {
-  "transactionId": "550e8400-e29b-41d4-a716-446655440000",
-  "categoryId": 123,
-  "categoryName": "Food & Drink",
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "category_id": 123,
+  "category_name_snapshot": "Food & Drink",
   "confidence": 0.95,
-  "source": "rule-based",
-  "timestamp": "2026-01-10T12:00:01Z"
+  "source": "rules"
 }
 ```
 
@@ -367,13 +364,12 @@ POST /feedback
 
 ```json
 {
-  "eventType": "classification_completed",
-  "transactionId": "550e8400-e29b-41d4-a716-446655440000",
-  "categoryId": 123,
+  "event_type": "classification_completed",
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+  "category_id": 123,
   "confidence": 0.95,
   "source": "ml",
-  "timestamp": "2026-01-10T12:00:01Z",
-  "processingTimeMs": 42
+  "timestamp": "2026-01-10T12:00:01Z"
 }
 ```
 

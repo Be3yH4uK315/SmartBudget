@@ -24,13 +24,13 @@ class OutboxRepository(BaseRepository):
     ) -> OutboxEvent:
         try:
             clean_payload = to_json_dict(payload)
+            resolved_event_type = event_type or clean_payload.get("event_type")
+            if not resolved_event_type:
+                raise ValueError("event_type is required for outbox events")
+
             return OutboxEvent(
                 topic=topic,
-                event_type=event_type
-                or clean_payload.get("event_type")
-                or clean_payload.get("eventType")
-                or clean_payload.get("eventName")
-                or "unknown",
+                event_type=resolved_event_type,
                 payload=clean_payload,
                 status="pending",
             )

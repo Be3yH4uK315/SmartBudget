@@ -15,20 +15,22 @@ class CamelModel(BaseModel):
 class FeedbackRequest(CamelModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
     correct_category_id: int = Field(..., description="ID категории, которую указал юзер")
-    user_id: Optional[UUID] = Field(None, description="ID пользователя (если есть)")
     comment: Optional[str] = Field(None, max_length=1024, description="Комментарий")
 
     @field_validator('correct_category_id')
     @classmethod
     def validate_category_id(cls, v):
-        if v < 0:
-            raise ValueError('Category ID must be non-negative')
+        if v <= 0:
+            raise ValueError('Category ID must be positive')
         return v
 
 class CategorizationResultResponse(CamelModel):
     transaction_id: UUID = Field(..., description="ID транзакции")
     category_id: int = Field(..., description="ID присвоенной категории")
-    category_name: str = Field(..., description="Имя присвоенной категории")
+    category_name_snapshot: str = Field(
+        ...,
+        description="Snapshot имени категории на момент классификации",
+    )
     confidence: float = Field(..., description="Уверенность модели (0.0 до 1.0)")
     source: str = Field(..., description="Источник (rules, ml, manual)")
     model_version: Optional[str] = Field(None, description="Версия модели, если source=ml")
@@ -49,8 +51,8 @@ class CategorizationResultResponse(CamelModel):
     @field_validator('category_id')
     @classmethod
     def validate_category_id(cls, v):
-        if v < 0:
-            raise ValueError('Category ID must be non-negative')
+        if v <= 0:
+            raise ValueError('Category ID must be positive')
         return v
 
 class HealthResponse(BaseModel):

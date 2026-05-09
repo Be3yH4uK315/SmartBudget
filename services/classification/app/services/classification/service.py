@@ -31,9 +31,9 @@ def _notification_event(
     event_id: UUID,
 ) -> dict[str, Any]:
     return {
-        "eventId": str(event_id),
-        "eventName": event_name,
-        "userId": str(user_id),
+        "event_id": str(event_id),
+        "event_type": event_name,
+        "user_id": str(user_id),
         "payload": payload,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -127,13 +127,13 @@ class ClassificationService:
                     self.uow.outbox.add_event(
                         settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
                         notification_event,
-                        notification_event["eventName"],
+                        notification_event["event_type"],
                     )
                 
                 resp = api_schemas.CategorizationResultResponse(
                     transaction_id=res_model.transaction_id,
                     category_id=res_model.category_id,
-                    category_name=res_model.category_name,
+                    category_name_snapshot=res_model.category_name_snapshot,
                     confidence=res_model.confidence,
                     source=res_model.source.value,
                     model_version=res_model.model_version
@@ -183,7 +183,7 @@ class ClassificationService:
             transaction_id=event.transaction_id,
             user_id=event.user_id,
             category_id=final_cat_id,
-            category_name=final_cat_name,
+            category_name_snapshot=final_cat_name,
             confidence=final_conf,
             source=final_source,
             model_version=final_ver,
@@ -194,8 +194,11 @@ class ClassificationService:
         
         outbox_data = {
             "transaction_id": str(event.transaction_id),
+            "user_id": str(event.user_id),
             "category_id": final_cat_id,
-            "category_name": final_cat_name
+            "category_name_snapshot": final_cat_name,
+            "confidence": final_conf,
+            "source": final_source.value,
         }
 
         notification_event = None
@@ -207,7 +210,7 @@ class ClassificationService:
             notification_event = _notification_event(
                 "transaction.unclassified.found",
                 event.user_id,
-                {"value": _decimal_to_float(event.value)},
+                {"amount": _decimal_to_float(event.amount)},
                 event_id=_notification_event_id(
                     "transaction.unclassified.found",
                     event.transaction_id,
@@ -259,23 +262,25 @@ class ClassificationService:
             self.uow.feedback.create(feedback)
 
             old_category_id = existing.category_id
-            old_name = existing.category_name
+            old_name = existing.category_name_snapshot
             existing.source = ClassificationSource.MANUAL
             existing.category_id = body.correct_category_id
-            existing.category_name = correct_cat.name
+            existing.category_name_snapshot = correct_cat.name
             existing.confidence = 1.0
             await self.uow.results.upsert(existing)
 
             event_data = {
                 "transaction_id": str(body.transaction_id),
-                "old_category": old_name,
+                "user_id": str(user_id),
+                "old_category_id": old_category_id,
+                "old_category_name": old_name,
                 "new_category_id": body.correct_category_id,
-                "new_category_name": correct_cat.name
+                "new_category_name": correct_cat.name,
             }
             self.uow.outbox.add_event(
-                settings.KAFKA.TOPIC_UPDATED, 
-                event_data, 
-                "transaction.updated"
+                settings.KAFKA.TOPIC_CATEGORY_UPDATED,
+                event_data,
+                "transaction.category_updated",
             )
 
             notification_event = None
@@ -284,9 +289,9 @@ class ClassificationService:
                     "transaction.category.changed",
                     user_id,
                     {
-                        "transactionId": str(body.transaction_id),
-                        "oldCategory": old_category_id,
-                        "newCategory": body.correct_category_id,
+                        "transaction_id": str(body.transaction_id),
+                        "old_category_id": old_category_id,
+                        "new_category_id": body.correct_category_id,
                     },
                     event_id=_notification_event_id(
                         "transaction.category.changed",
@@ -296,7 +301,7 @@ class ClassificationService:
                 self.uow.outbox.add_event(
                     settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
                     notification_event,
-                    notification_event["eventName"],
+                    notification_event["event_type"],
                 )
 
             await self.redis.delete(_classification_cache_key(user_id, body.transaction_id))
@@ -322,13 +327,13 @@ class ClassificationService:
             self.uow.outbox.add_event(
                 settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
                 notification_event,
-                notification_event["eventName"],
+                notification_event["event_type"],
             )
         
         resp = api_schemas.CategorizationResultResponse(
             transaction_id=result_model.transaction_id,
             category_id=result_model.category_id,
-            category_name=result_model.category_name,
+            category_name_snapshot=result_model.category_name_snapshot,
             confidence=result_model.confidence,
             source=result_model.source.value,
             model_version=result_model.model_version

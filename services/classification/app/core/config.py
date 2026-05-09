@@ -16,7 +16,7 @@ class DBSettings(SharedDBSettings):
 class ArqSettings(SharedArqSettings):
     """Настройки ARQ, унаследованные от общей конфигурации."""
 
-    REDIS_MAX_CONNECTIONS: int = 50
+    pass
 
 
 class KafkaSettings(BaseSettings):
@@ -24,16 +24,16 @@ class KafkaSettings(BaseSettings):
     KAFKA_GROUP_ID: str
     KAFKA_TOPIC: str | None = None
     KAFKA_DLQ_TOPIC: str | None = None
-    KAFKA_AUTO_OFFSET_RESET: str = "latest"
-    KAFKA_ENABLE_AUTO_COMMIT: bool = False
-    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
-    KAFKA_BATCH_SIZE: int = 100
+    KAFKA_AUTO_OFFSET_RESET: str
+    KAFKA_ENABLE_AUTO_COMMIT: bool
+    KAFKA_SECURITY_PROTOCOL: str
+    KAFKA_BATCH_SIZE: int
     TOPIC_NEED_CATEGORY: str
     TOPIC_CLASSIFIED: str
-    TOPIC_UPDATED: str
+    TOPIC_CATEGORY_UPDATED: str
     TOPIC_CLASSIFICATION_EVENTS: str
-    TOPIC_NOTIFICATION_EVENTS: str = "notification.events"
-    TOPIC_NEED_CATEGORY_DLQ: str = "classification.dlq"
+    TOPIC_NOTIFICATION_EVENTS: str
+    TOPIC_NEED_CATEGORY_DLQ: str
 
     @property
     def consumer_topic(self) -> str:
@@ -56,7 +56,7 @@ class AppSettings(SharedAppSettings):
 
     FRONTEND_URL: str
     PROMETHEUS_PORT: int
-    RULES_RELOAD_INTERVAL_SECONDS: int = 30
+    RULES_RELOAD_INTERVAL_SECONDS: int
 
 
 class Settings(BaseSettings):

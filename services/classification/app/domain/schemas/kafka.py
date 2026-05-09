@@ -1,36 +1,39 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
 
 class TransactionNeedCategoryEvent(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    transaction_id: UUID = Field(validation_alias=AliasChoices("transaction_id", "transactionId"))
-    user_id: Optional[UUID] = Field(default=None, validation_alias=AliasChoices("user_id", "userId"))
-    account_id: Optional[UUID] = Field(default=None, validation_alias=AliasChoices("account_id", "accountId"))
+    transaction_id: UUID
+    user_id: UUID
+    account_id: Optional[UUID] = None
     merchant: str
     mcc: Optional[int] = None
     description: Optional[str] = None
-    value: Optional[Decimal] = None
+    amount: Decimal
 
 class ClassificationClassifiedEvent(BaseModel):
     transaction_id: UUID
+    user_id: UUID
     category_id: int
-    category_name: str
+    category_name_snapshot: str
+    confidence: float
+    source: str
 
 class ClassificationUpdatedEvent(BaseModel):
     transaction_id: UUID
+    user_id: UUID
     merchant: Optional[str] = None
     mcc: Optional[int] = None
     description: Optional[str] = None
-    old_category: Optional[str] = None
+    old_category_id: Optional[int] = None
+    old_category_name: Optional[str] = None
     new_category_id: int
     new_category_name: str
 
 class DLQMessage(BaseModel):
-    originalTopic: str
-    originalMessage: str
+    original_topic: str
+    original_message: str
     error: str
     timestamp: datetime

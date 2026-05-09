@@ -35,7 +35,7 @@ class ClassificationResultRepository(BaseRepository):
                 transaction_id=result.transaction_id,
                 user_id=result.user_id,
                 category_id=result.category_id,
-                category_name=result.category_name,
+                category_name_snapshot=result.category_name_snapshot,
                 confidence=result.confidence,
                 source=result.source,
                 model_version=result.model_version,
@@ -48,7 +48,7 @@ class ClassificationResultRepository(BaseRepository):
                 set_={
                     "category_id": result.category_id,
                     "user_id": result.user_id,
-                    "category_name": result.category_name,
+                    "category_name_snapshot": result.category_name_snapshot,
                     "confidence": result.confidence,
                     "source": result.source,
                     "model_version": result.model_version,

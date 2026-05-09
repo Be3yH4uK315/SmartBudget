@@ -97,12 +97,12 @@ class Rule(base.Base):
 
 class ClassificationResult(base.Base):
     __tablename__ = "classification_results"
-    
+
     classification_result_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
     transaction_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
-    user_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     category_id = Column(Integer, ForeignKey("categories.category_id"), nullable=False)
-    category_name = Column(String(255), nullable=False)
+    category_name_snapshot = Column(String(255), nullable=False)
     confidence = Column(Float, default=1.0, nullable=False)
     source = Column(
         PgEnum(ClassificationSource, name="classification_source_enum"), 
@@ -149,7 +149,7 @@ class Feedback(base.Base):
         Index('ix_feedback_processed', processed),
     )
 
-class Model(base.Base):
+class ClassificationModel(base.Base):
     __tablename__ = "models"
     
     model_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
@@ -174,6 +174,7 @@ class Model(base.Base):
             postgresql_where=(is_active.is_(True)),
         ),
     )
+
 
 class TrainingDataset(base.Base):
     __tablename__ = "training_datasets"

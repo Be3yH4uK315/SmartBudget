@@ -7,6 +7,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi.responses import ORJSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
+from smartbudget_shared.request_logging import setup_request_logging
 
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -97,24 +98,9 @@ app = FastAPI(
     docs_url="/api/v1/class/docs",
     openapi_url="/api/v1/class/openapi.json",
 )
+setup_request_logging(app)
 
 Instrumentator().instrument(app).expose(app)
-
-
-@app.middleware("http")
-async def tracing_middleware(request: Request, call_next):
-    """Add request tracing headers."""
-    req_id = request.headers.get("X-Request-ID") or request.headers.get(
-        "X-Correlation-ID"
-    )
-    if not req_id:
-        import uuid
-
-        req_id = str(uuid.uuid4())
-
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = req_id
-    return response
 
 
 app.include_router(api_router, prefix="/api/v1/class")

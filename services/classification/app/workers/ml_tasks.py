@@ -8,7 +8,11 @@ import pyarrow.parquet as pq
 
 from app.core.config import settings
 from app.infrastructure.db.uow import UnitOfWork
-from app.infrastructure.db.models import TrainingDataset, TrainingDatasetStatus, Model
+from app.infrastructure.db.models import (
+    ClassificationModel,
+    TrainingDataset,
+    TrainingDatasetStatus,
+)
 from app.services.ml.pipeline import MLPipeline
 
 logger = logging.getLogger(__name__)
@@ -126,7 +130,7 @@ async def retrain_model_task(ctx):
         new_version, metrics = await MLPipeline.train_model(training_df)
         
         async with uow:
-            model_entry = Model(
+            model_entry = ClassificationModel(
                 name="lightgbm_tfidf",
                 version=new_version,
                 path=settings.ML.MODEL_PATH,
