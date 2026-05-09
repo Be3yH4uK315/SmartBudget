@@ -19,6 +19,7 @@ from app.domain.schemas import api as schemas
 from app.services.service import TransactionService
 
 router = APIRouter(tags=["Transactions"])
+goal_transactions_router = APIRouter(tags=["Goal Transactions"])
 
 
 @router.get(
@@ -70,9 +71,9 @@ async def readiness_check(request: Request) -> Response:
 @router.get(
     "/health",
     status_code=status.HTTP_200_OK,
-    summary="Legacy health check",
+    summary="Health check",
 )
-async def legacy_health_check() -> dict:
+async def health_check() -> dict:
     return {"status": "Healthy"}
 
 
@@ -92,11 +93,11 @@ async def list_transactions(
         limit=filters.limit,
         offset=filters.offset,
         category_ids=filters.category_ids,
-        date_from=filters.date_from,
-        date_to=filters.date_to,
+        occurred_from=filters.occurred_from,
+        occurred_to=filters.occurred_to,
         transaction_type=filters.transaction_type,
-        value_from=filters.value_from,
-        value_to=filters.value_to,
+        amount_from=filters.amount_from,
+        amount_to=filters.amount_to,
     )
 
 
@@ -207,8 +208,8 @@ async def delete_transaction(
     return Response(status_code=status.HTTP_200_OK)
 
 
-@router.get(
-    "/goals/{account_id}",
+@goal_transactions_router.get(
+    "/transactions/{account_id}",
     response_model=list[schemas.TransactionsByMonth],
     response_model_exclude_none=True,
     summary="Получить транзакции цели по месяцам",

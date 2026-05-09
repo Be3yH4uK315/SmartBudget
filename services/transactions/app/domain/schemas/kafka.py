@@ -3,97 +3,87 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 from app.domain.enums import TransactionType
 
 
-def to_camel(string: str) -> str:
-    parts = string.split("_")
-    return parts[0] + "".join(word.capitalize() for word in parts[1:])
-
-
-class CamelModel(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        json_encoders={Decimal: float},
-    )
-
-
 class TransactionClassifiedMessage(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    transaction_id: UUID = Field(
-        validation_alias=AliasChoices("transaction_id", "transactionId", "TransactionId"),
-    )
-    category_id: int | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "category_id",
-            "categoryId",
-            "CategoryId",
-            "new_category_id",
-            "newCategoryId",
-            "NewCategoryId",
-        ),
-    )
+    transaction_id: UUID
+    user_id: UUID
+    category_id: int
+    confidence: float
+    source: str
 
 
-class TransactionNewMessage(CamelModel):
+class TransactionCategoryUpdatedMessage(BaseModel):
+    transaction_id: UUID
+    user_id: UUID
+    old_category_id: int | None = None
+    new_category_id: int
+    old_category_name: str | None = None
+    new_category_name: str | None = None
+
+
+class TransactionNewMessage(BaseModel):
+    transaction_id: UUID
     user_id: UUID
     category_id: int | None
-    value: Decimal
-    type: TransactionType
+    amount: Decimal
+    transaction_type: TransactionType
+    occurred_at: datetime
 
 
-class TransactionNewGoalMessage(CamelModel):
+class TransactionNewGoalMessage(BaseModel):
     transaction_id: UUID
     goal_id: UUID
-    account_id: UUID | None = None
     user_id: UUID
-    value: Decimal
-    type: TransactionType
+    amount: Decimal
+    transaction_type: TransactionType
+    occurred_at: datetime
 
 
-class TransactionImportedMessage(CamelModel):
+class TransactionImportedMessage(BaseModel):
     event_type: str
     user_id: UUID
     details: dict[str, Any]
 
 
-class TransactionNeedCategoryMessage(CamelModel):
+class TransactionNeedCategoryMessage(BaseModel):
     transaction_id: UUID
-    user_id: UUID | None = None
+    user_id: UUID
     account_id: UUID | None = None
     merchant: str
     mcc: int | None = None
     description: str | None = None
-    value: Decimal | None = None
+    amount: Decimal
 
 
-class TransactionUpdatedMessage(CamelModel):
-    transaction_id: UUID
-    old_category_id: int | None
-    new_category_id: int | None
-    value: Decimal
-    type: TransactionType
-
-
-class TransactionDeletedMessage(CamelModel):
+class TransactionUpdatedMessage(BaseModel):
     transaction_id: UUID
     user_id: UUID
+    old_category_id: int | None
+    new_category_id: int | None
+    amount: Decimal
+    transaction_type: TransactionType
+    occurred_at: datetime
 
 
-class BudgetEventMessage(CamelModel):
+class TransactionDeletedMessage(BaseModel):
+    transaction_id: UUID
+    user_id: UUID
+    occurred_at: datetime
+
+
+class BudgetEventMessage(BaseModel):
     event_type: str
     user_id: UUID
     details: dict[str, Any]
 
 
-class NotificationEvent(CamelModel):
+class NotificationEvent(BaseModel):
     event_id: UUID
-    event_name: str
+    event_type: str
     user_id: UUID
     payload: dict[str, Any]
     timestamp: datetime

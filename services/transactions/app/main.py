@@ -9,7 +9,9 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from redis.asyncio import ConnectionPool
 from sqlalchemy.exc import SQLAlchemyError
+from smartbudget_shared.request_logging import setup_request_logging
 
+from app.api.routes import goal_transactions_router
 from app.api.routes import router as transactions_router
 from app.core import exceptions
 from app.core.context import set_request_id
@@ -86,18 +88,7 @@ app = FastAPI(
     docs_url="/api/v1/transactions/docs",
     openapi_url="/api/v1/transactions/openapi.json",
 )
-
-
-@app.middleware("http")
-async def tracing_middleware(request: Request, call_next) -> Response:
-    """Middleware для трассировки запросов по Request ID."""
-    req_id = request.headers.get("X-Request-ID") or request.headers.get(
-        "X-Correlation-ID"
-    )
-    final_id = set_request_id(req_id)
-    response: Response = await call_next(request)
-    response.headers["X-Request-ID"] = final_id
-    return response
+setup_request_logging(app, set_request_id)
 
 
 @app.exception_handler(exceptions.TransactionServiceError)
@@ -127,6 +118,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(transactions_router, prefix="/api/v1/transactions")
+app.include_router(goal_transactions_router, prefix="/api/v1/goals")
 
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)

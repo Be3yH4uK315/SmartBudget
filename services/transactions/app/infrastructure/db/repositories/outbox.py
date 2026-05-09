@@ -23,14 +23,14 @@ class OutboxRepository:
         event_type: str | None = None,
     ) -> models.OutboxEvent:
         clean_payload = to_jsonable(payload)
+        resolved_event_type = event_type or clean_payload.get("event_type")
+        if not resolved_event_type:
+            raise ValueError("event_type is required for outbox events")
+
         event = models.OutboxEvent(
             event_id=uuid4(),
             topic=topic,
-            event_type=event_type
-            or clean_payload.get("eventType")
-            or clean_payload.get("event_type")
-            or clean_payload.get("eventName")
-            or "unknown",
+            event_type=resolved_event_type,
             payload=clean_payload,
             status="pending",
             retry_count=0,

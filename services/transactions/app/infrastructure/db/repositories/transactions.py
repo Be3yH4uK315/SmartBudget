@@ -5,7 +5,6 @@ from uuid import UUID
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.enums import type_to_db
 from app.infrastructure.db import models
 
 
@@ -19,7 +18,7 @@ class TransactionRepository:
 
     async def exists(self, transaction_id: UUID) -> bool:
         result = await self.db.execute(
-            select(models.Transaction.id).where(
+            select(models.Transaction.transaction_id).where(
                 models.Transaction.transaction_id == transaction_id,
             )
         )
@@ -95,36 +94,36 @@ class TransactionRepository:
         limit: int,
         offset: int,
         category_ids: list[int] | None = None,
-        date_from: datetime | None = None,
-        date_to: datetime | None = None,
+        occurred_from: datetime | None = None,
+        occurred_to: datetime | None = None,
         transaction_type: str | None = None,
-        value_from: Decimal | None = None,
-        value_to: Decimal | None = None,
+        amount_from: Decimal | None = None,
+        amount_to: Decimal | None = None,
     ) -> list[models.Transaction]:
         query = select(models.Transaction).where(models.Transaction.user_id == user_id)
 
         if category_ids:
             query = query.where(models.Transaction.category_id.in_(category_ids))
 
-        if date_from:
-            query = query.where(models.Transaction.created_at >= date_from)
+        if occurred_from:
+            query = query.where(models.Transaction.occurred_at >= occurred_from)
 
-        if date_to:
-            query = query.where(models.Transaction.created_at <= date_to)
+        if occurred_to:
+            query = query.where(models.Transaction.occurred_at <= occurred_to)
 
         if transaction_type:
-            query = query.where(models.Transaction.type == type_to_db(transaction_type))
+            query = query.where(models.Transaction.transaction_type == transaction_type)
 
-        absolute_value = func.abs(models.Transaction.value)
+        absolute_value = func.abs(models.Transaction.amount)
 
-        if value_from is not None:
-            query = query.where(absolute_value >= value_from)
+        if amount_from is not None:
+            query = query.where(absolute_value >= amount_from)
 
-        if value_to is not None:
-            query = query.where(absolute_value <= value_to)
+        if amount_to is not None:
+            query = query.where(absolute_value <= amount_to)
 
         query = (
-            query.order_by(models.Transaction.created_at.desc())
+            query.order_by(models.Transaction.occurred_at.desc())
             .offset(offset)
             .limit(limit)
         )
@@ -148,7 +147,7 @@ class TransactionRepository:
                     models.Transaction.description.ilike(like),
                 ),
             )
-            .order_by(models.Transaction.created_at.desc())
+            .order_by(models.Transaction.occurred_at.desc())
             .limit(limit)
         )
         result = await self.db.execute(query)
@@ -187,21 +186,21 @@ class TransactionRepository:
         self,
         user_id: UUID,
         account_id: UUID,
-    ) -> list[tuple[Decimal, datetime, int]]:
-        month = func.date_trunc("month", models.Transaction.created_at).label("month")
+    ) -> list[tuple[Decimal, datetime, str]]:
+        month = func.date_trunc("month", models.Transaction.occurred_at).label("month")
         query = (
             select(
-                func.sum(models.Transaction.value).label("value"),
+                func.sum(models.Transaction.amount).label("amount"),
                 month,
-                models.Transaction.type,
+                models.Transaction.transaction_type,
             )
             .where(
                 models.Transaction.user_id == user_id,
                 models.Transaction.account_id == account_id,
             )
-            .group_by(month, models.Transaction.type)
-            .order_by(month.desc(), models.Transaction.type.asc())
+            .group_by(month, models.Transaction.transaction_type)
+            .order_by(month.desc(), models.Transaction.transaction_type.asc())
         )
 
         result = await self.db.execute(query)
-        return [(row.value, row.month, row.type) for row in result.all()]
+        return [(row.amount, row.month, row.transaction_type) for row in result.all()]

@@ -94,15 +94,17 @@ class KafkaProducerWrapper:
             logger.error("Kafka producer is not running")
             return [False] * len(events)
 
-        futures: list[asyncio.Future] = []
+        futures: list[asyncio.Task] = []
         for event in events:
             try:
                 futures.append(
-                    self.producer.send(
-                        topic=event["topic"],
-                        key=event.get("key"),
-                        value=event["value"],
-                        headers=event.get("headers"),
+                    asyncio.create_task(
+                        self.producer.send_and_wait(
+                            topic=event["topic"],
+                            key=event.get("key"),
+                            value=event["value"],
+                            headers=event.get("headers"),
+                        )
                     )
                 )
             except Exception as exc:
@@ -111,11 +113,14 @@ class KafkaProducerWrapper:
                 futures.append(future)
 
         try:
-            await asyncio.wait_for(self.producer.flush(), timeout=SEND_TIMEOUT)
+            results = await asyncio.wait_for(
+                asyncio.gather(*futures, return_exceptions=True),
+                timeout=SEND_TIMEOUT,
+            )
         except Exception as exc:
-            logger.error("Kafka flush failed: %s", exc, exc_info=True)
+            logger.error("Kafka batch send failed: %s", exc, exc_info=True)
+            return [False] * len(events)
 
-        results = await asyncio.gather(*futures, return_exceptions=True)
         statuses: list[bool] = []
         for result in results:
             if isinstance(result, Exception):

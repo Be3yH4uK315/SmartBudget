@@ -16,11 +16,8 @@ MAX_RETRIES = 5
 
 def _message_key(payload: dict[str, Any]) -> bytes | None:
     key = (
-        payload.get("transactionId")
-        or payload.get("transaction_id")
-        or payload.get("eventId")
+        payload.get("transaction_id")
         or payload.get("event_id")
-        or payload.get("userId")
         or payload.get("user_id")
     )
     return str(key).encode("utf-8") if key else None

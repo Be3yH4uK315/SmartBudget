@@ -18,7 +18,8 @@ FastAPI-сервис транзакций.
 
 Пользовательские операции фильтруются по `X-User-Id`, который выставляет
 API Gateway. Если `POST /import/mock` вызывается с `X-User-Id`, сервис
-привязывает импорт к этому пользователю и отклоняет body с чужим `userId`.
+привязывает импорт к этому пользователю; `userId` в body не является частью
+контракта.
 
 ## Kafka
 
@@ -39,10 +40,15 @@ Kafka-события классификации.
 - `budget.transactions.events`
 - `notification.events` для ручной смены категории
 
+`transaction.new`, `transaction.updated` и `transaction.deleted` содержат
+canonical snake_case поля `transaction_id`, `user_id`, `amount`,
+`transaction_type` и `occurred_at`, которые используются budgets service для
+идемпотентности и привязки проекции к месяцу исходной транзакции.
+
 Потребляет:
 
 - `transaction.classified`
-- `transaction.updated` от classification feedback
+- `transaction.category_updated` от classification feedback
 
 ## Переменные окружения
 

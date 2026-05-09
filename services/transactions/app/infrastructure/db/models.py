@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime, Index, Integer, Numeric, String, func
+from sqlalchemy import CheckConstraint, Column, DateTime, Index, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.infrastructure.db.base import Base
@@ -11,15 +11,14 @@ from app.infrastructure.db.base import Base
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    transaction_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    transaction_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
     account_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     category_id = Column(Integer, nullable=True, index=True)
-    date = Column(DateTime(timezone=True), nullable=True)
-    value = Column(Numeric(18, 2), nullable=False, default=Decimal("0.00"))
-    type = Column(Integer, nullable=False)
-    status = Column(Integer, nullable=False)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    amount = Column(Numeric(18, 2), nullable=False, default=Decimal("0.00"))
+    transaction_type = Column(String(20), nullable=False)
+    status = Column(String(20), nullable=False)
     merchant = Column(String(500), nullable=False, default="")
     mcc = Column(Integer, nullable=True)
     description = Column(String(2000), nullable=False, default="")
@@ -44,8 +43,23 @@ class Transaction(Base):
     )
 
     __table_args__ = (
-        Index("ix_transactions_user_created", "user_id", "created_at"),
-        Index("ix_transactions_filters", "user_id", "category_id", "type", "created_at"),
+        Index("ix_transactions_user_occurred", "user_id", "occurred_at"),
+        Index(
+            "ix_transactions_filters_v2",
+            "user_id",
+            "category_id",
+            "transaction_type",
+            "occurred_at",
+        ),
+        CheckConstraint("amount >= 0", name="ck_transactions_amount_non_negative"),
+        CheckConstraint(
+            "transaction_type IN ('income', 'expense')",
+            name="ck_transactions_transaction_type_allowed",
+        ),
+        CheckConstraint(
+            "status IN ('rejected', 'confirmed', 'pending')",
+            name="ck_transactions_status_allowed",
+        ),
     )
 
 

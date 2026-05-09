@@ -27,33 +27,54 @@ def _ensure_aware(value: datetime | None) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _transaction_amount(transaction: models.Transaction) -> Decimal:
+    return transaction.amount
+
+
+def _transaction_type(transaction: models.Transaction) -> enums.TransactionType:
+    return enums.TransactionType(transaction.transaction_type)
+
+
+def _transaction_status(transaction: models.Transaction) -> enums.TransactionStatus:
+    return enums.TransactionStatus(transaction.status)
+
+
+def _transaction_occurred_at(transaction: models.Transaction) -> datetime:
+    return _ensure_aware(transaction.occurred_at)
+
+
 def _model_to_api(transaction: models.Transaction) -> api_schemas.TransactionResponse:
+    amount = _transaction_amount(transaction)
+    transaction_type = _transaction_type(transaction)
+    occurred_at = _transaction_occurred_at(transaction)
     return api_schemas.TransactionResponse(
         transaction_id=transaction.transaction_id,
-        value=abs(transaction.value),
+        amount=amount,
         category_id=transaction.category_id,
         description=transaction.description,
-        name=transaction.merchant,
+        merchant=transaction.merchant,
         mcc=transaction.mcc,
-        status=enums.status_from_db(transaction.status),
-        date=transaction.created_at,
-        type=enums.type_from_db(transaction.type),
+        status=_transaction_status(transaction),
+        occurred_at=occurred_at,
+        transaction_type=transaction_type,
     )
 
 
 def _model_to_detail(
     transaction: models.Transaction,
 ) -> api_schemas.TransactionDetailResponse:
+    amount = _transaction_amount(transaction)
+    transaction_type = _transaction_type(transaction)
+    occurred_at = _transaction_occurred_at(transaction)
     return api_schemas.TransactionDetailResponse(
-        id=transaction.id,
         user_id=transaction.user_id,
         transaction_id=transaction.transaction_id,
         account_id=transaction.account_id,
         category_id=transaction.category_id,
-        date=transaction.date,
-        value=abs(transaction.value),
-        type=enums.type_from_db(transaction.type),
-        status=enums.status_from_db(transaction.status),
+        occurred_at=occurred_at,
+        amount=amount,
+        transaction_type=transaction_type,
+        status=_transaction_status(transaction),
         merchant=transaction.merchant,
         mcc=transaction.mcc,
         description=transaction.description,
@@ -64,7 +85,11 @@ def _model_to_detail(
 
 
 def _model_to_details_dict(transaction: models.Transaction) -> dict:
-    return _model_to_detail(transaction).model_dump(mode="json", by_alias=True)
+    return _model_to_detail(transaction).model_dump(mode="json", by_alias=False)
+
+
+def _transaction_event_date(transaction: models.Transaction) -> datetime:
+    return _transaction_occurred_at(transaction)
 
 
 def _notification_event_id(event_name: str, key: str) -> UUID:
@@ -101,11 +126,11 @@ class TransactionService:
         limit: int,
         offset: int,
         category_ids: list[int] | None = None,
-        date_from: datetime | None = None,
-        date_to: datetime | None = None,
+        occurred_from: datetime | None = None,
+        occurred_to: datetime | None = None,
         transaction_type: enums.TransactionType | None = None,
-        value_from: Decimal | None = None,
-        value_to: Decimal | None = None,
+        amount_from: Decimal | None = None,
+        amount_to: Decimal | None = None,
     ) -> list[api_schemas.TransactionResponse]:
         """Получает список транзакций пользователя с фильтрацией и пагинацией."""
         async with self.uow:
@@ -114,11 +139,11 @@ class TransactionService:
                 limit=limit,
                 offset=offset,
                 category_ids=category_ids,
-                date_from=date_from,
-                date_to=date_to,
+                occurred_from=occurred_from,
+                occurred_to=occurred_to,
                 transaction_type=transaction_type.value if transaction_type else None,
-                value_from=value_from,
-                value_to=value_to,
+                amount_from=amount_from,
+                amount_to=amount_to,
             )
 
         return [_model_to_api(transaction) for transaction in transactions]
@@ -166,22 +191,30 @@ class TransactionService:
     ) -> str:
         """Создает новую ручную транзакцию (не из банка)."""
         now = _utc_now()
-        transaction_type = (
-            enums.TransactionType.INCOME
-            if request.value >= Decimal("0")
-            else enums.TransactionType.EXPENSE
-        )
+        transaction_type = request.transaction_type
+        amount = request.amount
+        occurred_at = _ensure_aware(request.occurred_at or now)
+        merchant = request.merchant
+        category_id = request.category_id
+        description = request.description or ""
+        if _has_goal_account(request.account_id):
+            category_id = settings.APP.GOAL_CATEGORY_ID
+            description = (
+                "Пополнение цели"
+                if transaction_type == enums.TransactionType.INCOME
+                else "Списание с цели"
+            )
         transaction = models.Transaction(
-            id=uuid4(),
             user_id=user_id,
             transaction_id=uuid4(),
             account_id=request.account_id,
-            category_id=request.category_id,
-            value=abs(request.value),
-            type=enums.type_to_db(transaction_type),
-            status=enums.status_to_db(enums.TransactionStatus.CONFIRMED),
-            merchant=request.name or "",
-            description=request.description or "",
+            category_id=category_id,
+            occurred_at=occurred_at,
+            amount=amount,
+            transaction_type=transaction_type.value,
+            status=enums.TransactionStatus.CONFIRMED.value,
+            merchant=merchant or "",
+            description=description,
             created_at=now,
             imported_at=now,
             updated_at=now,
@@ -219,11 +252,13 @@ class TransactionService:
                 continue
 
             now = _utc_now()
-            transaction_type = item.type or enums.TransactionType.EXPENSE
+            transaction_type = item.transaction_type
             status = item.status or enums.TransactionStatus.PENDING
             account_id = item.account_id
             category_id = item.category_id
             description = item.description or ""
+            occurred_at = _ensure_aware(item.occurred_at)
+            amount = item.amount
 
             if _has_goal_account(account_id):
                 category_id = settings.APP.GOAL_CATEGORY_ID
@@ -234,19 +269,18 @@ class TransactionService:
                 )
 
             transaction = models.Transaction(
-                id=item.id or uuid4(),
                 user_id=item.user_id,
-                transaction_id=item.transaction_id or uuid4(),
+                transaction_id=item.transaction_id,
                 account_id=account_id,
                 category_id=category_id,
-                date=_ensure_aware(item.date),
-                value=abs(item.value) if item.value is not None else Decimal("0"),
-                type=enums.type_to_db(transaction_type),
-                status=enums.status_to_db(status),
+                occurred_at=occurred_at,
+                amount=amount,
+                transaction_type=transaction_type.value,
+                status=status.value,
                 merchant=item.merchant or "",
                 mcc=item.mcc,
                 description=description,
-                created_at=_ensure_aware(item.date),
+                created_at=now,
                 imported_at=now,
                 updated_at=now,
             )
@@ -295,18 +329,21 @@ class TransactionService:
             transaction.updated_at = _utc_now()
             await self.uow.flush()
 
-            value = abs(transaction.value)
-            transaction_type = enums.type_from_db(transaction.type)
+            amount = _transaction_amount(transaction)
+            transaction_type = _transaction_type(transaction)
+            occurred_at = _transaction_occurred_at(transaction)
             user_id = transaction.user_id
 
             self._queue_event(
                 settings.KAFKA.KAFKA_TOPIC_TRANSACTION_UPDATED,
                 kafka_schemas.TransactionUpdatedMessage(
                     transaction_id=transaction_id,
+                    user_id=user_id,
                     old_category_id=old_category_id,
                     new_category_id=category_id,
-                    value=value,
-                    type=transaction_type,
+                    amount=amount,
+                    transaction_type=transaction_type,
+                    occurred_at=occurred_at,
                 ),
                 "transaction.updated",
             )
@@ -316,9 +353,9 @@ class TransactionService:
                     event_type="transaction.updated",
                     user_id=user_id,
                     details={
-                        "transactionId": str(transaction_id),
-                        "oldCategoryId": old_category_id,
-                        "newCategoryId": category_id,
+                        "transaction_id": str(transaction_id),
+                        "old_category_id": old_category_id,
+                        "new_category_id": category_id,
                     },
                 ),
                 "transaction.updated",
@@ -331,12 +368,12 @@ class TransactionService:
                             "transaction.category.changed",
                             f"{transaction_id}:{old_category_id}:{category_id}",
                         ),
-                        event_name="transaction.category.changed",
+                        event_type="transaction.category.changed",
                         user_id=user_id,
                         payload={
-                            "transactionId": str(transaction_id),
-                            "oldCategory": old_category_id,
-                            "newCategory": category_id,
+                            "transaction_id": str(transaction_id),
+                            "old_category_id": old_category_id,
+                            "new_category_id": category_id,
                         },
                         timestamp=_utc_now(),
                     ),
@@ -354,7 +391,11 @@ class TransactionService:
             await self.uow.flush()
             user_id = transaction.user_id
 
-            self._publish_deleted_events(user_id, transaction_id)
+            self._publish_deleted_events(
+                user_id,
+                transaction_id,
+                _transaction_event_date(transaction),
+            )
 
     async def delete_user_transaction(
         self,
@@ -371,7 +412,11 @@ class TransactionService:
             await self.uow.flush()
             event_user_id = transaction.user_id
 
-            self._publish_deleted_events(event_user_id, transaction_id)
+            self._publish_deleted_events(
+                event_user_id,
+                transaction_id,
+                _transaction_event_date(transaction),
+            )
 
     async def get_transactions_by_month_for_goal(
         self,
@@ -386,20 +431,24 @@ class TransactionService:
 
         return [
             api_schemas.TransactionsByMonth(
-                value=value,
-                date=month,
-                type=enums.type_from_db(transaction_type),
+                amount=value,
+                period_start=month,
+                transaction_type=enums.TransactionType(transaction_type),
             )
             for value, month, transaction_type in rows
         ]
 
     async def apply_classification(
         self,
+        user_id: UUID,
         transaction_id: UUID,
-        category_id: int | None,
+        category_id: int,
     ) -> None:
         async with self.uow:
-            transaction = await self.uow.transactions.get_for_update(transaction_id)
+            transaction = await self.uow.transactions.get_user_transaction_for_update(
+                user_id,
+                transaction_id,
+            )
             if not transaction:
                 logger.warning(
                     "Transaction %s not found for classification",
@@ -407,18 +456,36 @@ class TransactionService:
                 )
                 return
 
+            old_category_id = transaction.category_id
             transaction.category_id = category_id
             transaction.updated_at = _utc_now()
+            self._queue_event(
+                settings.KAFKA.KAFKA_TOPIC_TRANSACTION_UPDATED,
+                kafka_schemas.TransactionUpdatedMessage(
+                    transaction_id=transaction.transaction_id,
+                    user_id=transaction.user_id,
+                    old_category_id=old_category_id,
+                    new_category_id=category_id,
+                    amount=_transaction_amount(transaction),
+                    transaction_type=_transaction_type(transaction),
+                    occurred_at=_transaction_occurred_at(transaction),
+                ),
+                "transaction.updated",
+            )
 
     def _publish_created_events(self, transaction: models.Transaction) -> None:
-        transaction_type = enums.type_from_db(transaction.type)
+        amount = _transaction_amount(transaction)
+        transaction_type = _transaction_type(transaction)
+        occurred_at = _transaction_occurred_at(transaction)
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEW,
             kafka_schemas.TransactionNewMessage(
+                transaction_id=transaction.transaction_id,
                 user_id=transaction.user_id,
                 category_id=transaction.category_id,
-                value=abs(transaction.value),
-                type=transaction_type,
+                amount=amount,
+                transaction_type=transaction_type,
+                occurred_at=occurred_at,
             ),
             "transaction.new",
         )
@@ -453,14 +520,18 @@ class TransactionService:
             transaction.category_id == settings.APP.GOAL_CATEGORY_ID
             and _has_goal_account(transaction.account_id)
         ):
-            transaction_type = enums.type_from_db(transaction.type)
+            amount = _transaction_amount(transaction)
+            transaction_type = _transaction_type(transaction)
+            occurred_at = _transaction_occurred_at(transaction)
             self._queue_event(
                 settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEW,
                 kafka_schemas.TransactionNewMessage(
+                    transaction_id=transaction.transaction_id,
                     user_id=transaction.user_id,
                     category_id=transaction.category_id,
-                    value=abs(transaction.value),
-                    type=transaction_type,
+                    amount=amount,
+                    transaction_type=transaction_type,
+                    occurred_at=occurred_at,
                 ),
                 "transaction.new",
             )
@@ -476,17 +547,23 @@ class TransactionService:
                 merchant=transaction.merchant,
                 mcc=transaction.mcc,
                 description=transaction.description,
-                value=abs(transaction.value),
+                amount=_transaction_amount(transaction),
             ),
             "transaction.need_category",
         )
 
-    def _publish_deleted_events(self, user_id: UUID, transaction_id: UUID) -> None:
+    def _publish_deleted_events(
+        self,
+        user_id: UUID,
+        transaction_id: UUID,
+        transaction_date: datetime,
+    ) -> None:
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DELETED,
             kafka_schemas.TransactionDeletedMessage(
                 transaction_id=transaction_id,
                 user_id=user_id,
+                occurred_at=transaction_date,
             ),
             "transaction.deleted",
         )
@@ -495,7 +572,7 @@ class TransactionService:
             kafka_schemas.BudgetEventMessage(
                 event_type="transaction.deleted",
                 user_id=user_id,
-                details={"transactionId": str(transaction_id)},
+                details={"transaction_id": str(transaction_id)},
             ),
             "transaction.deleted",
         )
@@ -509,10 +586,10 @@ class TransactionService:
             kafka_schemas.TransactionNewGoalMessage(
                 transaction_id=transaction.transaction_id,
                 goal_id=transaction.account_id,
-                account_id=transaction.account_id,
                 user_id=transaction.user_id,
-                value=abs(transaction.value),
-                type=enums.type_from_db(transaction.type),
+                amount=_transaction_amount(transaction),
+                transaction_type=_transaction_type(transaction),
+                occurred_at=_transaction_occurred_at(transaction),
             ),
             "transaction.goal",
         )

@@ -8,7 +8,10 @@ from aiokafka import AIOKafkaConsumer
 
 from app.core.config import settings
 from app.core.context import set_request_id
-from app.domain.schemas.kafka import TransactionClassifiedMessage
+from app.domain.schemas.kafka import (
+    TransactionCategoryUpdatedMessage,
+    TransactionClassifiedMessage,
+)
 from app.infrastructure.db.uow import UnitOfWork
 from app.services.service import TransactionService
 
@@ -131,7 +134,10 @@ class KafkaConsumerWorker:
 
         try:
             payload = json.loads(message.value)
-            event = TransactionClassifiedMessage.model_validate(payload)
+            if message.topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_CATEGORY_UPDATED:
+                event = TransactionCategoryUpdatedMessage.model_validate(payload)
+            else:
+                event = TransactionClassifiedMessage.model_validate(payload)
             await self.process_event(event)
             logger.info(
                 "Kafka message processed",
@@ -144,12 +150,21 @@ class KafkaConsumerWorker:
             )
             raise
 
-    async def process_event(self, event: TransactionClassifiedMessage) -> None:
+    async def process_event(
+        self,
+        event: TransactionClassifiedMessage | TransactionCategoryUpdatedMessage,
+    ) -> None:
         async with UnitOfWork(self.db_session_maker) as uow:
             service = TransactionService(uow)
+            category_id = (
+                event.category_id
+                if isinstance(event, TransactionClassifiedMessage)
+                else event.new_category_id
+            )
             await service.apply_classification(
+                event.user_id,
                 event.transaction_id,
-                event.category_id,
+                category_id,
             )
 
 

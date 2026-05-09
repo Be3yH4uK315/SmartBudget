@@ -80,25 +80,25 @@ class TransactionFilters:
         limit: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
         category_id: str | None = Query(None, alias="categoryId"),
-        date_from: date | None = Query(None, alias="dateFrom"),
-        date_to: date | None = Query(None, alias="dateTo"),
-        transaction_type: TransactionType | None = Query(None, alias="type"),
-        value_from: Decimal | None = Query(None, alias="valueFrom"),
-        value_to: Decimal | None = Query(None, alias="valueTo"),
+        occurred_from: date | None = Query(None, alias="occurredFrom"),
+        occurred_to: date | None = Query(None, alias="occurredTo"),
+        transaction_type: TransactionType | None = Query(None, alias="transactionType"),
+        amount_from: Decimal | None = Query(None, alias="amountFrom"),
+        amount_to: Decimal | None = Query(None, alias="amountTo"),
     ):
         self.limit = limit
         self.offset = offset
         self.category_ids = _parse_category_ids(category_id)
-        self.date_from = (
-            datetime.combine(date_from, time.min, tzinfo=timezone.utc)
-            if date_from
+        self.occurred_from = (
+            datetime.combine(occurred_from, time.min, tzinfo=timezone.utc)
+            if occurred_from
             else None
         )
-        self.date_to = (
-            datetime.combine(date_to, time.max, tzinfo=timezone.utc)
-            if date_to
+        self.occurred_to = (
+            datetime.combine(occurred_to, time.max, tzinfo=timezone.utc)
+            if occurred_to
             else None
         )
         self.transaction_type = transaction_type
-        self.value_from = value_from
-        self.value_to = value_to
+        self.amount_from = amount_from
+        self.amount_to = amount_to
