@@ -11,9 +11,9 @@ from app.utils.serialization import to_jsonable
 
 
 class OutboxRepository:
-    """Репозиторий Outbox-событий."""
+    """Репозиторий outbox-событий."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     def _build_event(
@@ -22,12 +22,14 @@ class OutboxRepository:
         payload: dict[str, Any],
         event_type: str | None = None,
     ) -> models.OutboxEvent:
+        """Создает ORM-модель outbox-события."""
         clean_payload = to_jsonable(payload)
         resolved_event_type = event_type or clean_payload.get("event_type")
+
         if not resolved_event_type:
             raise ValueError("event_type is required for outbox events")
 
-        event = models.OutboxEvent(
+        return models.OutboxEvent(
             event_id=uuid4(),
             topic=topic,
             event_type=resolved_event_type,
@@ -38,7 +40,6 @@ class OutboxRepository:
             trace_id=get_request_id(),
             next_retry_at=None,
         )
-        return event
 
     def add_event(
         self,
@@ -46,9 +47,11 @@ class OutboxRepository:
         payload: dict[str, Any],
         event_type: str | None = None,
     ) -> None:
+        """Добавляет outbox-событие без commit."""
         self.db.add(self._build_event(topic, payload, event_type))
 
     def add_events(self, events: list[dict[str, Any]]) -> None:
+        """Добавляет несколько outbox-событий без commit."""
         if not events:
             return
 
@@ -60,7 +63,9 @@ class OutboxRepository:
             )
 
     async def get_pending_events(self, limit: int = 100) -> list[models.OutboxEvent]:
+        """Получает pending-события, готовые к отправке."""
         now = datetime.now(timezone.utc)
+
         result = await self.db.execute(
             select(models.OutboxEvent)
             .where(
@@ -72,15 +77,18 @@ class OutboxRepository:
             )
             .order_by(models.OutboxEvent.created_at.asc())
             .limit(limit)
-            .with_for_update(skip_locked=True)
+            .with_for_update(skip_locked=True),
         )
+
         return list(result.scalars().all())
 
     async def delete_events(self, event_ids: list[UUID]) -> None:
+        """Удаляет outbox-события по ID."""
         if not event_ids:
             return
+
         await self.db.execute(
             delete(models.OutboxEvent).where(
                 models.OutboxEvent.event_id.in_(event_ids),
-            )
+            ),
         )

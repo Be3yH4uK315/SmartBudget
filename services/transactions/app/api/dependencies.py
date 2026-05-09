@@ -10,28 +10,33 @@ from app.services.service import TransactionService
 
 
 async def get_uow(request: Request) -> UnitOfWork:
-    db_session_maker = request.app.state.db_session_maker
-    if not db_session_maker:
+    """Создает UnitOfWork с фабрикой сессий из app.state."""
+    db_session_maker = getattr(request.app.state, "db_session_maker", None)
+    if db_session_maker is None:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database session factory not available",
         )
+
     return UnitOfWork(db_session_maker)
 
 
 def get_transaction_service(
     uow: UnitOfWork = Depends(get_uow),
 ) -> TransactionService:
+    """Создает сервис транзакций."""
     return TransactionService(uow)
 
 
 async def get_current_user_id(request: Request) -> UUID:
+    """Извлекает user_id из X-User-Id, который устанавливает API Gateway."""
     user_id = request.headers.get("X-User-Id")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User ID header missing",
         )
+
     try:
         return UUID(user_id)
     except ValueError as exc:
@@ -42,9 +47,11 @@ async def get_current_user_id(request: Request) -> UUID:
 
 
 async def get_optional_current_user_id(request: Request) -> UUID | None:
+    """Извлекает optional user_id из X-User-Id."""
     user_id = request.headers.get("X-User-Id")
     if not user_id:
         return None
+
     try:
         return UUID(user_id)
     except ValueError as exc:
@@ -55,6 +62,7 @@ async def get_optional_current_user_id(request: Request) -> UUID | None:
 
 
 def _parse_category_ids(category_id: str | None) -> list[int] | None:
+    """Парсит category_id из одного числа или comma-separated строки."""
     if not category_id:
         return None
 
@@ -70,11 +78,18 @@ def _parse_category_ids(category_id: str | None) -> list[int] | None:
             detail="categoryId must be an integer or comma-separated integers",
         ) from exc
 
-    result = [item for item in result if item != 0]
+    result = [
+        item
+        for item in result
+        if item != 0
+    ]
+
     return result or None
 
 
 class TransactionFilters:
+    """Query-фильтры списка транзакций."""
+
     def __init__(
         self,
         limit: int = Query(50, ge=1, le=1000),
@@ -85,7 +100,7 @@ class TransactionFilters:
         transaction_type: TransactionType | None = Query(None, alias="transactionType"),
         amount_from: Decimal | None = Query(None, alias="amountFrom"),
         amount_to: Decimal | None = Query(None, alias="amountTo"),
-    ):
+    ) -> None:
         self.limit = limit
         self.offset = offset
         self.category_ids = _parse_category_ids(category_id)

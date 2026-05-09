@@ -4,6 +4,7 @@ from app.core.config import settings
 
 
 def get_db_engine():
+    """Создает асинхронный SQLAlchemy engine."""
     return create_async_engine(
         settings.DB.DB_URL,
         pool_size=settings.DB.DB_POOL_SIZE,
@@ -13,7 +14,8 @@ def get_db_engine():
     )
 
 
-def get_session_factory(engine):
+def get_session_factory(engine) -> async_sessionmaker[AsyncSession]:
+    """Создает фабрику асинхронных SQLAlchemy-сессий."""
     return async_sessionmaker(
         engine,
         class_=AsyncSession,

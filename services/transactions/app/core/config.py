@@ -1,25 +1,28 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from smartbudget_shared.config import (
-    DBSettings as SharedDBSettings,
-    ArqSettings as SharedArqSettings,
     AppSettings as SharedAppSettings,
+    ArqSettings as SharedArqSettings,
+    DBSettings as SharedDBSettings,
 )
 
 
 class DBSettings(SharedDBSettings):
-    """Настройки базы данных, унаследованные от общей конфигурации."""
+    """Настройки базы данных."""
 
     pass
 
 
 class KafkaSettings(BaseSettings):
+    """Настройки Kafka для transactions service."""
+
     KAFKA_BOOTSTRAP_SERVERS: str
+
     KAFKA_GROUP_ID: str
     KAFKA_AUTO_OFFSET_RESET: str
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
+
     KAFKA_TOPIC_TRANSACTION_NEW: str
     KAFKA_TOPIC_TRANSACTION_IMPORTED: str
     KAFKA_TOPIC_TRANSACTION_GOAL: str
@@ -32,7 +35,13 @@ class KafkaSettings(BaseSettings):
     KAFKA_TOPIC_NOTIFICATION_EVENTS: str
 
     @property
+    def consumer_group_id(self) -> str:
+        """Возвращает group id consumer-а."""
+        return self.KAFKA_GROUP_ID
+
+    @property
     def consumer_topics(self) -> tuple[str, str]:
+        """Возвращает topics, которые читает transactions consumer."""
         return (
             self.KAFKA_TOPIC_TRANSACTION_CLASSIFIED,
             self.KAFKA_TOPIC_TRANSACTION_CATEGORY_UPDATED,
@@ -40,18 +49,20 @@ class KafkaSettings(BaseSettings):
 
 
 class ArqSettings(SharedArqSettings):
-    """Настройки ARQ, унаследованные от общей конфигурации."""
+    """Настройки ARQ."""
 
     pass
 
 
 class AppSettings(SharedAppSettings):
-    """Настройки приложения, унаследованные от общей конфигурации."""
+    """Настройки приложения."""
 
     GOAL_CATEGORY_ID: int
 
 
 class Settings(BaseSettings):
+    """Корневая конфигурация transactions service."""
+
     DB: DBSettings
     KAFKA: KafkaSettings
     ARQ: ArqSettings

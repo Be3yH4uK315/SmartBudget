@@ -8,10 +8,22 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from app.infrastructure.db.base import Base
 
 
+def _utc_now() -> datetime:
+    """Возвращает текущее UTC-время."""
+    return datetime.now(timezone.utc)
+
+
 class Transaction(Base):
+    """Модель транзакции пользователя."""
+
     __tablename__ = "transactions"
 
-    transaction_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    transaction_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     account_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     category_id = Column(Integer, nullable=True, index=True)
@@ -25,20 +37,20 @@ class Transaction(Base):
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=_utc_now,
         server_default=func.now(),
     )
     imported_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=_utc_now,
         server_default=func.now(),
     )
     updated_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utc_now,
+        onupdate=_utc_now,
         server_default=func.now(),
     )
 
@@ -64,16 +76,23 @@ class Transaction(Base):
 
 
 class OutboxEvent(Base):
+    """Outbox-событие для последующей публикации в Kafka."""
+
     __tablename__ = "outbox_events"
 
-    event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    event_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
     topic = Column(String(255), nullable=False)
     event_type = Column(String(255), nullable=False)
     payload = Column(JSONB, nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=_utc_now,
         server_default=func.now(),
     )
     retry_count = Column(Integer, default=0, nullable=False)

@@ -9,44 +9,54 @@ from app.infrastructure.db import models
 
 
 class TransactionRepository:
-    def __init__(self, db: AsyncSession):
+    """Репозиторий транзакций."""
+
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     def create(self, transaction: models.Transaction) -> models.Transaction:
+        """Добавляет транзакцию в текущую сессию без commit."""
         self.db.add(transaction)
+
         return transaction
 
     async def exists(self, transaction_id: UUID) -> bool:
+        """Проверяет существование транзакции по ID."""
         result = await self.db.execute(
             select(models.Transaction.transaction_id).where(
                 models.Transaction.transaction_id == transaction_id,
-            )
+            ),
         )
+
         return result.scalar_one_or_none() is not None
 
     async def get_existing_transaction_ids(
         self,
         transaction_ids: list[UUID],
     ) -> set[UUID]:
+        """Возвращает множество уже существующих transaction_id."""
         if not transaction_ids:
             return set()
 
         result = await self.db.execute(
             select(models.Transaction.transaction_id).where(
                 models.Transaction.transaction_id.in_(transaction_ids),
-            )
+            ),
         )
+
         return set(result.scalars().all())
 
     async def get_by_transaction_id(
         self,
         transaction_id: UUID,
     ) -> models.Transaction | None:
+        """Получает транзакцию по ID."""
         result = await self.db.execute(
             select(models.Transaction).where(
                 models.Transaction.transaction_id == transaction_id,
-            )
+            ),
         )
+
         return result.scalar_one_or_none()
 
     async def get_user_transaction(
@@ -54,23 +64,27 @@ class TransactionRepository:
         user_id: UUID,
         transaction_id: UUID,
     ) -> models.Transaction | None:
+        """Получает транзакцию пользователя."""
         result = await self.db.execute(
             select(models.Transaction).where(
                 models.Transaction.user_id == user_id,
                 models.Transaction.transaction_id == transaction_id,
-            )
+            ),
         )
+
         return result.scalar_one_or_none()
 
     async def get_for_update(
         self,
         transaction_id: UUID,
     ) -> models.Transaction | None:
+        """Получает транзакцию по ID с блокировкой."""
         result = await self.db.execute(
             select(models.Transaction)
             .where(models.Transaction.transaction_id == transaction_id)
-            .with_for_update()
+            .with_for_update(),
         )
+
         return result.scalar_one_or_none()
 
     async def get_user_transaction_for_update(
@@ -78,14 +92,16 @@ class TransactionRepository:
         user_id: UUID,
         transaction_id: UUID,
     ) -> models.Transaction | None:
+        """Получает транзакцию пользователя с блокировкой."""
         result = await self.db.execute(
             select(models.Transaction)
             .where(
                 models.Transaction.user_id == user_id,
                 models.Transaction.transaction_id == transaction_id,
             )
-            .with_for_update()
+            .with_for_update(),
         )
+
         return result.scalar_one_or_none()
 
     async def list_user_transactions(
@@ -100,7 +116,10 @@ class TransactionRepository:
         amount_from: Decimal | None = None,
         amount_to: Decimal | None = None,
     ) -> list[models.Transaction]:
-        query = select(models.Transaction).where(models.Transaction.user_id == user_id)
+        """Возвращает список транзакций пользователя с фильтрами."""
+        query = select(models.Transaction).where(
+            models.Transaction.user_id == user_id,
+        )
 
         if category_ids:
             query = query.where(models.Transaction.category_id.in_(category_ids))
@@ -114,13 +133,13 @@ class TransactionRepository:
         if transaction_type:
             query = query.where(models.Transaction.transaction_type == transaction_type)
 
-        absolute_value = func.abs(models.Transaction.amount)
+        absolute_amount = func.abs(models.Transaction.amount)
 
         if amount_from is not None:
-            query = query.where(absolute_value >= amount_from)
+            query = query.where(absolute_amount >= amount_from)
 
         if amount_to is not None:
-            query = query.where(absolute_value <= amount_to)
+            query = query.where(absolute_amount <= amount_to)
 
         query = (
             query.order_by(models.Transaction.occurred_at.desc())
@@ -129,6 +148,7 @@ class TransactionRepository:
         )
 
         result = await self.db.execute(query)
+
         return list(result.scalars().all())
 
     async def search_user_transactions(
@@ -137,6 +157,7 @@ class TransactionRepository:
         query_text: str,
         limit: int,
     ) -> list[models.Transaction]:
+        """Ищет транзакции пользователя по merchant или description."""
         like = f"%{query_text}%"
         query = (
             select(models.Transaction)
@@ -150,10 +171,16 @@ class TransactionRepository:
             .order_by(models.Transaction.occurred_at.desc())
             .limit(limit)
         )
+
         result = await self.db.execute(query)
+
         return list(result.scalars().all())
 
-    async def delete_by_transaction_id(self, transaction_id: UUID) -> models.Transaction | None:
+    async def delete_by_transaction_id(
+        self,
+        transaction_id: UUID,
+    ) -> models.Transaction | None:
+        """Удаляет транзакцию по ID."""
         transaction = await self.get_for_update(transaction_id)
         if not transaction:
             return None
@@ -161,8 +188,9 @@ class TransactionRepository:
         await self.db.execute(
             delete(models.Transaction).where(
                 models.Transaction.transaction_id == transaction_id,
-            )
+            ),
         )
+
         return transaction
 
     async def delete_user_transaction(
@@ -170,7 +198,11 @@ class TransactionRepository:
         user_id: UUID,
         transaction_id: UUID,
     ) -> models.Transaction | None:
-        transaction = await self.get_user_transaction_for_update(user_id, transaction_id)
+        """Удаляет транзакцию пользователя."""
+        transaction = await self.get_user_transaction_for_update(
+            user_id,
+            transaction_id,
+        )
         if not transaction:
             return None
 
@@ -178,8 +210,9 @@ class TransactionRepository:
             delete(models.Transaction).where(
                 models.Transaction.user_id == user_id,
                 models.Transaction.transaction_id == transaction_id,
-            )
+            ),
         )
+
         return transaction
 
     async def aggregate_by_month_for_account(
@@ -187,7 +220,12 @@ class TransactionRepository:
         user_id: UUID,
         account_id: UUID,
     ) -> list[tuple[Decimal, datetime, str]]:
-        month = func.date_trunc("month", models.Transaction.occurred_at).label("month")
+        """Агрегирует транзакции счета по месяцам и типу."""
+        month = func.date_trunc(
+            "month",
+            models.Transaction.occurred_at,
+        ).label("month")
+
         query = (
             select(
                 func.sum(models.Transaction.amount).label("amount"),
@@ -203,4 +241,8 @@ class TransactionRepository:
         )
 
         result = await self.db.execute(query)
-        return [(row.amount, row.month, row.transaction_type) for row in result.all()]
+
+        return [
+            (row.amount, row.month, row.transaction_type)
+            for row in result.all()
+        ]

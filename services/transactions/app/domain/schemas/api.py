@@ -8,78 +8,92 @@ from app.domain.enums import TransactionStatus, TransactionType
 
 
 def to_camel(string: str) -> str:
+    """Преобразует snake_case в camelCase."""
     parts = string.split("_")
     return parts[0] + "".join(word.capitalize() for word in parts[1:])
 
 
 class CamelModel(BaseModel):
+    """Базовая Pydantic-модель с camelCase alias."""
+
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
+        from_attributes=True,
         json_encoders={Decimal: float},
     )
 
 
 class CreateManualTransactionRequest(CamelModel):
-    account_id: UUID | None = None
-    amount: Decimal = Field(..., ge=0)
-    transaction_type: TransactionType
-    occurred_at: datetime | None = None
-    category_id: int | None = None
-    description: str | None = ""
-    merchant: str | None = None
+    """Запрос на создание ручной транзакции."""
+
+    account_id: UUID | None = Field(None, description="ID счета")
+    amount: Decimal = Field(..., ge=0, description="Сумма транзакции")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
+    occurred_at: datetime | None = Field(None, description="Время операции")
+    category_id: int | None = Field(None, description="ID категории")
+    description: str | None = Field("", description="Описание транзакции")
+    merchant: str | None = Field(None, description="Название merchant")
 
 
 class PatchTransactionCategoryRequest(CamelModel):
-    category_id: int | None = None
+    """Запрос на изменение категории транзакции."""
+
+    category_id: int | None = Field(None, description="ID новой категории")
 
 
 class TransactionResponse(CamelModel):
-    transaction_id: UUID
-    amount: Decimal
-    category_id: int | None = None
-    description: str | None = None
-    merchant: str
-    mcc: int | None = None
-    status: TransactionStatus
-    occurred_at: datetime
-    transaction_type: TransactionType
+    """Краткая модель транзакции для списка."""
+
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    amount: Decimal = Field(..., description="Сумма транзакции")
+    category_id: int | None = Field(None, description="ID категории")
+    description: str | None = Field(None, description="Описание транзакции")
+    merchant: str = Field(..., description="Название merchant")
+    mcc: int | None = Field(None, description="MCC код")
+    status: TransactionStatus = Field(..., description="Статус транзакции")
+    occurred_at: datetime = Field(..., description="Время операции")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
 
 
 class TransactionDetailResponse(CamelModel):
-    user_id: UUID
-    transaction_id: UUID
-    account_id: UUID | None = None
-    category_id: int | None = None
-    occurred_at: datetime
-    amount: Decimal
-    transaction_type: TransactionType
-    status: TransactionStatus
-    merchant: str
-    mcc: int | None = None
-    description: str | None = None
-    created_at: datetime
-    imported_at: datetime
-    updated_at: datetime
+    """Детальная модель транзакции."""
+
+    user_id: UUID = Field(..., description="ID пользователя")
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    account_id: UUID | None = Field(None, description="ID счета")
+    category_id: int | None = Field(None, description="ID категории")
+    occurred_at: datetime = Field(..., description="Время операции")
+    amount: Decimal = Field(..., description="Сумма транзакции")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
+    status: TransactionStatus = Field(..., description="Статус транзакции")
+    merchant: str = Field(..., description="Название merchant")
+    mcc: int | None = Field(None, description="MCC код")
+    description: str | None = Field(None, description="Описание транзакции")
+    created_at: datetime = Field(..., description="Время создания")
+    imported_at: datetime = Field(..., description="Время импорта")
+    updated_at: datetime = Field(..., description="Время обновления")
 
 
 class ImportTransactionItem(CamelModel):
-    model_config = ConfigDict(populate_by_name=True)
+    """Элемент mock-импорта транзакции."""
 
-    user_id: UUID | None = None
-    transaction_id: UUID
-    account_id: UUID | None = None
-    occurred_at: datetime
-    amount: Decimal = Field(..., ge=0)
-    transaction_type: TransactionType
-    status: TransactionStatus | None = None
-    merchant: str | None = ""
-    mcc: int | None = None
-    description: str | None = ""
-    category_id: int | None = None
+    user_id: UUID | None = Field(None, description="ID пользователя")
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    account_id: UUID | None = Field(None, description="ID счета")
+    occurred_at: datetime = Field(..., description="Время операции")
+    amount: Decimal = Field(..., ge=0, description="Сумма транзакции")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
+    status: TransactionStatus | None = Field(None, description="Статус транзакции")
+    merchant: str | None = Field("", description="Название merchant")
+    mcc: int | None = Field(None, description="MCC код")
+    description: str | None = Field("", description="Описание транзакции")
+    category_id: int | None = Field(None, description="ID категории")
 
 
 class TransactionsByMonth(CamelModel):
-    amount: Decimal
-    period_start: datetime
-    transaction_type: TransactionType
+    """Сумма транзакций цели за месяц."""
+
+    amount: Decimal = Field(..., description="Сумма транзакций")
+    period_start: datetime = Field(..., description="Начало периода")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
