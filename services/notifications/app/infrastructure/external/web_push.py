@@ -7,26 +7,25 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 async def send_web_push_notifications(
     subscriptions: list[dict[str, Any]],
     title: str,
     body: str,
     data: dict[str, Any] | None = None,
 ) -> None:
-    """Send browser Web Push notifications to stored Push API subscriptions."""
+    """Отправляет browser Web Push уведомления по сохраненным подпискам."""
     if not subscriptions:
         return
 
-    payload = json.dumps(
-        {
-            "title": title,
-            "body": body,
-            "url": (data or {}).get("url", "/"),
-            "data": data or {},
-        }
+    payload = _build_web_push_payload(
+        title=title,
+        body=body,
+        data=data,
     )
 
     failures = 0
+
     for subscription in subscriptions:
         try:
             await asyncio.to_thread(
@@ -40,15 +39,37 @@ async def send_web_push_notifications(
                 "Web Push send failed for endpoint %s: %s",
                 subscription.get("endpoint"),
                 exc,
+                exc_info=True,
             )
 
     logger.info(
-        "Web Push: sent %d notifications, failed %d",
+        "Web Push send completed. Success: %s, failed: %s",
         len(subscriptions) - failures,
         failures,
     )
 
+
+def _build_web_push_payload(
+    title: str,
+    body: str,
+    data: dict[str, Any] | None,
+) -> str:
+    """Формирует JSON payload для browser Web Push."""
+    payload_data = data or {}
+
+    return json.dumps(
+        {
+            "title": title,
+            "body": body,
+            "url": payload_data.get("url", "/"),
+            "data": payload_data,
+        },
+        ensure_ascii=False,
+    )
+
+
 def _send_web_push(subscription: dict[str, Any], payload: str) -> None:
+    """Синхронно отправляет одно Web Push уведомление."""
     from pywebpush import webpush
 
     webpush(

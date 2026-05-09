@@ -1,25 +1,28 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from smartbudget_shared.config import (
-    DBSettings as SharedDBSettings,
-    ArqSettings as SharedArqSettings,
     AppSettings as SharedAppSettings,
+    ArqSettings as SharedArqSettings,
+    DBSettings as SharedDBSettings,
 )
 
 
 class DBSettings(SharedDBSettings):
-    """Настройки базы данных, унаследованные от общей конфигурации."""
+    """Настройки базы данных."""
 
     pass
 
 
 class KafkaSettings(BaseSettings):
+    """Настройки Kafka для notification service."""
+
     KAFKA_BOOTSTRAP_SERVERS: str
+
     KAFKA_GROUP_ID: str | None = None
     KAFKA_AUTO_OFFSET_RESET: str
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
+
     KAFKA_NOTIFICATION_GROUP_ID: str
     KAFKA_TOPIC_EVENTS: str
     KAFKA_TOPIC_AUTH: str
@@ -27,26 +30,38 @@ class KafkaSettings(BaseSettings):
 
     @property
     def consumer_group_id(self) -> str:
+        """Возвращает group id consumer-а."""
         return self.KAFKA_GROUP_ID or self.KAFKA_NOTIFICATION_GROUP_ID
 
     @property
     def consumer_topics(self) -> tuple[str, str]:
-        return (self.KAFKA_TOPIC_EVENTS, self.KAFKA_TOPIC_AUTH)
+        """Возвращает topics, которые читает notification consumer."""
+        return (
+            self.KAFKA_TOPIC_EVENTS,
+            self.KAFKA_TOPIC_AUTH,
+        )
+
+    @property
+    def dlq_topic(self) -> str:
+        """Возвращает DLQ topic."""
+        return self.KAFKA_TOPIC_DLQ
 
 
 class ArqSettings(SharedArqSettings):
-    """Настройки ARQ, унаследованные от общей конфигурации."""
+    """Настройки ARQ."""
 
     pass
 
 
 class AppSettings(SharedAppSettings):
-    """Настройки приложения, унаследованные от общей конфигурации."""
+    """Настройки приложения."""
 
     FRONTEND_URL: str
 
 
 class SmtpSettings(BaseSettings):
+    """Настройки SMTP."""
+
     SMTP_ENABLED: bool
     SMTP_HOST: str
     SMTP_PORT: int
@@ -57,12 +72,16 @@ class SmtpSettings(BaseSettings):
 
 
 class PushSettings(BaseSettings):
+    """Настройки Web Push."""
+
     VAPID_PUBLIC_KEY: str
     VAPID_PRIVATE_KEY: str
     VAPID_CLAIMS_SUB: str
 
 
 class Settings(BaseSettings):
+    """Корневая конфигурация notification service."""
+
     DB: DBSettings
     KAFKA: KafkaSettings
     ARQ: ArqSettings

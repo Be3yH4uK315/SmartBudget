@@ -8,25 +8,29 @@ from app.infrastructure.db.repositories.base import BaseRepository
 
 
 class SettingsRepository(BaseRepository):
-    """Репозиторий для управления настройками пользователя и его email."""
+    """Репозиторий настроек уведомлений пользователя."""
 
     async def get_by_user_id(
         self,
         user_id: UUID,
     ) -> models.UserNotificationSettings | None:
         """Получает настройки по ID пользователя."""
-        stmt = select(models.UserNotificationSettings).where(
-            models.UserNotificationSettings.user_id == user_id
+        result = await self.db.execute(
+            select(models.UserNotificationSettings).where(
+                models.UserNotificationSettings.user_id == user_id,
+            ),
         )
-        result = await self.db.execute(stmt)
+
         return result.scalar_one_or_none()
 
     async def get_by_email(self, email: str) -> models.UserNotificationSettings | None:
         """Получает настройки по email без учета регистра."""
-        stmt = select(models.UserNotificationSettings).where(
-            func.lower(models.UserNotificationSettings.email) == email.lower()
+        result = await self.db.execute(
+            select(models.UserNotificationSettings).where(
+                func.lower(models.UserNotificationSettings.email) == email.lower(),
+            ),
         )
-        result = await self.db.execute(stmt)
+
         return result.scalar_one_or_none()
 
     async def upsert_profile(
@@ -34,11 +38,8 @@ class SettingsRepository(BaseRepository):
         user_id: UUID,
         email: str,
         language: str | None = None,
-    ) -> models.UserNotificationSettings:
-        """
-        Создает профиль настроек или обновляет email, если профиль уже существует.
-        Используется при обработке событий из сервиса Auth.
-        """
+    ) -> models.UserNotificationSettings | None:
+        """Создает профиль настроек или обновляет email существующего профиля."""
         values = {
             "user_id": user_id,
             "email": email,
@@ -48,16 +49,18 @@ class SettingsRepository(BaseRepository):
             "email": email,
             "updated_at": func.now(),
         }
+
         if language:
             update_values["language"] = language
 
-        stmt = pg_insert(models.UserNotificationSettings).values(**values)
-        stmt = stmt.on_conflict_do_update(
+        statement = pg_insert(models.UserNotificationSettings).values(**values)
+        statement = statement.on_conflict_do_update(
             index_elements=["user_id"],
             set_=update_values,
         ).returning(models.UserNotificationSettings)
 
-        result = await self.db.execute(stmt)
+        result = await self.db.execute(statement)
+
         return result.scalar_one_or_none()
 
     async def update_settings(
@@ -65,17 +68,17 @@ class SettingsRepository(BaseRepository):
         user_id: UUID,
         changes: dict,
     ) -> models.UserNotificationSettings | None:
-        """Обновляет настройки уведомлений."""
+        """Обновляет настройки уведомлений пользователя."""
         if not changes:
             return await self.get_by_user_id(user_id)
 
-        stmt = (
+        result = await self.db.execute(
             update(models.UserNotificationSettings)
             .where(models.UserNotificationSettings.user_id == user_id)
             .values(**changes, updated_at=func.now())
-            .returning(models.UserNotificationSettings)
+            .returning(models.UserNotificationSettings),
         )
-        result = await self.db.execute(stmt)
+
         return result.scalar_one_or_none()
 
     async def add_push_subscription(
@@ -83,6 +86,7 @@ class SettingsRepository(BaseRepository):
         user_id: UUID,
         subscription: dict,
     ) -> models.UserNotificationSettings | None:
+        """Добавляет или обновляет browser push подписку пользователя."""
         settings = await self.get_by_user_id(user_id)
         if not settings:
             return None
@@ -108,6 +112,7 @@ class SettingsRepository(BaseRepository):
         user_id: UUID,
         endpoint: str,
     ) -> models.UserNotificationSettings | None:
+        """Удаляет browser push подписку пользователя."""
         settings = await self.get_by_user_id(user_id)
         if not settings:
             return None

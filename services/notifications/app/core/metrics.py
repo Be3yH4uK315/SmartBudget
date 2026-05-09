@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Gauge
 
 NOTIFICATIONS_CREATED_TOTAL = Counter(
     "notifications_created_total",
@@ -8,8 +8,8 @@ NOTIFICATIONS_CREATED_TOTAL = Counter(
 
 BACKGROUND_TASKS_ENQUEUED = Counter(
     "background_tasks_enqueued_total",
-    "Total number of Arq tasks (push/email) scheduled",
-    ["task_name"]
+    "Total number of ARQ tasks scheduled",
+    ["task_name"],
 )
 
 KAFKA_CONSUMER_LAG = Gauge(
