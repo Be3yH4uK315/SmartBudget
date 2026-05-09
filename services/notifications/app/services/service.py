@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class _NotificationRow(Protocol):
-    id: UUID
+    notification_id: UUID
     created_at: datetime
     title_key: str
-    type: str
+    notification_type: str
     is_read: bool
     message_key: str
     props: Mapping[str, Any] | None
@@ -30,6 +30,8 @@ class _NotificationRow(Protocol):
 class _NotificationSettingsRow(Protocol):
     notifications_enabled: bool
     push_enabled: bool
+    email_enabled: bool
+    language: str
     disabled_services: list[str] | None
 
 AUTH_NOTIFICATION_EVENT_MAP = {
@@ -57,7 +59,7 @@ class NotificationService:
             await self.uow.settings.upsert_profile(
                 user_id=event.user_id,
                 email=event.payload.email,
-                locale=self._normalize_locale(event.payload.locale or event.payload.language),
+                language=self._normalize_language(event.payload.language),
             )
             await self.uow.commit()
             logger.info("Synchronized profile for user %s from Auth event.", event.user_id)
@@ -82,7 +84,7 @@ class NotificationService:
         await self.process_incoming_event(
             k_schemas.IncomingNotificationEvent(
                 event_id=event_id,
-                event_name=notification_event_name,
+                event_type=notification_event_name,
                 user_id=event.user_id,
                 payload={},
                 timestamp=timestamp,
@@ -91,9 +93,9 @@ class NotificationService:
 
     async def process_incoming_event(self, event: k_schemas.IncomingNotificationEvent) -> None:
         """Основная обработка бизнес-событий из платформы (Budget, Goals, etc.)."""
-        route_config = EVENT_REGISTRY.get(event.event_name)
+        route_config = EVENT_REGISTRY.get(event.event_type)
         if not route_config:
-            logger.warning("Event '%s' not found in registry. Ignored.", event.event_name)
+            logger.warning("Event '%s' not found in registry. Ignored.", event.event_type)
             return
 
         props = self._filter_props(route_config.message_key, route_config.props, event.payload)
@@ -122,7 +124,7 @@ class NotificationService:
                 "event_id": event.event_id,
                 "user_id": event.user_id,
                 "service": route_config.service.value,
-                "type": route_config.type.value,
+                "notification_type": route_config.notification_type.value,
                 "title_key": route_config.title_key,
                 "message_key": route_config.message_key,
                 "props": props or {},
@@ -138,8 +140,8 @@ class NotificationService:
             await self.uow.commit()
 
         metrics.NOTIFICATIONS_CREATED_TOTAL.labels(
-            service=route_config.service.value, 
-            type=route_config.type.value
+            service=route_config.service.value,
+            notification_type=route_config.notification_type.value,
         ).inc()
 
         if self.arq_pool:
@@ -152,7 +154,7 @@ class NotificationService:
                     "send_email_task",
                     user_id=event.user_id,
                     email=settings.email,
-                    locale=settings.locale,
+                    language=settings.language,
                     title_key=route_config.title_key,
                     message_key=route_config.message_key,
                     props=props or {}
@@ -164,7 +166,7 @@ class NotificationService:
                     "send_push_task",
                     user_id=event.user_id,
                     push_subscriptions=settings.push_subscriptions,
-                    locale=settings.locale,
+                    language=settings.language,
                     title_key=route_config.title_key,
                     message_key=route_config.message_key,
                     props=props or {}
@@ -206,7 +208,7 @@ class NotificationService:
             if not success:
                 raise exceptions.NotificationNotFoundError("Notification not found or already read")
             await self.uow.commit()
-        return {"success": True, "id": str(notification_id)}
+        return {"success": True, "notificationId": str(notification_id)}
 
     async def mark_all_as_read(self, user_id: UUID) -> dict:
         async with self.uow:
@@ -302,17 +304,29 @@ class NotificationService:
         self,
         notification: _NotificationRow,
     ) -> api_schemas.NotificationResponse:
-        props = notification.props or None
+        props = self._props_to_response(notification.props)
         return api_schemas.NotificationResponse(
-            id=notification.id,
-            date=notification.created_at,
+            notification_id=notification.notification_id,
+            created_at=notification.created_at,
             title_key=notification.title_key,
-            type=notification.type,
+            notification_type=notification.notification_type,
             is_read=notification.is_read,
             message_key=notification.message_key,
             props=props,
             service=notification.service,
         )
+
+    def _props_to_response(
+        self,
+        props: Mapping[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not props:
+            return None
+
+        return {
+            api_schemas.to_camel(key): value
+            for key, value in props.items()
+        }
 
     def _settings_to_response(
         self,
@@ -370,9 +384,9 @@ class NotificationService:
     def _is_placeholder_email(self, email: str) -> bool:
         return email.endswith("@unknown.smartbudget.local")
 
-    def _normalize_locale(self, locale: str | None) -> str | None:
-        if locale in {"ru", "en"}:
-            return locale
+    def _normalize_language(self, language: str | None) -> str | None:
+        if language in {"ru", "en"}:
+            return language
         return None
 
     async def _sync_auth_profile(self, event: k_schemas.AuthOutboxEvent) -> None:
@@ -380,8 +394,8 @@ class NotificationService:
             return
 
         email = event.new_email or event.email
-        locale = self._normalize_locale(event.locale or event.language)
-        if not email and not locale:
+        language = self._normalize_language(event.language)
+        if not email and not language:
             return
 
         async with self.uow:
@@ -395,7 +409,7 @@ class NotificationService:
             await self.uow.settings.upsert_profile(
                 user_id=event.user_id,
                 email=profile_email,
-                locale=locale,
+                language=language,
             )
             await self.uow.commit()
             logger.info("Synchronized auth profile for user %s from %s.", event.user_id, event.event_type)
@@ -462,7 +476,7 @@ class NotificationService:
         await self.process_incoming_event(
             k_schemas.IncomingNotificationEvent(
                 event_id=event_id,
-                event_name="auth.activity.suspicious",
+                event_type="auth.activity.suspicious",
                 user_id=settings.user_id,
                 payload={},
                 timestamp=timestamp,

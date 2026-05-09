@@ -16,14 +16,14 @@ class DBSettings(SharedDBSettings):
 class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_GROUP_ID: str | None = None
-    KAFKA_AUTO_OFFSET_RESET: str = "earliest"
-    KAFKA_ENABLE_AUTO_COMMIT: bool = False
-    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
-    KAFKA_BATCH_SIZE: int = 100
-    KAFKA_NOTIFICATION_GROUP_ID: str = "notification-group"
-    KAFKA_TOPIC_EVENTS: str = "notification.events"
-    KAFKA_TOPIC_AUTH: str = "auth.events"
-    KAFKA_TOPIC_DLQ: str = "notification.events.dlq"
+    KAFKA_AUTO_OFFSET_RESET: str
+    KAFKA_ENABLE_AUTO_COMMIT: bool
+    KAFKA_SECURITY_PROTOCOL: str
+    KAFKA_BATCH_SIZE: int
+    KAFKA_NOTIFICATION_GROUP_ID: str
+    KAFKA_TOPIC_EVENTS: str
+    KAFKA_TOPIC_AUTH: str
+    KAFKA_TOPIC_DLQ: str
 
     @property
     def consumer_group_id(self) -> str:
@@ -37,7 +37,7 @@ class KafkaSettings(BaseSettings):
 class ArqSettings(SharedArqSettings):
     """Настройки ARQ, унаследованные от общей конфигурации."""
 
-    ARQ_QUEUE_NAME: str = "notification_tasks"
+    pass
 
 
 class AppSettings(SharedAppSettings):
@@ -47,19 +47,19 @@ class AppSettings(SharedAppSettings):
 
 
 class SmtpSettings(BaseSettings):
-    SMTP_ENABLED: bool = False
-    SMTP_HOST: str = "localhost"
-    SMTP_PORT: int = 1025
-    SMTP_USER: str = ""
-    SMTP_PASS: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@smartbudget.com"
-    SMTP_FROM_NAME: str = "SmartBudget"
+    SMTP_ENABLED: bool
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USER: str
+    SMTP_PASS: str
+    SMTP_FROM_EMAIL: str
+    SMTP_FROM_NAME: str
 
 
 class PushSettings(BaseSettings):
-    VAPID_PUBLIC_KEY: str = ""
-    VAPID_PRIVATE_KEY: str = ""
-    VAPID_CLAIMS_SUB: str = "mailto:noreply@smartbudget.com"
+    VAPID_PUBLIC_KEY: str
+    VAPID_PRIVATE_KEY: str
+    VAPID_CLAIMS_SUB: str
 
 
 class Settings(BaseSettings):

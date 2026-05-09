@@ -33,7 +33,7 @@ class SettingsRepository(BaseRepository):
         self,
         user_id: UUID,
         email: str,
-        locale: str | None = None,
+        language: str | None = None,
     ) -> models.UserNotificationSettings:
         """
         Создает профиль настроек или обновляет email, если профиль уже существует.
@@ -42,14 +42,14 @@ class SettingsRepository(BaseRepository):
         values = {
             "user_id": user_id,
             "email": email,
+            "language": language or "ru",
         }
         update_values = {
             "email": email,
             "updated_at": func.now(),
         }
-        if locale:
-            values["locale"] = locale
-            update_values["locale"] = locale
+        if language:
+            update_values["language"] = language
 
         stmt = pg_insert(models.UserNotificationSettings).values(**values)
         stmt = stmt.on_conflict_do_update(

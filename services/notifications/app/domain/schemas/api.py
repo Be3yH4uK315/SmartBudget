@@ -17,11 +17,11 @@ class CamelModel(BaseModel):
 
 class NotificationResponse(CamelModel):
     """Модель одного уведомления в списке."""
-    id: UUID = Field(..., description="ID уведомления")
-    date: datetime = Field(..., description="Время создания")
+    notification_id: UUID = Field(..., description="ID уведомления")
+    created_at: datetime = Field(..., description="Время создания")
     title_key: str = Field(..., description="Ключ перевода заголовка")
     message_key: str = Field(..., description="Ключ перевода текста")
-    type: NotificationType = Field(..., description="Тип уведомления")
+    notification_type: NotificationType = Field(..., description="Тип уведомления")
     is_read: bool = Field(..., description="Прочитано ли")
     service: NotificationServiceType = Field(..., description="Сервис-отправитель")
     props: Optional[Dict[str, Any]] = Field(None, description="Переменные для шаблона")
@@ -57,9 +57,7 @@ class WebPushSubscription(CamelModel):
     keys: Dict[str, str] = Field(..., description="Browser push encryption keys")
 
 class PushSubscribeRequest(CamelModel):
-    user_id: Optional[str] = Field(None, description="Frontend user id; authoritative user id comes from gateway header")
     subscription: WebPushSubscription = Field(..., description="Browser push subscription")
 
 class PushUnsubscribeRequest(CamelModel):
-    user_id: Optional[str] = Field(None, description="Frontend user id; authoritative user id comes from gateway header")
     endpoint: str = Field(..., description="Browser push endpoint")

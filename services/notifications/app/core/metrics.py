@@ -3,7 +3,7 @@ from prometheus_client import Counter, Histogram, Gauge
 NOTIFICATIONS_CREATED_TOTAL = Counter(
     "notifications_created_total",
     "Total number of in-app notifications created",
-    ["service", "type"]
+    ["service", "notification_type"],
 )
 
 BACKGROUND_TASKS_ENQUEUED = Counter(

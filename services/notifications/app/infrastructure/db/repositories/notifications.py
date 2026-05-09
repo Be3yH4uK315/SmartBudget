@@ -75,7 +75,7 @@ class NotificationRepository(BaseRepository):
         stmt = (
             update(models.Notification)
             .where(
-                models.Notification.id == notification_id,
+                models.Notification.notification_id == notification_id,
                 models.Notification.user_id == user_id,
             )
             .values(

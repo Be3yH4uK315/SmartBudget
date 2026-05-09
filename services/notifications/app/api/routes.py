@@ -21,6 +21,8 @@ from app.services.service import NotificationService
 from app.api.websockets import ws_manager
 
 router = APIRouter(tags=["Notifications"])
+settings_router = APIRouter(tags=["Notification Settings"])
+push_router = APIRouter(tags=["Push Notifications"])
 
 # --- ПРОБЫ ЗДОРОВЬЯ (HEALTH CHECKS) ---
 
@@ -89,30 +91,8 @@ async def get_unread_count(
     return await service.get_unread_count(user_id)
 
 
-@router.patch(
-    "/{notification_id}/read", summary="Отметить одно уведомление прочитанным"
-)
-async def mark_as_read(
-    notification_id: UUID = Path(...),
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: NotificationService = Depends(dependencies.get_notification_service),
-):
-    return await service.mark_as_read(user_id, notification_id)
-
-
-@router.post("/read-all", summary="Отметить все уведомления пользователя прочитанными")
-async def mark_all_as_read(
-    user_id: UUID = Depends(dependencies.get_current_user_id),
-    service: NotificationService = Depends(dependencies.get_notification_service),
-):
-    return await service.mark_all_as_read(user_id)
-
-
-# --- НАСТРОЙКИ (SETTINGS) ---
-
-
-@router.get(
-    "/settings",
+@settings_router.get(
+    "",
     response_model=schemas.NotificationSettingsResponse,
     summary="Получить настройки уведомлений",
 )
@@ -123,8 +103,8 @@ async def get_settings(
     return await service.get_settings(user_id)
 
 
-@router.patch(
-    "/settings",
+@settings_router.patch(
+    "",
     response_model=schemas.NotificationSettingsResponse,
     summary="Обновить настройки уведомлений",
 )
@@ -136,8 +116,8 @@ async def update_settings(
     return await service.update_settings(user_id, request)
 
 
-@router.patch(
-    "/settings/status",
+@settings_router.patch(
+    "/status",
     response_model=schemas.NotificationSettingsResponse,
     summary="Включить/выключить уведомления",
 )
@@ -162,7 +142,7 @@ async def update_notifications_status(
 # --- BROWSER PUSH ---
 
 
-@router.post("/push/subscribe", summary="Сохранить browser push подписку")
+@push_router.post("/subscribe", summary="Сохранить browser push подписку")
 async def subscribe_push(
     request: schemas.PushSubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
@@ -171,7 +151,7 @@ async def subscribe_push(
     return await service.subscribe_push(user_id, request.subscription)
 
 
-@router.post("/push/unsubscribe", summary="Удалить browser push подписку")
+@push_router.post("/unsubscribe", summary="Удалить browser push подписку")
 async def unsubscribe_push(
     request: schemas.PushUnsubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),

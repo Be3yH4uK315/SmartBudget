@@ -12,19 +12,33 @@ class SafeDict(dict):
     def __missing__(self, key):
         return "{" + key + "}"
 
-def get_translation(ctx: dict, locale: str, key: str) -> str:
+
+def get_push_url(message_key: str, props: dict) -> str:
+    """Возвращает UI URL для клика по browser push."""
+    if message_key.startswith("Goals.") and props.get("goal_id"):
+        return f"/goals/{props['goal_id']}"
+    if message_key.startswith("Budget.") or message_key.startswith("Limit."):
+        return "/budget"
+    if message_key.startswith("Security."):
+        return "/settings/security"
+    if message_key == "Transactions.unclassified.message":
+        return "/transactions/?categoriesIds=30"
+    return "/notifications"
+
+
+def get_translation(ctx: dict, language: str, key: str) -> str:
     """Извлекает переведенную строку из словаря, загруженного в память при старте."""
     translations = ctx.get("translations", {})
-    loc_dict = translations.get(locale) or translations.get("ru", {})
+    loc_dict = translations.get(language) or translations.get("ru", {})
     return loc_dict.get(key, key)
 
 async def send_email_task(
-    ctx: dict, user_id: Any, email: str, locale: str,
+    ctx: dict, user_id: Any, email: str, language: str,
     title_key: str, message_key: str, props: dict
 ) -> None:
     """Фоновая задача отправки транзакционного письма."""
-    title_tpl = get_translation(ctx, locale, title_key)
-    message_tpl = get_translation(ctx, locale, message_key)
+    title_tpl = get_translation(ctx, language, title_key)
+    message_tpl = get_translation(ctx, language, message_key)
 
     safe_props = SafeDict(**(props or {}))
     subject = title_tpl.format_map(safe_props)
@@ -32,7 +46,7 @@ async def send_email_task(
 
     jinja_env: Environment = ctx["jinja_env"]
     try:
-        template = jinja_env.get_template(f"base_email_{locale}.html")
+        template = jinja_env.get_template(f"base_email_{language}.html")
     except Exception:
         template = jinja_env.get_template("base_email.html")
         
@@ -42,20 +56,24 @@ async def send_email_task(
 
 
 async def send_push_task(
-    ctx: dict, user_id: Any, push_subscriptions: list[dict], locale: str,
+    ctx: dict, user_id: Any, push_subscriptions: list[dict], language: str,
     title_key: str, message_key: str, props: dict
 ) -> None:
     """Фоновая задача отправки PUSH-уведомления на устройства."""
-    title_tpl = get_translation(ctx, locale, title_key)
-    message_tpl = get_translation(ctx, locale, message_key)
+    title_tpl = get_translation(ctx, language, title_key)
+    message_tpl = get_translation(ctx, language, message_key)
 
     safe_props = SafeDict(**(props or {}))
     title = title_tpl.format_map(safe_props)
     body = message_tpl.format_map(safe_props)
+    data = {
+        **(props or {}),
+        "url": get_push_url(message_key, props or {}),
+    }
 
     await send_web_push_notifications(
         subscriptions=push_subscriptions,
         title=title,
         body=body,
-        data=props
+        data=data,
     )
