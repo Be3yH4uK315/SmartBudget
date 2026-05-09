@@ -312,6 +312,8 @@ services:
     depends_on:
       transactions_postgres:
         condition: service_healthy
+      redis_cache:
+        condition: service_healthy
       kafka:
         condition: service_healthy
     volumes:
@@ -696,11 +698,9 @@ volumes:
   pg_data_budgets:
   pg_data_transactions:
   pg_data_notification:
-  geoip_data:
   models_data:
   datasets_data:
   redis_data_cache:
-  kafka_data:
 
 networks:
   smartbudget-net:
