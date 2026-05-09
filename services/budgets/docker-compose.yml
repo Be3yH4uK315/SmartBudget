@@ -1,0 +1,170 @@
+services:
+  redis_cache:
+    image: redis:7
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_cache:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 2181 || exit 1"]
+      interval: 5s
+      retries: 5
+      timeout: 2s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092"]
+      interval: 10s
+      retries: 10
+      timeout: 3s
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+
+  budgets_postgres:
+    image: postgres:16
+    container_name: budgets_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: budgets_db
+    ports:
+      - "5438:5432"
+    volumes:
+      - pg_data_budgets:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+    networks:
+      - smartbudget-net
+
+  budgets_service:
+    build:
+      context: ../..
+      dockerfile: services/budgets/Dockerfile
+    env_file:
+      - .env
+    container_name: budgets_service_dev
+    ports:
+      - "8005:8000"
+    depends_on:
+      budgets_postgres:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/budgets:/app
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --reload
+      "
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/budget/health/live"]
+      interval: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - smartbudget-net
+
+  budgets_worker:
+    build:
+      context: ../..
+      dockerfile: services/budgets/Dockerfile
+    env_file:
+      - .env
+    container_name: budgets_worker_dev
+    depends_on:
+      budgets_service:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/budgets:/app
+    command: arq app.workers.main.WorkerSettings --watch /app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
+      interval: 30s
+      retries: 3
+      start_period: 20s
+    networks:
+      - smartbudget-net
+
+  budgets_consumer:
+    build:
+      context: ../..
+      dockerfile: services/budgets/Dockerfile
+    env_file:
+      - .env
+    container_name: budgets_consumer_dev
+    depends_on:
+      budgets_service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../../services/budgets:/app
+    command: python -m app.run_consumer
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -f /tmp/healthy && find /tmp/healthy -mmin -1"]
+      interval: 30s
+      retries: 3
+      start_period: 20s
+    networks:
+      - smartbudget-net
+
+volumes:
+  pg_data_budgets:
+  redis_data_cache:
+  kafka_data:
+
+networks:
+  smartbudget-net:
+    name: smartbudget-net
