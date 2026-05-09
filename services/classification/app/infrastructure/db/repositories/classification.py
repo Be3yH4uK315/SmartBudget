@@ -1,17 +1,34 @@
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator
 from uuid import UUID
-from sqlalchemy import select, or_, update
+
+from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from app.infrastructure.db.models import ClassificationResult, Feedback, ClassificationSource
+from app.infrastructure.db.models import (
+    ClassificationResult,
+    ClassificationSource,
+    Feedback,
+)
 from app.infrastructure.db.repositories.base import BaseRepository
 
+ML_LOW_CONFIDENCE_THRESHOLD = 0.8
+
+
 class ClassificationResultRepository(BaseRepository):
-    async def get_by_transaction_id(self, tx_id: UUID) -> ClassificationResult | None:
+    """Репозиторий результатов классификации."""
+
+    async def get_by_transaction_id(
+        self,
+        tx_id: UUID,
+    ) -> ClassificationResult | None:
         """Получает результат классификации по ID транзакции."""
-        stmt = select(ClassificationResult).where(ClassificationResult.transaction_id == tx_id)
-        result = await self.db.execute(stmt)
+        result = await self.db.execute(
+            select(ClassificationResult).where(
+                ClassificationResult.transaction_id == tx_id,
+            ),
+        )
+
         return result.scalar_one_or_none()
 
     async def get_user_result(
@@ -19,16 +36,18 @@ class ClassificationResultRepository(BaseRepository):
         user_id: UUID,
         tx_id: UUID,
     ) -> ClassificationResult | None:
-        """Получает результат классификации только для владельца транзакции."""
-        stmt = select(ClassificationResult).where(
-            ClassificationResult.user_id == user_id,
-            ClassificationResult.transaction_id == tx_id,
+        """Получает результат классификации владельца транзакции."""
+        result = await self.db.execute(
+            select(ClassificationResult).where(
+                ClassificationResult.user_id == user_id,
+                ClassificationResult.transaction_id == tx_id,
+            ),
         )
-        result = await self.db.execute(stmt)
+
         return result.scalar_one_or_none()
 
     async def upsert(self, result: ClassificationResult) -> ClassificationResult:
-        """Использует ON CONFLICT для атомарного upsert."""
+        """Атомарно создает или обновляет результат классификации."""
         insert_stmt = (
             insert(ClassificationResult)
             .values(
@@ -59,106 +78,128 @@ class ClassificationResultRepository(BaseRepository):
             )
             .returning(ClassificationResult)
         )
+
         return await self.db.scalar(insert_stmt)
 
     async def get_existing_ids(self, tx_ids: list[UUID]) -> set[UUID]:
-        """Возвращает set из ID транзакций, которые уже есть в базе."""
+        """Возвращает множество transaction_id, которые уже есть в базе."""
         if not tx_ids:
             return set()
-            
-        stmt = select(ClassificationResult.transaction_id).where(
-            ClassificationResult.transaction_id.in_(tx_ids)
+
+        result = await self.db.execute(
+            select(ClassificationResult.transaction_id).where(
+                ClassificationResult.transaction_id.in_(tx_ids),
+            ),
         )
-        result = await self.db.execute(stmt)
+
         return set(result.scalars().all())
 
+
 class FeedbackRepository(BaseRepository):
+    """Репозиторий пользовательского feedback."""
+
     def create(self, feedback: Feedback) -> Feedback:
-        """Создает новую обратную связь."""
+        """Добавляет feedback в текущую сессию без commit."""
         self.db.add(feedback)
+
         return feedback
-        
+
     async def get_training_data(self, days_limit: int = 180) -> list[dict]:
-        """Получает данные для обучения (преобразованные в словари)."""
+        """Получает данные для обучения."""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
-        stmt = select(
-            ClassificationResult.merchant, 
-            ClassificationResult.description, 
-            ClassificationResult.mcc, 
-            Feedback.correct_category_id
-        ).join(
-            ClassificationResult, 
-            Feedback.transaction_id == ClassificationResult.transaction_id
-        ).where(
-            Feedback.created_at >= cutoff_date,
-            or_(
-                ClassificationResult.source.in_(
-                    [ClassificationSource.ML, ClassificationSource.MANUAL]
-                ),
-                ClassificationResult.confidence < 0.8
-            )
-        )
-        result = await self.db.execute(stmt)
-        return [
-            {
-                "merchant": row["merchant"],
-                "description": row["description"],
-                "mcc": row["mcc"],
-                "label": int(row["correct_category_id"])
-            }
-            for row in result.mappings().all()
-        ]
-    
-    async def stream_training_data(self, days_limit: int = 180, batch_size: int = 1000) -> AsyncGenerator[list[dict], None]:
-        """Стриминг данных для обучения пачками."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
-        
-        stmt = (
+
+        result = await self.db.execute(
             select(
-                ClassificationResult.merchant, 
-                ClassificationResult.description, 
-                ClassificationResult.mcc, 
-                Feedback.correct_category_id
+                ClassificationResult.merchant,
+                ClassificationResult.description,
+                ClassificationResult.mcc,
+                Feedback.correct_category_id,
             )
             .join(
-                ClassificationResult, 
-                Feedback.transaction_id == ClassificationResult.transaction_id
+                ClassificationResult,
+                Feedback.transaction_id == ClassificationResult.transaction_id,
             )
             .where(
                 Feedback.created_at >= cutoff_date,
                 or_(
                     ClassificationResult.source.in_(
-                        [ClassificationSource.ML, ClassificationSource.MANUAL]
+                        [
+                            ClassificationSource.ML,
+                            ClassificationSource.MANUAL,
+                        ],
                     ),
-                    ClassificationResult.confidence < 0.8
-                )
+                    ClassificationResult.confidence < ML_LOW_CONFIDENCE_THRESHOLD,
+                ),
+            ),
+        )
+
+        return [
+            {
+                "merchant": row["merchant"],
+                "description": row["description"],
+                "mcc": row["mcc"],
+                "label": int(row["correct_category_id"]),
+            }
+            for row in result.mappings().all()
+        ]
+
+    async def stream_training_data(
+        self,
+        days_limit: int = 180,
+        batch_size: int = 1000,
+    ) -> AsyncGenerator[list[dict], None]:
+        """Стримит данные для обучения пачками."""
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
+
+        stmt = (
+            select(
+                ClassificationResult.merchant,
+                ClassificationResult.description,
+                ClassificationResult.mcc,
+                Feedback.correct_category_id,
             )
-            .order_by(Feedback.created_at.asc()) 
+            .join(
+                ClassificationResult,
+                Feedback.transaction_id == ClassificationResult.transaction_id,
+            )
+            .where(
+                Feedback.created_at >= cutoff_date,
+                or_(
+                    ClassificationResult.source.in_(
+                        [
+                            ClassificationSource.ML,
+                            ClassificationSource.MANUAL,
+                        ],
+                    ),
+                    ClassificationResult.confidence < ML_LOW_CONFIDENCE_THRESHOLD,
+                ),
+            )
+            .order_by(Feedback.created_at.asc())
         )
 
         result = await self.db.stream(stmt)
-        
+
         while True:
             chunk = await result.fetchmany(batch_size)
             if not chunk:
                 break
-            
+
             yield [
                 {
                     "merchant": row.merchant,
                     "description": row.description,
                     "mcc": row.mcc,
-                    "label": int(row.correct_category_id)
+                    "label": int(row.correct_category_id),
                 }
                 for row in chunk
             ]
-    
+
     async def mark_unprocessed_as_processed(self) -> int:
-        """Помечает все необработанные записи Feedback как обработанные."""
-        stmt = (
+        """Помечает все необработанные feedback-записи как обработанные."""
+        result = await self.db.execute(
             update(Feedback)
-            .where(Feedback.processed == False)
-            .values(processed=True)
+            .where(Feedback.processed.is_(False))
+            .values(processed=True),
         )
-        result = await self.db.execute(stmt)
+
         return result.rowcount

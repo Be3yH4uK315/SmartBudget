@@ -1,26 +1,28 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from smartbudget_shared.config import (
-    DBSettings as SharedDBSettings,
-    ArqSettings as SharedArqSettings,
     AppSettings as SharedAppSettings,
+    ArqSettings as SharedArqSettings,
+    DBSettings as SharedDBSettings,
 )
 
 
 class DBSettings(SharedDBSettings):
-    """Настройки базы данных, унаследованные от общей конфигурации."""
+    """Настройки базы данных."""
 
     pass
 
 
 class ArqSettings(SharedArqSettings):
-    """Настройки ARQ, унаследованные от общей конфигурации."""
+    """Настройки ARQ."""
 
     pass
 
 
 class KafkaSettings(BaseSettings):
+    """Настройки Kafka для classification service."""
+
     KAFKA_BOOTSTRAP_SERVERS: str
+
     KAFKA_GROUP_ID: str
     KAFKA_TOPIC: str | None = None
     KAFKA_DLQ_TOPIC: str | None = None
@@ -28,6 +30,7 @@ class KafkaSettings(BaseSettings):
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
+
     TOPIC_NEED_CATEGORY: str
     TOPIC_CLASSIFIED: str
     TOPIC_CATEGORY_UPDATED: str
@@ -36,15 +39,24 @@ class KafkaSettings(BaseSettings):
     TOPIC_NEED_CATEGORY_DLQ: str
 
     @property
+    def consumer_group_id(self) -> str:
+        """Возвращает group id consumer-а."""
+        return self.KAFKA_GROUP_ID
+
+    @property
     def consumer_topic(self) -> str:
+        """Возвращает topic, который читает classification consumer."""
         return self.KAFKA_TOPIC or self.TOPIC_NEED_CATEGORY
 
     @property
     def dlq_topic(self) -> str:
+        """Возвращает DLQ topic."""
         return self.KAFKA_DLQ_TOPIC or self.TOPIC_NEED_CATEGORY_DLQ
 
 
 class MLSettings(BaseSettings):
+    """Настройки ML pipeline."""
+
     MODEL_PATH: str
     DATASET_PATH: str
     ML_CONFIDENCE_THRESHOLD_ACCEPT: float
@@ -52,7 +64,7 @@ class MLSettings(BaseSettings):
 
 
 class AppSettings(SharedAppSettings):
-    """Настройки приложения, унаследованные от общей конфигурации."""
+    """Настройки приложения."""
 
     FRONTEND_URL: str
     PROMETHEUS_PORT: int
@@ -60,6 +72,8 @@ class AppSettings(SharedAppSettings):
 
 
 class Settings(BaseSettings):
+    """Корневая конфигурация classification service."""
+
     DB: DBSettings
     ARQ: ArqSettings
     KAFKA: KafkaSettings

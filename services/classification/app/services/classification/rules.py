@@ -8,99 +8,202 @@ from app.infrastructure.db.uow import UnitOfWork
 
 logger = logging.getLogger(__name__)
 
+RULE_TYPE_MCC = "mcc"
+RULE_TYPE_EXACT = "exact"
+RULE_TYPE_REGEX = "regex"
+RULE_TYPE_CONTAINS = "contains"
+
+
 class RuleManager:
     """
-    Singleton для управления правилами.
-    Реализует оптимизированный поиск (HashMap для точных совпадений).
+    Singleton manager для правил классификации.
     """
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(RuleManager, cls).__new__(cls)
             cls._instance.last_check = datetime.min
-            cls._instance.update_interval_seconds = settings.APP.RULES_RELOAD_INTERVAL_SECONDS
+            cls._instance.update_interval_seconds = (
+                settings.APP.RULES_RELOAD_INTERVAL_SECONDS
+            )
             cls._instance._rules_signature = None
-            
+
             cls._instance._mcc_rules = {}
             cls._instance._exact_rules = {}
             cls._instance._complex_rules = []
+
         return cls._instance
 
-    def get_rules(self):
-        """Возвращает текущие правила."""
+    def get_rules(self) -> dict[str, Any]:
+        """Возвращает текущие правила классификации."""
         return {
             "mcc": self._mcc_rules,
             "exact": self._exact_rules,
-            "complex": self._complex_rules
+            "complex": self._complex_rules,
         }
 
-    async def check_for_updates(self, db_session_maker):
-        """Проверяет и обновляет правила, если прошло достаточно времени."""
+    async def check_for_updates(self, db_session_maker) -> None:
+        """Обновляет правила, если прошел reload interval."""
         now = datetime.now()
         if (now - self.last_check).total_seconds() < self.update_interval_seconds:
             return
 
         try:
-            uow = UnitOfWork(db_session_maker)
-            async with uow:
-                raw_rules = await uow.rules.get_all_active_rules()
-            
-            new_mcc = {}
-            new_exact = {}
-            new_complex = []
+            raw_rules = await self._load_rules(db_session_maker)
+            mcc_rules, exact_rules, complex_rules = self._build_indexes(raw_rules)
 
-            for rule in raw_rules:
-                pt = rule["pattern_type"]
-                
-                if pt == "mcc" and rule["mcc"]:
-                    if rule["mcc"] not in new_mcc:
-                        new_mcc[rule["mcc"]] = rule
-                        
-                elif pt == "exact":
-                    if not rule["pattern"]:
-                        logger.error("Exact rule %s skipped because pattern is empty.", rule["rule_id"])
-                        continue
-                    pat = rule["pattern"].lower().strip()
-                    if pat not in new_exact:
-                        new_exact[pat] = rule
-                        
-                elif pt in ["regex", "contains"]:
-                    if not rule["pattern"]:
-                        logger.error("%s rule %s skipped because pattern is empty.", pt, rule["rule_id"])
-                        continue
-                    if pt == "regex":
-                        try:
-                            rule["compiled_regex"] = re.compile(rule["pattern"], re.IGNORECASE)
-                        except re.error as e:
-                            logger.error(f"Invalid regex rule {rule['rule_id']}: {e}")
-                            continue
-                    new_complex.append(rule)
+            new_signature = self._make_rules_signature(
+                mcc_rules=mcc_rules,
+                exact_rules=exact_rules,
+                complex_rules=complex_rules,
+            )
 
-            new_complex.sort(key=lambda r: r["priority"])
-            new_signature = self._make_rules_signature(new_mcc, new_exact, new_complex)
-
-            self._mcc_rules = new_mcc
-            self._exact_rules = new_exact
-            self._complex_rules = new_complex
+            self._mcc_rules = mcc_rules
+            self._exact_rules = exact_rules
+            self._complex_rules = complex_rules
             self.last_check = now
 
-            if new_signature != self._rules_signature:
-                self._rules_signature = new_signature
-                count = len(new_mcc) + len(new_exact) + len(new_complex)
-                logger.info(
-                    "Rules reloaded. Total: %s (MCC: %s, Exact: %s, Complex: %s)",
-                    count,
-                    len(new_mcc),
-                    len(new_exact),
-                    len(new_complex),
+            self._log_reload_if_changed(new_signature)
+
+        except Exception as exc:
+            self.last_check = now
+            logger.error("Error updating rules: %s", exc, exc_info=True)
+
+    def find_match(
+        self,
+        merchant: str,
+        mcc: int | None,
+        description: str,
+    ) -> tuple[int | None, str | None, str | None]:
+        """Ищет подходящее правило классификации."""
+        text = self._build_search_text(merchant, description)
+
+        exact_match = self._find_exact_match(text)
+        if exact_match:
+            return exact_match
+
+        complex_match = self._find_complex_match(text)
+        if complex_match:
+            return complex_match
+
+        mcc_match = self._find_mcc_match(mcc)
+        if mcc_match:
+            return mcc_match
+
+        return None, None, None
+
+    @staticmethod
+    async def _load_rules(db_session_maker) -> list[dict[str, Any]]:
+        """Загружает правила из БД."""
+        uow = UnitOfWork(db_session_maker)
+        async with uow:
+            return await uow.rules.get_all_active_rules()
+
+    def _build_indexes(
+        self,
+        raw_rules: list[dict[str, Any]],
+    ) -> tuple[dict[int, dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+        """Строит индексы правил для быстрого поиска."""
+        mcc_rules: dict[int, dict[str, Any]] = {}
+        exact_rules: dict[str, dict[str, Any]] = {}
+        complex_rules: list[dict[str, Any]] = []
+
+        for rule in raw_rules:
+            pattern_type = rule["pattern_type"]
+
+            if pattern_type == RULE_TYPE_MCC:
+                self._add_mcc_rule(rule, mcc_rules)
+
+            elif pattern_type == RULE_TYPE_EXACT:
+                self._add_exact_rule(rule, exact_rules)
+
+            elif pattern_type in {RULE_TYPE_REGEX, RULE_TYPE_CONTAINS}:
+                self._add_complex_rule(rule, complex_rules)
+
+        complex_rules.sort(key=lambda item: item["priority"])
+
+        return mcc_rules, exact_rules, complex_rules
+
+    @staticmethod
+    def _add_mcc_rule(
+        rule: dict[str, Any],
+        mcc_rules: dict[int, dict[str, Any]],
+    ) -> None:
+        """Добавляет MCC-правило в индекс."""
+        mcc = rule.get("mcc")
+        if not mcc:
+            return
+
+        if mcc not in mcc_rules:
+            mcc_rules[mcc] = rule
+
+    @staticmethod
+    def _add_exact_rule(
+        rule: dict[str, Any],
+        exact_rules: dict[str, dict[str, Any]],
+    ) -> None:
+        """Добавляет exact-правило в индекс."""
+        pattern = rule.get("pattern")
+        if not pattern:
+            logger.error(
+                "Exact rule %s skipped because pattern is empty.",
+                rule.get("rule_id"),
+            )
+            return
+
+        normalized_pattern = pattern.lower().strip()
+        if normalized_pattern not in exact_rules:
+            exact_rules[normalized_pattern] = rule
+
+    @staticmethod
+    def _add_complex_rule(
+        rule: dict[str, Any],
+        complex_rules: list[dict[str, Any]],
+    ) -> None:
+        """Добавляет regex/contains-правило в индекс."""
+        pattern_type = rule["pattern_type"]
+        pattern = rule.get("pattern")
+
+        if not pattern:
+            logger.error(
+                "%s rule %s skipped because pattern is empty.",
+                pattern_type,
+                rule.get("rule_id"),
+            )
+            return
+
+        if pattern_type == RULE_TYPE_REGEX:
+            try:
+                rule["compiled_regex"] = re.compile(pattern, re.IGNORECASE)
+            except re.error as exc:
+                logger.error(
+                    "Invalid regex rule %s: %s",
+                    rule.get("rule_id"),
+                    exc,
+                    exc_info=True,
                 )
-            else:
-                logger.debug("Rules checked. No changes.")
-            
-        except Exception as e:
-            self.last_check = now
-            logger.error(f"Error updating rules: {e}")
+                return
+
+        complex_rules.append(rule)
+
+    def _log_reload_if_changed(self, new_signature: tuple) -> None:
+        """Логирует перезагрузку правил только при изменении signature."""
+        if new_signature == self._rules_signature:
+            logger.debug("Rules checked. No changes.")
+            return
+
+        self._rules_signature = new_signature
+        count = len(self._mcc_rules) + len(self._exact_rules) + len(self._complex_rules)
+
+        logger.info(
+            "Rules reloaded. Total: %s (MCC: %s, Exact: %s, Complex: %s)",
+            count,
+            len(self._mcc_rules),
+            len(self._exact_rules),
+            len(self._complex_rules),
+        )
 
     @staticmethod
     def _make_rules_signature(
@@ -108,38 +211,89 @@ class RuleManager:
         exact_rules: dict[str, dict[str, Any]],
         complex_rules: list[dict[str, Any]],
     ) -> tuple:
+        """Создает signature набора правил."""
         return (
-            tuple(sorted((mcc, rule["rule_id"], rule["category_id"]) for mcc, rule in mcc_rules.items())),
-            tuple(sorted((pattern, rule["rule_id"], rule["category_id"]) for pattern, rule in exact_rules.items())),
-            tuple((rule["rule_id"], rule["category_id"], rule["priority"], rule["pattern"]) for rule in complex_rules),
+            tuple(
+                sorted(
+                    (
+                        mcc,
+                        rule["rule_id"],
+                        rule["category_id"],
+                    )
+                    for mcc, rule in mcc_rules.items()
+                ),
+            ),
+            tuple(
+                sorted(
+                    (
+                        pattern,
+                        rule["rule_id"],
+                        rule["category_id"],
+                    )
+                    for pattern, rule in exact_rules.items()
+                ),
+            ),
+            tuple(
+                (
+                    rule["rule_id"],
+                    rule["category_id"],
+                    rule["priority"],
+                    rule["pattern"],
+                )
+                for rule in complex_rules
+            ),
         )
 
-    def find_match(self, merchant: str, mcc: int | None, description: str) -> tuple[int | None, str | None, str | None]:
-        """Ищет подходящее правило."""
-        text = f"{merchant} {description}".lower().strip()
+    @staticmethod
+    def _build_search_text(merchant: str, description: str) -> str:
+        """Формирует текст для поиска правил."""
+        return f"{merchant} {description}".lower().strip()
 
-        if text in self._exact_rules:
-            rule = self._exact_rules[text]
-            return rule["category_id"], rule["category_name"], "exact"
+    def _find_exact_match(
+        self,
+        text: str,
+    ) -> tuple[int, str, str] | None:
+        """Ищет exact match."""
+        rule = self._exact_rules.get(text)
+        if not rule:
+            return None
 
+        return rule["category_id"], rule["category_name"], RULE_TYPE_EXACT
+
+    def _find_complex_match(
+        self,
+        text: str,
+    ) -> tuple[int, str, str] | None:
+        """Ищет regex/contains match."""
         for rule in self._complex_rules:
-            pt = rule["pattern_type"]
-            pat = rule["pattern"].lower()
+            pattern_type = rule["pattern_type"]
+            pattern = rule["pattern"].lower()
             is_match = False
 
-            if pt == "contains" and pat in text:
+            if pattern_type == RULE_TYPE_CONTAINS and pattern in text:
                 is_match = True
-            elif pt == "regex" and "compiled_regex" in rule:
-                if rule["compiled_regex"].search(text):
-                    is_match = True
-            
+
+            elif pattern_type == RULE_TYPE_REGEX and "compiled_regex" in rule:
+                is_match = bool(rule["compiled_regex"].search(text))
+
             if is_match:
-                return rule["category_id"], rule["category_name"], pt
+                return rule["category_id"], rule["category_name"], pattern_type
 
-        if mcc in self._mcc_rules:
-            rule = self._mcc_rules[mcc]
-            return rule["category_id"], rule["category_name"], "mcc"
+        return None
 
-        return None, None, None
+    def _find_mcc_match(
+        self,
+        mcc: int | None,
+    ) -> tuple[int, str, str] | None:
+        """Ищет MCC match."""
+        if mcc is None:
+            return None
+
+        rule = self._mcc_rules.get(mcc)
+        if not rule:
+            return None
+
+        return rule["category_id"], rule["category_name"], RULE_TYPE_MCC
+
 
 ruleManager = RuleManager()

@@ -1,34 +1,79 @@
 import json
+from datetime import date, datetime, timezone
 from decimal import Decimal
-from datetime import date, datetime
-from uuid import UUID
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
-def app_json_serializer(obj: Any) -> Any:
-    """Универсальный сериализатор для JSON."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
-    if isinstance(obj, UUID):
-        return str(obj)
-    if isinstance(obj, Enum):
-        return obj.value
-    return str(obj)
+import orjson
 
-def to_json_str(data: Any) -> str:
-    """Сериализует объект в строку."""
-    return json.dumps(data, default=app_json_serializer, ensure_ascii=False)
+
+def app_json_serializer(value: Any) -> Any:
+    """Сериализует нестандартные типы в JSON-compatible значения."""
+    if isinstance(value, Decimal):
+        return float(value)
+
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+
+        return value.isoformat()
+
+    if isinstance(value, date):
+        return value.isoformat()
+
+    if isinstance(value, UUID):
+        return str(value)
+
+    if isinstance(value, Enum):
+        return value.value
+
+    return str(value)
+
 
 def to_json_dict(data: Any, max_depth: int = 10) -> Any:
-    """Рекурсивно приводит типы к примитивам."""
+    """Рекурсивно приводит объект к JSON-compatible структуре."""
     if max_depth <= 0:
         return str(data)
-    if isinstance(obj := data, dict):
-        return {k: to_json_dict(v, max_depth - 1) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [to_json_dict(v, max_depth - 1) for v in obj]
-    if isinstance(obj, (Decimal, date, datetime, UUID, Enum)):
-        return app_json_serializer(obj)
-    return obj
+
+    if isinstance(data, dict):
+        return {
+            key: to_json_dict(value, max_depth - 1)
+            for key, value in data.items()
+        }
+
+    if isinstance(data, list):
+        return [
+            to_json_dict(value, max_depth - 1)
+            for value in data
+        ]
+
+    if isinstance(data, tuple):
+        return [
+            to_json_dict(value, max_depth - 1)
+            for value in data
+        ]
+
+    if isinstance(data, set):
+        return [
+            to_json_dict(value, max_depth - 1)
+            for value in data
+        ]
+
+    if isinstance(data, (Decimal, date, datetime, UUID, Enum)):
+        return app_json_serializer(data)
+
+    return data
+
+
+def to_json_str(data: Any) -> str:
+    """Сериализует объект в JSON string."""
+    return json.dumps(
+        to_json_dict(data),
+        ensure_ascii=False,
+    )
+
+
+def to_json_bytes(data: Any) -> bytes:
+    """Сериализует объект в JSON bytes."""
+    return orjson.dumps(to_json_dict(data))

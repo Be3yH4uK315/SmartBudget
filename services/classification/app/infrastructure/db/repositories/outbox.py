@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class OutboxRepository(BaseRepository):
-    """Репозиторий Outbox-событий."""
+    """Репозиторий outbox-событий."""
 
     def _build_event(
         self,
@@ -22,9 +22,11 @@ class OutboxRepository(BaseRepository):
         payload: dict[str, Any],
         event_type: str | None = None,
     ) -> OutboxEvent:
+        """Создает ORM-модель outbox-события."""
         try:
             clean_payload = to_json_dict(payload)
             resolved_event_type = event_type or clean_payload.get("event_type")
+
             if not resolved_event_type:
                 raise ValueError("event_type is required for outbox events")
 
@@ -34,9 +36,14 @@ class OutboxRepository(BaseRepository):
                 payload=clean_payload,
                 status="pending",
             )
+
         except Exception as exc:
-            logger.error("Failed to serialize outbox event: %s", exc)
-            raise InvalidKafkaMessageError("Event serialization failed")
+            logger.error(
+                "Failed to serialize outbox event: %s",
+                exc,
+                exc_info=True,
+            )
+            raise InvalidKafkaMessageError("Event serialization failed") from exc
 
     def add_event(
         self,
@@ -44,10 +51,11 @@ class OutboxRepository(BaseRepository):
         payload: dict[str, Any],
         event_type: str | None = None,
     ) -> None:
-        """Добавляет событие в outbox."""
+        """Добавляет outbox-событие без commit."""
         self.db.add(self._build_event(topic, payload, event_type))
 
     def add_events(self, events: list[dict[str, Any]]) -> None:
+        """Добавляет несколько outbox-событий без commit."""
         if not events:
             return
 
@@ -59,23 +67,26 @@ class OutboxRepository(BaseRepository):
             )
 
     async def get_pending_events(self, limit: int = 100) -> list[OutboxEvent]:
-        """Получает ожидающие события для отправки в Kafka."""
+        """Получает pending-события для отправки в Kafka."""
         result = await self.db.execute(
             select(OutboxEvent)
             .where(OutboxEvent.status == "pending")
             .order_by(OutboxEvent.created_at.asc())
             .limit(limit)
-            .with_for_update(skip_locked=True)
+            .with_for_update(skip_locked=True),
         )
+
         return list(result.scalars().all())
 
     async def delete_events(self, event_ids: list[UUID]) -> None:
-        """Удаляет успешно отправленные события из outbox."""
+        """Удаляет успешно отправленные outbox-события."""
         if not event_ids:
             return
 
         await self.db.execute(
-            delete(OutboxEvent).where(OutboxEvent.event_id.in_(event_ids))
+            delete(OutboxEvent).where(
+                OutboxEvent.event_id.in_(event_ids),
+            ),
         )
 
     async def handle_failed_event(
@@ -84,13 +95,14 @@ class OutboxRepository(BaseRepository):
         error_msg: str,
         max_retries: int = 5,
     ) -> None:
-        """Обрабатывает неудачное событие, увеличивая счетчик попыток и обновляя статус."""
+        """Увеличивает retry_count и при превышении лимита помечает событие failed."""
         event = await self.db.get(OutboxEvent, event_id)
         if not event:
             return
 
         event.retry_count += 1
         event.last_error = str(error_msg)[:512]
+
         if event.retry_count >= max_retries:
             logger.error(
                 "Event %s reached max retries (%s). Marking as failed.",
@@ -108,12 +120,14 @@ class OutboxRepository(BaseRepository):
     ) -> int:
         """Удаляет старые failed-события."""
         cutoff = datetime.now(timezone.utc) - timedelta(
-            days=days if days is not None else retention_days
+            days=days if days is not None else retention_days,
         )
+
         result = await self.db.execute(
             delete(OutboxEvent).where(
                 OutboxEvent.status == "failed",
                 OutboxEvent.created_at < cutoff,
-            )
+            ),
         )
+
         return result.rowcount
