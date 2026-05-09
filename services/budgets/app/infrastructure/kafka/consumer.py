@@ -17,30 +17,38 @@ from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.service import BudgetService
 
 logger = logging.getLogger(__name__)
+
 HEALTH_FILE = Path("/tmp/healthy")
+KEEP_ALIVE_INTERVAL_SECONDS = 5
+CONSUMER_TIMEOUT_MS = 1000
+REQUEST_ID_HEADER = "X-Request-ID"
 
 
 async def keep_alive_task() -> None:
+    """Периодически обновляет health-файл consumer-процесса."""
     while True:
         try:
             HEALTH_FILE.touch(exist_ok=True)
         except OSError:
-            pass
-        await asyncio.sleep(5)
+            logger.debug("Failed to touch consumer health file", exc_info=True)
+
+        await asyncio.sleep(KEEP_ALIVE_INTERVAL_SECONDS)
 
 
 def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | None:
+    """Извлекает X-Request-ID из Kafka headers."""
     if not headers:
         return None
 
     for key, value in headers:
-        if key == "X-Request-ID":
+        if key == REQUEST_ID_HEADER:
             return value.decode("utf-8")
+
     return None
 
 
 class KafkaConsumerWorker:
-    """Класс для потребления сообщений из Kafka и обработки событий бюджета."""
+    """Kafka consumer для обработки событий budget service."""
 
     def __init__(
         self,
@@ -54,13 +62,16 @@ class KafkaConsumerWorker:
 
     @property
     def topics(self) -> tuple[str, str, str]:
+        """Возвращает topics, которые читает consumer."""
         return settings.KAFKA.consumer_topics
 
     @property
     def group_id(self) -> str:
-        return settings.KAFKA.KAFKA_GROUP_ID
+        """Возвращает group id consumer-а."""
+        return settings.KAFKA.consumer_group_id
 
     def _build_consumer(self) -> AIOKafkaConsumer:
+        """Создает AIOKafkaConsumer."""
         return AIOKafkaConsumer(
             *self.topics,
             bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
@@ -72,19 +83,24 @@ class KafkaConsumerWorker:
         )
 
     async def run(self) -> None:
+        """Запускает основной consumer loop."""
         self.consumer = self._build_consumer()
 
         try:
             await self.consumer.start()
             self.health_task = asyncio.create_task(keep_alive_task())
+
             logger.info(
                 "Kafka worker started",
-                extra={"topics": self.topics, "group_id": self.group_id},
+                extra={
+                    "topics": self.topics,
+                    "group_id": self.group_id,
+                },
             )
 
             while True:
                 batches = await self.consumer.getmany(
-                    timeout_ms=1000,
+                    timeout_ms=CONSUMER_TIMEOUT_MS,
                     max_records=settings.KAFKA.KAFKA_BATCH_SIZE,
                 )
 
@@ -92,13 +108,7 @@ class KafkaConsumerWorker:
                     if not messages:
                         continue
 
-                    highwater = self.consumer.highwater(topic_partition)
-                    if highwater is not None:
-                        current_offset = messages[-1].offset + 1
-                        metrics.KAFKA_CONSUMER_LAG.labels(
-                            topic=topic_partition.topic,
-                            partition=topic_partition.partition,
-                        ).set(highwater - current_offset)
+                    self._update_consumer_lag(topic_partition, messages)
 
                     for message in messages:
                         await self.handle_message(message)
@@ -109,19 +119,28 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={"topics": self.topics, "group_id": self.group_id},
+                extra={
+                    "topics": self.topics,
+                    "group_id": self.group_id,
+                },
             )
             raise
+
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={"topics": self.topics, "group_id": self.group_id},
+                extra={
+                    "topics": self.topics,
+                    "group_id": self.group_id,
+                },
             )
             raise
+
         finally:
             await self.shutdown()
 
     async def shutdown(self) -> None:
+        """Останавливает consumer и health task."""
         if self.health_task:
             self.health_task.cancel()
             try:
@@ -133,10 +152,14 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={"topics": self.topics, "group_id": self.group_id},
+                extra={
+                    "topics": self.topics,
+                    "group_id": self.group_id,
+                },
             )
 
     async def handle_message(self, message: Any) -> None:
+        """Обрабатывает одно Kafka-сообщение."""
         logger.info(
             "Kafka message received",
             extra={
@@ -152,35 +175,50 @@ class KafkaConsumerWorker:
         try:
             payload = json.loads(message.value)
             await self.process_payload(message.topic, payload)
+
             logger.info(
                 "Kafka message processed",
-                extra={"topic": message.topic, "offset": message.offset},
+                extra={
+                    "topic": message.topic,
+                    "offset": message.offset,
+                },
             )
+
         except (json.JSONDecodeError, ValidationError) as exc:
-            logger.exception(
-                "Kafka poison message processing failed",
-                extra={"topic": message.topic, "offset": message.offset},
+            await self._handle_poison_message(
+                message=message,
+                exc=exc,
+                request_id=request_id,
             )
-            metrics.KAFKA_DLQ_ERRORS.labels(
-                topic=message.topic,
-                reason=type(exc).__name__,
-            ).inc()
-            await self.send_to_dlq(message, exc, request_id)
+
         except SQLAlchemyError:
             logger.exception(
                 "Kafka message processing failed with database error",
-                extra={"topic": message.topic, "offset": message.offset},
-            )
-            raise
-        except Exception:
-            logger.exception(
-                "Kafka message processing failed with transient error",
-                extra={"topic": message.topic, "offset": message.offset},
+                extra={
+                    "topic": message.topic,
+                    "offset": message.offset,
+                },
             )
             raise
 
-    async def process_payload(self, topic: str, payload: dict[str, Any]) -> None:
+        except Exception:
+            logger.exception(
+                "Kafka message processing failed with transient error",
+                extra={
+                    "topic": message.topic,
+                    "offset": message.offset,
+                },
+            )
+            raise
+
+    async def process_payload(
+        self,
+        topic: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Маршрутизирует Kafka payload в обработчик budget service."""
         service = BudgetService(UnitOfWork(self.db_session_maker))
+
         if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEW:
             event = schemas.TransactionNewMessage.model_validate(payload)
             await service.process_new_transaction(event)
@@ -204,21 +242,27 @@ class KafkaConsumerWorker:
         exc: Exception,
         request_id: str | None,
     ) -> None:
+        """Публикует проблемное сообщение в DLQ."""
         headers = [("error", str(exc).encode("utf-8"))]
+
         if request_id:
-            headers.append(("X-Request-ID", request_id.encode("utf-8")))
+            headers.append((REQUEST_ID_HEADER, request_id.encode("utf-8")))
 
         success = await self.dlq_producer.send_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_DLQ,
+            topic=settings.KAFKA.dlq_topic,
             value=message.value,
             key=message.key,
             headers=headers,
             wait=True,
         )
+
         if not success:
             logger.critical(
                 "Kafka DLQ publish failed",
-                extra={"topic": message.topic, "offset": message.offset},
+                extra={
+                    "topic": message.topic,
+                    "offset": message.offset,
+                },
             )
             raise RuntimeError("DLQ refused message")
 
@@ -227,6 +271,43 @@ class KafkaConsumerWorker:
             extra={
                 "topic": message.topic,
                 "offset": message.offset,
-                "dlq_topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_DLQ,
+                "dlq_topic": settings.KAFKA.dlq_topic,
             },
         )
+
+    async def _handle_poison_message(
+        self,
+        message: Any,
+        exc: Exception,
+        request_id: str | None,
+    ) -> None:
+        """Обрабатывает poison message и отправляет его в DLQ."""
+        logger.exception(
+            "Kafka poison message processing failed",
+            extra={
+                "topic": message.topic,
+                "offset": message.offset,
+            },
+        )
+
+        metrics.KAFKA_DLQ_ERRORS.labels(
+            topic=message.topic,
+            reason=type(exc).__name__,
+        ).inc()
+
+        await self.send_to_dlq(message, exc, request_id)
+
+    def _update_consumer_lag(self, topic_partition: Any, messages: list[Any]) -> None:
+        """Обновляет метрику Kafka consumer lag."""
+        if not self.consumer:
+            return
+
+        highwater = self.consumer.highwater(topic_partition)
+        if highwater is None:
+            return
+
+        current_offset = messages[-1].offset + 1
+        metrics.KAFKA_CONSUMER_LAG.labels(
+            topic=topic_partition.topic,
+            partition=topic_partition.partition,
+        ).set(highwater - current_offset)

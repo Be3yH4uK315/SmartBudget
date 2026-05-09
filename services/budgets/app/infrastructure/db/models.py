@@ -21,10 +21,22 @@ from sqlalchemy.types import DECIMAL
 from app.infrastructure.db.base import Base
 
 
+def _utc_now() -> datetime:
+    """Возвращает текущее UTC-время."""
+    return datetime.now(timezone.utc)
+
+
 class Budget(Base):
+    """Модель месячного бюджета пользователя."""
+
     __tablename__ = "budgets"
 
-    budget_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    budget_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     month = Column(Date, nullable=False)
     total_income_amount = Column(DECIMAL(18, 2), nullable=False, default=0)
@@ -41,26 +53,35 @@ class Budget(Base):
     )
 
     __table_args__ = (
-        Index("ix_budgets_user_id_month", user_id, month),
+        Index("ix_budgets_user_id_month", "user_id", "month"),
         UniqueConstraint("user_id", "month", name="uq_budgets_user_id_month"),
     )
 
     @validates("total_income_amount", "total_limit_amount")
-    def validate_budget_decimals(self, key, value):
-        if not isinstance(value, Decimal):
-            value = Decimal(str(value))
-        if value < 0:
+    def validate_budget_decimals(self, key: str, value) -> Decimal:
+        """Валидирует денежные поля бюджета."""
+        resolved_value = value if isinstance(value, Decimal) else Decimal(str(value))
+
+        if resolved_value < 0:
             raise ValueError(f"{key} must be non-negative")
-        return value
+
+        return resolved_value
 
 
 class CategoryLimit(Base):
+    """Модель лимита бюджета по категории."""
+
     __tablename__ = "category_limits"
 
-    category_limit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    category_limit_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
     budget_id = Column(
         UUID(as_uuid=True),
-        ForeignKey(Budget.budget_id, ondelete="CASCADE"),
+        ForeignKey("budgets.budget_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -73,7 +94,7 @@ class CategoryLimit(Base):
     budget = relationship("Budget", back_populates="category_limits")
 
     __table_args__ = (
-        Index("ix_category_limits_category_id", category_id),
+        Index("ix_category_limits_category_id", "category_id"),
         UniqueConstraint(
             "budget_id",
             "category_id",
@@ -82,15 +103,19 @@ class CategoryLimit(Base):
     )
 
     @validates("limit_amount", "spent_amount")
-    def validate_category_decimals(self, key, value):
-        if not isinstance(value, Decimal):
-            value = Decimal(str(value))
-        if value < 0:
+    def validate_category_decimals(self, key: str, value) -> Decimal:
+        """Валидирует денежные поля лимита категории."""
+        resolved_value = value if isinstance(value, Decimal) else Decimal(str(value))
+
+        if resolved_value < 0:
             raise ValueError(f"{key} must be non-negative")
-        return value
+
+        return resolved_value
 
 
 class ProcessedBudgetTransaction(Base):
+    """Обработанная транзакция бюджета для идемпотентности consumer-а."""
+
     __tablename__ = "processed_budget_transactions"
 
     transaction_id = Column(
@@ -107,33 +132,34 @@ class ProcessedBudgetTransaction(Base):
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=_utc_now,
         server_default=func.now(),
     )
     updated_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=_utc_now,
         server_default=func.now(),
     )
 
     __table_args__ = (
-        Index("ix_processed_budget_transactions_user_id", user_id),
-        Index("ix_processed_budget_transactions_category_id", category_id),
+        Index("ix_processed_budget_transactions_user_id", "user_id"),
+        Index("ix_processed_budget_transactions_category_id", "category_id"),
         Index(
             "ix_processed_budget_transactions_user_month",
-            user_id,
-            month,
+            "user_id",
+            "month",
         ),
-        Index("ix_processed_budget_transactions_occurred_at", occurred_at),
+        Index("ix_processed_budget_transactions_occurred_at", "occurred_at"),
     )
 
 
 class OutboxEvent(Base):
+    """Outbox-событие для последующей публикации в Kafka."""
+
     __tablename__ = "outbox_events"
 
     event_id = Column(
-        "event_id",
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid4,

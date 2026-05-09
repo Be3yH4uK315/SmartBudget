@@ -7,31 +7,36 @@ from aiokafka import AIOKafkaProducer
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-SEND_TIMEOUT = 10
+
+SEND_TIMEOUT_SECONDS = 10
 
 
 class KafkaProducerWrapper:
-    """Kafka producer с поддержкой батчинга."""
+    """Kafka producer с контролем состояния и пакетной отправкой событий."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.producer = AIOKafkaProducer(
             bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
             acks="all",
             linger_ms=50,
-            request_timeout_ms=SEND_TIMEOUT * 1000,
+            request_timeout_ms=SEND_TIMEOUT_SECONDS * 1000,
         )
         self._is_running = False
 
     async def start(self) -> None:
+        """Запускает Kafka producer."""
         await self.producer.start()
         self._is_running = True
         logger.info("Kafka producer started")
 
     async def stop(self) -> None:
-        if self._is_running and self.producer:
-            await self.producer.stop()
-            self._is_running = False
-            logger.info("Kafka producer stopped")
+        """Останавливает Kafka producer."""
+        if not self._is_available:
+            return
+
+        await self.producer.stop()
+        self._is_running = False
+        logger.info("Kafka producer stopped")
 
     async def send_event(
         self,
@@ -41,8 +46,9 @@ class KafkaProducerWrapper:
         headers: list[tuple[str, bytes]] | None = None,
         wait: bool = True,
     ) -> bool:
-        if not self._is_running or not self.producer:
-            logger.error("Kafka producer not running")
+        """Отправляет одно событие в Kafka."""
+        if not self._is_available:
+            logger.error("Kafka producer is not running")
             return False
 
         try:
@@ -54,7 +60,7 @@ class KafkaProducerWrapper:
                         value=value,
                         headers=headers,
                     ),
-                    timeout=SEND_TIMEOUT,
+                    timeout=SEND_TIMEOUT_SECONDS,
                 )
             else:
                 await self.producer.send(
@@ -63,41 +69,47 @@ class KafkaProducerWrapper:
                     value=value,
                     headers=headers,
                 )
+
             return True
+
         except Exception as exc:
-            logger.error("Kafka send error to %s: %s", topic, exc, exc_info=True)
+            logger.error(
+                "Kafka send error to %s: %s",
+                topic,
+                exc,
+                exc_info=True,
+            )
             return False
 
     async def send_batch(self, events: list[dict[str, Any]]) -> list[bool]:
-        if not self._is_running or not self.producer:
-            logger.error("Kafka producer not running")
+        """Отправляет несколько событий в Kafka и возвращает статус каждого."""
+        if not self._is_available:
+            logger.error("Kafka producer is not running")
             return [False] * len(events)
 
-        futures: list[asyncio.Task] = []
+        futures = []
+
         for event in events:
             try:
-                future = asyncio.create_task(
-                    self.producer.send_and_wait(
-                        topic=event["topic"],
-                        value=event["value"],
-                        key=event.get("key"),
-                        headers=event.get("headers"),
-                    )
+                future = await self.producer.send(
+                    topic=event["topic"],
+                    value=event["value"],
+                    key=event.get("key"),
+                    headers=event.get("headers"),
                 )
                 futures.append(future)
+
             except Exception as exc:
-                future = asyncio.get_running_loop().create_future()
-                future.set_exception(exc)
-                futures.append(future)
+                failed_future = asyncio.get_running_loop().create_future()
+                failed_future.set_exception(exc)
+                futures.append(failed_future)
 
         try:
-            results = await asyncio.wait_for(
-                asyncio.gather(*futures, return_exceptions=True),
-                timeout=SEND_TIMEOUT,
-            )
+            await self.producer.flush()
         except Exception as exc:
-            logger.error("Kafka batch send failed: %s", exc, exc_info=True)
-            return [False] * len(events)
+            logger.error("Kafka flush failed: %s", exc, exc_info=True)
+
+        results = await asyncio.gather(*futures, return_exceptions=True)
 
         statuses: list[bool] = []
         for result in results:
@@ -106,4 +118,10 @@ class KafkaProducerWrapper:
                 statuses.append(False)
             else:
                 statuses.append(True)
+
         return statuses
+
+    @property
+    def _is_available(self) -> bool:
+        """Проверяет, готов ли producer к отправке сообщений."""
+        return self._is_running and self.producer is not None

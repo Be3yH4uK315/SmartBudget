@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 from arq.connections import RedisSettings
 from arq.cron import cron
@@ -16,41 +17,50 @@ from app.workers.tasks import (
 
 logger = logging.getLogger(__name__)
 
+MAX_JOBS = 100
+JOB_TIMEOUT_SECONDS = 120
+MAX_TRIES = 3
 
-async def on_startup(ctx) -> None:
-    """Инициализация ресурсов ARQ worker при запуске."""
+
+async def on_startup(ctx: dict[str, Any]) -> None:
+    """Инициализирует ресурсы ARQ worker."""
     setup_logging()
-    logger.info("ARQ worker starting")
+    logger.info("Budgets ARQ worker starting")
 
     engine = get_db_engine()
     ctx["db_engine"] = engine
     ctx["db_session_maker"] = get_session_factory(engine)
 
-    kafka = KafkaProducerWrapper()
-    await kafka.start()
-    ctx["kafka_producer"] = kafka
+    kafka_producer = KafkaProducerWrapper()
+    await kafka_producer.start()
+    ctx["kafka_producer"] = kafka_producer
+
     ctx["outbox_task"] = asyncio.create_task(run_outbox_loop(ctx))
-    logger.info("ARQ worker started")
+
+    logger.info("Budgets ARQ worker started")
 
 
-async def on_shutdown(ctx) -> None:
-    """Закрытие ресурсов ARQ worker."""
-    logger.info("ARQ worker shutting down")
+async def on_shutdown(ctx: dict[str, Any]) -> None:
+    """Корректно завершает ARQ worker."""
+    logger.info("Budgets ARQ worker shutting down")
 
-    if ctx.get("outbox_task"):
-        ctx["outbox_task"].cancel()
+    outbox_task: asyncio.Task | None = ctx.get("outbox_task")
+    if outbox_task:
+        outbox_task.cancel()
         try:
-            await ctx["outbox_task"]
+            await outbox_task
         except asyncio.CancelledError:
             pass
 
-    if ctx.get("kafka_producer"):
-        await ctx["kafka_producer"].stop()
+    kafka_producer: KafkaProducerWrapper | None = ctx.get("kafka_producer")
+    if kafka_producer:
+        await kafka_producer.stop()
 
-    if ctx.get("db_engine"):
-        await ctx["db_engine"].dispose()
+    db_engine = ctx.get("db_engine")
+    if db_engine:
+        await db_engine.dispose()
 
-    logger.info("ARQ worker stopped")
+    logger.info("Budgets ARQ worker stopped")
 
 
 class WorkerSettings:
@@ -60,10 +70,22 @@ class WorkerSettings:
         process_outbox_task,
         renew_monthly_budgets_task,
     ]
+
     on_startup = on_startup
     on_shutdown = on_shutdown
+
     cron_jobs = [
-        cron(renew_monthly_budgets_task, day=1, hour=0, minute=5),
+        cron(
+            renew_monthly_budgets_task,
+            day=1,
+            hour=0,
+            minute=5,
+        ),
     ]
+
     queue_name = settings.ARQ.ARQ_QUEUE_NAME
     redis_settings = RedisSettings.from_dsn(settings.ARQ.REDIS_URL)
+
+    max_jobs = MAX_JOBS
+    job_timeout = JOB_TIMEOUT_SECONDS
+    max_tries = MAX_TRIES
