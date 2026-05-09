@@ -1,26 +1,32 @@
 import logging
-from uuid import UUID, uuid4
 from datetime import timedelta
-from typing import Optional
+from uuid import UUID, uuid4
 
 import orjson
 from redis.asyncio import Redis
 from redis.exceptions import LockError
 
-from app.core import exceptions, config
-from app.infrastructure.db import models, uow
-from app.domain.schemas import dtos
-from app.domain.mappers.user import user_to_dto
+from app.core import config, exceptions
 from app.domain.mappers.session import session_to_dto
-from app.utils import redis_keys, crypto, time
-from app.services.token_service import TokenService
+from app.domain.mappers.user import user_to_dto
+from app.domain.schemas import dtos
+from app.infrastructure.db import models, uow
 from app.services.notifier import AuthNotifier
+from app.services.token_service import TokenService
+from app.utils import crypto, redis_keys, time
 
 logger = logging.getLogger(__name__)
 settings = config.settings
 
+DEFAULT_RETENTION_DAYS = 30
+USER_CACHE_TTL_SECONDS = 600
+ACTIVITY_THROTTLE_SECONDS = 300
+REFRESH_LOCK_TIMEOUT_SECONDS = 5
+REFRESH_LOCK_BLOCKING_TIMEOUT_SECONDS = 2
+
+
 class SessionService:
-    """Сервис управления сессиями."""
+    """Сервис управления пользовательскими сессиями."""
 
     def __init__(
         self,
@@ -28,64 +34,34 @@ class SessionService:
         redis: Redis,
         token_service: TokenService,
         notifier: AuthNotifier,
-    ):
+    ) -> None:
         self.uow = uow
         self.redis = redis
         self.token_service = token_service
         self.notifier = notifier
 
-    async def _cache_session_data(
-        self,
-        session_dto: dtos.SessionDTO,
-        user_dto: dtos.UserDTO,
-    ) -> None:
-        """Кэширует минимальные данные сессии."""
-        data = {
-            "uid": str(user_dto.user_id),
-            "role": user_dto.role.value,
-            "exp": session_dto.expires_at.timestamp() 
-        }
-        key = redis_keys.get_session_key(str(session_dto.session_id))
-
-        await self.redis.set(
-            key,
-            orjson.dumps(data),
-            ex=int(timedelta(days=settings.JWT.SESSION_CACHE_EXPIRE_DAYS).total_seconds()),
-        )
-
     async def cache_user_data(self, user_dto: dtos.UserDTO) -> None:
-        """Кэширует полного пользователя."""
-        cache_key = redis_keys.get_user_cache_key(str(user_dto.user_id))
+        """Кэширует данные пользователя."""
         await self.redis.set(
-            cache_key,
+            redis_keys.get_user_cache_key(str(user_dto.user_id)),
             user_dto.model_dump_json(),
-            ex=600,
+            ex=USER_CACHE_TTL_SECONDS,
         )
 
     async def invalidate_user_cache(self, user_id: UUID) -> None:
         """Удаляет кэш пользователя."""
-        await self.redis.delete(
-            redis_keys.get_user_cache_key(str(user_id))
-        )
+        await self.redis.delete(redis_keys.get_user_cache_key(str(user_id)))
 
     async def clear_session_cache(self, session_id: UUID) -> None:
         """Очищает кэш конкретной сессии."""
-        await self.redis.delete(
-            redis_keys.get_session_key(str(session_id))
-        )
+        await self.redis.delete(redis_keys.get_session_key(str(session_id)))
 
-    async def clear_sessions_cache_bulk(
-        self,
-        session_ids: list[UUID],
-    ) -> None:
-        """Массовая очистка кэша сессий."""
+    async def clear_sessions_cache_bulk(self, session_ids: list[UUID]) -> None:
+        """Очищает кэш нескольких сессий."""
         if not session_ids:
             return
 
-        keys = [
-            redis_keys.get_session_key(str(sid))
-            for sid in session_ids
-        ]
+        keys = [redis_keys.get_session_key(str(session_id)) for session_id in session_ids]
         await self.redis.delete(*keys)
 
     async def activate_session_in_cache(
@@ -93,26 +69,20 @@ class SessionService:
         session_dto: dtos.SessionDTO,
         user_dto: dtos.UserDTO,
     ) -> None:
-        """Активирует кэш после успешного commit."""
+        """Кэширует сессию и пользователя после успешного commit."""
         session_key = redis_keys.get_session_key(str(session_dto.session_id))
-        session_data = {
-            "uid": str(user_dto.user_id),
-            "role": user_dto.role.value,
-            "exp": session_dto.expires_at.timestamp()
-        }
-        
         user_key = redis_keys.get_user_cache_key(str(user_dto.user_id))
 
         async with self.redis.pipeline(transaction=True) as pipe:
             await pipe.set(
                 session_key,
-                orjson.dumps(session_data),
-                ex=int(timedelta(days=settings.JWT.SESSION_CACHE_EXPIRE_DAYS).total_seconds())
+                self._build_session_cache_payload(session_dto, user_dto),
+                ex=self._session_cache_ttl_seconds,
             )
             await pipe.set(
                 user_key,
                 user_dto.model_dump_json(),
-                ex=600
+                ex=USER_CACHE_TTL_SECONDS,
             )
             await pipe.execute()
 
@@ -124,11 +94,12 @@ class SessionService:
         ip: str,
         location: str | None,
     ) -> tuple[str, str, models.Session]:
-        """Создаёт ORM-сессию и токены."""
+        """Создает ORM-сессию, access token и refresh token."""
         refresh_token = str(uuid4())
-        fingerprint = crypto.hash_token(refresh_token)
+        refresh_fingerprint = crypto.hash_token(refresh_token)
+
         now = time.utc_now()
-        retention = user.retention_days if user.retention_days else 30
+        retention_days = user.retention_days or DEFAULT_RETENTION_DAYS
 
         session = models.Session(
             session_id=uuid4(),
@@ -138,136 +109,64 @@ class SessionService:
             ip=ip,
             location=location,
             revoked=False,
-            refresh_fingerprint=fingerprint,
+            refresh_fingerprint=refresh_fingerprint,
             last_activity=now,
-            expires_at=now + timedelta(days=retention),
+            expires_at=now + timedelta(days=retention_days),
             created_at=now,
         )
 
         self.uow.sessions.create(session)
 
         access_token = self.token_service.create_access_token(
-            str(user.user_id),
-            user.role,
-            str(session.session_id),
+            user_id=str(user.user_id),
+            role=user.role,
+            session_id=str(session.session_id),
         )
 
         return access_token, refresh_token, session
 
     async def refresh_session(self, refresh_token: str) -> tuple[str, str]:
-        """Обновление refresh/access токенов."""
+        """Обновляет access token и refresh token."""
         fingerprint = crypto.hash_token(refresh_token)
         lock_key = f"auth:lock:refresh:{fingerprint}"
 
         try:
             async with self.redis.lock(
                 lock_key,
-                timeout=5,
-                blocking_timeout=2,
+                timeout=REFRESH_LOCK_TIMEOUT_SECONDS,
+                blocking_timeout=REFRESH_LOCK_BLOCKING_TIMEOUT_SECONDS,
             ):
-                async with self.uow:
-                    session = await self.uow.sessions.get_by_fingerprint(
-                        fingerprint
-                    )
-                    if not session:
-                        raise exceptions.InvalidTokenError(
-                            "Invalid refresh token"
-                        )
+                return await self._refresh_session_locked(fingerprint)
 
-                    if session.expires_at < time.utc_now():
-                        session.revoked = True
-                        await self.uow.commit()
-                        
-                        await self.clear_session_cache(session.session_id)
-                        
-                        raise exceptions.InvalidTokenError("Refresh token expired")
-
-                    user_orm = await self.uow.users.get_by_id(
-                        session.user_id
-                    )
-                    if not user_orm:
-                        raise exceptions.UserNotFoundError(
-                            "User not found"
-                        )
-
-                    retention = user_orm.retention_days
-                    new_refresh = str(uuid4())
-                    new_fingerprint = crypto.hash_token(new_refresh)
-                    new_expires = time.utc_now() + timedelta(days=retention)
-
-                    await self.uow.sessions.update_fingerprint(
-                        session,
-                        new_fingerprint,
-                        new_expires,
-                    )
-
-                    new_access = self.token_service.create_access_token(
-                        str(user_orm.user_id),
-                        user_orm.role,
-                        str(session.session_id),
-                    )
-
-                    await self.notifier.notify_token_refreshed(
-                        str(user_orm.user_id)
-                    )
-
-                    session_dto = session_to_dto(session)
-                    session_dto.is_current = True
-                    user_dto = user_to_dto(user_orm)
-
-                    await self.uow.commit()
-
-                await self.activate_session_in_cache(
-                    session_dto,
-                    user_dto,
-                )
-
-                return new_access, new_refresh
-
-        except LockError:
+        except LockError as exc:
             raise exceptions.TooManyAttemptsError(
-                "Refresh already in progress"
-            )
+                "Refresh already in progress",
+            ) from exc
 
     async def validate_access_token(self, token: str) -> None:
-        """Проверяет access токен и кэш сессии."""
+        """Проверяет access token и актуальность связанной сессии."""
         payload = await self.token_service.get_token_payload(token)
-        session_id = payload.get("sid")
-        cache_key = redis_keys.get_session_key(session_id)
+        session_id = self._get_required_payload_value(payload, "sid")
 
-        session_json = await self.redis.get(cache_key)
+        session_key = redis_keys.get_session_key(session_id)
+        session_cache = await self._get_valid_session_cache(session_key)
 
-        if session_json:
-            try:
-                data = orjson.loads(session_json)
-                exp_timestamp = data.get("exp")
-                if exp_timestamp and time.utc_timestamp() < exp_timestamp:
-                    return
-            except Exception:
-                pass
+        if session_cache is not None:
+            return
 
         async with self.uow:
-            session = await self.uow.sessions.get_active_by_id(
-                UUID(session_id)
-            )
+            session = await self.uow.sessions.get_active_by_id(UUID(session_id))
             if not session:
-                raise exceptions.InvalidTokenError(
-                    "Revoked or expired"
-                )
+                raise exceptions.InvalidTokenError("Revoked or expired")
 
-            user_orm = await self.uow.users.get_by_id(
-                session.user_id
-            )
-            if not user_orm:
-                raise exceptions.UserNotFoundError()
+            user = await self.uow.users.get_by_id(session.user_id)
+            if not user:
+                raise exceptions.UserNotFoundError("User not found")
 
             session_dto = session_to_dto(session)
-            user_dto = user_to_dto(user_orm)
+            user_dto = user_to_dto(user)
 
-        await self.activate_session_in_cache(
-            session_dto,
-            user_dto,
-        )
+        await self.activate_session_in_cache(session_dto, user_dto)
 
     async def get_all_sessions(
         self,
@@ -275,43 +174,35 @@ class SessionService:
         current_refresh_token: str | None,
     ) -> list[dtos.SessionDTO]:
         """Получает все активные сессии пользователя."""
-        current_fp = (
-            crypto.hash_token(current_refresh_token)
-            if current_refresh_token
-            else None
+        current_fingerprint = (
+            crypto.hash_token(current_refresh_token) if current_refresh_token else None
         )
 
         async with self.uow:
-            sessions = await self.uow.sessions.get_all_active(
-                user_id
-            )
+            sessions = await self.uow.sessions.get_all_active(user_id)
 
-        result: list[dtos.SessionDTO] = []
-        current_session_dto: dtos.SessionDTO | None = None
-        for s in sessions:
-            dto = session_to_dto(s)
-            if current_fp and s.refresh_fingerprint == current_fp:
-                dto.is_current = True
-                current_session_dto = dto
-            
-            result.append(dto)
-        if current_session_dto:
-            result.remove(current_session_dto)
-            result.insert(0, current_session_dto)
+        session_dtos = [session_to_dto(session) for session in sessions]
 
-        return result
-    
+        if not current_fingerprint:
+            return session_dtos
+
+        for index, session in enumerate(sessions):
+            if session.refresh_fingerprint == current_fingerprint:
+                current_session = session_dtos.pop(index)
+                current_session.is_current = True
+                session_dtos.insert(0, current_session)
+                break
+
+        return session_dtos
+
     async def revoke_session(
         self,
         user_id: UUID,
         session_id: UUID,
     ) -> None:
-        """Отзывает конкретную сессию."""
+        """Отзывает конкретную сессию пользователя."""
         async with self.uow:
-            await self.uow.sessions.revoke_by_id(
-                user_id,
-                session_id,
-            )
+            await self.uow.sessions.revoke_by_id(user_id, session_id)
             await self.notifier.notify_session_revoked(
                 str(user_id),
                 str(session_id),
@@ -325,147 +216,253 @@ class SessionService:
         user_id: UUID,
         current_refresh_token: str,
     ) -> None:
-        """Отзывает все сессии кроме текущей."""
-        current_fp = crypto.hash_token(current_refresh_token)
+        """Отзывает все сессии пользователя, кроме текущей."""
+        current_fingerprint = crypto.hash_token(current_refresh_token)
 
         async with self.uow:
             revoked_ids = await self.uow.sessions.revoke_all_except(
                 user_id,
-                current_fp,
+                current_fingerprint,
             )
             await self.uow.commit()
 
         if revoked_ids:
             await self.clear_sessions_cache_bulk(revoked_ids)
 
-    async def revoke_all_user_sessions(
-        self,
-        user_id: UUID,
-    ) -> None:
+    async def revoke_all_user_sessions(self, user_id: UUID) -> None:
         """Отзывает все сессии пользователя."""
         async with self.uow:
-            revoked_ids = await self.uow.sessions.revoke_all_for_user(
-                user_id
-            )
+            revoked_ids = await self.uow.sessions.revoke_all_for_user(user_id)
             await self.uow.commit()
 
         if revoked_ids:
             await self.clear_sessions_cache_bulk(revoked_ids)
 
-    async def get_user_and_session_id(
-        self,
-        token: str,
-    ) -> tuple[dtos.UserDTO, str]:
-        """Получает пользователя и ID сессии по access токену."""
+    async def get_user_and_session_id(self, token: str) -> tuple[dtos.UserDTO, str]:
+        """Получает пользователя и session_id по access token."""
         payload = await self.token_service.get_token_payload(token)
-        user_id = payload.get("sub")
-        session_id = payload.get("sid")
+
+        user_id = self._get_required_payload_value(payload, "sub")
+        session_id = self._get_required_payload_value(payload, "sid")
 
         session_cache_key = redis_keys.get_session_key(session_id)
-        session_json_raw = await self.redis.get(session_cache_key)
+        session_cache = await self._get_valid_session_cache(session_cache_key)
 
-        is_session_valid = False
+        if session_cache is None:
+            user_dto = await self._get_user_by_session_from_db(
+                user_id=user_id,
+                session_id=session_id,
+            )
 
-        if session_json_raw:
-            try:
-                session_data = orjson.loads(session_json_raw)
-                exp_timestamp = session_data.get("exp")
-                if exp_timestamp and time.utc_timestamp() > exp_timestamp:
-                    await self.redis.delete(session_cache_key)
-                    is_session_valid = False
-                else:
-                    is_session_valid = True
-            except Exception:
-                await self.redis.delete(session_cache_key)
-                is_session_valid = False
-
-        if not is_session_valid:
-            async with self.uow:
-                session_orm = await self.uow.sessions.get_active_by_id(UUID(session_id))
-                
-                if not session_orm:
-                    raise exceptions.InvalidTokenError("Session revoked or expired")
-                
-                user_orm = await self.uow.users.get_by_id(UUID(user_id))
-                if not user_orm:
-                     raise exceptions.UserNotFoundError()
-
-                session_dto = session_to_dto(session_orm)
-                user_dto = user_to_dto(user_orm)
-            
-            await self.activate_session_in_cache(session_dto, user_dto)
-            
             if not user_dto.is_active:
                 raise exceptions.UserInactiveError()
-            
+
             return user_dto, session_id
-        
-        cache_key = redis_keys.get_user_cache_key(user_id)
-        cached_user = await self.redis.get(cache_key)
 
-        user_dto: Optional[dtos.UserDTO] = None
-        if cached_user:
-            try:
-                user_dto = dtos.UserDTO.model_validate_json(cached_user)
-            except Exception:
-                logger.warning(f"Failed to parse cached user {user_id}")
-
-        if not user_dto:
-            async with self.uow:
-                user_orm = await self.uow.users.get_by_id(UUID(user_id))
-                if not user_orm:
-                    raise exceptions.UserNotFoundError()
-
-            user_dto = user_to_dto(user_orm)
-            await self.cache_user_data(user_dto)
+        user_dto = await self._get_user_from_cache_or_db(user_id)
 
         if not user_dto.is_active:
             raise exceptions.UserInactiveError()
 
         return user_dto, session_id
-    
+
     async def update_activity(self, session_id: UUID) -> None:
-        """Обновляет время последней активности сессии с троттлингом."""
+        """Обновляет последнюю активность сессии с Redis-троттлингом."""
         throttle_key = f"auth:session:activity:{session_id}"
 
         should_update = await self.redis.set(
             throttle_key,
             "1",
-            ex=300,
+            ex=ACTIVITY_THROTTLE_SECONDS,
             nx=True,
         )
 
-        if should_update:
-            async with self.uow:
-                await self.uow.sessions.update_last_activity(
-                    session_id,
-                    time.utc_now(),
-                )
-                await self.uow.commit()
-    
+        if not should_update:
+            return
+
+        async with self.uow:
+            await self.uow.sessions.update_last_activity(
+                session_id,
+                time.utc_now(),
+            )
+            await self.uow.commit()
+
     async def update_user_retention_settings(self, user_id: UUID, days: int) -> None:
-        """Обновляет настройки срока жизни сессии пользователя."""
+        """Обновляет пользовательский срок хранения сессий."""
         async with self.uow:
             await self.uow.users.update_retention_days(user_id, days)
             await self.uow.commit()
-        
+
         await self.invalidate_user_cache(user_id)
-    
+
     async def verify_session_fast(self, session_id: str) -> bool:
-        """Быстрая проверка сессии только через кэш."""
+        """Быстро проверяет сессию только через Redis cache.
+
+        Используется API Gateway. Метод намеренно не ходит в базу данных.
+        """
         session_key = redis_keys.get_session_key(session_id)
+        session_cache = await self._get_valid_session_cache(session_key)
+
+        return session_cache is not None
+
+    async def _refresh_session_locked(self, fingerprint: str) -> tuple[str, str]:
+        """Обновляет сессию внутри refresh lock."""
+        async with self.uow:
+            session = await self.uow.sessions.get_by_fingerprint(fingerprint)
+            if not session:
+                raise exceptions.InvalidTokenError("Invalid refresh token")
+
+            if session.expires_at < time.utc_now():
+                session.revoked = True
+                session_id = session.session_id
+                await self.uow.commit()
+
+                await self.clear_session_cache(session_id)
+
+                raise exceptions.InvalidTokenError("Refresh token expired")
+
+            user = await self.uow.users.get_by_id(session.user_id)
+            if not user:
+                raise exceptions.UserNotFoundError("User not found")
+
+            new_refresh_token = str(uuid4())
+            new_fingerprint = crypto.hash_token(new_refresh_token)
+            new_expires_at = time.utc_now() + timedelta(
+                days=user.retention_days or DEFAULT_RETENTION_DAYS,
+            )
+
+            await self.uow.sessions.update_fingerprint(
+                session=session,
+                new_fingerprint=new_fingerprint,
+                new_expires_at=new_expires_at,
+            )
+
+            new_access_token = self.token_service.create_access_token(
+                user_id=str(user.user_id),
+                role=user.role,
+                session_id=str(session.session_id),
+            )
+
+            await self.notifier.notify_token_refreshed(str(user.user_id))
+
+            session_dto = session_to_dto(session)
+            session_dto.is_current = True
+            user_dto = user_to_dto(user)
+
+            await self.uow.commit()
+
+        await self.activate_session_in_cache(session_dto, user_dto)
+
+        return new_access_token, new_refresh_token
+
+    async def _get_user_by_session_from_db(
+        self,
+        user_id: str,
+        session_id: str,
+    ) -> dtos.UserDTO:
+        """Проверяет сессию в БД и возвращает пользователя."""
+        async with self.uow:
+            session = await self.uow.sessions.get_active_by_id(UUID(session_id))
+            if not session:
+                raise exceptions.InvalidTokenError("Session revoked or expired")
+
+            user = await self.uow.users.get_by_id(UUID(user_id))
+            if not user:
+                raise exceptions.UserNotFoundError("User not found")
+
+            session_dto = session_to_dto(session)
+            user_dto = user_to_dto(user)
+
+        await self.activate_session_in_cache(session_dto, user_dto)
+
+        return user_dto
+
+    async def _get_user_from_cache_or_db(self, user_id: str) -> dtos.UserDTO:
+        """Получает пользователя из Redis cache или БД."""
+        cache_key = redis_keys.get_user_cache_key(user_id)
+        cached_user = await self.redis.get(cache_key)
+
+        if cached_user:
+            try:
+                return dtos.UserDTO.model_validate_json(cached_user)
+            except Exception:
+                logger.warning(
+                    "Failed to parse cached user %s",
+                    user_id,
+                    exc_info=True,
+                )
+                await self.redis.delete(cache_key)
+
+        async with self.uow:
+            user = await self.uow.users.get_by_id(UUID(user_id))
+            if not user:
+                raise exceptions.UserNotFoundError("User not found")
+
+            user_dto = user_to_dto(user)
+
+        await self.cache_user_data(user_dto)
+
+        return user_dto
+
+    async def _get_valid_session_cache(self, session_key: str) -> dict | None:
+        """Возвращает валидный cache сессии или None."""
         cached_raw = await self.redis.get(session_key)
-        
         if not cached_raw:
-            return False
+            return None
 
         try:
             session_data = orjson.loads(cached_raw)
-            exp_timestamp = session_data.get("exp")
-            
-            if exp_timestamp and time.utc_timestamp() > exp_timestamp:
-                return False
-                
-            return True
         except Exception:
-            return False
+            logger.warning(
+                "Failed to parse cached session %s",
+                session_key,
+                exc_info=True,
+            )
+            await self.redis.delete(session_key)
+            return None
+
+        exp_timestamp = session_data.get("exp")
+        if not exp_timestamp:
+            await self.redis.delete(session_key)
+            return None
+
+        if time.utc_timestamp() > exp_timestamp:
+            await self.redis.delete(session_key)
+            return None
+
+        return session_data
+
+    @staticmethod
+    def _build_session_cache_payload(
+        session_dto: dtos.SessionDTO,
+        user_dto: dtos.UserDTO,
+    ) -> bytes:
+        """Формирует payload кэша сессии."""
+        return orjson.dumps(
+            {
+                "uid": str(user_dto.user_id),
+                "role": user_dto.role.value,
+                "exp": session_dto.expires_at.timestamp(),
+            },
+        )
+
+    @staticmethod
+    def _get_required_payload_value(payload: dict, key: str) -> str:
+        """Достает обязательное строковое значение из JWT payload."""
+        value = payload.get(key)
+
+        if not value:
+            raise exceptions.InvalidTokenStructureError(
+                f"Missing required token field: {key}",
+            )
+
+        return str(value)
+
+    @property
+    def _session_cache_ttl_seconds(self) -> int:
+        """TTL кэша сессии в секундах."""
+        return int(
+            timedelta(
+                days=settings.JWT.SESSION_CACHE_EXPIRE_DAYS,
+            ).total_seconds(),
+        )

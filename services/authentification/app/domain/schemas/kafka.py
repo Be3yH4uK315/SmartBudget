@@ -4,8 +4,10 @@ from typing import Optional, Literal
 from datetime import datetime, timezone
 from uuid import UUID
 
+
 class KafkaTopics(str, Enum):
     AUTH_EVENTS = "auth.events"
+
 
 class AuthEventTypes(str, Enum):
     USER_REGISTERED = "user.registered"
@@ -24,6 +26,7 @@ class AuthEventTypes(str, Enum):
     EMAIL_CHANGE_STARTED = "user.email_change_started"
     EMAIL_CHANGED = "user.email_changed"
 
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -32,11 +35,13 @@ class BaseAuthEvent(BaseModel):
     event_type: AuthEventTypes
     timestamp: datetime = Field(default_factory=utc_now)
 
+
 class UserEvent(BaseAuthEvent):
     user_id: Optional[UUID] = None
     email: Optional[EmailStr] = None
     ip: Optional[str] = None
     location: Optional[str] = None
+
 
 class UserRegisteredEvent(UserEvent):
     event_type: Literal[AuthEventTypes.USER_REGISTERED]

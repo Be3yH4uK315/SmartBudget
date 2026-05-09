@@ -1,8 +1,9 @@
-from app.infrastructure.db import models
 from app.domain.schemas.dtos import SessionDTO
+from app.infrastructure.db import models
+
 
 def session_to_dto(session: models.Session) -> SessionDTO:
-    """Безопасный mapper ORM → DTO."""
+    """Преобразует ORM-модель сессии во внутренний DTO."""
     return SessionDTO(
         session_id=session.session_id,
         user_id=session.user_id,

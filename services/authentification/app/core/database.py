@@ -1,8 +1,10 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from app.core.config import settings
 
+
 def get_db_engine():
-    """Создает Singleton Engine."""
+    """Создает асинхронный SQLAlchemy engine."""
     return create_async_engine(
         settings.DB.DB_URL,
         pool_size=settings.DB.DB_POOL_SIZE,
@@ -12,10 +14,11 @@ def get_db_engine():
         echo=False,
     )
 
-def get_session_factory(engine):
-    """Создает фабрику сессий."""
+
+def get_session_factory(engine) -> async_sessionmaker[AsyncSession]:
+    """Создает фабрику асинхронных сессий SQLAlchemy."""
     return async_sessionmaker(
-        engine, 
-        class_=AsyncSession, 
-        expire_on_commit=False
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
     )

@@ -4,18 +4,22 @@ import secrets
 from hashlib import sha256
 from bcrypt import hashpw, gensalt, checkpw
 
+
 def secure_compare(val1: str, val2: str) -> bool:
     """Сравнивает две строки за константное время."""
     return secrets.compare_digest(val1, val2)
+
 
 def hash_token(token: str) -> str:
     """Быстрое хеширование (SHA256) для технических токенов (email, refresh)."""
     return sha256(token.encode()).hexdigest()
 
+
 def hash_password_sync(password: str) -> str:
     """Внутренняя синхронная функция."""
-    salt = gensalt(rounds=10) 
+    salt = gensalt(rounds=10)
     return hashpw(password.encode(), salt).decode()
+
 
 def _check_password_sync(password: str, hashed: str) -> bool:
     """Внутренняя синхронная проверка."""
@@ -24,13 +28,16 @@ def _check_password_sync(password: str, hashed: str) -> bool:
     except Exception:
         return False
 
+
 async def hash_password(password: str) -> str:
     """Асинхронное хеширование."""
     return await asyncio.to_thread(hash_password_sync, password)
 
+
 async def check_password(password: str, hashed: str) -> bool:
     """Асинхронная проверка пароля."""
     return await asyncio.to_thread(_check_password_sync, password, hashed)
+
 
 def int_to_base64url(value: int) -> str:
     """Вспомогательная функция для JWKS."""

@@ -1,9 +1,10 @@
-from app.infrastructure.db import models
-from app.domain.schemas.dtos import UserDTO
 from app.domain.schemas.api import Gender, Language, UserRole
+from app.domain.schemas.dtos import UserDTO
+from app.infrastructure.db import models
+
 
 def user_to_dto(user: models.User) -> UserDTO:
-    """Безопасный mapper ORM → DTO."""
+    """Преобразует ORM-модель пользователя во внутренний DTO."""
     return UserDTO(
         user_id=user.user_id,
         email=user.email,

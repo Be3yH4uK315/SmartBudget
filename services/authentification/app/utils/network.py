@@ -1,74 +1,85 @@
-from dataclasses import dataclass
 import ipaddress
 import logging
-from typing import Optional
+from dataclasses import dataclass
+
 from dadata import Dadata
-from user_agents import parse as ua_parse
+from user_agents import parse as parse_user_agent
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass(frozen=True)
 class LocationData:
-    country: Optional[str]
-    city: Optional[str]
+    """Данные о местоположении пользователя."""
+
+    country: str | None
+    city: str | None
     full: str
 
+
 def parse_device(user_agent: str) -> str:
-    """Анализирует информацию об устройстве из User-Agent."""
+    """Извлекает краткое описание устройства из User-Agent."""
     try:
-        ua = ua_parse(user_agent)
-        device_family = ua.device.family or "Unknown"
-        os_family = ua.os.family or "Unknown"
-        os_version = ua.os.version_string or ""
-        device_str = f"{device_family}, {os_family}"
+        parsed_ua = parse_user_agent(user_agent)
+
+        device_family = parsed_ua.device.family or "Unknown"
+        os_family = parsed_ua.os.family or "Unknown"
+        os_version = parsed_ua.os.version_string or ""
+
+        device = f"{device_family}, {os_family}"
         if os_version:
-            device_str += f" {os_version}"
-        
-        return device_str[:255]
-    except Exception as e:
-        logger.warning(f"Failed to parse user agent: {e}")
+            device = f"{device} {os_version}"
+
+        return device[:255]
+
+    except Exception as exc:
+        logger.warning("Failed to parse User-Agent: %s", exc, exc_info=True)
         return "Unknown Device"
+
 
 def get_location(ip: str, dadata_client: Dadata | None) -> LocationData:
     """Получает местоположение по IP-адресу через DaData."""
-    unknown = LocationData(None, None, "Unknown")
-    local = LocationData(None, None, "Local Network")
+    unknown_location = LocationData(None, None, "Unknown")
+    local_location = LocationData(None, None, "Local Network")
+
     try:
         ip_obj = ipaddress.ip_address(ip)
         if ip_obj.is_private or ip_obj.is_loopback:
-             return local
+            return local_location
     except ValueError:
-        pass 
+        logger.warning("Invalid IP address for location lookup: %s", ip)
+        return unknown_location
 
-    if not dadata_client:
-        return unknown
+    if dadata_client is None:
+        return unknown_location
 
     try:
         response = dadata_client.iplocate(ip)
-        
         if not response:
-             return unknown
+            return unknown_location
 
         data = response.get("data")
-        
         if not data:
-            logger.warning(f"DaData returned response without 'data' block for {ip}")
-            return unknown
-            
-        country = data.get("country", "Unknown")
-        city = data.get("city")
+            logger.warning("DaData response has no data block for IP %s", ip)
+            return unknown_location
+
+        country = data.get("country") or "Unknown"
+        city = data.get("city") or data.get("region_with_type") or data.get("region")
 
         if not city:
-            city = data.get("region_with_type") or data.get("region") or "Unknown"
-
-        full_location = f"{country}, {city}"
+            city = "Unknown"
 
         return LocationData(
             country=country,
             city=city,
-            full=full_location
+            full=f"{country}, {city}",
         )
 
-    except Exception as e:
-        logger.error(f"DaData lookup error for IP {ip}: {e}", exc_info=True)
-        return unknown
+    except Exception as exc:
+        logger.error(
+            "DaData lookup error for IP %s: %s",
+            ip,
+            exc,
+            exc_info=True,
+        )
+        return unknown_location

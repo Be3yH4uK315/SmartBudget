@@ -1,6 +1,7 @@
 from urllib.parse import quote
 from app.core.config import settings
 
+
 def get_verification_email_body(email: str, token: str) -> str:
     """Генерирует тело письма для верификации аккаунта."""
     encoded_email = quote(email)
@@ -17,11 +18,12 @@ def get_verification_email_body(email: str, token: str) -> str:
     Если вы не регистрировались, просто проигнорируйте это письмо.
     """
 
+
 def get_password_reset_body(email: str, token: str) -> str:
     """Генерирует тело письма для сброса пароля."""
     encoded_email = quote(email)
     reset_url = f"{settings.APP.FRONTEND_URL}/auth/reset-password?token={token}&email={encoded_email}"
-    
+
     return f"""
     Здравствуйте!
 
@@ -34,10 +36,13 @@ def get_password_reset_body(email: str, token: str) -> str:
     Если вы не запрашивали сброс, просто проигнорируйте это письмо.
     """
 
+
 def get_change_email_body(new_email: str, token: str) -> str:
     """Генерирует тело письма для подтверждения смены email."""
-    confirm_url = f"{settings.APP.FRONTEND_URL}/profile/change-email/confirm?token={token}"
-    
+    confirm_url = (
+        f"{settings.APP.FRONTEND_URL}/profile/change-email/confirm?token={token}"
+    )
+
     return f"""
     Здравствуйте!
 

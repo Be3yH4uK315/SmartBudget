@@ -1,21 +1,40 @@
 from uuid import uuid4
-from sqlalchemy import (
-    Column, String, Boolean, DateTime, ForeignKey, Integer,
-    Index, UniqueConstraint, CheckConstraint
-)
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import validates, relationship
 
-from app.infrastructure.db.base import Base
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship, validates
+
 from app.domain.schemas import api as schemas
+from app.infrastructure.db.base import Base
 from app.utils import time
+
 
 class User(Base):
     """Модель пользователя."""
+
     __tablename__ = "users"
 
-    user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
-    role = Column(Integer, default=schemas.UserRole.USER.value, nullable=False)
+    user_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
+    role = Column(
+        Integer,
+        default=schemas.UserRole.USER.value,
+        nullable=False,
+    )
     email = Column(String(255), nullable=False)
     password_hash = Column(String, nullable=False)
     name = Column(String(255), nullable=False)
@@ -26,14 +45,23 @@ class User(Base):
     is_locked = Column(Boolean, default=False, nullable=False)
     locked_until = Column(DateTime(timezone=True), nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=time.utc_now, onupdate=time.utc_now)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=time.utc_now,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=time.utc_now,
+        onupdate=time.utc_now,
+    )
 
     sessions = relationship(
         "Session",
         back_populates="user",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
 
     __table_args__ = (
@@ -46,7 +74,7 @@ class User(Base):
             name="ck_users_email_format",
         ),
         CheckConstraint(
-            f"role IN ({', '.join(str(r.value) for r in schemas.UserRole)})",
+            f"role IN ({', '.join(str(role.value) for role in schemas.UserRole)})",
             name="ck_users_role_allowed",
         ),
         CheckConstraint(
@@ -57,28 +85,40 @@ class User(Base):
 
     @validates("email")
     def validate_email(self, _, value: str) -> str:
+        """Валидирует и нормализует email."""
         if not value or "@" not in value:
             raise ValueError("Invalid email format")
+
         return value.lower().strip()
 
     @validates("name")
     def validate_name(self, _, value: str) -> str:
+        """Валидирует и нормализует имя пользователя."""
         if not value or len(value.strip()) < 2:
             raise ValueError("Name must be at least 2 characters")
+
         return value.strip()
 
     @validates("language")
     def validate_language(self, _, value: str) -> str:
-        if value not in {lang.value for lang in schemas.Language}:
+        """Валидирует язык интерфейса."""
+        if value not in {language.value for language in schemas.Language}:
             raise ValueError("Language must be one of: ru, en")
+
         return value
 
 
 class Session(Base):
-    """Модель сессии пользователя."""
+    """Модель пользовательской сессии."""
+
     __tablename__ = "sessions"
 
-    session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    session_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
     user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),
@@ -91,9 +131,17 @@ class Session(Base):
     location = Column(String, nullable=True)
     revoked = Column(Boolean, default=False, nullable=False)
     refresh_fingerprint = Column(String(64), nullable=False, unique=True)
-    last_activity = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)
+    last_activity = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=time.utc_now,
+    )
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=time.utc_now)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=time.utc_now,
+    )
 
     user = relationship("User", back_populates="sessions")
 
@@ -108,18 +156,33 @@ class Session(Base):
 
 
 class OutboxEvent(Base):
+    """Модель outbox-события для последующей публикации в Kafka."""
+
     __tablename__ = "outbox_events"
 
-    event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
+    event_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+    )
     topic = Column(String(255), nullable=False)
     event_type = Column(String(255), nullable=False)
     payload = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=time.utc_now, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=time.utc_now,
+        nullable=False,
+    )
     retry_count = Column(Integer, default=0, nullable=False)
-    status = Column(String(50), default='pending', nullable=False)
-    next_retry_at = Column(DateTime(timezone=True), default=time.utc_now, nullable=False)
+    status = Column(String(50), default="pending", nullable=False)
+    next_retry_at = Column(
+        DateTime(timezone=True),
+        default=time.utc_now,
+        nullable=False,
+    )
 
     __table_args__ = (
-        Index('ix_outbox_created_at', 'created_at'),
-        Index('ix_outbox_pending_retry', 'status', 'next_retry_at'),
+        Index("ix_outbox_created_at", "created_at"),
+        Index("ix_outbox_pending_retry", "status", "next_retry_at"),
     )
