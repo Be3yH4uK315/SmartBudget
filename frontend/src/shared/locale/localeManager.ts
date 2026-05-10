@@ -1,5 +1,8 @@
+import { user_api } from '@shared/api/user'
+import { getState } from '@shared/store'
 import { Languages, OneLocaleDictionary } from '@shared/types'
 import dayjs from 'dayjs'
+import { showToast } from '../utils'
 import { initI18n } from './localization.config'
 
 class LocaleManager {
@@ -15,6 +18,7 @@ class LocaleManager {
 
   async updateLocale(lang?: Languages, extraDict?: OneLocaleDictionary) {
     const nextLang = lang ?? (this.i18n.language as Languages)
+    const isAuth = getState().user.isAuth
 
     if (extraDict) {
       const current = this.i18n.getResourceBundle(nextLang, 'translation') || {}
@@ -28,6 +32,12 @@ class LocaleManager {
 
     dayjs.locale(nextLang)
     localStorage.setItem('language', nextLang)
+
+    if (isAuth) {
+      user_api
+        .updateUserLang(nextLang)
+        .catch(() => showToast({ messageKey: 'cannotUpdateLang', type: 'warning' }))
+    }
   }
 
   translate(key: string, params?: Record<string, unknown>): string {
