@@ -231,11 +231,13 @@ class KafkaConsumerWorker:
         payload: dict[str, Any],
     ) -> TransactionClassifiedMessage | TransactionCategoryUpdatedMessage:
         """Парсит Kafka payload по topic."""
+        event_payload = payload.get("payload", payload)
+
         if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_CATEGORY_UPDATED:
-            return TransactionCategoryUpdatedMessage.model_validate(payload)
+            return TransactionCategoryUpdatedMessage.model_validate(event_payload)
 
         if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_CLASSIFIED:
-            return TransactionClassifiedMessage.model_validate(payload)
+            return TransactionClassifiedMessage.model_validate(event_payload)
 
         raise ValueError(f"Unknown Kafka topic for transactions service: {topic}")
 

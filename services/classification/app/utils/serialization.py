@@ -11,7 +11,7 @@ import orjson
 def app_json_serializer(value: Any) -> Any:
     """Сериализует нестандартные типы в JSON-compatible значения."""
     if isinstance(value, Decimal):
-        return float(value)
+        return str(value)
 
     if isinstance(value, datetime):
         if value.tzinfo is None:

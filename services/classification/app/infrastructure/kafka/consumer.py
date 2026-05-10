@@ -48,6 +48,16 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
+def _event_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Возвращает бизнес-payload из envelope или старого Kafka payload."""
+    nested_payload = payload.get("payload")
+
+    if isinstance(nested_payload, dict):
+        return nested_payload
+
+    return payload
+
+
 class KafkaConsumerWorker:
     """Kafka consumer классификации транзакций с отправкой ошибок в DLQ."""
 
@@ -203,7 +213,8 @@ class KafkaConsumerWorker:
         try:
             async with uow.make_savepoint():
                 payload = json.loads(message.value)
-                event = TransactionNeedCategoryEvent.model_validate(payload)
+                event_payload = _event_payload(payload)
+                event = TransactionNeedCategoryEvent.model_validate(event_payload)
                 await self.process_event(event, service)
 
             logger.info(

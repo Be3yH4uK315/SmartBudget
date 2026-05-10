@@ -14,6 +14,13 @@ from app.core.exceptions import (
 )
 from app.domain.schemas import api as api_schemas
 from app.domain.schemas.kafka import TransactionNeedCategoryEvent
+from smartbudget_shared.events import (
+    ClassificationCompletedPayload,
+    ClassificationUpdatedPayload,
+    EventEnvelope,
+    EventSource,
+    NotificationPayload,
+)
 from app.infrastructure.db.models import (
     Category,
     ClassificationResult,
@@ -47,15 +54,27 @@ def _notification_event(
     user_id: UUID,
     payload: dict[str, Any],
     event_id: UUID,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
-    """Формирует notification event payload."""
-    return {
-        "event_id": str(event_id),
-        "event_type": event_name,
-        "user_id": str(user_id),
-        "payload": payload,
-        "timestamp": _utc_now().isoformat(),
-    }
+    """Формирует notification event envelope."""
+    event_payload = NotificationPayload(
+        user_id=user_id,
+        payload=payload,
+    )
+    event = EventEnvelope.create(
+        event_id=event_id,
+        event_type=event_name,
+        source_service=EventSource.CLASSIFICATION,
+        payload=event_payload,
+        occurred_at=_utc_now(),
+        idempotency_key=idempotency_key,
+    )
+
+    return event.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
 
 
 def _decimal_to_float(value: Decimal | int | float | None) -> float:
@@ -69,6 +88,76 @@ def _decimal_to_float(value: Decimal | int | float | None) -> float:
 def _classification_cache_key(user_id: UUID, transaction_id: UUID) -> str:
     """Возвращает Redis cache key результата классификации."""
     return f"classification:{user_id}:{transaction_id}"
+
+
+def _classification_completed_event(
+    *,
+    transaction_id: UUID,
+    user_id: UUID,
+    category_id: int,
+    category_name_snapshot: str,
+    confidence: float,
+    source: str,
+) -> dict[str, Any]:
+    """Формирует transaction.classified event envelope."""
+    payload = ClassificationCompletedPayload(
+        transaction_id=transaction_id,
+        user_id=user_id,
+        category_id=category_id,
+        category_name_snapshot=category_name_snapshot,
+        confidence=confidence,
+        source=source,
+    )
+    event = EventEnvelope.create(
+        event_type="transaction.classified",
+        source_service=EventSource.CLASSIFICATION,
+        payload=payload,
+        idempotency_key=f"transaction.classified:{transaction_id}",
+    )
+
+    return event.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
+
+
+def _classification_updated_event(
+    *,
+    transaction_id: UUID,
+    user_id: UUID,
+    merchant: str | None,
+    mcc: int | None,
+    description: str | None,
+    old_category_id: int | None,
+    old_category_name: str | None,
+    new_category_id: int,
+    new_category_name: str,
+) -> dict[str, Any]:
+    """Формирует transaction.category_updated event envelope."""
+    payload = ClassificationUpdatedPayload(
+        transaction_id=transaction_id,
+        user_id=user_id,
+        merchant=merchant,
+        mcc=mcc,
+        description=description,
+        old_category_id=old_category_id,
+        old_category_name=old_category_name,
+        new_category_id=new_category_id,
+        new_category_name=new_category_name,
+    )
+    event = EventEnvelope.create(
+        event_type="transaction.category_updated",
+        source_service=EventSource.CLASSIFICATION,
+        payload=payload,
+        idempotency_key=f"transaction.category_updated:{transaction_id}",
+    )
+
+    return event.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
 
 
 def _result_to_response(
@@ -268,7 +357,7 @@ class ClassificationService:
             self.uow.outbox.add_event(
                 settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
                 notification_event,
-                notification_event["event_type"],
+                notification_event.get("event_type", "notification.event"),
             )
 
         if result_model.user_id:
@@ -333,14 +422,14 @@ class ClassificationService:
             mcc=mcc,
         )
 
-        outbox_data = {
-            "transaction_id": str(event.transaction_id),
-            "user_id": str(event.user_id),
-            "category_id": category_id,
-            "category_name_snapshot": category_name,
-            "confidence": confidence,
-            "source": source.value,
-        }
+        outbox_data = _classification_completed_event(
+            transaction_id=event.transaction_id,
+            user_id=event.user_id,
+            category_id=category_id,
+            category_name_snapshot=category_name,
+            confidence=confidence,
+            source=source.value,
+        )
 
         notification_event = self._build_unclassified_notification(
             event=event,
@@ -437,12 +526,14 @@ class ClassificationService:
             "transaction.unclassified.found",
             event.user_id,
             {
+                "transaction_id": str(event.transaction_id),
                 "amount": _decimal_to_float(event.amount),
             },
             event_id=_notification_event_id(
                 "transaction.unclassified.found",
                 event.transaction_id,
             ),
+            idempotency_key=f"transaction.unclassified.found:{event.transaction_id}",
         )
 
     def _create_feedback(
@@ -480,14 +571,17 @@ class ClassificationService:
         correct_category: Category,
     ) -> dict[str, Any]:
         """Добавляет transaction.category_updated event."""
-        event_data = {
-            "transaction_id": str(body.transaction_id),
-            "user_id": str(user_id),
-            "old_category_id": old_category_id,
-            "old_category_name": old_category_name,
-            "new_category_id": body.correct_category_id,
-            "new_category_name": correct_category.name,
-        }
+        event_data = _classification_updated_event(
+            transaction_id=body.transaction_id,
+            user_id=user_id,
+            merchant=None,
+            mcc=None,
+            description=None,
+            old_category_id=old_category_id,
+            old_category_name=old_category_name,
+            new_category_id=body.correct_category_id,
+            new_category_name=correct_category.name,
+        )
 
         self.uow.outbox.add_event(
             settings.KAFKA.TOPIC_CATEGORY_UPDATED,
@@ -516,6 +610,12 @@ class ClassificationService:
             event_id=_notification_event_id(
                 "transaction.category.changed",
                 f"{transaction_id}:{old_category_id}:{new_category_id}",
+            ),
+            idempotency_key=(
+                f"transaction.category.changed:"
+                f"{transaction_id}:"
+                f"{old_category_id}:"
+                f"{new_category_id}"
             ),
         )
 

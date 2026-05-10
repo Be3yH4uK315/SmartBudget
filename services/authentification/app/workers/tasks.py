@@ -218,6 +218,21 @@ async def _retry_email_or_give_up(
     )
 
 
+def _message_key(payload: dict[str, Any]) -> bytes | None:
+    """Возвращает Kafka message key из payload или envelope."""
+    business_payload = payload.get("payload", payload)
+
+    key = (
+        business_payload.get("user_id")
+        or business_payload.get("email")
+        or business_payload.get("new_email")
+        or payload.get("event_id")
+        or payload.get("idempotency_key")
+    )
+
+    return str(key).encode("utf-8") if key else None
+
+
 async def process_outbox_task(ctx: dict[str, Any]) -> int:
     """Отправляет pending-события из outbox в Kafka."""
     db_session_maker = ctx.get("db_session_maker")
@@ -241,14 +256,13 @@ async def process_outbox_task(ctx: dict[str, Any]) -> int:
         for event in events:
             try:
                 message_bytes = to_json_bytes(event.payload)
-                key_value = event.payload.get("user_id") or event.payload.get("email")
-                key = str(key_value).encode("utf-8") if key_value else None
 
                 batch_data.append(
                     {
                         "topic": event.topic,
                         "value": message_bytes,
-                        "key": key,
+                        "key": _message_key(event.payload),
+                        "headers": None,
                     }
                 )
                 events_map.append(event)

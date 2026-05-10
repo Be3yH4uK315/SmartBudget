@@ -7,6 +7,12 @@ from app.core import config, exceptions, metrics
 from app.domain.enums import GoalEventType, GoalPriority, GoalStatus, TransactionType
 from app.domain.schemas import api as api_schemas
 from app.domain.schemas import kafka as kafka_schemas
+from smartbudget_shared.events import (
+    EventEnvelope,
+    EventSource,
+    GoalPayload,
+    NotificationPayload,
+)
 from app.infrastructure.db import models, uow
 
 logger = logging.getLogger(__name__)
@@ -25,11 +31,30 @@ def _create_outbox_event(
     event_type: GoalEventType,
     **payload_fields,
 ) -> dict:
-    """Создает payload события для outbox_events."""
-    return {
-        "event_type": event_type.value,
-        **payload_fields,
-    }
+    """Создает goal event envelope для outbox_events."""
+    goal_id = payload_fields.get("goal_id")
+    user_id = payload_fields.get("user_id")
+
+    if not goal_id:
+        raise ValueError("goal_id is required for goal outbox event")
+
+    payload = GoalPayload(
+        goal_id=UUID(str(goal_id)),
+        user_id=UUID(str(user_id)) if user_id else None,
+        details=payload_fields,
+    )
+    event = EventEnvelope.create(
+        event_type=event_type.value,
+        source_service=EventSource.GOALS,
+        payload=payload,
+        idempotency_key=f"{event_type.value}:{goal_id}",
+    )
+
+    return event.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
 
 
 def _notification_event_id(
@@ -51,15 +76,27 @@ def _create_notification_event(
     user_id: UUID,
     payload: dict,
     event_id: UUID | None = None,
+    idempotency_key: str | None = None,
 ) -> dict:
-    """Создает событие для notification service."""
-    return {
-        "event_id": str(event_id or uuid4()),
-        "event_type": event_name,
-        "user_id": str(user_id),
-        "payload": payload,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    """Создает notification event envelope."""
+    event_payload = NotificationPayload(
+        user_id=user_id,
+        payload=payload,
+    )
+    event = EventEnvelope.create(
+        event_id=event_id or uuid4(),
+        event_type=event_name,
+        source_service=EventSource.GOALS,
+        payload=event_payload,
+        occurred_at=datetime.now(timezone.utc),
+        idempotency_key=idempotency_key,
+    )
+
+    return event.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
 
 
 def _decimal_to_float(value: Decimal | int | float | None) -> float:
@@ -520,6 +557,7 @@ class GoalService:
                 goal_id=str(goal.goal_id),
                 days_left=0,
             ),
+            event_type=GoalEventType.ALERT.value,
         )
 
         await self._add_goal_notification_event(
@@ -636,7 +674,9 @@ class GoalService:
                                 goal.goal_id,
                                 month_key,
                             ),
+                            idempotency_key=f"goal.payment_missed:{goal.goal_id}:{month_key}",
                         ),
+                        "event_type": "goal.payment_missed",
                     }
                     for goal in batch
                 ]
@@ -680,7 +720,9 @@ class GoalService:
                 goal.user_id,
                 payload,
                 event_id=_notification_event_id(event_name, goal.goal_id),
+                idempotency_key=f"{event_name}:{goal.goal_id}",
             ),
+            event_type=event_name,
         )
 
     def _add_goal_created_events(self, goal: models.Goal, user_id: UUID) -> None:
@@ -696,6 +738,7 @@ class GoalService:
                 finish_date=goal.finish_date,
                 priority=goal.priority,
             ),
+            event_type=GoalEventType.CREATED.value,
         )
 
         self.uow.outbox.add_event(
@@ -709,7 +752,9 @@ class GoalService:
                     "recommended_payment": _goal_recommended_payment(goal),
                 },
                 event_id=_notification_event_id("goal.created", goal.goal_id),
+                idempotency_key=f"goal.created:{goal.goal_id}",
             ),
+            event_type="goal.created",
         )
 
     def _add_goal_changed_event(self, goal_id: UUID, changes: dict) -> None:
@@ -721,6 +766,7 @@ class GoalService:
                 goal_id=str(goal_id),
                 changes=changes,
             ),
+            event_type=GoalEventType.CHANGED.value,
         )
 
     def _add_goal_updated_event(self, goal: models.Goal) -> None:
@@ -730,9 +776,11 @@ class GoalService:
             payload=_create_outbox_event(
                 GoalEventType.UPDATED,
                 goal_id=str(goal.goal_id),
+                user_id=str(goal.user_id),
                 current_amount=goal.current_amount,
                 status=goal.status,
             ),
+            event_type=GoalEventType.UPDATED.value,
         )
 
     def _build_expired_goal_events(self, goal: models.Goal) -> list[dict]:
@@ -745,6 +793,7 @@ class GoalService:
                     goal_id=str(goal.goal_id),
                     status=GoalStatus.EXPIRED.value,
                 ),
+                "event_type": GoalEventType.UPDATED.value,
             },
             {
                 "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
@@ -753,6 +802,7 @@ class GoalService:
                     goal_id=str(goal.goal_id),
                     days_left=0,
                 ),
+                "event_type": GoalEventType.EXPIRED.value,
             },
             {
                 "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
@@ -764,7 +814,9 @@ class GoalService:
                         "name": goal.name,
                     },
                     event_id=_notification_event_id("goal.expired", goal.goal_id),
+                    idempotency_key=f"goal.expired:{goal.goal_id}",
                 ),
+                "event_type": "goal.expired",
             },
         ]
 
@@ -779,6 +831,7 @@ class GoalService:
                     type="approaching",
                     days_left=goal.days_left,
                 ),
+                "event_type": GoalEventType.APPROACHING.value,
             },
             {
                 "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
@@ -795,7 +848,9 @@ class GoalService:
                         "goal.deadline_approaching",
                         goal.goal_id,
                     ),
+                    idempotency_key=f"goal.deadline_approaching:{goal.goal_id}",
                 ),
+                "event_type": "goal.deadline_approaching",
             },
         ]
 

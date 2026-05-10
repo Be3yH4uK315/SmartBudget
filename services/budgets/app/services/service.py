@@ -10,6 +10,13 @@ from app.core import config, exceptions
 from app.domain.enums import TransactionType
 from app.domain.schemas import api as api_schemas
 from app.domain.schemas import kafka as kafka_schemas
+from smartbudget_shared.events import (
+    BudgetEventType,
+    BudgetPayload,
+    EventEnvelope,
+    EventSource,
+    NotificationPayload,
+)
 from app.infrastructure.db import models
 from app.infrastructure.db.uow import UnitOfWork
 
@@ -186,13 +193,22 @@ def _budget_event(
     event_type: str,
     user_id: UUID,
     details: dict[str, Any],
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
-    """Создает budget event payload."""
-    return kafka_schemas.BudgetEventMessage(
-        event_type=event_type,
+    """Создает budget event envelope."""
+    payload = BudgetPayload(
+        budget_id=UUID(str(details["budget_id"])) if details.get("budget_id") else None,
         user_id=user_id,
         details=details,
-    ).model_dump(
+    )
+    event = EventEnvelope.create(
+        event_type=event_type,
+        source_service=EventSource.BUDGETS,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+
+    return event.model_dump(
         mode="json",
         by_alias=True,
         exclude_none=True,
@@ -209,15 +225,23 @@ def _notification_event(
     user_id: UUID,
     payload: dict[str, Any],
     event_id: UUID,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
-    """Создает notification event payload."""
-    return kafka_schemas.NotificationEvent(
-        event_id=event_id,
-        event_type=event_name,
+    """Создает notification event envelope."""
+    event_payload = NotificationPayload(
         user_id=user_id,
         payload=payload,
-        timestamp=_utc_now(),
-    ).model_dump(
+    )
+    event = EventEnvelope.create(
+        event_id=event_id,
+        event_type=event_name,
+        source_service=EventSource.BUDGETS,
+        payload=event_payload,
+        occurred_at=_utc_now(),
+        idempotency_key=idempotency_key,
+    )
+
+    return event.model_dump(
         mode="json",
         by_alias=True,
         exclude_none=True,
@@ -595,6 +619,7 @@ class BudgetService:
                 user_id,
                 payload,
                 event_id=_notification_event_id(event_name, key),
+                idempotency_key=f"{event_name}:{key}",
             ),
             event_type=event_name,
         )
@@ -730,14 +755,17 @@ class BudgetService:
         if extra_details:
             details.update(extra_details)
 
+        event_type = BudgetEventType.BUDGET_CREATED.value
+
         self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
             payload=_budget_event(
-                "budget.created",
+                event_type,
                 user_id,
                 details,
+                idempotency_key=f"{event_type}:{budget.budget_id}",
             ),
-            event_type="budget.created",
+            event_type=event_type,
         )
 
     def _queue_budget_settings_changed_events(
@@ -746,31 +774,36 @@ class BudgetService:
         budget: models.Budget,
     ) -> None:
         """Добавляет события изменения настроек бюджета."""
+        budget_event_type = "budget.settings_changed"
+        notification_event_type = "budget.settings.changed"
+
         self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
             payload=_budget_event(
-                "budget.settings_changed",
+                budget_event_type,
                 user_id,
                 {
                     "budget_id": str(budget.budget_id),
                     "total_limit_amount": budget.total_limit_amount,
                     "is_auto_renew": budget.is_auto_renew,
                 },
+                idempotency_key=f"{budget_event_type}:{budget.budget_id}",
             ),
-            event_type="budget.settings_changed",
+            event_type=budget_event_type,
         )
         self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
             payload=_notification_event(
-                "budget.settings.changed",
+                notification_event_type,
                 user_id,
                 {"budget_id": str(budget.budget_id)},
                 event_id=_notification_event_id(
-                    "budget.settings.changed",
+                    notification_event_type,
                     str(budget.budget_id),
                 ),
+                idempotency_key=f"{notification_event_type}:{budget.budget_id}",
             ),
-            event_type="budget.settings.changed",
+            event_type=notification_event_type,
         )
 
     def _apply_patch_to_existing_budget(

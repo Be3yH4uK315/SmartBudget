@@ -10,7 +10,7 @@ import orjson
 def app_default(obj: Any) -> Any:
     """Преобразует нестандартные Python-типы в JSON-совместимые значения."""
     if isinstance(obj, Decimal):
-        return float(obj)
+        return str(obj)
 
     if isinstance(obj, Enum):
         return obj.value

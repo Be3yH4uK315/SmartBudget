@@ -134,9 +134,8 @@ async def check_goals_deadlines_task(ctx: dict[str, Any]) -> None:
     await touch_health_file()
 
     try:
-        async with UnitOfWork(db_session_maker) as uow:
-            service = GoalService(uow)
-            await service.check_deadlines()
+        service = GoalService(UnitOfWork(db_session_maker))
+        await service.check_deadlines()
 
         logger.info("Deadline check completed")
 
@@ -144,12 +143,26 @@ async def check_goals_deadlines_task(ctx: dict[str, Any]) -> None:
         logger.error("Deadline check failed: %s", exc, exc_info=True)
 
 
+def _message_key(payload: dict[str, Any]) -> bytes | None:
+    """Возвращает Kafka message key из payload или envelope."""
+    business_payload = payload.get("payload", payload)
+    details = business_payload.get("details", {})
+
+    key = (
+        business_payload.get("goal_id")
+        or business_payload.get("user_id")
+        or details.get("goal_id")
+        or details.get("user_id")
+        or payload.get("event_id")
+        or payload.get("idempotency_key")
+    )
+
+    return str(key).encode("utf-8") if key else None
+
+
 def _build_kafka_batch_item(event) -> dict[str, Any]:
     """Формирует элемент batch-отправки в Kafka из outbox-события."""
     message_bytes = to_json_bytes(event.payload)
-
-    key_value = event.payload.get("goal_id") or event.payload.get("user_id")
-    key = str(key_value).encode("utf-8") if key_value else None
 
     headers: list[tuple[str, bytes]] = []
     if event.trace_id:
@@ -158,8 +171,8 @@ def _build_kafka_batch_item(event) -> dict[str, Any]:
     return {
         "topic": event.topic,
         "value": message_bytes,
-        "key": key,
-        "headers": headers,
+        "key": _message_key(event.payload),
+        "headers": headers or None,
     }
 
 

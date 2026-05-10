@@ -45,6 +45,16 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
+def _event_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Возвращает бизнес-payload из envelope или старого Kafka payload."""
+    nested_payload = payload.get("payload")
+
+    if isinstance(nested_payload, dict):
+        return nested_payload
+
+    return payload
+
+
 class KafkaConsumerWorker:
     """Kafka consumer для обработки транзакционных событий целей."""
 
@@ -181,12 +191,13 @@ class KafkaConsumerWorker:
 
         try:
             payload = json.loads(message.value)
+            event_payload = _event_payload(payload)
 
             if message.topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DELETED:
-                event = schemas.TransactionDeletedEvent.model_validate(payload)
+                event = schemas.TransactionDeletedEvent.model_validate(event_payload)
                 await service.rollback_goal_transaction(event)
             else:
-                event = schemas.TransactionEvent.model_validate(payload)
+                event = schemas.TransactionEvent.model_validate(event_payload)
                 await service.update_goal_balance(event)
 
             logger.info(

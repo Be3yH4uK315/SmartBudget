@@ -25,7 +25,16 @@ class OutboxRepository(BaseRepository):
         """Создает ORM-модель outbox-события."""
         try:
             clean_payload = to_json_dict(payload)
-            resolved_event_type = event_type or clean_payload.get("event_type")
+            nested_payload = clean_payload.get("payload")
+            resolved_event_type = (
+                event_type
+                or clean_payload.get("event_type")
+                or (
+                    nested_payload.get("event_type")
+                    if isinstance(nested_payload, dict)
+                    else None
+                )
+            )
 
             if not resolved_event_type:
                 raise ValueError("event_type is required for outbox events")

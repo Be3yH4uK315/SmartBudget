@@ -33,7 +33,7 @@ def get_push_url(message_key: str, props: dict[str, Any]) -> str:
         return "/settings/security"
 
     if message_key == "Transactions.unclassified.message":
-        return "/transactions/?categoriesIds=30"
+        return "/transactions/?categoriesIds=1"
 
     return DEFAULT_NOTIFICATION_URL
 

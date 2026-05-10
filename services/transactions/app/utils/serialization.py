@@ -10,7 +10,7 @@ import orjson
 def to_jsonable(value: Any) -> Any:
     """Рекурсивно приводит значение к JSON-совместимому виду."""
     if isinstance(value, Decimal):
-        return float(value)
+        return str(value)
 
     if isinstance(value, UUID):
         return str(value)

@@ -66,6 +66,64 @@ def _timestamp_from_message(message: Any) -> datetime:
     )
 
 
+def _is_event_envelope(payload: dict[str, Any]) -> bool:
+    """Проверяет, что Kafka payload похож на EventEnvelope."""
+    return (
+        isinstance(payload.get("payload"), dict)
+        and "event_id" in payload
+        and "event_type" in payload
+    )
+
+
+def _notification_event_from_payload(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Преобразует старый notification payload или EventEnvelope во входящее событие."""
+    if not _is_event_envelope(payload):
+        return payload
+
+    business_payload = payload.get("payload") or {}
+    nested_payload = business_payload.get("payload")
+
+    return {
+        "event_id": payload["event_id"],
+        "event_type": payload["event_type"],
+        "user_id": business_payload.get("user_id"),
+        "payload": nested_payload if isinstance(nested_payload, dict) else {},
+        "timestamp": payload.get("occurred_at") or payload.get("timestamp"),
+    }
+
+
+def _auth_event_from_payload(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Преобразует auth legacy payload или EventEnvelope в AuthOutboxEvent payload."""
+    if not _is_event_envelope(payload):
+        return payload
+
+    business_payload = payload.get("payload") or {}
+    nested_payload = business_payload.get("payload")
+
+    normalized = {
+        "event_type": payload.get("event_type"),
+        "user_id": business_payload.get("user_id"),
+        "email": business_payload.get("email"),
+        "old_email": business_payload.get("old_email"),
+        "new_email": business_payload.get("new_email"),
+        "name": business_payload.get("name"),
+        "language": business_payload.get("language"),
+        "ip": business_payload.get("ip"),
+        "location": business_payload.get("location"),
+        "payload": nested_payload if isinstance(nested_payload, dict) else {},
+    }
+
+    return {
+        key: value
+        for key, value in normalized.items()
+        if value is not None
+    }
+
+
 class KafkaConsumerWorker:
     """Kafka consumer для обработки событий notification service."""
 
@@ -226,16 +284,49 @@ class KafkaConsumerWorker:
     ) -> None:
         """Маршрутизирует Kafka payload в нужный обработчик сервиса."""
         if message.topic == settings.KAFKA.KAFKA_TOPIC_AUTH:
-            event = schemas.AuthOutboxEvent.model_validate(payload)
+            auth_payload = _auth_event_from_payload(payload)
+            event = schemas.AuthOutboxEvent.model_validate(auth_payload)
+
             await service.process_auth_outbox_event(
                 event=event,
-                event_id=_event_id_from_message(message),
-                timestamp=_timestamp_from_message(message),
+                event_id=self._resolve_event_id(payload, message),
+                timestamp=self._resolve_event_timestamp(payload, message),
             )
             return
 
-        event = schemas.IncomingNotificationEvent.model_validate(payload)
+        notification_payload = _notification_event_from_payload(payload)
+        event = schemas.IncomingNotificationEvent.model_validate(notification_payload)
         await service.process_incoming_event(event)
+
+    @staticmethod
+    def _resolve_event_id(payload: dict[str, Any], message: Any) -> Any:
+        """Возвращает event_id из envelope или deterministic id из Kafka metadata."""
+        if payload.get("event_id"):
+            return payload["event_id"]
+
+        return _event_id_from_message(message)
+
+    @staticmethod
+    def _resolve_event_timestamp(payload: dict[str, Any], message: Any) -> datetime:
+        """Возвращает timestamp события из envelope или Kafka metadata."""
+        raw_timestamp = payload.get("occurred_at") or payload.get("timestamp")
+        if raw_timestamp:
+            if isinstance(raw_timestamp, datetime):
+                return raw_timestamp
+
+            try:
+                parsed = datetime.fromisoformat(str(raw_timestamp))
+                if parsed.tzinfo is None:
+                    return parsed.replace(tzinfo=timezone.utc)
+
+                return parsed.astimezone(timezone.utc)
+            except ValueError:
+                logger.warning(
+                    "Invalid event timestamp in Kafka payload",
+                    extra={"timestamp": raw_timestamp},
+                )
+
+        return _timestamp_from_message(message)
 
     async def send_to_dlq(
         self,

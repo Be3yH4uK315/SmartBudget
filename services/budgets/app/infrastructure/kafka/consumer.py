@@ -47,6 +47,16 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
+def _event_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Возвращает бизнес-payload из envelope или старого Kafka payload."""
+    nested_payload = payload.get("payload")
+
+    if isinstance(nested_payload, dict):
+        return nested_payload
+
+    return payload
+
+
 class KafkaConsumerWorker:
     """Kafka consumer для обработки событий budget service."""
 
@@ -218,19 +228,20 @@ class KafkaConsumerWorker:
     ) -> None:
         """Маршрутизирует Kafka payload в обработчик budget service."""
         service = BudgetService(UnitOfWork(self.db_session_maker))
+        event_payload = _event_payload(payload)
 
         if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEW:
-            event = schemas.TransactionNewMessage.model_validate(payload)
+            event = schemas.TransactionNewMessage.model_validate(event_payload)
             await service.process_new_transaction(event)
             return
 
         if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_UPDATED:
-            event = schemas.TransactionUpdatedMessage.model_validate(payload)
+            event = schemas.TransactionUpdatedMessage.model_validate(event_payload)
             await service.process_updated_transaction(event)
             return
 
         if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DELETED:
-            event = schemas.TransactionDeletedMessage.model_validate(payload)
+            event = schemas.TransactionDeletedMessage.model_validate(event_payload)
             await service.process_deleted_transaction(event)
             return
 

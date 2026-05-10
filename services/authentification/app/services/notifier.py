@@ -8,6 +8,11 @@ from app.domain.schemas import dtos
 from app.domain.schemas import kafka as kafka_schemas
 from app.infrastructure.db import uow
 from app.utils import email_templates
+from smartbudget_shared.events import (
+    AuthUserPayload,
+    EventEnvelope,
+    EventSource,
+)
 
 settings = config.settings
 
@@ -29,16 +34,82 @@ class AuthNotifier:
         **payload_fields: Any,
     ) -> None:
         """Сохраняет auth-событие в outbox для последующей публикации в Kafka."""
-        payload = {
-            "event_type": event_type.value,
-            **payload_fields,
+        known_fields = {
+            "user_id",
+            "email",
+            "old_email",
+            "new_email",
+            "name",
+            "language",
+            "ip",
+            "location",
         }
+
+        additional_payload = {
+            key: value
+            for key, value in payload_fields.items()
+            if key not in known_fields
+        }
+
+        def _none_if_empty(value: Any) -> Any:
+            """Возвращает None вместо пустой строки."""
+            if isinstance(value, str) and not value.strip():
+                return None
+
+            return value
+
+        payload = AuthUserPayload(
+            user_id=_none_if_empty(payload_fields.get("user_id")),
+            email=_none_if_empty(payload_fields.get("email")),
+            old_email=_none_if_empty(payload_fields.get("old_email")),
+            new_email=_none_if_empty(payload_fields.get("new_email")),
+            name=_none_if_empty(payload_fields.get("name")),
+            language=_none_if_empty(payload_fields.get("language")),
+            ip=_none_if_empty(payload_fields.get("ip")),
+            location=_none_if_empty(payload_fields.get("location")),
+            payload=additional_payload,
+        )
+
+        event = EventEnvelope.create(
+            event_type=event_type.value,
+            source_service=EventSource.AUTH,
+            payload=payload,
+            idempotency_key=self._build_idempotency_key(
+                event_type=event_type,
+                payload_fields=payload_fields,
+            ),
+        )
 
         self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_AUTH_EVENTS_TOPIC,
-            payload=payload,
+            payload=event.model_dump(
+                mode="json",
+                by_alias=True,
+                exclude_none=True,
+            ),
             event_type=event_type.value,
         )
+    
+    @staticmethod
+    def _build_idempotency_key(
+        event_type: kafka_schemas.AuthEventTypes,
+        payload_fields: dict[str, Any],
+    ) -> str | None:
+        """Формирует ключ идемпотентности auth-события."""
+        user_id = payload_fields.get("user_id")
+        email = payload_fields.get("email")
+        new_email = payload_fields.get("new_email")
+        session_id = payload_fields.get("session_id")
+
+        key_parts = [
+            event_type.value,
+            str(user_id or email or new_email or "anonymous"),
+        ]
+
+        if session_id:
+            key_parts.append(str(session_id))
+
+        return ":".join(key_parts)
 
     async def enrich_session(
         self,

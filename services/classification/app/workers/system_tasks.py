@@ -186,11 +186,14 @@ def _should_skip_by_retry_delay(
 
 
 def _message_key(payload: dict[str, Any]) -> bytes | None:
-    """Возвращает Kafka message key из payload."""
+    """Возвращает Kafka message key из payload или envelope."""
+    business_payload = payload.get("payload", payload)
+
     key = (
-        payload.get("transaction_id")
+        business_payload.get("transaction_id")
+        or business_payload.get("user_id")
         or payload.get("event_id")
-        or payload.get("user_id")
+        or payload.get("idempotency_key")
     )
 
     return str(key).encode("utf-8") if key else None

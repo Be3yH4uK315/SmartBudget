@@ -23,10 +23,14 @@ REQUEST_ID_HEADER = "X-Request-ID"
 
 
 def _message_key(payload: dict[str, Any]) -> bytes | None:
-    """Возвращает Kafka message key из payload."""
+    """Возвращает Kafka message key из payload или envelope."""
+    business_payload = payload.get("payload", payload)
+
     key = (
-        payload.get("transaction_id")
+        business_payload.get("transaction_id")
+        or business_payload.get("goal_id")
         or payload.get("event_id")
+        or business_payload.get("user_id")
         or payload.get("user_id")
     )
 

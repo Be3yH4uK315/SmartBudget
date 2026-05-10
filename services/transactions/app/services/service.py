@@ -8,9 +8,26 @@ from app.core import exceptions
 from app.core.config import settings
 from app.domain import enums
 from app.domain.schemas import api as api_schemas
-from app.domain.schemas import kafka as kafka_schemas
 from app.infrastructure.db import models
 from app.infrastructure.db.uow import UnitOfWork
+from smartbudget_shared.events import (
+    BudgetPayload,
+    EventEnvelope,
+    EventSource,
+    GoalTransactionPayload,
+    NotificationPayload,
+    TransactionDeletedPayload,
+    TransactionEventType,
+    TransactionImportedPayload,
+    TransactionNeedCategoryPayload,
+    TransactionPayload,
+    TransactionUpdatedPayload,
+    create_goal_transaction_created_event,
+    create_transaction_created_event,
+    create_transaction_deleted_event,
+    create_transaction_need_category_event,
+    create_transaction_updated_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -387,11 +404,30 @@ class TransactionService:
             else payload
         )
 
+        resolved_event_type = event_type
+        if resolved_event_type is None and isinstance(data, dict):
+            resolved_event_type = data.get("event_type")
+
         self.uow.outbox.add_event(
             topic=topic,
             payload=data,
-            event_type=event_type,
+            event_type=resolved_event_type,
         )
+    
+        @staticmethod
+        def _build_event_envelope(
+            *,
+            event_type: str,
+            payload: Any,
+            idempotency_key: str | None = None,
+        ) -> EventEnvelope:
+            """Создает envelope для transaction service."""
+            return EventEnvelope.create(
+                event_type=event_type,
+                source_service=EventSource.TRANSACTIONS,
+                payload=payload,
+                idempotency_key=idempotency_key,
+            )
 
     def _publish_created_events(self, transaction: models.Transaction) -> None:
         """Публикует события создания транзакции."""
@@ -403,14 +439,19 @@ class TransactionService:
 
     def _publish_imported_events(self, transaction: models.Transaction) -> None:
         """Публикует события импорта транзакции."""
+        payload = TransactionImportedPayload(
+            user_id=transaction.user_id,
+            details=_model_to_details_dict(transaction),
+        )
+        event = self._build_event_envelope(
+            event_type=TransactionEventType.TRANSACTION_IMPORTED,
+            payload=payload,
+            idempotency_key=f"transaction.imported:{transaction.transaction_id}",
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_IMPORTED,
-            kafka_schemas.TransactionImportedMessage(
-                event_type="transaction.imported",
-                user_id=transaction.user_id,
-                details=_model_to_details_dict(transaction),
-            ),
-            "transaction.imported",
+            event,
         )
 
         if self._is_goal_transaction(transaction):
@@ -452,40 +493,54 @@ class TransactionService:
         transaction_date: datetime,
     ) -> None:
         """Публикует события удаления транзакции."""
+        transaction_payload = TransactionDeletedPayload(
+            transaction_id=transaction_id,
+            user_id=user_id,
+            occurred_at=transaction_date,
+        )
+        transaction_event = create_transaction_deleted_event(transaction_payload)
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DELETED,
-            kafka_schemas.TransactionDeletedMessage(
-                transaction_id=transaction_id,
-                user_id=user_id,
-                occurred_at=transaction_date,
-            ),
-            "transaction.deleted",
+            transaction_event,
         )
+
+        budget_payload = BudgetPayload(
+            user_id=user_id,
+            details={
+                "transaction_id": str(transaction_id),
+            },
+        )
+        budget_event = self._build_event_envelope(
+            event_type=TransactionEventType.TRANSACTION_DELETED,
+            payload=budget_payload,
+            idempotency_key=f"budget.transaction.deleted:{transaction_id}",
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            kafka_schemas.BudgetEventMessage(
-                event_type="transaction.deleted",
-                user_id=user_id,
-                details={
-                    "transaction_id": str(transaction_id),
-                },
-            ),
-            "transaction.deleted",
+            budget_event,
         )
 
     def _queue_transaction_new_event(self, transaction: models.Transaction) -> None:
         """Добавляет transaction.new event."""
+        payload = TransactionPayload(
+            transaction_id=transaction.transaction_id,
+            user_id=transaction.user_id,
+            category_id=transaction.category_id,
+            amount=_transaction_amount(transaction),
+            transaction_type=_transaction_type(transaction).value,
+            occurred_at=_transaction_occurred_at(transaction),
+        )
+        event = self._build_event_envelope(
+            event_type=TransactionEventType.TRANSACTION_NEW,
+            payload=payload,
+            idempotency_key=f"transaction.new:{transaction.transaction_id}",
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEW,
-            kafka_schemas.TransactionNewMessage(
-                transaction_id=transaction.transaction_id,
-                user_id=transaction.user_id,
-                category_id=transaction.category_id,
-                amount=_transaction_amount(transaction),
-                transaction_type=_transaction_type(transaction),
-                occurred_at=_transaction_occurred_at(transaction),
-            ),
-            "transaction.new",
+            event,
         )
 
     def _queue_transaction_updated_event(
@@ -495,18 +550,20 @@ class TransactionService:
         new_category_id: int | None,
     ) -> None:
         """Добавляет transaction.updated event."""
+        payload = TransactionUpdatedPayload(
+            transaction_id=transaction.transaction_id,
+            user_id=transaction.user_id,
+            old_category_id=old_category_id,
+            new_category_id=new_category_id,
+            amount=_transaction_amount(transaction),
+            transaction_type=_transaction_type(transaction).value,
+            occurred_at=_transaction_occurred_at(transaction),
+        )
+        event = create_transaction_updated_event(payload)
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_UPDATED,
-            kafka_schemas.TransactionUpdatedMessage(
-                transaction_id=transaction.transaction_id,
-                user_id=transaction.user_id,
-                old_category_id=old_category_id,
-                new_category_id=new_category_id,
-                amount=_transaction_amount(transaction),
-                transaction_type=_transaction_type(transaction),
-                occurred_at=_transaction_occurred_at(transaction),
-            ),
-            "transaction.updated",
+            event,
         )
 
     def _queue_budget_transaction_event(
@@ -515,14 +572,19 @@ class TransactionService:
         transaction: models.Transaction,
     ) -> None:
         """Добавляет budget event с полной транзакцией в details."""
+        payload = BudgetPayload(
+            user_id=transaction.user_id,
+            details=_model_to_details_dict(transaction),
+        )
+        event = self._build_event_envelope(
+            event_type=event_type,
+            payload=payload,
+            idempotency_key=f"budget.{event_type}:{transaction.transaction_id}",
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            kafka_schemas.BudgetEventMessage(
-                event_type=event_type,
-                user_id=transaction.user_id,
-                details=_model_to_details_dict(transaction),
-            ),
-            event_type,
+            event,
         )
 
     def _queue_budget_category_changed_event(
@@ -532,34 +594,41 @@ class TransactionService:
         new_category_id: int | None,
     ) -> None:
         """Добавляет budget event изменения категории."""
+        payload = BudgetPayload(
+            user_id=transaction.user_id,
+            details={
+                "transaction_id": str(transaction.transaction_id),
+                "old_category_id": old_category_id,
+                "new_category_id": new_category_id,
+            },
+        )
+        event = self._build_event_envelope(
+            event_type=TransactionEventType.TRANSACTION_UPDATED,
+            payload=payload,
+            idempotency_key=f"budget.transaction.updated:{transaction.transaction_id}",
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            kafka_schemas.BudgetEventMessage(
-                event_type="transaction.updated",
-                user_id=transaction.user_id,
-                details={
-                    "transaction_id": str(transaction.transaction_id),
-                    "old_category_id": old_category_id,
-                    "new_category_id": new_category_id,
-                },
-            ),
-            "transaction.updated",
+            event,
         )
 
     def _queue_need_category_event(self, transaction: models.Transaction) -> None:
         """Добавляет transaction.need_category event."""
+        payload = TransactionNeedCategoryPayload(
+            transaction_id=transaction.transaction_id,
+            user_id=transaction.user_id,
+            account_id=transaction.account_id,
+            merchant=transaction.merchant,
+            mcc=transaction.mcc,
+            description=transaction.description,
+            amount=_transaction_amount(transaction),
+        )
+        event = create_transaction_need_category_event(payload)
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEED_CATEGORY,
-            kafka_schemas.TransactionNeedCategoryMessage(
-                transaction_id=transaction.transaction_id,
-                user_id=transaction.user_id,
-                account_id=transaction.account_id,
-                merchant=transaction.merchant,
-                mcc=transaction.mcc,
-                description=transaction.description,
-                amount=_transaction_amount(transaction),
-            ),
-            "transaction.need_category",
+            event,
         )
 
     def _queue_category_changed_notification(
@@ -569,27 +638,37 @@ class TransactionService:
         new_category_id: int | None,
     ) -> None:
         """Добавляет notification event изменения категории."""
+        payload = NotificationPayload(
+            user_id=transaction.user_id,
+            payload={
+                "transaction_id": str(transaction.transaction_id),
+                "old_category_id": old_category_id,
+                "new_category_id": new_category_id,
+            },
+        )
+        event = EventEnvelope.create(
+            event_type="transaction.category.changed",
+            source_service=EventSource.TRANSACTIONS,
+            payload=payload,
+            event_id=_notification_event_id(
+                "transaction.category.changed",
+                (
+                    f"{transaction.transaction_id}:"
+                    f"{old_category_id}:"
+                    f"{new_category_id}"
+                ),
+            ),
+            idempotency_key=(
+                f"transaction.category.changed:"
+                f"{transaction.transaction_id}:"
+                f"{old_category_id}:"
+                f"{new_category_id}"
+            ),
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-            kafka_schemas.NotificationEvent(
-                event_id=_notification_event_id(
-                    "transaction.category.changed",
-                    (
-                        f"{transaction.transaction_id}:"
-                        f"{old_category_id}:"
-                        f"{new_category_id}"
-                    ),
-                ),
-                event_type="transaction.category.changed",
-                user_id=transaction.user_id,
-                payload={
-                    "transaction_id": str(transaction.transaction_id),
-                    "old_category_id": old_category_id,
-                    "new_category_id": new_category_id,
-                },
-                timestamp=_utc_now(),
-            ),
-            "transaction.category.changed",
+            event,
         )
 
     def _queue_goal_event(self, transaction: models.Transaction) -> None:
@@ -597,17 +676,23 @@ class TransactionService:
         if not transaction.account_id:
             return
 
+        payload = GoalTransactionPayload(
+            transaction_id=transaction.transaction_id,
+            goal_id=transaction.account_id,
+            user_id=transaction.user_id,
+            amount=_transaction_amount(transaction),
+            transaction_type=_transaction_type(transaction).value,
+            occurred_at=_transaction_occurred_at(transaction),
+        )
+        event = self._build_event_envelope(
+            event_type=TransactionEventType.TRANSACTION_GOAL,
+            payload=payload,
+            idempotency_key=f"transaction.goal:{transaction.transaction_id}",
+        )
+
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_GOAL,
-            kafka_schemas.TransactionNewGoalMessage(
-                transaction_id=transaction.transaction_id,
-                goal_id=transaction.account_id,
-                user_id=transaction.user_id,
-                amount=_transaction_amount(transaction),
-                transaction_type=_transaction_type(transaction),
-                occurred_at=_transaction_occurred_at(transaction),
-            ),
-            "transaction.goal",
+            event,
         )
 
     @staticmethod
