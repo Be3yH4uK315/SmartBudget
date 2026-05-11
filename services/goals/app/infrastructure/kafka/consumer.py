@@ -6,10 +6,11 @@ from typing import Any
 
 from aiokafka import AIOKafkaConsumer
 from pydantic import TypeAdapter, ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core import metrics
 from app.core.config import settings
-from app.core.context import set_request_id
+from app.core.context import clear_request_id, set_request_id
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.service import GoalService
@@ -28,6 +29,7 @@ HEALTH_FILE = Path("/tmp/healthy")
 KEEP_ALIVE_INTERVAL_SECONDS = 5
 CONSUMER_TIMEOUT_MS = 1000
 REQUEST_ID_HEADER = "X-Request-ID"
+ERROR_HEADER = "error"
 
 GoalAppliedAdapter = TypeAdapter(EventEnvelope[TransactionGoalAppliedPayload])
 TransactionDeletedAdapter = TypeAdapter(EventEnvelope[TransactionDeletedPayload])
@@ -56,6 +58,19 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
+def _raw_message_value(message: Any) -> str:
+    """Возвращает Kafka message value как строку."""
+    if isinstance(message.value, bytes):
+        return message.value.decode("utf-8")
+
+    return str(message.value)
+
+
+def _decode_message_value(message: Any) -> dict[str, Any]:
+    """Декодирует Kafka message value в dict."""
+    return json.loads(_raw_message_value(message))
+
+
 class KafkaConsumerWorker:
     """Kafka consumer для обработки транзакционных событий целей."""
 
@@ -70,7 +85,7 @@ class KafkaConsumerWorker:
         self.health_task: asyncio.Task | None = None
 
     @property
-    def topics(self) -> tuple[str]:
+    def topics(self) -> tuple[str, ...]:
         """Возвращает topics, которые читает consumer."""
         return settings.KAFKA.consumer_topics
 
@@ -115,7 +130,6 @@ class KafkaConsumerWorker:
                         continue
 
                     self._update_consumer_lag(topic_partition, messages)
-
                     await self.process_batch(messages)
 
                 if batches and not settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT:
@@ -154,10 +168,14 @@ class KafkaConsumerWorker:
                 extra={"topics": self.topics, "group_id": self.group_id},
             )
 
-    async def process_batch(self, messages: list[Any]) -> None:
-        """Обрабатывает batch Kafka-сообщений."""
+    async def before_batch(self) -> None:
+        """Выполняет подготовку перед обработкой batch."""
         async with UnitOfWork(self.db_session_maker) as uow:
             await uow.goals.ensure_current_partition()
+
+    async def process_batch(self, messages: list[Any]) -> None:
+        """Обрабатывает batch Kafka-сообщений."""
+        await self.before_batch()
 
         service = GoalService(UnitOfWork(self.db_session_maker))
 
@@ -179,7 +197,7 @@ class KafkaConsumerWorker:
         set_request_id(request_id)
 
         try:
-            payload = json.loads(message.value)
+            payload = _decode_message_value(message)
             await self.process_payload(payload, service)
 
             logger.info(
@@ -187,19 +205,14 @@ class KafkaConsumerWorker:
                 extra={"topic": message.topic, "offset": message.offset},
             )
 
-        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
-            await self._handle_processing_error(
-                message=message,
-                exc=exc,
-                request_id=request_id,
-            )
+        except (json.JSONDecodeError, ValidationError, ValueError, SQLAlchemyError) as exc:
+            await self._handle_processing_error(message, exc, request_id)
 
         except Exception as exc:
-            await self._handle_processing_error(
-                message=message,
-                exc=exc,
-                request_id=request_id,
-            )
+            await self._handle_processing_error(message, exc, request_id)
+
+        finally:
+            clear_request_id()
 
     async def process_payload(
         self,
@@ -209,12 +222,12 @@ class KafkaConsumerWorker:
         """Маршрутизирует Kafka envelope в обработчик goal service."""
         event_type = payload.get("event_type")
 
-        if event_type == TransactionEventType.TRANSACTION_GOAL_APPLIED:
+        if event_type == TransactionEventType.TRANSACTION_GOAL_APPLIED.value:
             event = GoalAppliedAdapter.validate_python(payload)
             await service.update_goal_balance(event.payload)
             return
 
-        if event_type == TransactionEventType.TRANSACTION_DELETED:
+        if event_type == TransactionEventType.TRANSACTION_DELETED.value:
             event = TransactionDeletedAdapter.validate_python(payload)
             if event.payload.goal_id is not None:
                 await service.rollback_goal_transaction(event.payload)
@@ -231,14 +244,14 @@ class KafkaConsumerWorker:
         """Публикует проблемное сообщение в DLQ."""
         dlq_payload = DLQPayload(
             original_topic=message.topic,
-            original_message=message.value.decode("utf-8", errors="replace"),
+            original_message=_raw_message_value(message),
             error=str(exc),
             consumer_group=self.group_id,
             retry_count=0,
         )
         dlq_event = create_dlq_event(dlq_payload)
 
-        headers = [("error", str(exc).encode("utf-8"))]
+        headers = [(ERROR_HEADER, str(exc).encode("utf-8"))]
 
         if request_id:
             headers.append((REQUEST_ID_HEADER, request_id.encode("utf-8")))
@@ -254,7 +267,11 @@ class KafkaConsumerWorker:
         if not success:
             logger.critical(
                 "Kafka DLQ publish failed",
-                extra={"topic": message.topic, "offset": message.offset},
+                extra={
+                    "topic": message.topic,
+                    "offset": message.offset,
+                    "dlq_topic": settings.KAFKA.dlq_topic,
+                },
             )
             raise RuntimeError("DLQ refused message")
 
@@ -273,7 +290,7 @@ class KafkaConsumerWorker:
         exc: Exception,
         request_id: str | None,
     ) -> None:
-        """Обрабатывает ошибку обработки сообщения."""
+        """Обрабатывает ошибку обработки Kafka-сообщения."""
         logger.exception(
             "Kafka message processing failed",
             extra={"topic": message.topic, "offset": message.offset},
@@ -287,7 +304,7 @@ class KafkaConsumerWorker:
         await self.send_to_dlq(message, exc, request_id)
 
     def _update_consumer_lag(self, topic_partition: Any, messages: list[Any]) -> None:
-        """Обновляет метрику consumer lag."""
+        """Обновляет метрику Kafka consumer lag."""
         if not self.consumer:
             return
 

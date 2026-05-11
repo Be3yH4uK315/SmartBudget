@@ -48,13 +48,15 @@ class OutboxRepository:
         event_type: str | None = None,
     ) -> None:
         """Добавляет outbox-событие без commit."""
-        self.db.add(self._build_event(topic, payload, event_type))
+        event = self._build_event(
+            topic=topic,
+            payload=payload,
+            event_type=event_type,
+        )
+        self.db.add(event)
 
     def add_events(self, events: list[dict[str, Any]]) -> None:
         """Добавляет несколько outbox-событий без commit."""
-        if not events:
-            return
-
         for event in events:
             self.add_event(
                 topic=event["topic"],
@@ -63,7 +65,8 @@ class OutboxRepository:
             )
 
     async def get_pending_events(
-        self, limitAmount: int = 100
+        self,
+        limit_amount: int = 100,
     ) -> list[models.OutboxEvent]:
         """Получает pending-события, готовые к отправке."""
         now = datetime.now(timezone.utc)
@@ -78,7 +81,7 @@ class OutboxRepository:
                 ),
             )
             .order_by(models.OutboxEvent.created_at.asc())
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
             .with_for_update(skip_locked=True),
         )
 

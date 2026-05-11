@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, status
 
 from app.api import dependencies
 from app.domain.schemas import api as schemas
@@ -10,7 +10,7 @@ router = APIRouter(tags=["auth settings"])
 
 @router.post(
     "/change-password",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Смена пароля пользователя",
 )

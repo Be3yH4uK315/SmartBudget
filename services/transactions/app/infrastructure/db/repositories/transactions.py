@@ -17,7 +17,6 @@ class TransactionRepository:
     def create(self, transaction: models.Transaction) -> models.Transaction:
         """Добавляет транзакцию в текущую сессию без commit."""
         self.db.add(transaction)
-
         return transaction
 
     async def exists(self, transaction_id: UUID) -> bool:
@@ -107,7 +106,7 @@ class TransactionRepository:
     async def list_user_transactions(
         self,
         user_id: UUID,
-        limitAmount: int,
+        limit_amount: int,
         offset: int,
         category_ids: list[int] | None = None,
         occurred_from: datetime | None = None,
@@ -144,7 +143,7 @@ class TransactionRepository:
         query = (
             query.order_by(models.Transaction.occurred_at.desc())
             .offset(offset)
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
         )
 
         result = await self.db.execute(query)
@@ -155,10 +154,11 @@ class TransactionRepository:
         self,
         user_id: UUID,
         query_text: str,
-        limitAmount: int,
+        limit_amount: int,
     ) -> list[models.Transaction]:
         """Ищет транзакции пользователя по merchant или description."""
         like = f"%{query_text}%"
+
         query = (
             select(models.Transaction)
             .where(
@@ -169,7 +169,7 @@ class TransactionRepository:
                 ),
             )
             .order_by(models.Transaction.occurred_at.desc())
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
         )
 
         result = await self.db.execute(query)

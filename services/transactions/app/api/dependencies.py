@@ -84,7 +84,7 @@ class TransactionFilters:
 
     def __init__(
         self,
-        limitAmount: int = Query(50, ge=1, le=1000),
+        limit_amount: int = Query(50, ge=1, le=1000, alias="limitAmount"),
         offset: int = Query(0, ge=0),
         category_id: str | None = Query(None, alias="categoryId"),
         occurred_from: date | None = Query(None, alias="occurredFrom"),
@@ -93,7 +93,7 @@ class TransactionFilters:
         amount_from: Decimal | None = Query(None, alias="amountFrom"),
         amount_to: Decimal | None = Query(None, alias="amountTo"),
     ) -> None:
-        self.limitAmount = limitAmount
+        self.limit_amount = limit_amount
         self.offset = offset
         self.category_ids = _parse_category_ids(category_id)
         self.occurred_from = (

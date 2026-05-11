@@ -32,7 +32,7 @@ async def main() -> None:
     logger.info("Starting Kafka consumer service")
 
     engine = get_db_engine()
-    session_maker = get_session_factory(engine)
+    db_session_maker = get_session_factory(engine)
 
     redis_pool = None
     redis_client = None
@@ -45,7 +45,7 @@ async def main() -> None:
     stop_task: asyncio.Task | None = None
 
     try:
-        await seed_rules_if_empty(session_maker)
+        await seed_rules_if_empty(db_session_maker)
 
         redis_pool = await create_redis_pool()
         redis_client = Redis(
@@ -57,7 +57,7 @@ async def main() -> None:
 
         worker = KafkaConsumerWorker(
             redis_client=redis_client,
-            db_session_maker=session_maker,
+            db_session_maker=db_session_maker,
             dlq_producer=dlq_producer,
         )
 

@@ -14,6 +14,7 @@ from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.classification.rules import ruleManager
 from app.services.classification.service import ClassificationService
 from app.services.ml.manager import modelManager
+from app.core.context import clear_request_id, set_request_id
 from smartbudget_shared.events import (
     DLQPayload,
     EventEnvelope,
@@ -56,8 +57,21 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
+def _raw_message_value(message: Any) -> str:
+    """Возвращает Kafka message value как строку."""
+    if isinstance(message.value, bytes):
+        return message.value.decode("utf-8")
+
+    return str(message.value)
+
+
+def _decode_message_value(message: Any) -> dict[str, Any]:
+    """Декодирует Kafka message value в dict."""
+    return json.loads(_raw_message_value(message))
+
+
 class KafkaConsumerWorker:
-    """Kafka consumer классификации транзакций с отправкой ошибок в DLQ."""
+    """Kafka consumer классификации транзакций."""
 
     def __init__(
         self,
@@ -72,9 +86,12 @@ class KafkaConsumerWorker:
         self.health_task: asyncio.Task | None = None
 
     @property
-    def topic(self) -> str:
-        """Возвращает topic, который читает consumer."""
-        return settings.KAFKA.consumer_topic
+    def topics(self) -> tuple[str, ...]:
+        """Возвращает topics, которые читает consumer."""
+        if hasattr(settings.KAFKA, "consumer_topics"):
+            return settings.KAFKA.consumer_topics
+
+        return (settings.KAFKA.consumer_topic,)
 
     @property
     def group_id(self) -> str:
@@ -84,7 +101,7 @@ class KafkaConsumerWorker:
     def _build_consumer(self) -> AIOKafkaConsumer:
         """Создает AIOKafkaConsumer."""
         return AIOKafkaConsumer(
-            self.topic,
+            *self.topics,
             bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
             group_id=self.group_id,
             enable_auto_commit=settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT,
@@ -103,20 +120,22 @@ class KafkaConsumerWorker:
 
             logger.info(
                 "Kafka worker started",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
             while True:
-                await self._refresh_runtime_dependencies()
+                await self.before_poll()
 
                 batches = await self.consumer.getmany(
                     timeout_ms=CONSUMER_TIMEOUT_MS,
                     max_records=settings.KAFKA.KAFKA_BATCH_SIZE,
                 )
 
-                for _, messages in batches.items():
-                    if messages:
-                        await self.process_batch(messages)
+                for topic_partition, messages in batches.items():
+                    if not messages:
+                        continue
+
+                    await self.process_batch(messages)
 
                 if batches and not settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT:
                     await self.consumer.commit()
@@ -124,14 +143,14 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
@@ -151,8 +170,13 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={"topic": self.topic, "group_id": self.group_id},
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
+
+    async def before_poll(self) -> None:
+        """Обновляет ML-модель и правила перед чтением batch."""
+        await modelManager.check_for_updates(self.db_session_maker)
+        await ruleManager.check_for_updates(self.db_session_maker)
 
     async def process_batch(self, messages: list[Any]) -> None:
         """Обрабатывает batch Kafka-сообщений."""
@@ -168,15 +192,11 @@ class KafkaConsumerWorker:
             )
 
             for message in messages:
-                await self.handle_message(
-                    message=message,
-                    service=service,
-                    uow=uow,
-                )
+                await self.handle_message_with_service(message, service, uow)
 
             await uow.commit()
 
-    async def handle_message(
+    async def handle_message_with_service(
         self,
         message: Any,
         service: ClassificationService,
@@ -193,48 +213,35 @@ class KafkaConsumerWorker:
         )
 
         request_id = _request_id_from_headers(message.headers)
+        set_request_id(request_id)
 
         try:
             async with uow.make_savepoint():
-                raw_payload = json.loads(message.value)
-                event = self._parse_event(raw_payload)
+                payload = _decode_message_value(message)
+                event = self._parse_event(payload)
+
                 if event is None:
+                    logger.info(
+                        "Kafka message skipped",
+                        extra={"topic": message.topic, "offset": message.offset},
+                    )
                     return
-                await self.process_event(event, service)
+
+                await service.classify_transaction(event.payload)
 
             logger.info(
                 "Kafka message processed",
                 extra={"topic": message.topic, "offset": message.offset},
             )
 
-        except (json.JSONDecodeError, ValidationError) as exc:
-            logger.exception(
-                "Kafka message validation failed",
-                extra={"topic": message.topic, "offset": message.offset},
-            )
-            await self.send_to_dlq(message, exc, request_id)
-
-        except SQLAlchemyError as exc:
-            logger.exception(
-                "Kafka message processing failed with database error",
-                extra={"topic": message.topic, "offset": message.offset},
-            )
-            await self.send_to_dlq(message, exc, request_id)
+        except (json.JSONDecodeError, ValidationError, SQLAlchemyError) as exc:
+            await self._handle_processing_error(message, exc, request_id)
 
         except Exception as exc:
-            logger.exception(
-                "Kafka message processing failed with transient error",
-                extra={"topic": message.topic, "offset": message.offset},
-            )
-            await self.send_to_dlq(message, exc, request_id)
+            await self._handle_processing_error(message, exc, request_id)
 
-    async def process_event(
-        self,
-        event: EventEnvelope[TransactionNeedCategoryPayload],
-        service: ClassificationService,
-    ) -> None:
-        """Передает событие в ClassificationService."""
-        await service.classify_transaction(event.payload)
+        finally:
+            clear_request_id()
 
     def _parse_event(
         self,
@@ -258,19 +265,18 @@ class KafkaConsumerWorker:
         exc: Exception,
         request_id: str | None,
     ) -> None:
-        """Отправляет проблемное сообщение в DLQ."""
+        """Публикует проблемное сообщение в DLQ."""
         dlq_payload = DLQPayload(
             original_topic=message.topic,
-            original_message=message.value.decode("utf-8", errors="replace"),
+            original_message=_raw_message_value(message),
             error=str(exc),
             consumer_group=self.group_id,
             retry_count=0,
         )
         dlq_event = create_dlq_event(dlq_payload)
 
-        headers = [
-            (ERROR_HEADER, str(exc).encode("utf-8")),
-        ]
+        headers = [(ERROR_HEADER, str(exc).encode("utf-8"))]
+
         if request_id:
             headers.append((REQUEST_ID_HEADER, request_id.encode("utf-8")))
 
@@ -302,21 +308,16 @@ class KafkaConsumerWorker:
             },
         )
 
-    async def _refresh_runtime_dependencies(self) -> None:
-        """Обновляет ML-модель и правила перед чтением batch."""
-        await modelManager.check_for_updates(self.db_session_maker)
-        await ruleManager.check_for_updates(self.db_session_maker)
+    async def _handle_processing_error(
+        self,
+        message: Any,
+        exc: Exception,
+        request_id: str | None,
+    ) -> None:
+        """Обрабатывает ошибку обработки Kafka-сообщения."""
+        logger.exception(
+            "Kafka message processing failed",
+            extra={"topic": message.topic, "offset": message.offset},
+        )
 
-
-async def consume_loop(
-    redis_client: Any,
-    db_session_maker: Any,
-    dlq_producer: KafkaProducerWrapper,
-) -> None:
-    """Запускает consumer loop."""
-    worker = KafkaConsumerWorker(
-        redis_client=redis_client,
-        db_session_maker=db_session_maker,
-        dlq_producer=dlq_producer,
-    )
-    await worker.run()
+        await self.send_to_dlq(message, exc, request_id)

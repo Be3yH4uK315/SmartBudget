@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi_limiter.depends import RateLimiter
 
 from app.api import dependencies
@@ -13,7 +13,7 @@ router = APIRouter(tags=["sessions"])
 
 @router.patch(
     "/sessions/retention",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Обновление настроек хранения сессий пользователя",
 )
@@ -33,7 +33,7 @@ async def update_retention_settings(
 
 @router.get(
     "/sessions/retention",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.RetentionInfo,
     summary="Получение настроек хранения сессий пользователя",
 )
@@ -45,7 +45,7 @@ async def get_retention_settings(
 
 @router.get(
     "/sessions",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.AllSessionsResponse,
     summary="Получение всех сессий пользователя",
 )
@@ -66,7 +66,7 @@ async def get_all_user_sessions(
 
 @router.delete(
     "/sessions/{sessionId}",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Ревокация сессии пользователя по ID",
 )
@@ -86,7 +86,7 @@ async def revoke_session(
 
 @router.post(
     "/sessions/logout-others",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Ревокация всех других сессий пользователя",
@@ -98,7 +98,7 @@ async def revoke_other_sessions(
 ):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     await session_service.revoke_other_sessions(user.user_id, refresh_token)
 

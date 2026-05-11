@@ -9,6 +9,7 @@ from fastapi import (
     Query,
     Request,
     Response,
+    status,
 )
 from fastapi_limiter.depends import RateLimiter
 
@@ -28,7 +29,7 @@ router = APIRouter(tags=["auth"])
 
 @router.post(
     "/verify-email",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Начало верификации email",
@@ -49,7 +50,7 @@ async def verify_email(
 
 @router.get(
     "/verify-link",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Проверка верификационной или сбросной ссылки",
@@ -66,7 +67,7 @@ async def verify_link(
     elif token_type == "reset":
         await pwd_service.validate_password_reset_token(token, email)
     else:
-        raise HTTPException(status_code=400, detail="Invalid token type")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token type")
 
     return schemas.UnifiedResponse(
         status="success",
@@ -77,7 +78,7 @@ async def verify_link(
 
 @router.post(
     "/complete-registration",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Завершение регистрации пользователя",
@@ -111,7 +112,7 @@ async def complete_registration(
 
 @router.post(
     "/login",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Аутентификация пользователя",
@@ -145,7 +146,7 @@ async def login(
 
 @router.post(
     "/logout",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Выход пользователя из системы",
 )
@@ -174,7 +175,7 @@ async def logout(
 
 @router.post(
     "/reset-password",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Начало сброса пароля пользователя",
@@ -194,7 +195,7 @@ async def reset_password(
 
 @router.post(
     "/complete-reset",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Завершение сброса пароля пользователя",
 )
@@ -213,7 +214,7 @@ async def complete_reset(
 
 @router.post(
     "/validate-token",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Валидация access токена пользователя",
 )
@@ -232,7 +233,7 @@ async def validate_token(
 
 @router.post(
     "/refresh",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=30, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Обновление access и refresh токенов пользователя",
@@ -244,7 +245,7 @@ async def refresh(
 ):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(status_code=401, detail="Missing refresh token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
 
     new_access_token, new_refresh_token = await session_service.refresh_session(
         refresh_token,

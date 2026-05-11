@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from arq.connections import ArqRedis
-from fastapi import BackgroundTasks, Depends, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, HTTPException, Request, status
 from redis.asyncio import ConnectionPool, Redis
 
 from app.core import exceptions
@@ -25,7 +25,7 @@ async def get_uow(request: Request) -> UnitOfWork:
     db_session_maker = getattr(request.app.state, "db_session_maker", None)
     if db_session_maker is None:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database session factory not available",
         )
 
@@ -37,7 +37,7 @@ async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
     pool: ConnectionPool | None = getattr(request.app.state, "redis_pool", None)
     if pool is None:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Redis pool not available",
         )
 
@@ -53,7 +53,7 @@ async def get_arq_pool(request: Request) -> ArqRedis:
     arq_pool: ArqRedis | None = getattr(request.app.state, "arq_pool", None)
     if arq_pool is None:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="ARQ pool not available",
         )
 
@@ -193,7 +193,7 @@ async def get_current_active_user(
     access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
         )
 
@@ -210,17 +210,17 @@ async def get_current_active_user(
 
     except exceptions.UserInactiveError as exc:
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="User is inactive",
         ) from exc
     except exceptions.UserNotFoundError as exc:
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         ) from exc
     except (exceptions.AuthServiceError, exceptions.InvalidTokenError) as exc:
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
 

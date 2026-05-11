@@ -130,7 +130,7 @@ class TransactionService:
     async def list_transactions(
         self,
         user_id: UUID,
-        limitAmount: int,
+        limit_amount: int,
         offset: int,
         category_ids: list[int] | None = None,
         occurred_from: datetime | None = None,
@@ -143,7 +143,7 @@ class TransactionService:
         async with self.uow:
             transactions = await self.uow.transactions.list_user_transactions(
                 user_id=user_id,
-                limitAmount=limitAmount,
+                limit_amount=limit_amount,
                 offset=offset,
                 category_ids=category_ids,
                 occurred_from=occurred_from,
@@ -159,7 +159,7 @@ class TransactionService:
         self,
         user_id: UUID,
         query: str,
-        limitAmount: int,
+        limit_amount: int,
     ) -> list[api_schemas.TransactionResponse]:
         """Ищет транзакции пользователя по merchant или description."""
         normalized_query = query.strip()
@@ -170,7 +170,7 @@ class TransactionService:
             transactions = await self.uow.transactions.search_user_transactions(
                 user_id=user_id,
                 query_text=normalized_query,
-                limitAmount=limitAmount,
+                limit_amount=limit_amount,
             )
 
         return [_model_to_api(transaction) for transaction in transactions]

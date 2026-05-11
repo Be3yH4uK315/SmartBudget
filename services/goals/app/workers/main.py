@@ -17,11 +17,15 @@ from app.workers.tasks import (
 
 logger = logging.getLogger(__name__)
 
+MAX_JOBS = 100
+JOB_TIMEOUT_SECONDS = 120
+MAX_TRIES = 3
+
 
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Инициализирует ресурсы ARQ worker."""
     setup_logging()
-    logger.info("ARQ worker starting")
+    logger.info("Goals ARQ worker starting")
 
     engine = get_db_engine()
     ctx["db_engine"] = engine
@@ -33,12 +37,12 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
     ctx["outbox_task"] = asyncio.create_task(run_outbox_loop(ctx))
 
-    logger.info("ARQ worker started")
+    logger.info("Goals ARQ worker started")
 
 
 async def on_shutdown(ctx: dict[str, Any]) -> None:
     """Корректно закрывает ресурсы ARQ worker."""
-    logger.info("ARQ worker shutting down")
+    logger.info("Goals ARQ worker shutting down")
 
     outbox_task: asyncio.Task | None = ctx.get("outbox_task")
     if outbox_task:
@@ -56,7 +60,7 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
     if db_engine:
         await db_engine.dispose()
 
-    logger.info("ARQ worker stopped")
+    logger.info("Goals ARQ worker stopped")
 
 
 class WorkerSettings:
@@ -78,6 +82,6 @@ class WorkerSettings:
     queue_name = settings.ARQ.ARQ_QUEUE_NAME
     redis_settings = RedisSettings.from_dsn(settings.ARQ.REDIS_URL)
 
-    max_tries = 3
-    max_jobs = 20
-    keep_result = 60
+    max_jobs = MAX_JOBS
+    job_timeout = JOB_TIMEOUT_SECONDS
+    max_tries = MAX_TRIES

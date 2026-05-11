@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Response
+from fastapi import APIRouter, Body, Depends, Response, status
 from fastapi_limiter.depends import RateLimiter
 
 from app.api import dependencies
@@ -12,7 +12,7 @@ router = APIRouter(tags=["user"])
 
 @router.get(
     "/me",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UserInfo,
     summary="Получение информации о текущем пользователе",
 )
@@ -24,7 +24,7 @@ async def get_current_user_info(
 
 @router.patch(
     "/me/profile",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Обновление профиля пользователя",
 )
@@ -44,7 +44,7 @@ async def update_profile(
 
 @router.patch(
     "/language",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     response_model=schemas.UnifiedResponse,
     summary="Обновление языка интерфейса пользователя",
 )
@@ -64,7 +64,7 @@ async def update_language(
 
 @router.post(
     "/me/email/request",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Инициация смены email пользователя",
@@ -85,7 +85,7 @@ async def request_email_change(
 
 @router.post(
     "/me/email/confirm",
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
     response_model=schemas.UnifiedResponse,
     summary="Подтверждение смены email пользователя",

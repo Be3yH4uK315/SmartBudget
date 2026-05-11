@@ -1,16 +1,16 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
 from pydantic import TypeAdapter, ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core import metrics
 from app.core.config import settings
-from app.core.context import set_request_id
+from app.core.context import clear_request_id, set_request_id
 from app.domain.schemas.kafka import IncomingNotificationEvent
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
@@ -33,6 +33,7 @@ HEALTH_FILE = Path("/tmp/healthy")
 KEEP_ALIVE_INTERVAL_SECONDS = 5
 CONSUMER_TIMEOUT_MS = 1000
 REQUEST_ID_HEADER = "X-Request-ID"
+ERROR_HEADER = "error"
 
 AuthEventAdapter = TypeAdapter(EventEnvelope[AuthUserPayload])
 BudgetEventAdapter = TypeAdapter(EventEnvelope[BudgetPayload])
@@ -62,16 +63,17 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
-def _parse_timestamp(value: str | None) -> datetime:
-    """Парсит timestamp события."""
-    if not value:
-        return datetime.now(timezone.utc)
+def _raw_message_value(message: Any) -> str:
+    """Возвращает Kafka message value как строку."""
+    if isinstance(message.value, bytes):
+        return message.value.decode("utf-8")
 
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+    return str(message.value)
 
-    return parsed.astimezone(timezone.utc)
+
+def _decode_message_value(message: Any) -> dict[str, Any]:
+    """Декодирует Kafka message value в dict."""
+    return json.loads(_raw_message_value(message))
 
 
 def _budget_notification_payload(event: EventEnvelope[BudgetPayload]) -> dict[str, Any]:
@@ -120,7 +122,7 @@ class KafkaConsumerWorker:
         self.health_task: asyncio.Task | None = None
 
     @property
-    def topics(self) -> tuple[str, str, str]:
+    def topics(self) -> tuple[str, ...]:
         """Возвращает topics, которые читает consumer."""
         return settings.KAFKA.consumer_topics
 
@@ -165,9 +167,7 @@ class KafkaConsumerWorker:
                         continue
 
                     self._update_consumer_lag(topic_partition, messages)
-
-                    for message in messages:
-                        await self.handle_message(message)
+                    await self.process_batch(messages)
 
                 if batches and not settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT:
                     await self.consumer.commit()
@@ -205,6 +205,11 @@ class KafkaConsumerWorker:
                 extra={"topics": self.topics, "group_id": self.group_id},
             )
 
+    async def process_batch(self, messages: list[Any]) -> None:
+        """Обрабатывает batch Kafka-сообщений."""
+        for message in messages:
+            await self.handle_message(message)
+
     async def handle_message(self, message: Any) -> None:
         """Обрабатывает одно Kafka-сообщение."""
         logger.info(
@@ -220,35 +225,30 @@ class KafkaConsumerWorker:
         set_request_id(request_id)
 
         try:
-            payload = json.loads(message.value)
+            payload = _decode_message_value(message)
 
             service = NotificationService(
                 UnitOfWork(self.db_session_maker),
                 self.arq_pool,
             )
 
-            await self.process_event(payload, service)
+            await self.process_payload(payload, service)
 
             logger.info(
                 "Kafka message processed",
                 extra={"topic": message.topic, "offset": message.offset},
             )
 
-        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
-            await self._handle_processing_error(
-                message=message,
-                exc=exc,
-                request_id=request_id,
-            )
+        except (json.JSONDecodeError, ValidationError, ValueError, SQLAlchemyError) as exc:
+            await self._handle_processing_error(message, exc, request_id)
 
         except Exception as exc:
-            await self._handle_processing_error(
-                message=message,
-                exc=exc,
-                request_id=request_id,
-            )
+            await self._handle_processing_error(message, exc, request_id)
 
-    async def process_event(
+        finally:
+            clear_request_id()
+
+    async def process_payload(
         self,
         payload: dict[str, Any],
         service: NotificationService,
@@ -257,15 +257,15 @@ class KafkaConsumerWorker:
         event_type = payload.get("event_type")
 
         if event_type in {
-            AuthEventType.USER_REGISTERED,
-            AuthEventType.PROFILE_UPDATED,
-            AuthEventType.EMAIL_CHANGED,
+            AuthEventType.USER_REGISTERED.value,
+            AuthEventType.PROFILE_UPDATED.value,
+            AuthEventType.EMAIL_CHANGED.value,
         }:
             event = AuthEventAdapter.validate_python(payload)
             await service.process_auth_event(event)
             return
 
-        if event_type == AuthEventType.PASSWORD_CHANGED:
+        if event_type == AuthEventType.PASSWORD_CHANGED.value:
             event = AuthEventAdapter.validate_python(payload)
             await service.process_auth_event(event)
             await service.process_incoming_event(
@@ -279,7 +279,7 @@ class KafkaConsumerWorker:
             )
             return
 
-        if event_type == BudgetEventType.BUDGET_THRESHOLD_REACHED:
+        if event_type == BudgetEventType.BUDGET_THRESHOLD_REACHED.value:
             event = BudgetEventAdapter.validate_python(payload)
             if not event.payload.user_id:
                 return
@@ -296,9 +296,9 @@ class KafkaConsumerWorker:
             return
 
         if event_type in {
-            GoalEventType.GOAL_COMPLETED,
-            GoalEventType.GOAL_EXPIRED,
-            GoalEventType.GOAL_THRESHOLD_REACHED,
+            GoalEventType.GOAL_COMPLETED.value,
+            GoalEventType.GOAL_EXPIRED.value,
+            GoalEventType.GOAL_THRESHOLD_REACHED.value,
         }:
             event = GoalEventAdapter.validate_python(payload)
             if not event.payload.user_id:
@@ -326,14 +326,14 @@ class KafkaConsumerWorker:
         """Публикует проблемное сообщение в DLQ."""
         dlq_payload = DLQPayload(
             original_topic=message.topic,
-            original_message=message.value.decode("utf-8", errors="replace"),
+            original_message=_raw_message_value(message),
             error=str(exc),
             consumer_group=self.group_id,
             retry_count=0,
         )
         dlq_event = create_dlq_event(dlq_payload)
 
-        headers = [("error", str(exc).encode("utf-8"))]
+        headers = [(ERROR_HEADER, str(exc).encode("utf-8"))]
 
         if request_id:
             headers.append((REQUEST_ID_HEADER, request_id.encode("utf-8")))
@@ -349,7 +349,11 @@ class KafkaConsumerWorker:
         if not success:
             logger.critical(
                 "Kafka DLQ publish failed",
-                extra={"topic": message.topic, "offset": message.offset},
+                extra={
+                    "topic": message.topic,
+                    "offset": message.offset,
+                    "dlq_topic": settings.KAFKA.dlq_topic,
+                },
             )
             raise RuntimeError("DLQ refused message")
 

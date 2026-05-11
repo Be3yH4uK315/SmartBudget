@@ -5,6 +5,7 @@ import signal
 from app.core.database import get_db_engine, get_session_factory
 from app.core.logging import setup_logging
 from app.infrastructure.kafka.consumer import KafkaConsumerWorker
+from app.infrastructure.kafka.producer import KafkaProducerWrapper
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -29,14 +30,21 @@ async def main() -> None:
     engine = get_db_engine()
     db_session_maker = get_session_factory(engine)
 
+    dlq_producer = KafkaProducerWrapper()
+
     stop_event = asyncio.Event()
     _install_signal_handlers(stop_event)
 
-    worker = KafkaConsumerWorker(db_session_maker)
+    worker = KafkaConsumerWorker(
+        db_session_maker=db_session_maker,
+        dlq_producer=dlq_producer,
+    )
     worker_task: asyncio.Task | None = None
     stop_task: asyncio.Task | None = None
 
     try:
+        await dlq_producer.start()
+
         worker_task = asyncio.create_task(worker.run())
         stop_task = asyncio.create_task(stop_event.wait())
 
@@ -69,6 +77,7 @@ async def main() -> None:
         if stop_task and not stop_task.done():
             stop_task.cancel()
 
+        await dlq_producer.stop()
         await engine.dispose()
 
         logger.info("Kafka consumer service stopped")

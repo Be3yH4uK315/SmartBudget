@@ -33,7 +33,7 @@ async def list_transactions(
     """Возвращает список транзакций пользователя с фильтрами."""
     return await service.list_transactions(
         user_id=user_id,
-        limitAmount=filters.limitAmount,
+        limit_amount=filters.limit_amount,
         offset=filters.offset,
         category_ids=filters.category_ids,
         occurred_from=filters.occurred_from,
@@ -52,12 +52,16 @@ async def list_transactions(
 )
 async def search_transactions(
     query: str = Query(..., min_length=1, max_length=255),
-    limitAmount: int = Query(10, ge=1, le=100),
+    limit_amount: int = Query(10, ge=1, le=100, alias="limitAmount"),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
     """Ищет транзакции пользователя по строке."""
-    return await service.search_transactions(user_id, query, limitAmount)
+    return await service.search_transactions(
+        user_id=user_id,
+        query=query,
+        limit_amount=limit_amount,
+    )
 
 
 @router.get(

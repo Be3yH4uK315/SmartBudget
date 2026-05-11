@@ -26,6 +26,7 @@ class KafkaSettings(BaseSettings):
 
     KAFKA_TOPIC_TRANSACTION_EVENTS: str = KafkaTopic.TRANSACTION_EVENTS
     KAFKA_TOPIC_CLASSIFICATION_EVENTS: str = KafkaTopic.CLASSIFICATION_EVENTS
+    KAFKA_TOPIC_DLQ: str = KafkaTopic.DLQ
 
     @property
     def consumer_group_id(self) -> str:
@@ -36,6 +37,11 @@ class KafkaSettings(BaseSettings):
     def consumer_topics(self) -> tuple[str]:
         """Возвращает topics, которые читает transactions consumer."""
         return (self.KAFKA_TOPIC_CLASSIFICATION_EVENTS,)
+    
+    @property
+    def dlq_topic(self) -> str:
+        """Возвращает DLQ topic."""
+        return self.KAFKA_TOPIC_DLQ
 
 
 class ArqSettings(SharedArqSettings):

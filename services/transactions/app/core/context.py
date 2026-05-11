@@ -1,9 +1,11 @@
 from contextvars import ContextVar
 from uuid import uuid4
 
+DEFAULT_REQUEST_ID = "unknown"
+
 request_id_ctx: ContextVar[str] = ContextVar(
     "request_id",
-    default="unknown",
+    default=DEFAULT_REQUEST_ID,
 )
 
 
@@ -18,3 +20,8 @@ def set_request_id(request_id: str | None = None) -> str:
     request_id_ctx.set(resolved_request_id)
 
     return resolved_request_id
+
+
+def clear_request_id() -> None:
+    """Сбрасывает request_id в значение по умолчанию."""
+    request_id_ctx.set(DEFAULT_REQUEST_ID)

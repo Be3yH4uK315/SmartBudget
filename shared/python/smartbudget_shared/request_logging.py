@@ -3,7 +3,7 @@ import time
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
 
 logger = logging.getLogger("smartbudget.request")
 
@@ -32,7 +32,7 @@ def setup_request_logging(
         )
 
         started_at = time.perf_counter()
-        status_code = 500
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         response: Response | None = None
 
         try:
