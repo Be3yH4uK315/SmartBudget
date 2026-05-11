@@ -4,6 +4,7 @@ from smartbudget_shared.config import (
     ArqSettings as SharedArqSettings,
     DBSettings as SharedDBSettings,
 )
+from smartbudget_shared.events import KafkaTopic
 
 
 class DBSettings(SharedDBSettings):
@@ -17,45 +18,30 @@ class KafkaSettings(BaseSettings):
 
     KAFKA_BOOTSTRAP_SERVERS: str
 
-    KAFKA_GROUP_ID: str | None = None
-    KAFKA_TOPIC: str | None = None
-    KAFKA_DLQ_TOPIC: str | None = None
-
+    KAFKA_GROUP_ID: str
     KAFKA_AUTO_OFFSET_RESET: str
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
 
-    KAFKA_GOALS_GROUP_ID: str
-    KAFKA_TOPIC_TRANSACTION_GOAL: str
-    KAFKA_TOPIC_TRANSACTION_DELETED: str
-    KAFKA_TOPIC_BUDGET_EVENTS: str
-    KAFKA_TOPIC_BUDGET_NOTIFICATION: str
-    KAFKA_TOPIC_NOTIFICATION_EVENTS: str
-    KAFKA_TOPIC_TRANSACTION_DLQ: str
+    KAFKA_TOPIC_TRANSACTION_EVENTS: str = KafkaTopic.TRANSACTION_EVENTS
+    KAFKA_TOPIC_GOAL_EVENTS: str = KafkaTopic.GOAL_EVENTS
+    KAFKA_TOPIC_DLQ: str = KafkaTopic.DLQ
 
     @property
     def consumer_group_id(self) -> str:
         """Возвращает group id consumer-а."""
-        return self.KAFKA_GROUP_ID or self.KAFKA_GOALS_GROUP_ID
+        return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topic(self) -> str:
-        """Возвращает основной topic входящих событий транзакций."""
-        return self.KAFKA_TOPIC or self.KAFKA_TOPIC_TRANSACTION_GOAL
-
-    @property
-    def consumer_topics(self) -> tuple[str, str]:
+    def consumer_topics(self) -> tuple[str]:
         """Возвращает topics, которые читает goals consumer."""
-        return (
-            self.consumer_topic,
-            self.KAFKA_TOPIC_TRANSACTION_DELETED,
-        )
+        return (self.KAFKA_TOPIC_TRANSACTION_EVENTS,)
 
     @property
     def dlq_topic(self) -> str:
         """Возвращает DLQ topic."""
-        return self.KAFKA_DLQ_TOPIC or self.KAFKA_TOPIC_TRANSACTION_DLQ
+        return self.KAFKA_TOPIC_DLQ
 
 
 class ArqSettings(SharedArqSettings):

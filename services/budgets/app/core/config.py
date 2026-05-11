@@ -4,6 +4,7 @@ from smartbudget_shared.config import (
     ArqSettings as SharedArqSettings,
     DBSettings as SharedDBSettings,
 )
+from smartbudget_shared.events import KafkaTopic
 
 
 class DBSettings(SharedDBSettings):
@@ -23,12 +24,9 @@ class KafkaSettings(BaseSettings):
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
 
-    KAFKA_TOPIC_TRANSACTION_NEW: str
-    KAFKA_TOPIC_TRANSACTION_UPDATED: str
-    KAFKA_TOPIC_TRANSACTION_DELETED: str
-    KAFKA_TOPIC_BUDGET_EVENTS: str
-    KAFKA_TOPIC_NOTIFICATION_EVENTS: str
-    KAFKA_TOPIC_BUDGET_DLQ: str
+    KAFKA_TOPIC_TRANSACTION_EVENTS: str = KafkaTopic.TRANSACTION_EVENTS
+    KAFKA_TOPIC_BUDGET_EVENTS: str = KafkaTopic.BUDGET_EVENTS
+    KAFKA_TOPIC_DLQ: str = KafkaTopic.DLQ
 
     @property
     def consumer_group_id(self) -> str:
@@ -36,18 +34,14 @@ class KafkaSettings(BaseSettings):
         return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str, str, str]:
+    def consumer_topics(self) -> tuple[str]:
         """Возвращает topics, которые читает budgets consumer."""
-        return (
-            self.KAFKA_TOPIC_TRANSACTION_NEW,
-            self.KAFKA_TOPIC_TRANSACTION_UPDATED,
-            self.KAFKA_TOPIC_TRANSACTION_DELETED,
-        )
+        return (self.KAFKA_TOPIC_TRANSACTION_EVENTS,)
 
     @property
     def dlq_topic(self) -> str:
         """Возвращает DLQ topic."""
-        return self.KAFKA_TOPIC_BUDGET_DLQ
+        return self.KAFKA_TOPIC_DLQ
 
 
 class ArqSettings(SharedArqSettings):

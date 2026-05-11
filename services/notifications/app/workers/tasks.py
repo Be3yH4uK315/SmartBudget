@@ -26,7 +26,7 @@ def get_push_url(message_key: str, props: dict[str, Any]) -> str:
     if message_key.startswith("Goals.") and props.get("goal_id"):
         return f"/goals/{props['goal_id']}"
 
-    if message_key.startswith(("Budget.", "Limit.")):
+    if message_key.startswith(("Budget.", "limitAmount.")):
         return "/budget"
 
     if message_key.startswith("Security."):

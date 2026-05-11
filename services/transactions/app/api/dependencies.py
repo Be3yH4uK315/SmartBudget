@@ -67,22 +67,14 @@ def _parse_category_ids(category_id: str | None) -> list[int] | None:
         return None
 
     try:
-        result = [
-            int(part.strip())
-            for part in category_id.split(",")
-            if part.strip()
-        ]
+        result = [int(part.strip()) for part in category_id.split(",") if part.strip()]
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="categoryId must be an integer or comma-separated integers",
         ) from exc
 
-    result = [
-        item
-        for item in result
-        if item != 0
-    ]
+    result = [item for item in result if item != 0]
 
     return result or None
 
@@ -92,7 +84,7 @@ class TransactionFilters:
 
     def __init__(
         self,
-        limit: int = Query(50, ge=1, le=1000),
+        limitAmount: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
         category_id: str | None = Query(None, alias="categoryId"),
         occurred_from: date | None = Query(None, alias="occurredFrom"),
@@ -101,7 +93,7 @@ class TransactionFilters:
         amount_from: Decimal | None = Query(None, alias="amountFrom"),
         amount_to: Decimal | None = Query(None, alias="amountTo"),
     ) -> None:
-        self.limit = limit
+        self.limitAmount = limitAmount
         self.offset = offset
         self.category_ids = _parse_category_ids(category_id)
         self.occurred_from = (

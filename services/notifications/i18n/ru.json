@@ -1,8 +1,8 @@
 {
-  "Limit.preOverflow.title": "Близость к лимиту",
-  "Limit.preOverflow.message": "Расходы по категории {category_id} приближаются к лимиту.",
-  "Limit.overflow.title": "Лимит превышен",
-  "Limit.overflow.message": "Лимит по категории {category_id} превышен.",
+  "limitAmount.preOverflow.title": "Близость к лимиту",
+  "limitAmount.preOverflow.message": "Расходы по категории {category_id} приближаются к лимиту.",
+  "limitAmount.overflow.title": "Лимит превышен",
+  "limitAmount.overflow.message": "Лимит по категории {category_id} превышен.",
   "Budget.checkResults.title": "Проверка бюджета",
   "Budget.checkResults.message": "Проверка бюджета завершена.",
   "Budget.overflow.title": "Бюджет превышен",
@@ -32,5 +32,10 @@
   "Security.passwordChanged.title": "Пароль изменен",
   "Security.passwordChanged.message": "Пароль аккаунта изменен.",
   "Security.suspiciousActivity.title": "Подозрительная активность",
-  "Security.suspiciousActivity.message": "Обнаружена подозрительная активность в аккаунте."
+  "Security.suspiciousActivity.message": "Обнаружена подозрительная активность в аккаунте.",
+
+  "Budget.thresholdReached.title": "Лимит бюджета почти достигнут",
+  "Budget.thresholdReached.message": "Расходы достигли {threshold_percent}% от лимита.",
+  "Goals.thresholdReached.title": "Цель почти достигнута",
+  "Goals.thresholdReached.message": "Прогресс цели: {progress_percent}%. Порог: {threshold_percent}%."
 }

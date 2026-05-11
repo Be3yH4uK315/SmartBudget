@@ -4,6 +4,7 @@ from smartbudget_shared.config import (
     ArqSettings as SharedArqSettings,
     DBSettings as SharedDBSettings,
 )
+from smartbudget_shared.events import KafkaTopic
 
 
 class DBSettings(SharedDBSettings):
@@ -17,28 +18,29 @@ class KafkaSettings(BaseSettings):
 
     KAFKA_BOOTSTRAP_SERVERS: str
 
-    KAFKA_GROUP_ID: str | None = None
+    KAFKA_GROUP_ID: str
     KAFKA_AUTO_OFFSET_RESET: str
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
 
-    KAFKA_NOTIFICATION_GROUP_ID: str
-    KAFKA_TOPIC_EVENTS: str
-    KAFKA_TOPIC_AUTH: str
-    KAFKA_TOPIC_DLQ: str
+    KAFKA_TOPIC_AUTH_EVENTS: str = KafkaTopic.AUTH_EVENTS
+    KAFKA_TOPIC_BUDGET_EVENTS: str = KafkaTopic.BUDGET_EVENTS
+    KAFKA_TOPIC_GOAL_EVENTS: str = KafkaTopic.GOAL_EVENTS
+    KAFKA_TOPIC_DLQ: str = KafkaTopic.DLQ
 
     @property
     def consumer_group_id(self) -> str:
         """Возвращает group id consumer-а."""
-        return self.KAFKA_GROUP_ID or self.KAFKA_NOTIFICATION_GROUP_ID
+        return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str, str]:
+    def consumer_topics(self) -> tuple[str, str, str]:
         """Возвращает topics, которые читает notification consumer."""
         return (
-            self.KAFKA_TOPIC_EVENTS,
-            self.KAFKA_TOPIC_AUTH,
+            self.KAFKA_TOPIC_AUTH_EVENTS,
+            self.KAFKA_TOPIC_BUDGET_EVENTS,
+            self.KAFKA_TOPIC_GOAL_EVENTS,
         )
 
     @property

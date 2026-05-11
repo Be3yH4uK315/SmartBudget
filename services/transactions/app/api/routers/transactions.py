@@ -1,7 +1,16 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Response,
+    status,
+)
 
 from app.api import dependencies
 from app.domain.schemas import api as schemas
@@ -24,7 +33,7 @@ async def list_transactions(
     """Возвращает список транзакций пользователя с фильтрами."""
     return await service.list_transactions(
         user_id=user_id,
-        limit=filters.limit,
+        limitAmount=filters.limitAmount,
         offset=filters.offset,
         category_ids=filters.category_ids,
         occurred_from=filters.occurred_from,
@@ -43,12 +52,12 @@ async def list_transactions(
 )
 async def search_transactions(
     query: str = Query(..., min_length=1, max_length=255),
-    limit: int = Query(10, ge=1, le=100),
+    limitAmount: int = Query(10, ge=1, le=100),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
     """Ищет транзакции пользователя по строке."""
-    return await service.search_transactions(user_id, query, limit)
+    return await service.search_transactions(user_id, query, limitAmount)
 
 
 @router.get(
@@ -93,8 +102,7 @@ async def import_mock_transactions(
 
     try:
         items = [
-            schemas.ImportTransactionItem.model_validate(item)
-            for item in raw_items
+            schemas.ImportTransactionItem.model_validate(item) for item in raw_items
         ]
     except Exception as exc:
         raise HTTPException(

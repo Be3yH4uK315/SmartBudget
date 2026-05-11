@@ -35,7 +35,7 @@ class UserInactiveError(AuthServiceError):
 
 
 class TooManyAttemptsError(AuthServiceError):
-    """Слишком много попыток (Rate Limit)."""
+    """Слишком много попыток (Rate limitAmount)."""
 
     pass
 

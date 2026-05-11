@@ -1,17 +1,17 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
+from uuid import UUID, uuid4
 
 from app.core import config, exceptions, metrics
-from app.domain.enums import GoalEventType, GoalPriority, GoalStatus, TransactionType
+from app.domain.enums import GoalPriority, GoalStatus, TransactionType
 from app.domain.schemas import api as api_schemas
-from app.domain.schemas import kafka as kafka_schemas
 from smartbudget_shared.events import (
-    EventEnvelope,
-    EventSource,
+    GoalEventType as SharedGoalEventType,
     GoalPayload,
-    NotificationPayload,
+    TransactionDeletedPayload,
+    TransactionGoalAppliedPayload,
+    create_goal_event,
 )
 from app.infrastructure.db import models, uow
 
@@ -28,26 +28,22 @@ def _get_utc_today() -> date:
 
 
 def _create_outbox_event(
-    event_type: GoalEventType,
-    **payload_fields,
+    event_type: SharedGoalEventType,
+    goal: models.Goal,
+    threshold_percent: int | None = None,
 ) -> dict:
     """Создает goal event envelope для outbox_events."""
-    goal_id = payload_fields.get("goal_id")
-    user_id = payload_fields.get("user_id")
-
-    if not goal_id:
-        raise ValueError("goal_id is required for goal outbox event")
-
     payload = GoalPayload(
-        goal_id=UUID(str(goal_id)),
-        user_id=UUID(str(user_id)) if user_id else None,
-        details=payload_fields,
+        goal_id=goal.goal_id,
+        user_id=goal.user_id,
+        target_amount=goal.target_amount,
+        current_amount=goal.current_amount,
+        progress_percent=int(_goal_current_percent(goal)),
+        threshold_percent=threshold_percent,
     )
-    event = EventEnvelope.create(
-        event_type=event_type.value,
-        source_service=EventSource.GOALS,
+    event = create_goal_event(
+        event_type=event_type,
         payload=payload,
-        idempotency_key=f"{event_type.value}:{goal_id}",
     )
 
     return event.model_dump(
@@ -55,56 +51,6 @@ def _create_outbox_event(
         by_alias=True,
         exclude_none=True,
     )
-
-
-def _notification_event_id(
-    event_name: str,
-    goal_id: UUID | str,
-    occurrence_key: str | None = None,
-) -> UUID:
-    """Создает детерминированный event_id для notification service."""
-    key = f"smartbudget:notifications:{event_name}:{goal_id}"
-
-    if occurrence_key:
-        key = f"{key}:{occurrence_key}"
-
-    return uuid5(NAMESPACE_URL, key)
-
-
-def _create_notification_event(
-    event_name: str,
-    user_id: UUID,
-    payload: dict,
-    event_id: UUID | None = None,
-    idempotency_key: str | None = None,
-) -> dict:
-    """Создает notification event envelope."""
-    event_payload = NotificationPayload(
-        user_id=user_id,
-        payload=payload,
-    )
-    event = EventEnvelope.create(
-        event_id=event_id or uuid4(),
-        event_type=event_name,
-        source_service=EventSource.GOALS,
-        payload=event_payload,
-        occurred_at=datetime.now(timezone.utc),
-        idempotency_key=idempotency_key,
-    )
-
-    return event.model_dump(
-        mode="json",
-        by_alias=True,
-        exclude_none=True,
-    )
-
-
-def _decimal_to_float(value: Decimal | int | float | None) -> float:
-    """Преобразует Decimal/int/float/None в float для notification payload."""
-    if value is None:
-        return 0.0
-
-    return float(value)
 
 
 def _goal_current_percent(goal: models.Goal) -> float:
@@ -116,16 +62,6 @@ def _goal_current_percent(goal: models.Goal) -> float:
     bounded_percent = min(percent, Decimal("100")).quantize(Decimal("0.01"))
 
     return float(bounded_percent)
-
-
-def _goal_recommended_payment(goal: models.Goal) -> float:
-    """Возвращает рекомендованный платеж по цели в float."""
-    if goal.created_at is None:
-        goal.created_at = datetime.now(timezone.utc)
-
-    value = goal.calculate_recommended_payment()
-
-    return _decimal_to_float(value)
 
 
 def _previous_month_period(today: date) -> tuple[datetime, datetime, str]:
@@ -226,7 +162,7 @@ class GoalService:
         self,
         user_id: UUID,
         query: str,
-        limit: int,
+        limitAmount: int,
     ) -> list[api_schemas.GoalSearchResponse]:
         """Ищет цели пользователя по названию."""
         normalized_query = query.strip()
@@ -237,7 +173,7 @@ class GoalService:
             goals = await self.uow.goals.search_goals(
                 user_id,
                 normalized_query,
-                limit,
+                limitAmount,
             )
 
         return [api_schemas.GoalSearchResponse.model_validate(goal) for goal in goals]
@@ -245,7 +181,7 @@ class GoalService:
     async def get_all_goals(
         self,
         user_id: UUID,
-        limit: int = 100,
+        limitAmount: int = 100,
         offset: int = 0,
         tags: list[str] | None = None,
         priorities: list[GoalPriority] | None = None,
@@ -255,7 +191,7 @@ class GoalService:
         async with self.uow:
             goals = await self.uow.goals.get_all_goals(
                 user_id,
-                limit=limit,
+                limitAmount=limitAmount,
                 offset=offset,
                 tags=tags,
                 priorities=priorities,
@@ -298,7 +234,7 @@ class GoalService:
                     changes_for_kafka["status"] = goal.status
 
             if changes_for_kafka:
-                self._add_goal_changed_event(goal_id, changes_for_kafka)
+                await self._add_goal_changed_event(user_id, goal_id)
 
             response = await self._build_goal_response(goal)
 
@@ -363,12 +299,13 @@ class GoalService:
 
     async def update_goal_balance(
         self,
-        event: kafka_schemas.TransactionEvent,
+        event: TransactionGoalAppliedPayload,
     ) -> None:
         """Обновляет баланс цели на основе транзакции."""
+        transaction_type = TransactionType(event.transaction_type)
         value_change = _transaction_amount_delta(
             event.amount,
-            event.transaction_type,
+            transaction_type,
         )
 
         async with self.uow:
@@ -378,7 +315,7 @@ class GoalService:
                 amount_delta=value_change,
                 transaction_id=event.transaction_id,
                 raw_amount=event.amount,
-                transaction_type=event.transaction_type.value,
+                transaction_type=transaction_type.value,
                 occurred_at=event.occurred_at,
             )
 
@@ -413,9 +350,12 @@ class GoalService:
 
     async def rollback_goal_transaction(
         self,
-        event: kafka_schemas.TransactionDeletedEvent,
+        event: TransactionDeletedPayload,
     ) -> None:
         """Откатывает баланс цели при удалении транзакции."""
+        if event.goal_id is None:
+            return
+
         async with self.uow:
             goal = await self.uow.goals.rollback_transaction(
                 user_id=event.user_id,
@@ -477,10 +417,7 @@ class GoalService:
                 goal_id,
                 {"status": new_status.value},
             )
-            self._add_goal_changed_event(
-                goal_id,
-                {"status": new_status.value},
-            )
+            await self._add_goal_changed_event(user_id, goal_id)
 
         return api_schemas.GoalStatusResponse(status=new_status)
 
@@ -550,24 +487,7 @@ class GoalService:
 
     async def _process_achieved_goal_in_uow(self, goal: models.Goal) -> None:
         """Добавляет события достижения цели."""
-        self.uow.outbox.add_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-            payload=_create_outbox_event(
-                GoalEventType.ALERT,
-                goal_id=str(goal.goal_id),
-                days_left=0,
-            ),
-            event_type=GoalEventType.ALERT.value,
-        )
-
-        await self._add_goal_notification_event(
-            "goal.achieved",
-            goal,
-            {
-                "goal_id": str(goal.goal_id),
-                "name": goal.name,
-            },
-        )
+        self._add_goal_completed_event(goal)
 
         metrics.GOAL_ACHIEVEMENT_TIME.observe(
             (datetime.now(timezone.utc) - goal.created_at).total_seconds(),
@@ -581,7 +501,7 @@ class GoalService:
             async with self.uow:
                 batch = await self.uow.goals.get_expired_goals_batch(
                     today=today,
-                    limit=DEADLINE_BATCH_SIZE,
+                    limitAmount=DEADLINE_BATCH_SIZE,
                     last_id=last_id,
                 )
 
@@ -615,7 +535,7 @@ class GoalService:
             async with self.uow:
                 approaching_batch = await self.uow.goals.get_approaching_goals_batch(
                     today,
-                    limit=DEADLINE_BATCH_SIZE,
+                    limitAmount=DEADLINE_BATCH_SIZE,
                 )
 
                 if not approaching_batch:
@@ -643,7 +563,7 @@ class GoalService:
         if today.day != 1:
             return
 
-        period_start, period_end, month_key = _previous_month_period(today)
+        period_start, period_end, _ = _previous_month_period(today)
         last_id: UUID | None = None
 
         while True:
@@ -651,7 +571,7 @@ class GoalService:
                 batch = await self.uow.goals.get_goals_without_income_batch(
                     period_start=period_start,
                     period_end=period_end,
-                    limit=batch_size,
+                    limitAmount=batch_size,
                     last_id=last_id,
                 )
 
@@ -659,35 +579,18 @@ class GoalService:
                     break
 
                 last_id = batch[-1].goal_id
-                outbox_events = [
-                    {
-                        "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-                        "payload": _create_notification_event(
-                            "goal.payment_missed",
-                            goal.user_id,
-                            {
-                                "goal_id": str(goal.goal_id),
-                                "name": goal.name,
-                            },
-                            event_id=_notification_event_id(
-                                "goal.payment_missed",
-                                goal.goal_id,
-                                month_key,
-                            ),
-                            idempotency_key=f"goal.payment_missed:{goal.goal_id}:{month_key}",
-                        ),
-                        "event_type": "goal.payment_missed",
-                    }
-                    for goal in batch
-                ]
 
-                self.uow.outbox.add_events(outbox_events)
+                for goal in batch:
+                    self._add_goal_threshold_reached_event(
+                        goal=goal,
+                        threshold_percent=int(_goal_current_percent(goal)),
+                    )
 
     async def _add_almost_achieved_notification_in_uow(
         self,
         goal: models.Goal,
     ) -> bool:
-        """Добавляет notification-событие, если цель почти достигнута."""
+        """Добавляет goal.threshold_reached event, если цель почти достигнута."""
         if goal.status != GoalStatus.ONGOING.value:
             return False
 
@@ -695,128 +598,101 @@ class GoalService:
         if current_percent < ALMOST_ACHIEVED_PERCENT:
             return False
 
-        await self._add_goal_notification_event(
-            "goal.almost_achieved",
-            goal,
-            {
-                "goal_id": str(goal.goal_id),
-                "name": goal.name,
-            },
+        self._add_goal_threshold_reached_event(
+            goal=goal,
+            threshold_percent=int(ALMOST_ACHIEVED_PERCENT),
         )
 
         return True
 
-    async def _add_goal_notification_event(
-        self,
-        event_name: str,
-        goal: models.Goal,
-        payload: dict,
-    ) -> None:
-        """Добавляет событие для notification service в outbox."""
-        self.uow.outbox.add_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-            payload=_create_notification_event(
-                event_name,
-                goal.user_id,
-                payload,
-                event_id=_notification_event_id(event_name, goal.goal_id),
-                idempotency_key=f"{event_name}:{goal.goal_id}",
-            ),
-            event_type=event_name,
-        )
-
     def _add_goal_created_events(self, goal: models.Goal, user_id: UUID) -> None:
-        """Добавляет outbox-события создания цели."""
-        self.uow.outbox.add_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            payload=_create_outbox_event(
-                GoalEventType.CREATED,
-                goal_id=str(goal.goal_id),
-                user_id=str(user_id),
-                name=goal.name,
-                target_amount=goal.target_amount,
-                finish_date=goal.finish_date,
-                priority=goal.priority,
-            ),
-            event_type=GoalEventType.CREATED.value,
-        )
+        """Добавляет goal.created event."""
+        event_type = SharedGoalEventType.GOAL_CREATED
 
         self.uow.outbox.add_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-            payload=_create_notification_event(
-                "goal.created",
-                user_id,
-                {
-                    "goal_id": str(goal.goal_id),
-                    "name": goal.name,
-                    "recommended_payment": _goal_recommended_payment(goal),
-                },
-                event_id=_notification_event_id("goal.created", goal.goal_id),
-                idempotency_key=f"goal.created:{goal.goal_id}",
+            topic=settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
+            payload=_create_outbox_event(
+                event_type=event_type,
+                goal=goal,
             ),
-            event_type="goal.created",
+            event_type=event_type.value,
         )
 
-    def _add_goal_changed_event(self, goal_id: UUID, changes: dict) -> None:
-        """Добавляет outbox-событие изменения цели."""
-        self.uow.outbox.add_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
-            payload=_create_outbox_event(
-                GoalEventType.CHANGED,
-                goal_id=str(goal_id),
-                changes=changes,
-            ),
-            event_type=GoalEventType.CHANGED.value,
-        )
+    async def _add_goal_changed_event(self, user_id: UUID, goal_id: UUID) -> None:
+        """Добавляет goal.updated event после изменения цели."""
+        goal = await self.uow.goals.get_by_id(user_id, goal_id)
+        if not goal:
+            return
+
+        self._add_goal_updated_event(goal)
 
     def _add_goal_updated_event(self, goal: models.Goal) -> None:
-        """Добавляет outbox-событие обновления баланса цели."""
+        """Добавляет goal.updated event."""
+        event_type = SharedGoalEventType.GOAL_UPDATED
+
         self.uow.outbox.add_event(
-            topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+            topic=settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
             payload=_create_outbox_event(
-                GoalEventType.UPDATED,
-                goal_id=str(goal.goal_id),
-                user_id=str(goal.user_id),
-                current_amount=goal.current_amount,
-                status=goal.status,
+                event_type=event_type,
+                goal=goal,
             ),
-            event_type=GoalEventType.UPDATED.value,
+            event_type=event_type.value,
+        )
+
+    def _add_goal_completed_event(self, goal: models.Goal) -> None:
+        """Добавляет goal.completed event."""
+        event_type = SharedGoalEventType.GOAL_COMPLETED
+
+        self.uow.outbox.add_event(
+            topic=settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
+            payload=_create_outbox_event(
+                event_type=event_type,
+                goal=goal,
+            ),
+            event_type=event_type.value,
+        )
+
+    def _add_goal_expired_event(self, goal: models.Goal) -> None:
+        """Добавляет goal.expired event."""
+        event_type = SharedGoalEventType.GOAL_EXPIRED
+
+        self.uow.outbox.add_event(
+            topic=settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
+            payload=_create_outbox_event(
+                event_type=event_type,
+                goal=goal,
+            ),
+            event_type=event_type.value,
+        )
+
+    def _add_goal_threshold_reached_event(
+        self,
+        goal: models.Goal,
+        threshold_percent: int,
+    ) -> None:
+        """Добавляет goal.threshold_reached event."""
+        event_type = SharedGoalEventType.GOAL_THRESHOLD_REACHED
+
+        self.uow.outbox.add_event(
+            topic=settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
+            payload=_create_outbox_event(
+                event_type=event_type,
+                goal=goal,
+                threshold_percent=threshold_percent,
+            ),
+            event_type=event_type.value,
         )
 
     def _build_expired_goal_events(self, goal: models.Goal) -> list[dict]:
         """Формирует outbox-события истечения цели."""
         return [
             {
-                "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+                "topic": settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
                 "payload": _create_outbox_event(
-                    GoalEventType.UPDATED,
-                    goal_id=str(goal.goal_id),
-                    status=GoalStatus.EXPIRED.value,
+                    event_type=SharedGoalEventType.GOAL_EXPIRED,
+                    goal=goal,
                 ),
-                "event_type": GoalEventType.UPDATED.value,
-            },
-            {
-                "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
-                "payload": _create_outbox_event(
-                    GoalEventType.EXPIRED,
-                    goal_id=str(goal.goal_id),
-                    days_left=0,
-                ),
-                "event_type": GoalEventType.EXPIRED.value,
-            },
-            {
-                "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-                "payload": _create_notification_event(
-                    "goal.expired",
-                    goal.user_id,
-                    {
-                        "goal_id": str(goal.goal_id),
-                        "name": goal.name,
-                    },
-                    event_id=_notification_event_id("goal.expired", goal.goal_id),
-                    idempotency_key=f"goal.expired:{goal.goal_id}",
-                ),
-                "event_type": "goal.expired",
+                "event_type": SharedGoalEventType.GOAL_EXPIRED.value,
             },
         ]
 
@@ -824,33 +700,13 @@ class GoalService:
         """Формирует outbox-события приближения срока цели."""
         return [
             {
-                "topic": settings.KAFKA.KAFKA_TOPIC_BUDGET_NOTIFICATION,
+                "topic": settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
                 "payload": _create_outbox_event(
-                    GoalEventType.APPROACHING,
-                    goal_id=str(goal.goal_id),
-                    type="approaching",
-                    days_left=goal.days_left,
+                    event_type=SharedGoalEventType.GOAL_THRESHOLD_REACHED,
+                    goal=goal,
+                    threshold_percent=int(_goal_current_percent(goal)),
                 ),
-                "event_type": GoalEventType.APPROACHING.value,
-            },
-            {
-                "topic": settings.KAFKA.KAFKA_TOPIC_NOTIFICATION_EVENTS,
-                "payload": _create_notification_event(
-                    "goal.deadline_approaching",
-                    goal.user_id,
-                    {
-                        "goal_id": str(goal.goal_id),
-                        "name": goal.name,
-                        "days_left": goal.days_left,
-                        "current_percent": _goal_current_percent(goal),
-                    },
-                    event_id=_notification_event_id(
-                        "goal.deadline_approaching",
-                        goal.goal_id,
-                    ),
-                    idempotency_key=f"goal.deadline_approaching:{goal.goal_id}",
-                ),
-                "event_type": "goal.deadline_approaching",
+                "event_type": SharedGoalEventType.GOAL_THRESHOLD_REACHED.value,
             },
         ]
 

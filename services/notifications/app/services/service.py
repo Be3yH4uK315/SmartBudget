@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from hashlib import sha256
 from typing import Any, Mapping, Protocol
 from uuid import UUID
 
@@ -11,19 +10,12 @@ from app.core import config, exceptions, metrics
 from app.core.registry import EVENT_REGISTRY, EventRouteConfig
 from app.domain.enums import NotificationServiceType
 from app.domain.schemas import api as api_schemas
-from app.domain.schemas import kafka as kafka_schemas
+from app.domain.schemas.kafka import IncomingNotificationEvent
+from smartbudget_shared.events import AuthUserPayload, EventEnvelope
 from app.infrastructure.db import uow
 
 logger = logging.getLogger(__name__)
 
-AUTH_NOTIFICATION_EVENT_MAP = {
-    "user.login": "auth.device.new_login",
-    "user.password_changed": "auth.password.changed",
-}
-
-FAILED_LOGIN_THRESHOLD = 5
-FAILED_LOGIN_WINDOW_SECONDS = 30 * 60
-SUSPICIOUS_ACTIVITY_COOLDOWN_SECONDS = 60 * 60
 PLACEHOLDER_EMAIL_DOMAIN = "@unknown.smartbudget.local"
 
 
@@ -64,48 +56,35 @@ class NotificationService:
         self.uow = unit_of_work
         self.arq_pool = arq_pool
 
-    async def process_auth_event(self, event: kafka_schemas.AuthUserEvent) -> None:
+    async def process_auth_event(
+        self,
+        event: EventEnvelope[AuthUserPayload],
+    ) -> None:
         """Синхронизирует профиль пользователя из auth event."""
+        user_id = event.payload.user_id
+        email = event.payload.new_email or event.payload.email
+        language = self._normalize_language(event.payload.language)
+
         async with self.uow:
-            await self.uow.settings.upsert_profile(
-                user_id=event.user_id,
-                email=event.payload.email,
-                language=self._normalize_language(event.payload.language),
-            )
+            if email:
+                await self.uow.settings.upsert_profile(
+                    user_id=user_id,
+                    email=email,
+                    language=language,
+                )
+            else:
+                await self._get_or_create_settings_in_uow(user_id)
+
             await self.uow.commit()
 
-        logger.info("Synchronized profile for user %s from auth event", event.user_id)
-
-    async def process_auth_outbox_event(
-        self,
-        event: kafka_schemas.AuthOutboxEvent,
-        event_id: UUID,
-        timestamp: datetime,
-    ) -> None:
-        """Обрабатывает auth outbox event и при необходимости создает уведомление."""
-        await self._sync_auth_profile(event)
-
-        if event.event_type == "user.login_failed":
-            await self._handle_failed_login(event, event_id, timestamp)
-            return
-
-        notification_event_name = AUTH_NOTIFICATION_EVENT_MAP.get(event.event_type)
-        if not notification_event_name or not event.user_id:
-            return
-
-        await self.process_incoming_event(
-            kafka_schemas.IncomingNotificationEvent(
-                event_id=event_id,
-                event_type=notification_event_name,
-                user_id=event.user_id,
-                payload={},
-                timestamp=timestamp,
-            ),
+        logger.info(
+            "Synchronized profile for user %s from auth event",
+            user_id,
         )
 
     async def process_incoming_event(
         self,
-        event: kafka_schemas.IncomingNotificationEvent,
+        event: IncomingNotificationEvent,
     ) -> None:
         """Обрабатывает входящее бизнес-событие платформы."""
         route_config = EVENT_REGISTRY.get(event.event_type)
@@ -160,7 +139,7 @@ class NotificationService:
         self,
         user_id: UUID,
         is_read: bool | None,
-        limit: int,
+        limitAmount: int,
         offset: int,
     ) -> list[api_schemas.NotificationResponse]:
         """Получает историю уведомлений пользователя для UI."""
@@ -168,7 +147,7 @@ class NotificationService:
             notifications = await self.uow.notifications.list_paginated(
                 user_id,
                 is_read,
-                limit,
+                limitAmount,
                 offset,
             )
 
@@ -364,7 +343,7 @@ class NotificationService:
 
     async def _create_notification_in_uow(
         self,
-        event: kafka_schemas.IncomingNotificationEvent,
+        event: IncomingNotificationEvent,
         route_config: EventRouteConfig,
         props: dict[str, Any] | None,
     ) -> _NotificationRow | None:
@@ -524,10 +503,7 @@ class NotificationService:
         if not props:
             return None
 
-        return {
-            api_schemas.to_camel(key): value
-            for key, value in props.items()
-        }
+        return {api_schemas.to_camel(key): value for key, value in props.items()}
 
     @staticmethod
     def _settings_to_response(
@@ -543,7 +519,8 @@ class NotificationService:
             transactions=NotificationServiceType.TRANSACTIONS.value not in disabled,
             budget=api_schemas.BudgetNotificationSettings(
                 total_limit=NotificationServiceType.BUDGET.value not in disabled,
-                categories_limit=NotificationServiceType.LIMIT.value not in disabled,
+                categories_limit=NotificationServiceType.limitAmount.value
+                not in disabled,
             ),
         )
 
@@ -564,7 +541,7 @@ class NotificationService:
             disabled_services.append(NotificationServiceType.BUDGET.value)
 
         if not request.budget.categories_limit:
-            disabled_services.append(NotificationServiceType.LIMIT.value)
+            disabled_services.append(NotificationServiceType.limitAmount.value)
 
         return {
             "push_enabled": request.push_status,
@@ -587,10 +564,7 @@ class NotificationService:
                 f"Missing props for {message_key}: {', '.join(missing)}",
             )
 
-        return {
-            key: payload[key]
-            for key in expected
-        }
+        return {key: payload[key] for key in expected}
 
     @staticmethod
     def _placeholder_email(user_id: UUID) -> str:
@@ -609,136 +583,3 @@ class NotificationService:
             return language
 
         return None
-
-    async def _sync_auth_profile(self, event: kafka_schemas.AuthOutboxEvent) -> None:
-        """Синхронизирует notification profile из auth outbox event."""
-        if not event.user_id:
-            return
-
-        email = event.new_email or event.email
-        language = self._normalize_language(event.language)
-
-        if not email and not language:
-            return
-
-        async with self.uow:
-            current = await self.uow.settings.get_by_user_id(event.user_id)
-
-            profile_email = email
-            if not profile_email and current:
-                profile_email = current.email
-
-            if not profile_email:
-                profile_email = self._placeholder_email(event.user_id)
-
-            await self.uow.settings.upsert_profile(
-                user_id=event.user_id,
-                email=profile_email,
-                language=language,
-            )
-            await self.uow.commit()
-
-        logger.info(
-            "Synchronized auth profile for user %s from %s",
-            event.user_id,
-            event.event_type,
-        )
-
-    async def _handle_failed_login(
-        self,
-        event: kafka_schemas.AuthOutboxEvent,
-        event_id: UUID,
-        timestamp: datetime,
-    ) -> None:
-        """Обрабатывает failed login и создает suspicious activity при пороге."""
-        if not event.email:
-            logger.info("Auth failed login event without email ignored")
-            return
-
-        if not self.arq_pool:
-            logger.info("Failed login event ignored because Redis is unavailable")
-            return
-
-        normalized_email = event.email.strip().lower()
-        ip = (event.ip or "unknown").strip() or "unknown"
-        key_suffix = self._failed_login_key_suffix(normalized_email, ip)
-
-        if not await self._mark_failed_login_event_processed(event_id):
-            logger.info("Duplicate failed login event %s ignored", event_id)
-            return
-
-        attempts = await self._increment_failed_login_counter(key_suffix)
-        if attempts < FAILED_LOGIN_THRESHOLD:
-            logger.info(
-                "Failed login below suspicious threshold: %s/%s",
-                attempts,
-                FAILED_LOGIN_THRESHOLD,
-            )
-            return
-
-        if not await self._acquire_suspicious_activity_cooldown(key_suffix):
-            logger.info("Suspicious activity notification suppressed by cooldown")
-            return
-
-        async with self.uow:
-            settings = await self.uow.settings.get_by_email(normalized_email)
-
-        if not settings:
-            logger.info("Failed login for unknown notification profile ignored")
-            return
-
-        await self.process_incoming_event(
-            kafka_schemas.IncomingNotificationEvent(
-                event_id=event_id,
-                event_type="auth.activity.suspicious",
-                user_id=settings.user_id,
-                payload={},
-                timestamp=timestamp,
-            ),
-        )
-
-    async def _mark_failed_login_event_processed(self, event_id: UUID) -> bool:
-        """Помечает failed login event как обработанный в Redis."""
-        if not self.arq_pool:
-            return False
-
-        processed_key = f"notifications:security:failed-login-event:{event_id}"
-        processed = await self.arq_pool.set(
-            processed_key,
-            "1",
-            ex=FAILED_LOGIN_WINDOW_SECONDS,
-            nx=True,
-        )
-
-        return bool(processed)
-
-    async def _increment_failed_login_counter(self, key_suffix: str) -> int:
-        """Увеличивает счетчик failed login попыток."""
-        if not self.arq_pool:
-            return 0
-
-        counter_key = f"notifications:security:failed-login:{key_suffix}"
-        attempts = await self.arq_pool.incr(counter_key)
-        await self.arq_pool.expire(counter_key, FAILED_LOGIN_WINDOW_SECONDS)
-
-        return int(attempts)
-
-    async def _acquire_suspicious_activity_cooldown(self, key_suffix: str) -> bool:
-        """Создает cooldown ключ для suspicious activity уведомления."""
-        if not self.arq_pool:
-            return False
-
-        cooldown_key = f"notifications:security:suspicious-sent:{key_suffix}"
-        should_send = await self.arq_pool.set(
-            cooldown_key,
-            "1",
-            ex=SUSPICIOUS_ACTIVITY_COOLDOWN_SECONDS,
-            nx=True,
-        )
-
-        return bool(should_send)
-
-    @staticmethod
-    def _failed_login_key_suffix(email: str, ip: str) -> str:
-        """Возвращает хешированный ключ failed login счетчика."""
-        return sha256(f"{email}|{ip}".encode("utf-8")).hexdigest()

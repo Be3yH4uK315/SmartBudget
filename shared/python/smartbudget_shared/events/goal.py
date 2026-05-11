@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
@@ -17,47 +16,23 @@ class GoalEventType(StrEnum):
     """Типы событий goal service."""
 
     GOAL_CREATED = "goal.created"
-    GOAL_CHANGED = "goal.changed"
     GOAL_UPDATED = "goal.updated"
     GOAL_DELETED = "goal.deleted"
-    GOAL_ACHIEVED = "goal.achieved"
-    GOAL_EXPIRED = "goal.expired"
-    GOAL_APPROACHING = "goal.approaching"
-    GOAL_ALERT = "goal.alert"
     GOAL_COMPLETED = "goal.completed"
+    GOAL_EXPIRED = "goal.expired"
     GOAL_PROGRESS_CHANGED = "goal.progress_changed"
-    GOAL_TRANSACTION_CREATED = "goal.transaction.created"
-    GOAL_TRANSACTION_DELETED = "goal.transaction.deleted"
+    GOAL_THRESHOLD_REACHED = "goal.threshold_reached"
 
 
 class GoalPayload(BaseEventPayload):
-    """Базовый payload события цели."""
+    """Payload события цели."""
 
     goal_id: UUID = Field(..., description="ID цели")
-    user_id: UUID | None = Field(None, description="ID пользователя")
-    details: dict[str, object] = Field(
-        default_factory=dict,
-        description="Детали события цели",
-    )
-
-
-class GoalTransactionPayload(BaseEventPayload):
-    """Payload транзакции, связанной с целью."""
-
-    transaction_id: UUID = Field(..., description="ID транзакции")
-    goal_id: UUID = Field(..., description="ID цели")
     user_id: UUID = Field(..., description="ID пользователя")
-    amount: Decimal = Field(..., description="Сумма транзакции")
-    transaction_type: str = Field(..., description="Тип транзакции")
-    occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
-
-
-class GoalTransactionDeletedPayload(BaseEventPayload):
-    """Payload удаления транзакции цели."""
-
-    transaction_id: UUID = Field(..., description="ID транзакции")
-    user_id: UUID = Field(..., description="ID пользователя")
-    occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
+    target_amount: Decimal | None = Field(None, description="Целевая сумма")
+    current_amount: Decimal | None = Field(None, description="Текущая накопленная сумма")
+    progress_percent: int | None = Field(None, description="Процент выполнения цели")
+    threshold_percent: int | None = Field(None, description="Порог уведомления в процентах")
 
 
 def create_goal_event(
@@ -66,12 +41,13 @@ def create_goal_event(
     payload: GoalPayload,
 ) -> EventEnvelope[GoalPayload]:
     """Создает событие goal service."""
-
     resolved_event_type = str(enum_value(event_type))
 
     return EventEnvelope.create(
         event_type=resolved_event_type,
         source_service=EventSource.GOALS,
         payload=payload,
+        aggregate_id=payload.goal_id,
+        user_id=payload.user_id,
         idempotency_key=f"{resolved_event_type}:{payload.goal_id}",
     )

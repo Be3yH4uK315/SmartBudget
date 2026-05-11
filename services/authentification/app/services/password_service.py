@@ -135,7 +135,10 @@ class PasswordService:
             new_hash = await crypto.hash_password(body.new_password)
             self.uow.users.update_password(user, new_hash)
 
-            await self.notifier.notify_password_changed(str(user_id))
+            await self.notifier.notify_password_changed(
+                user_id=str(user_id),
+                email=user.email,
+            )
             await self.uow.commit()
 
         await self.session_service.revoke_all_user_sessions(user_id)

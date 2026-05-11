@@ -4,6 +4,7 @@ from smartbudget_shared.config import (
     ArqSettings as SharedArqSettings,
     DBSettings as SharedDBSettings,
 )
+from smartbudget_shared.events import KafkaTopic
 
 
 class DBSettings(SharedDBSettings):
@@ -23,16 +24,8 @@ class KafkaSettings(BaseSettings):
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
 
-    KAFKA_TOPIC_TRANSACTION_NEW: str
-    KAFKA_TOPIC_TRANSACTION_IMPORTED: str
-    KAFKA_TOPIC_TRANSACTION_GOAL: str
-    KAFKA_TOPIC_TRANSACTION_NEED_CATEGORY: str
-    KAFKA_TOPIC_TRANSACTION_CLASSIFIED: str
-    KAFKA_TOPIC_TRANSACTION_UPDATED: str
-    KAFKA_TOPIC_TRANSACTION_CATEGORY_UPDATED: str
-    KAFKA_TOPIC_TRANSACTION_DELETED: str
-    KAFKA_TOPIC_BUDGET_EVENTS: str
-    KAFKA_TOPIC_NOTIFICATION_EVENTS: str
+    KAFKA_TOPIC_TRANSACTION_EVENTS: str = KafkaTopic.TRANSACTION_EVENTS
+    KAFKA_TOPIC_CLASSIFICATION_EVENTS: str = KafkaTopic.CLASSIFICATION_EVENTS
 
     @property
     def consumer_group_id(self) -> str:
@@ -40,12 +33,9 @@ class KafkaSettings(BaseSettings):
         return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str, str]:
+    def consumer_topics(self) -> tuple[str]:
         """Возвращает topics, которые читает transactions consumer."""
-        return (
-            self.KAFKA_TOPIC_TRANSACTION_CLASSIFIED,
-            self.KAFKA_TOPIC_TRANSACTION_CATEGORY_UPDATED,
-        )
+        return (self.KAFKA_TOPIC_CLASSIFICATION_EVENTS,)
 
 
 class ArqSettings(SharedArqSettings):

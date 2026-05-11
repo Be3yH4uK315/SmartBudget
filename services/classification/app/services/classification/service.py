@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import UUID
 
 from redis.asyncio import Redis
 
@@ -13,13 +13,12 @@ from app.core.exceptions import (
     ClassificationResultNotFoundError,
 )
 from app.domain.schemas import api as api_schemas
-from app.domain.schemas.kafka import TransactionNeedCategoryEvent
 from smartbudget_shared.events import (
-    ClassificationCompletedPayload,
-    ClassificationUpdatedPayload,
-    EventEnvelope,
-    EventSource,
-    NotificationPayload,
+    TransactionCategoryUpdatedPayload,
+    TransactionClassifiedPayload,
+    TransactionNeedCategoryPayload,
+    create_transaction_category_updated_event,
+    create_transaction_classified_event,
 )
 from app.infrastructure.db.models import (
     Category,
@@ -44,47 +43,6 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _notification_event_id(event_name: str, key: UUID | str) -> UUID:
-    """Создает детерминированный notification event id."""
-    return uuid5(NAMESPACE_URL, f"smartbudget:notifications:{event_name}:{key}")
-
-
-def _notification_event(
-    event_name: str,
-    user_id: UUID,
-    payload: dict[str, Any],
-    event_id: UUID,
-    idempotency_key: str | None = None,
-) -> dict[str, Any]:
-    """Формирует notification event envelope."""
-    event_payload = NotificationPayload(
-        user_id=user_id,
-        payload=payload,
-    )
-    event = EventEnvelope.create(
-        event_id=event_id,
-        event_type=event_name,
-        source_service=EventSource.CLASSIFICATION,
-        payload=event_payload,
-        occurred_at=_utc_now(),
-        idempotency_key=idempotency_key,
-    )
-
-    return event.model_dump(
-        mode="json",
-        by_alias=True,
-        exclude_none=True,
-    )
-
-
-def _decimal_to_float(value: Decimal | int | float | None) -> float:
-    """Безопасно приводит число к float для notification payload."""
-    if value is None:
-        return 0.0
-
-    return float(value)
-
-
 def _classification_cache_key(user_id: UUID, transaction_id: UUID) -> str:
     """Возвращает Redis cache key результата классификации."""
     return f"classification:{user_id}:{transaction_id}"
@@ -100,7 +58,7 @@ def _classification_completed_event(
     source: str,
 ) -> dict[str, Any]:
     """Формирует transaction.classified event envelope."""
-    payload = ClassificationCompletedPayload(
+    payload = TransactionClassifiedPayload(
         transaction_id=transaction_id,
         user_id=user_id,
         category_id=category_id,
@@ -108,12 +66,7 @@ def _classification_completed_event(
         confidence=confidence,
         source=source,
     )
-    event = EventEnvelope.create(
-        event_type="transaction.classified",
-        source_service=EventSource.CLASSIFICATION,
-        payload=payload,
-        idempotency_key=f"transaction.classified:{transaction_id}",
-    )
+    event = create_transaction_classified_event(payload)
 
     return event.model_dump(
         mode="json",
@@ -135,7 +88,7 @@ def _classification_updated_event(
     new_category_name: str,
 ) -> dict[str, Any]:
     """Формирует transaction.category_updated event envelope."""
-    payload = ClassificationUpdatedPayload(
+    payload = TransactionCategoryUpdatedPayload(
         transaction_id=transaction_id,
         user_id=user_id,
         merchant=merchant,
@@ -146,12 +99,7 @@ def _classification_updated_event(
         new_category_id=new_category_id,
         new_category_name=new_category_name,
     )
-    event = EventEnvelope.create(
-        event_type="transaction.category_updated",
-        source_service=EventSource.CLASSIFICATION,
-        payload=payload,
-        idempotency_key=f"transaction.category_updated:{transaction_id}",
-    )
+    event = create_transaction_category_updated_event(payload)
 
     return event.model_dump(
         mode="json",
@@ -191,7 +139,7 @@ class ClassificationService:
 
     async def process_batch(
         self,
-        events: list[TransactionNeedCategoryEvent],
+        events: list[TransactionNeedCategoryPayload],
     ) -> None:
         """Пакетно классифицирует транзакции."""
         if not events:
@@ -216,8 +164,8 @@ class ClassificationService:
             semaphore = asyncio.Semaphore(BATCH_CLASSIFICATION_CONCURRENCY)
 
             async def classify_with_limit(
-                event: TransactionNeedCategoryEvent,
-            ) -> tuple[ClassificationResult, dict[str, Any], dict[str, Any] | None]:
+                event: TransactionNeedCategoryPayload,
+            ) -> tuple[ClassificationResult, dict[str, Any]]:
                 async with semaphore:
                     return await self._calculate_classification(event)
 
@@ -228,11 +176,10 @@ class ClassificationService:
                 ],
             )
 
-            for result_model, outbox_data, notification_event in results_data:
+            for result_model, outbox_data in results_data:
                 await self._save_classification_result(
                     result_model=result_model,
                     outbox_data=outbox_data,
-                    notification_event=notification_event,
                 )
 
     async def get_classification(
@@ -304,61 +251,41 @@ class ClassificationService:
                 correct_category=correct_category,
             )
 
-            notification_event = None
-            if old_category_id != body.correct_category_id:
-                notification_event = self._queue_category_changed_notification(
-                    user_id=user_id,
-                    transaction_id=body.transaction_id,
-                    old_category_id=old_category_id,
-                    new_category_id=body.correct_category_id,
-                )
-
             await self.redis.delete(
                 _classification_cache_key(user_id, body.transaction_id),
             )
 
-            return event_data, correct_category, notification_event
+            return event_data, correct_category, None
 
     async def classify_transaction(
         self,
-        event: TransactionNeedCategoryEvent,
+        event: TransactionNeedCategoryPayload,
     ) -> None:
         """Классифицирует одну транзакцию из Kafka consumer-а."""
         existing = await self.uow.results.get_by_transaction_id(event.transaction_id)
         if existing:
             return
 
-        result_model, outbox_payload, notification_event = (
-            await self._calculate_classification(event)
-        )
+        result_model, outbox_payload = await self._calculate_classification(event)
 
         await self._save_classification_result(
             result_model=result_model,
             outbox_data=outbox_payload,
-            notification_event=notification_event,
         )
 
     async def _save_classification_result(
         self,
         result_model: ClassificationResult,
         outbox_data: dict[str, Any],
-        notification_event: dict[str, Any] | None,
     ) -> None:
-        """Сохраняет результат классификации и связанные outbox events."""
+        """Сохраняет результат классификации и связанное outbox event."""
         await self.uow.results.upsert(result_model)
 
         self.uow.outbox.add_event(
-            settings.KAFKA.TOPIC_CLASSIFIED,
+            settings.KAFKA.KAFKA_TOPIC_CLASSIFICATION_EVENTS,
             outbox_data,
             "transaction.classified",
         )
-
-        if notification_event:
-            self.uow.outbox.add_event(
-                settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
-                notification_event,
-                notification_event.get("event_type", "notification.event"),
-            )
 
         if result_model.user_id:
             await self._cache_classification_response(
@@ -369,8 +296,8 @@ class ClassificationService:
 
     async def _calculate_classification(
         self,
-        event: TransactionNeedCategoryEvent,
-    ) -> tuple[ClassificationResult, dict[str, Any], dict[str, Any] | None]:
+        event: TransactionNeedCategoryPayload,
+    ) -> tuple[ClassificationResult, dict[str, Any]]:
         """Рассчитывает категорию транзакции по правилам и ML."""
         merchant = event.merchant
         mcc = event.mcc
@@ -431,17 +358,11 @@ class ClassificationService:
             source=source.value,
         )
 
-        notification_event = self._build_unclassified_notification(
-            event=event,
-            category_id=category_id,
-            confidence=confidence,
-        )
-
-        return result, outbox_data, notification_event
+        return result, outbox_data
 
     async def _apply_ml(
         self,
-        event: TransactionNeedCategoryEvent,
+        event: TransactionNeedCategoryPayload,
     ) -> tuple[int | None, str | None, float, str | None]:
         """Применяет ML-классификацию к транзакции."""
         if not self.ml_pipeline:
@@ -508,33 +429,6 @@ class ClassificationService:
             )
         )
 
-    @staticmethod
-    def _build_unclassified_notification(
-        event: TransactionNeedCategoryEvent,
-        category_id: int,
-        confidence: float,
-    ) -> dict[str, Any] | None:
-        """Формирует notification event для неклассифицированной транзакции."""
-        if (
-            category_id != UNCATEGORIZED_CATEGORY_ID
-            or confidence != 0.0
-            or not event.user_id
-        ):
-            return None
-
-        return _notification_event(
-            "transaction.unclassified.found",
-            event.user_id,
-            {
-                "transaction_id": str(event.transaction_id),
-                "amount": _decimal_to_float(event.amount),
-            },
-            event_id=_notification_event_id(
-                "transaction.unclassified.found",
-                event.transaction_id,
-            ),
-            idempotency_key=f"transaction.unclassified.found:{event.transaction_id}",
-        )
 
     def _create_feedback(
         self,
@@ -584,48 +478,13 @@ class ClassificationService:
         )
 
         self.uow.outbox.add_event(
-            settings.KAFKA.TOPIC_CATEGORY_UPDATED,
+            settings.KAFKA.KAFKA_TOPIC_CLASSIFICATION_EVENTS,
             event_data,
             "transaction.category_updated",
         )
 
         return event_data
 
-    def _queue_category_changed_notification(
-        self,
-        user_id: UUID,
-        transaction_id: UUID,
-        old_category_id: int,
-        new_category_id: int,
-    ) -> dict[str, Any]:
-        """Добавляет notification event изменения категории."""
-        notification_event = _notification_event(
-            "transaction.category.changed",
-            user_id,
-            {
-                "transaction_id": str(transaction_id),
-                "old_category_id": old_category_id,
-                "new_category_id": new_category_id,
-            },
-            event_id=_notification_event_id(
-                "transaction.category.changed",
-                f"{transaction_id}:{old_category_id}:{new_category_id}",
-            ),
-            idempotency_key=(
-                f"transaction.category.changed:"
-                f"{transaction_id}:"
-                f"{old_category_id}:"
-                f"{new_category_id}"
-            ),
-        )
-
-        self.uow.outbox.add_event(
-            settings.KAFKA.TOPIC_NOTIFICATION_EVENTS,
-            notification_event,
-            notification_event["event_type"],
-        )
-
-        return notification_event
 
     async def _cache_classification_response(
         self,

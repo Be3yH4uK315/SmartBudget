@@ -5,16 +5,22 @@ from pathlib import Path
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
-from app.domain.schemas.kafka import TransactionNeedCategoryEvent
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.classification.rules import ruleManager
 from app.services.classification.service import ClassificationService
 from app.services.ml.manager import modelManager
+from smartbudget_shared.events import (
+    DLQPayload,
+    EventEnvelope,
+    TransactionEventType,
+    TransactionNeedCategoryPayload,
+    create_dlq_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,8 @@ KEEP_ALIVE_INTERVAL_SECONDS = 5
 CONSUMER_TIMEOUT_MS = 1000
 REQUEST_ID_HEADER = "X-Request-ID"
 ERROR_HEADER = "error"
+
+NeedCategoryEnvelopeAdapter = TypeAdapter(EventEnvelope[TransactionNeedCategoryPayload])
 
 
 async def keep_alive_task() -> None:
@@ -46,16 +54,6 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
             return value.decode("utf-8")
 
     return None
-
-
-def _event_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Возвращает бизнес-payload из envelope или старого Kafka payload."""
-    nested_payload = payload.get("payload")
-
-    if isinstance(nested_payload, dict):
-        return nested_payload
-
-    return payload
 
 
 class KafkaConsumerWorker:
@@ -105,10 +103,7 @@ class KafkaConsumerWorker:
 
             logger.info(
                 "Kafka worker started",
-                extra={
-                    "topic": self.topic,
-                    "group_id": self.group_id,
-                },
+                extra={"topic": self.topic, "group_id": self.group_id},
             )
 
             while True:
@@ -120,10 +115,8 @@ class KafkaConsumerWorker:
                 )
 
                 for _, messages in batches.items():
-                    if not messages:
-                        continue
-
-                    await self.process_batch(messages)
+                    if messages:
+                        await self.process_batch(messages)
 
                 if batches and not settings.KAFKA.KAFKA_ENABLE_AUTO_COMMIT:
                     await self.consumer.commit()
@@ -131,20 +124,14 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={
-                    "topic": self.topic,
-                    "group_id": self.group_id,
-                },
+                extra={"topic": self.topic, "group_id": self.group_id},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={
-                    "topic": self.topic,
-                    "group_id": self.group_id,
-                },
+                extra={"topic": self.topic, "group_id": self.group_id},
             )
             raise
 
@@ -164,10 +151,7 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={
-                    "topic": self.topic,
-                    "group_id": self.group_id,
-                },
+                extra={"topic": self.topic, "group_id": self.group_id},
             )
 
     async def process_batch(self, messages: list[Any]) -> None:
@@ -212,56 +196,61 @@ class KafkaConsumerWorker:
 
         try:
             async with uow.make_savepoint():
-                payload = json.loads(message.value)
-                event_payload = _event_payload(payload)
-                event = TransactionNeedCategoryEvent.model_validate(event_payload)
+                raw_payload = json.loads(message.value)
+                event = self._parse_event(raw_payload)
+                if event is None:
+                    return
                 await self.process_event(event, service)
 
             logger.info(
                 "Kafka message processed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
 
         except (json.JSONDecodeError, ValidationError) as exc:
             logger.exception(
                 "Kafka message validation failed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             await self.send_to_dlq(message, exc, request_id)
 
         except SQLAlchemyError as exc:
             logger.exception(
                 "Kafka message processing failed with database error",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             await self.send_to_dlq(message, exc, request_id)
 
         except Exception as exc:
             logger.exception(
                 "Kafka message processing failed with transient error",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             await self.send_to_dlq(message, exc, request_id)
 
     async def process_event(
         self,
-        event: TransactionNeedCategoryEvent,
+        event: EventEnvelope[TransactionNeedCategoryPayload],
         service: ClassificationService,
     ) -> None:
         """Передает событие в ClassificationService."""
-        await service.classify_transaction(event)
+        await service.classify_transaction(event.payload)
+
+    def _parse_event(
+        self,
+        payload: dict[str, Any],
+    ) -> EventEnvelope[TransactionNeedCategoryPayload] | None:
+        """Парсит Kafka envelope по event_type."""
+        event_type = payload.get("event_type")
+
+        if event_type != TransactionEventType.TRANSACTION_NEED_CATEGORY.value:
+            logger.debug(
+                "Kafka event ignored by classification service: %s",
+                event_type,
+            )
+            return None
+
+        return NeedCategoryEnvelopeAdapter.validate_python(payload)
 
     async def send_to_dlq(
         self,
@@ -270,6 +259,15 @@ class KafkaConsumerWorker:
         request_id: str | None,
     ) -> None:
         """Отправляет проблемное сообщение в DLQ."""
+        dlq_payload = DLQPayload(
+            original_topic=message.topic,
+            original_message=message.value.decode("utf-8", errors="replace"),
+            error=str(exc),
+            consumer_group=self.group_id,
+            retry_count=0,
+        )
+        dlq_event = create_dlq_event(dlq_payload)
+
         headers = [
             (ERROR_HEADER, str(exc).encode("utf-8")),
         ]
@@ -278,7 +276,7 @@ class KafkaConsumerWorker:
 
         success = await self.dlq_producer.send_event(
             topic=settings.KAFKA.dlq_topic,
-            value=message.value,
+            value=dlq_event.to_kafka_payload(),
             key=message.key,
             headers=headers,
             wait=True,

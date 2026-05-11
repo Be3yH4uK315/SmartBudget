@@ -4,6 +4,7 @@ from smartbudget_shared.config import (
     ArqSettings as SharedArqSettings,
     DBSettings as SharedDBSettings,
 )
+from smartbudget_shared.events import KafkaTopic
 
 
 class DBSettings(SharedDBSettings):
@@ -24,19 +25,14 @@ class KafkaSettings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
 
     KAFKA_GROUP_ID: str
-    KAFKA_TOPIC: str | None = None
-    KAFKA_DLQ_TOPIC: str | None = None
     KAFKA_AUTO_OFFSET_RESET: str
     KAFKA_ENABLE_AUTO_COMMIT: bool
     KAFKA_SECURITY_PROTOCOL: str
     KAFKA_BATCH_SIZE: int
 
-    TOPIC_NEED_CATEGORY: str
-    TOPIC_CLASSIFIED: str
-    TOPIC_CATEGORY_UPDATED: str
-    TOPIC_CLASSIFICATION_EVENTS: str
-    TOPIC_NOTIFICATION_EVENTS: str
-    TOPIC_NEED_CATEGORY_DLQ: str
+    KAFKA_TOPIC_TRANSACTION_EVENTS: str = KafkaTopic.TRANSACTION_EVENTS
+    KAFKA_TOPIC_CLASSIFICATION_EVENTS: str = KafkaTopic.CLASSIFICATION_EVENTS
+    KAFKA_TOPIC_DLQ: str = KafkaTopic.DLQ
 
     @property
     def consumer_group_id(self) -> str:
@@ -46,12 +42,12 @@ class KafkaSettings(BaseSettings):
     @property
     def consumer_topic(self) -> str:
         """Возвращает topic, который читает classification consumer."""
-        return self.KAFKA_TOPIC or self.TOPIC_NEED_CATEGORY
+        return self.KAFKA_TOPIC_TRANSACTION_EVENTS
 
     @property
     def dlq_topic(self) -> str:
         """Возвращает DLQ topic."""
-        return self.KAFKA_DLQ_TOPIC or self.TOPIC_NEED_CATEGORY_DLQ
+        return self.KAFKA_TOPIC_DLQ
 
 
 class MLSettings(BaseSettings):

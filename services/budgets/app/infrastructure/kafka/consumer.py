@@ -5,16 +5,24 @@ from pathlib import Path
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core import metrics
 from app.core.config import settings
 from app.core.context import set_request_id
-from app.domain.schemas import kafka as schemas
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.service import BudgetService
+from smartbudget_shared.events import (
+    DLQPayload,
+    EventEnvelope,
+    TransactionDeletedPayload,
+    TransactionEventType,
+    TransactionPayload,
+    TransactionUpdatedPayload,
+    create_dlq_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +30,10 @@ HEALTH_FILE = Path("/tmp/healthy")
 KEEP_ALIVE_INTERVAL_SECONDS = 5
 CONSUMER_TIMEOUT_MS = 1000
 REQUEST_ID_HEADER = "X-Request-ID"
+
+TransactionCreatedAdapter = TypeAdapter(EventEnvelope[TransactionPayload])
+TransactionUpdatedAdapter = TypeAdapter(EventEnvelope[TransactionUpdatedPayload])
+TransactionDeletedAdapter = TypeAdapter(EventEnvelope[TransactionDeletedPayload])
 
 
 async def keep_alive_task() -> None:
@@ -47,16 +59,6 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
-def _event_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Возвращает бизнес-payload из envelope или старого Kafka payload."""
-    nested_payload = payload.get("payload")
-
-    if isinstance(nested_payload, dict):
-        return nested_payload
-
-    return payload
-
-
 class KafkaConsumerWorker:
     """Kafka consumer для обработки событий budget service."""
 
@@ -71,7 +73,7 @@ class KafkaConsumerWorker:
         self.health_task: asyncio.Task | None = None
 
     @property
-    def topics(self) -> tuple[str, str, str]:
+    def topics(self) -> tuple[str, str]:
         """Возвращает topics, которые читает consumer."""
         return settings.KAFKA.consumer_topics
 
@@ -102,10 +104,7 @@ class KafkaConsumerWorker:
 
             logger.info(
                 "Kafka worker started",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
             while True:
@@ -129,20 +128,14 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
@@ -162,10 +155,7 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
     async def handle_message(self, message: Any) -> None:
@@ -184,14 +174,11 @@ class KafkaConsumerWorker:
 
         try:
             payload = json.loads(message.value)
-            await self.process_payload(message.topic, payload)
+            await self.process_payload(payload)
 
             logger.info(
                 "Kafka message processed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
 
         except (json.JSONDecodeError, ValidationError) as exc:
@@ -204,48 +191,41 @@ class KafkaConsumerWorker:
         except SQLAlchemyError:
             logger.exception(
                 "Kafka message processing failed with database error",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka message processing failed with transient error",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise
 
     async def process_payload(
         self,
-        topic: str,
         payload: dict[str, Any],
     ) -> None:
-        """Маршрутизирует Kafka payload в обработчик budget service."""
+        """Маршрутизирует Kafka envelope в обработчик budget service."""
         service = BudgetService(UnitOfWork(self.db_session_maker))
-        event_payload = _event_payload(payload)
+        event_type = payload.get("event_type")
 
-        if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_NEW:
-            event = schemas.TransactionNewMessage.model_validate(event_payload)
-            await service.process_new_transaction(event)
+        if event_type == TransactionEventType.TRANSACTION_CREATED.value:
+            event = TransactionCreatedAdapter.validate_python(payload)
+            await service.process_new_transaction(event.payload)
             return
 
-        if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_UPDATED:
-            event = schemas.TransactionUpdatedMessage.model_validate(event_payload)
-            await service.process_updated_transaction(event)
+        if event_type == TransactionEventType.TRANSACTION_UPDATED.value:
+            event = TransactionUpdatedAdapter.validate_python(payload)
+            await service.process_updated_transaction(event.payload)
             return
 
-        if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_DELETED:
-            event = schemas.TransactionDeletedMessage.model_validate(event_payload)
-            await service.process_deleted_transaction(event)
+        if event_type == TransactionEventType.TRANSACTION_DELETED.value:
+            event = TransactionDeletedAdapter.validate_python(payload)
+            await service.process_deleted_transaction(event.payload)
             return
 
-        logger.warning("Unknown Kafka topic for budgets service: %s", topic)
+        logger.debug("Kafka event ignored by budgets service: %s", event_type)
 
     async def send_to_dlq(
         self,
@@ -254,6 +234,15 @@ class KafkaConsumerWorker:
         request_id: str | None,
     ) -> None:
         """Публикует проблемное сообщение в DLQ."""
+        dlq_payload = DLQPayload(
+            original_topic=message.topic,
+            original_message=message.value.decode("utf-8", errors="replace"),
+            error=str(exc),
+            consumer_group=self.group_id,
+            retry_count=0,
+        )
+        dlq_event = create_dlq_event(dlq_payload)
+
         headers = [("error", str(exc).encode("utf-8"))]
 
         if request_id:
@@ -261,7 +250,7 @@ class KafkaConsumerWorker:
 
         success = await self.dlq_producer.send_event(
             topic=settings.KAFKA.dlq_topic,
-            value=message.value,
+            value=dlq_event.to_kafka_payload(),
             key=message.key,
             headers=headers,
             wait=True,
@@ -270,10 +259,7 @@ class KafkaConsumerWorker:
         if not success:
             logger.critical(
                 "Kafka DLQ publish failed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise RuntimeError("DLQ refused message")
 
@@ -295,10 +281,7 @@ class KafkaConsumerWorker:
         """Обрабатывает poison message и отправляет его в DLQ."""
         logger.exception(
             "Kafka poison message processing failed",
-            extra={
-                "topic": message.topic,
-                "offset": message.offset,
-            },
+            extra={"topic": message.topic, "offset": message.offset},
         )
 
         metrics.KAFKA_DLQ_ERRORS.labels(

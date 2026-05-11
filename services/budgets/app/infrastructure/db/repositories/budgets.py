@@ -65,7 +65,7 @@ class BudgetRepository:
             .where(*filters)
             .options(selectinload(models.Budget.category_limits))
             .order_by(models.Budget.created_at.desc())
-            .limit(1)
+            .limitAmount(1)
             .with_for_update(),
         )
 
@@ -92,7 +92,7 @@ class BudgetRepository:
     async def list_auto_renew_budgets(
         self,
         month: date,
-        limit: int,
+        limitAmount: int,
     ) -> list[models.Budget]:
         """Получает бюджеты с auto-renew за указанный месяц."""
         result = await self.db.execute(
@@ -103,7 +103,7 @@ class BudgetRepository:
             )
             .options(selectinload(models.Budget.category_limits))
             .order_by(models.Budget.created_at.asc())
-            .limit(limit),
+            .limitAmount(limitAmount),
         )
 
         return list(result.scalars().all())
@@ -145,7 +145,11 @@ class BudgetRepository:
             month=month,
             category_id=category_id,
             amount=amount,
-            transaction_type=transaction_type.value,
+            transaction_type=(
+                transaction_type.value
+                if hasattr(transaction_type, "value")
+                else str(transaction_type)
+            ),
             occurred_at=occurred_at,
             created_at=now,
             updated_at=now,

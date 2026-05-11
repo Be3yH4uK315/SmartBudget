@@ -82,7 +82,7 @@ async def process_outbox_task(ctx: dict[str, Any]) -> int:
     await touch_health_file()
 
     async with UnitOfWork(db_maker) as uow:
-        events = await uow.outbox.get_pending_events(limit=OUTBOX_BATCH_SIZE)
+        events = await uow.outbox.get_pending_events(limitAmount=OUTBOX_BATCH_SIZE)
         if not events:
             return 0
 
@@ -192,7 +192,7 @@ def _schedule_retry_or_fail(
         )
         return
 
-    delay = OUTBOX_RETRY_BASE_SECONDS ** event.retry_count
+    delay = OUTBOX_RETRY_BASE_SECONDS**event.retry_count
     event.next_retry_at = now + timedelta(seconds=delay)
 
     logger.warning(

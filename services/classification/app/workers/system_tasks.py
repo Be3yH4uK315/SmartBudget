@@ -63,7 +63,7 @@ async def process_outbox_task(ctx: dict[str, Any]) -> int:
     await touch_health_file()
 
     async with UnitOfWork(db_maker) as uow:
-        events = await uow.outbox.get_pending_events(limit=OUTBOX_BATCH_SIZE)
+        events = await uow.outbox.get_pending_events(limitAmount=OUTBOX_BATCH_SIZE)
         if not events:
             return 0
 
@@ -176,12 +176,11 @@ def _should_skip_by_retry_delay(
     if event.retry_count <= 0:
         return False
 
-    required_delay = OUTBOX_RETRY_BASE_SECONDS ** event.retry_count
+    required_delay = OUTBOX_RETRY_BASE_SECONDS**event.retry_count
     required_delay = min(required_delay, OUTBOX_MAX_RETRY_DELAY_SECONDS)
 
     return bool(
-        event.created_at
-        and now < event.created_at + timedelta(seconds=required_delay)
+        event.created_at and now < event.created_at + timedelta(seconds=required_delay)
     )
 
 

@@ -1,14 +1,16 @@
+from functools import cached_property
 from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import cached_property
 
-from smartbudget_shared.config import (
-    DBSettings as SharedDBSettings,
-    ArqSettings as SharedArqSettings,
-    AppSettings as SharedAppSettings,
-)
 from app.utils.crypto import hash_password_sync
+from smartbudget_shared.config import (
+    AppSettings as SharedAppSettings,
+    ArqSettings as SharedArqSettings,
+    DBSettings as SharedDBSettings,
+)
+from smartbudget_shared.events import KafkaTopic
 
 
 class DBSettings(SharedDBSettings):
@@ -53,9 +55,23 @@ class ArqSettings(SharedArqSettings):
 
 
 class KafkaSettings(BaseSettings):
+    """Настройки Kafka для auth service."""
+
     KAFKA_BOOTSTRAP_SERVERS: str
-    KAFKA_AUTH_GROUP_ID: str
-    KAFKA_AUTH_EVENTS_TOPIC: str
+    KAFKA_GROUP_ID: str | None = None
+    KAFKA_AUTH_GROUP_ID: str | None = None
+
+    KAFKA_TOPIC_AUTH_EVENTS: str = KafkaTopic.AUTH_EVENTS
+
+    @property
+    def producer_topic(self) -> str:
+        """Возвращает topic auth-событий."""
+        return self.KAFKA_TOPIC_AUTH_EVENTS
+
+    @property
+    def consumer_group_id(self) -> str | None:
+        """Возвращает group id, если он нужен worker-ам."""
+        return self.KAFKA_GROUP_ID or self.KAFKA_AUTH_GROUP_ID
 
 
 class GeoSettings(BaseSettings):

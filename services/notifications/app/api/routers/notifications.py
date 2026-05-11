@@ -17,7 +17,7 @@ router = APIRouter(tags=["Notifications"])
 )
 async def get_notifications(
     is_read: bool | None = Query(None, description="Фильтр по статусу прочтения"),
-    limit: int = Query(20, ge=1, le=100),
+    limitAmount: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
@@ -26,7 +26,7 @@ async def get_notifications(
     return await service.get_paginated_notifications(
         user_id,
         is_read,
-        limit,
+        limitAmount,
         offset,
     )
 

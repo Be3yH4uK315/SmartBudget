@@ -21,9 +21,9 @@ class DLQPayload(BaseEventPayload):
 
 def create_dlq_event(payload: DLQPayload) -> EventEnvelope[DLQPayload]:
     """Создает DLQ-событие."""
-
     return EventEnvelope.create(
         event_type="event.dead_letter",
         source_service=EventSource.LOGS,
         payload=payload,
+        idempotency_key=f"event.dead_letter:{payload.original_topic}:{payload.failed_at.isoformat()}",
     )

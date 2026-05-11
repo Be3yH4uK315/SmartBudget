@@ -47,7 +47,7 @@ class GoalFilters:
 
     def __init__(
         self,
-        limit: int = Query(100, ge=1, le=1000, description="Лимит записей"),
+        limitAmount: int = Query(100, ge=1, le=1000, description="Лимит записей"),
         offset: int = Query(0, ge=0, description="Смещение"),
         tags: str | None = Query(
             None,
@@ -59,7 +59,7 @@ class GoalFilters:
         ),
         is_archived: bool = Query(False, description="Показывать архивные цели"),
     ) -> None:
-        self.limit = limit
+        self.limitAmount = limitAmount
         self.offset = offset
         self.is_archived = is_archived
         self.tags_list = self._parse_tags(tags)

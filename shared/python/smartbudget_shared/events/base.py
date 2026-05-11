@@ -29,9 +29,9 @@ class EventSource(StrEnum):
 
     AUTH = "authentification"
     TRANSACTIONS = "transactions"
+    CLASSIFICATION = "classification"
     BUDGETS = "budgets"
     GOALS = "goals"
-    CLASSIFICATION = "classification"
     NOTIFICATIONS = "notifications"
     LOGS = "logs"
 
@@ -39,28 +39,18 @@ class EventSource(StrEnum):
 class KafkaTopic(StrEnum):
     """Kafka topics, используемые сервисами SmartBudget."""
 
-    AUTH_EVENTS = "auth.events"
-
-    TRANSACTION_EVENTS = "transaction.events"
-    TRANSACTION_NEW = "transaction.new"
-    TRANSACTION_UPDATED = "transaction.updated"
-    TRANSACTION_DELETED = "transaction.deleted"
-    TRANSACTION_GOAL = "transaction.goal"
-    TRANSACTION_NEED_CATEGORY = "transaction.need_category"
-    TRANSACTION_CLASSIFIED = "transaction.classified"
-    TRANSACTION_CATEGORY_UPDATED = "transaction.category_updated"
-
-    BUDGET_EVENTS = "budget.events"
-    GOAL_EVENTS = "goal.events"
-    CLASSIFICATION_EVENTS = "classification.events"
-    NOTIFICATION_EVENTS = "notification.events"
-
-    DLQ = "events.dlq"
+    AUTH_EVENTS = "smartbudget.auth.events"
+    TRANSACTION_EVENTS = "smartbudget.transactions.events"
+    CLASSIFICATION_EVENTS = "smartbudget.classification.events"
+    BUDGET_EVENTS = "smartbudget.budgets.events"
+    GOAL_EVENTS = "smartbudget.goals.events"
+    NOTIFICATION_EVENTS = "smartbudget.notifications.events"
+    DLQ = "smartbudget.events.dlq"
 
 
 class EventEnvelope(BaseModel, Generic[PayloadT]):
     """
-    Единая обертка для всех Kafka-событий.
+    Единая обертка для Kafka-событий.
 
     Envelope хранит технические метаданные события, а payload содержит
     бизнес-данные конкретного события.
@@ -87,6 +77,14 @@ class EventEnvelope(BaseModel, Generic[PayloadT]):
         default_factory=utc_now,
         description="Время возникновения события",
     )
+    aggregate_id: UUID | None = Field(
+        default=None,
+        description="ID основной сущности события",
+    )
+    user_id: UUID | None = Field(
+        default=None,
+        description="ID пользователя, к которому относится событие",
+    )
     correlation_id: UUID | None = Field(
         default=None,
         description="ID цепочки связанных операций",
@@ -111,6 +109,8 @@ class EventEnvelope(BaseModel, Generic[PayloadT]):
         event_id: UUID | None = None,
         version: int = 1,
         occurred_at: datetime | None = None,
+        aggregate_id: UUID | None = None,
+        user_id: UUID | None = None,
         correlation_id: UUID | None = None,
         causation_id: UUID | None = None,
         idempotency_key: str | None = None,
@@ -122,6 +122,8 @@ class EventEnvelope(BaseModel, Generic[PayloadT]):
             source_service=str(enum_value(source_service)),
             version=version,
             occurred_at=occurred_at or utc_now(),
+            aggregate_id=aggregate_id,
+            user_id=user_id,
             correlation_id=correlation_id,
             causation_id=causation_id,
             idempotency_key=idempotency_key,

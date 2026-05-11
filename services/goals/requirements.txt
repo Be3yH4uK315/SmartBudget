@@ -20,7 +20,7 @@ aiokafka>=0.10.0
 # --- Monitoring & Instrumentation ---
 prometheus-client>=0.18.0
 prometheus-fastapi-instrumentator>=6.1.0
--e ../../shared/python
+../../shared/python
 
 # --- Settings & Validation ---
 pydantic-settings>=2.0.0

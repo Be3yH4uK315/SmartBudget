@@ -89,7 +89,7 @@
     │            │              │              │
    ▼            ▼              ▼              ▼
 PostgreSQL   Redis            Kafka          Arq
-(Users,    (Rate limit,      (Events:    (Background
+(Users,    (Rate limitAmount,      (Events:    (Background
 Sessions)  Tokens)      user.login, etc)  Tasks)
 ```
 

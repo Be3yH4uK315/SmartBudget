@@ -4,17 +4,28 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
 
 from aiokafka import AIOKafkaConsumer
+from pydantic import TypeAdapter, ValidationError
 
 from app.core import metrics
 from app.core.config import settings
 from app.core.context import set_request_id
-from app.domain.schemas import kafka as schemas
+from app.domain.schemas.kafka import IncomingNotificationEvent
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
 from app.services.service import NotificationService
+from smartbudget_shared.events import (
+    AuthEventType,
+    AuthUserPayload,
+    BudgetEventType,
+    BudgetPayload,
+    DLQPayload,
+    EventEnvelope,
+    GoalEventType,
+    GoalPayload,
+    create_dlq_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +33,10 @@ HEALTH_FILE = Path("/tmp/healthy")
 KEEP_ALIVE_INTERVAL_SECONDS = 5
 CONSUMER_TIMEOUT_MS = 1000
 REQUEST_ID_HEADER = "X-Request-ID"
+
+AuthEventAdapter = TypeAdapter(EventEnvelope[AuthUserPayload])
+BudgetEventAdapter = TypeAdapter(EventEnvelope[BudgetPayload])
+GoalEventAdapter = TypeAdapter(EventEnvelope[GoalPayload])
 
 
 async def keep_alive_task() -> None:
@@ -47,80 +62,45 @@ def _request_id_from_headers(headers: list[tuple[str, bytes]] | None) -> str | N
     return None
 
 
-def _event_id_from_message(message: Any) -> Any:
-    """Создает детерминированный event_id для auth outbox message."""
-    return uuid5(
-        NAMESPACE_URL,
-        f"{message.topic}:{message.partition}:{message.offset}",
-    )
-
-
-def _timestamp_from_message(message: Any) -> datetime:
-    """Возвращает timestamp Kafka-сообщения как UTC datetime."""
-    if not message.timestamp:
+def _parse_timestamp(value: str | None) -> datetime:
+    """Парсит timestamp события."""
+    if not value:
         return datetime.now(timezone.utc)
 
-    return datetime.fromtimestamp(
-        message.timestamp / 1000,
-        tz=timezone.utc,
-    )
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(timezone.utc)
 
 
-def _is_event_envelope(payload: dict[str, Any]) -> bool:
-    """Проверяет, что Kafka payload похож на EventEnvelope."""
-    return (
-        isinstance(payload.get("payload"), dict)
-        and "event_id" in payload
-        and "event_type" in payload
-    )
-
-
-def _notification_event_from_payload(
-    payload: dict[str, Any],
-) -> dict[str, Any]:
-    """Преобразует старый notification payload или EventEnvelope во входящее событие."""
-    if not _is_event_envelope(payload):
-        return payload
-
-    business_payload = payload.get("payload") or {}
-    nested_payload = business_payload.get("payload")
-
+def _budget_notification_payload(event: EventEnvelope[BudgetPayload]) -> dict[str, Any]:
+    """Преобразует budget event в payload уведомления."""
     return {
-        "event_id": payload["event_id"],
-        "event_type": payload["event_type"],
-        "user_id": business_payload.get("user_id"),
-        "payload": nested_payload if isinstance(nested_payload, dict) else {},
-        "timestamp": payload.get("occurred_at") or payload.get("timestamp"),
+        "budget_id": str(event.payload.budget_id) if event.payload.budget_id else None,
+        "category_id": event.payload.category_id,
+        "limit_amount": str(event.payload.limit_amount)
+        if event.payload.limit_amount is not None
+        else None,
+        "spent_amount": str(event.payload.spent_amount)
+        if event.payload.spent_amount is not None
+        else None,
+        "threshold_percent": event.payload.threshold_percent,
     }
 
 
-def _auth_event_from_payload(
-    payload: dict[str, Any],
-) -> dict[str, Any]:
-    """Преобразует auth legacy payload или EventEnvelope в AuthOutboxEvent payload."""
-    if not _is_event_envelope(payload):
-        return payload
-
-    business_payload = payload.get("payload") or {}
-    nested_payload = business_payload.get("payload")
-
-    normalized = {
-        "event_type": payload.get("event_type"),
-        "user_id": business_payload.get("user_id"),
-        "email": business_payload.get("email"),
-        "old_email": business_payload.get("old_email"),
-        "new_email": business_payload.get("new_email"),
-        "name": business_payload.get("name"),
-        "language": business_payload.get("language"),
-        "ip": business_payload.get("ip"),
-        "location": business_payload.get("location"),
-        "payload": nested_payload if isinstance(nested_payload, dict) else {},
-    }
-
+def _goal_notification_payload(event: EventEnvelope[GoalPayload]) -> dict[str, Any]:
+    """Преобразует goal event в payload уведомления."""
     return {
-        key: value
-        for key, value in normalized.items()
-        if value is not None
+        "goal_id": str(event.payload.goal_id),
+        "target_amount": str(event.payload.target_amount)
+        if event.payload.target_amount is not None
+        else None,
+        "current_amount": str(event.payload.current_amount)
+        if event.payload.current_amount is not None
+        else None,
+        "progress_percent": event.payload.progress_percent,
+        "threshold_percent": event.payload.threshold_percent,
     }
 
 
@@ -140,7 +120,7 @@ class KafkaConsumerWorker:
         self.health_task: asyncio.Task | None = None
 
     @property
-    def topics(self) -> tuple[str, str]:
+    def topics(self) -> tuple[str, str, str]:
         """Возвращает topics, которые читает consumer."""
         return settings.KAFKA.consumer_topics
 
@@ -171,10 +151,7 @@ class KafkaConsumerWorker:
 
             logger.info(
                 "Kafka worker started",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
             while True:
@@ -198,20 +175,14 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
@@ -231,10 +202,7 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
     async def handle_message(self, message: Any) -> None:
@@ -259,14 +227,18 @@ class KafkaConsumerWorker:
                 self.arq_pool,
             )
 
-            await self.process_event(payload, message, service)
+            await self.process_event(payload, service)
 
             logger.info(
                 "Kafka message processed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
+            )
+
+        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+            await self._handle_processing_error(
+                message=message,
+                exc=exc,
+                request_id=request_id,
             )
 
         except Exception as exc:
@@ -279,54 +251,71 @@ class KafkaConsumerWorker:
     async def process_event(
         self,
         payload: dict[str, Any],
-        message: Any,
         service: NotificationService,
     ) -> None:
-        """Маршрутизирует Kafka payload в нужный обработчик сервиса."""
-        if message.topic == settings.KAFKA.KAFKA_TOPIC_AUTH:
-            auth_payload = _auth_event_from_payload(payload)
-            event = schemas.AuthOutboxEvent.model_validate(auth_payload)
+        """Маршрутизирует Kafka envelope в нужный обработчик сервиса."""
+        event_type = payload.get("event_type")
 
-            await service.process_auth_outbox_event(
-                event=event,
-                event_id=self._resolve_event_id(payload, message),
-                timestamp=self._resolve_event_timestamp(payload, message),
+        if event_type in {
+            AuthEventType.USER_REGISTERED,
+            AuthEventType.PROFILE_UPDATED,
+            AuthEventType.EMAIL_CHANGED,
+        }:
+            event = AuthEventAdapter.validate_python(payload)
+            await service.process_auth_event(event)
+            return
+
+        if event_type == AuthEventType.PASSWORD_CHANGED:
+            event = AuthEventAdapter.validate_python(payload)
+            await service.process_auth_event(event)
+            await service.process_incoming_event(
+                IncomingNotificationEvent(
+                    event_id=event.event_id,
+                    event_type="auth.password.changed",
+                    user_id=event.payload.user_id,
+                    payload={},
+                    timestamp=event.occurred_at,
+                ),
             )
             return
 
-        notification_payload = _notification_event_from_payload(payload)
-        event = schemas.IncomingNotificationEvent.model_validate(notification_payload)
-        await service.process_incoming_event(event)
+        if event_type == BudgetEventType.BUDGET_THRESHOLD_REACHED:
+            event = BudgetEventAdapter.validate_python(payload)
+            if not event.payload.user_id:
+                return
 
-    @staticmethod
-    def _resolve_event_id(payload: dict[str, Any], message: Any) -> Any:
-        """Возвращает event_id из envelope или deterministic id из Kafka metadata."""
-        if payload.get("event_id"):
-            return payload["event_id"]
+            await service.process_incoming_event(
+                IncomingNotificationEvent(
+                    event_id=event.event_id,
+                    event_type=event.event_type,
+                    user_id=event.payload.user_id,
+                    payload=_budget_notification_payload(event),
+                    timestamp=event.occurred_at,
+                ),
+            )
+            return
 
-        return _event_id_from_message(message)
+        if event_type in {
+            GoalEventType.GOAL_COMPLETED,
+            GoalEventType.GOAL_EXPIRED,
+            GoalEventType.GOAL_THRESHOLD_REACHED,
+        }:
+            event = GoalEventAdapter.validate_python(payload)
+            if not event.payload.user_id:
+                return
 
-    @staticmethod
-    def _resolve_event_timestamp(payload: dict[str, Any], message: Any) -> datetime:
-        """Возвращает timestamp события из envelope или Kafka metadata."""
-        raw_timestamp = payload.get("occurred_at") or payload.get("timestamp")
-        if raw_timestamp:
-            if isinstance(raw_timestamp, datetime):
-                return raw_timestamp
+            await service.process_incoming_event(
+                IncomingNotificationEvent(
+                    event_id=event.event_id,
+                    event_type=event.event_type,
+                    user_id=event.payload.user_id,
+                    payload=_goal_notification_payload(event),
+                    timestamp=event.occurred_at,
+                ),
+            )
+            return
 
-            try:
-                parsed = datetime.fromisoformat(str(raw_timestamp))
-                if parsed.tzinfo is None:
-                    return parsed.replace(tzinfo=timezone.utc)
-
-                return parsed.astimezone(timezone.utc)
-            except ValueError:
-                logger.warning(
-                    "Invalid event timestamp in Kafka payload",
-                    extra={"timestamp": raw_timestamp},
-                )
-
-        return _timestamp_from_message(message)
+        logger.debug("Kafka event ignored by notifications service: %s", event_type)
 
     async def send_to_dlq(
         self,
@@ -335,6 +324,15 @@ class KafkaConsumerWorker:
         request_id: str | None,
     ) -> None:
         """Публикует проблемное сообщение в DLQ."""
+        dlq_payload = DLQPayload(
+            original_topic=message.topic,
+            original_message=message.value.decode("utf-8", errors="replace"),
+            error=str(exc),
+            consumer_group=self.group_id,
+            retry_count=0,
+        )
+        dlq_event = create_dlq_event(dlq_payload)
+
         headers = [("error", str(exc).encode("utf-8"))]
 
         if request_id:
@@ -342,7 +340,7 @@ class KafkaConsumerWorker:
 
         success = await self.dlq_producer.send_event(
             topic=settings.KAFKA.dlq_topic,
-            value=message.value,
+            value=dlq_event.to_kafka_payload(),
             key=message.key,
             headers=headers,
             wait=True,
@@ -351,10 +349,7 @@ class KafkaConsumerWorker:
         if not success:
             logger.critical(
                 "Kafka DLQ publish failed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise RuntimeError("DLQ refused message")
 
@@ -376,10 +371,7 @@ class KafkaConsumerWorker:
         """Обрабатывает ошибку обработки Kafka-сообщения."""
         logger.exception(
             "Kafka message processing failed",
-            extra={
-                "topic": message.topic,
-                "offset": message.offset,
-            },
+            extra={"topic": message.topic, "offset": message.offset},
         )
 
         metrics.KAFKA_DLQ_ERRORS.labels(

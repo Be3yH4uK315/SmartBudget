@@ -5,17 +5,19 @@ from pathlib import Path
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.core.context import set_request_id
-from app.domain.schemas.kafka import (
-    TransactionCategoryUpdatedMessage,
-    TransactionClassifiedMessage,
-)
 from app.infrastructure.db.uow import UnitOfWork
 from app.services.service import TransactionService
+from smartbudget_shared.events import (
+    ClassificationEventType,
+    EventEnvelope,
+    TransactionCategoryUpdatedPayload,
+    TransactionClassifiedPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,9 @@ HEALTH_FILE = Path("/tmp/healthy")
 KEEP_ALIVE_INTERVAL_SECONDS = 5
 CONSUMER_TIMEOUT_MS = 1000
 REQUEST_ID_HEADER = "X-Request-ID"
+
+ClassifiedEnvelopeAdapter = TypeAdapter(EventEnvelope[TransactionClassifiedPayload])
+CategoryUpdatedEnvelopeAdapter = TypeAdapter(EventEnvelope[TransactionCategoryUpdatedPayload])
 
 
 async def keep_alive_task() -> None:
@@ -57,7 +62,7 @@ class KafkaConsumerWorker:
         self.health_task: asyncio.Task | None = None
 
     @property
-    def topics(self) -> tuple[str, str]:
+    def topics(self) -> tuple[str]:
         """Возвращает topics, которые читает consumer."""
         return settings.KAFKA.consumer_topics
 
@@ -88,10 +93,7 @@ class KafkaConsumerWorker:
 
             logger.info(
                 "Kafka worker started",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
             while True:
@@ -101,9 +103,6 @@ class KafkaConsumerWorker:
                 )
 
                 for _, messages in batches.items():
-                    if not messages:
-                        continue
-
                     for message in messages:
                         await self.handle_message(message)
 
@@ -113,20 +112,14 @@ class KafkaConsumerWorker:
         except asyncio.CancelledError:
             logger.info(
                 "Kafka worker shutdown requested",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka worker failed",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
             raise
 
@@ -146,10 +139,7 @@ class KafkaConsumerWorker:
             await self.consumer.stop()
             logger.info(
                 "Kafka worker stopped",
-                extra={
-                    "topics": self.topics,
-                    "group_id": self.group_id,
-                },
+                extra={"topics": self.topics, "group_id": self.group_id},
             )
 
     async def handle_message(self, message: Any) -> None:
@@ -168,88 +158,80 @@ class KafkaConsumerWorker:
 
         try:
             payload = json.loads(message.value)
-            event = self._parse_event(
-                topic=message.topic,
-                payload=payload,
-            )
+            event = self._parse_event(payload)
+            if event is None:
+                return
             await self.process_event(event)
 
             logger.info(
                 "Kafka message processed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
 
         except (json.JSONDecodeError, ValidationError):
             logger.exception(
                 "Kafka message validation failed",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise
 
         except SQLAlchemyError:
             logger.exception(
                 "Kafka message processing failed with database error",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise
 
         except Exception:
             logger.exception(
                 "Kafka message processing failed with transient error",
-                extra={
-                    "topic": message.topic,
-                    "offset": message.offset,
-                },
+                extra={"topic": message.topic, "offset": message.offset},
             )
             raise
 
     async def process_event(
         self,
-        event: TransactionClassifiedMessage | TransactionCategoryUpdatedMessage,
+        event: EventEnvelope[TransactionClassifiedPayload]
+        | EventEnvelope[TransactionCategoryUpdatedPayload],
     ) -> None:
         """Применяет категорию из Kafka event к транзакции."""
         async with UnitOfWork(self.db_session_maker) as uow:
             service = TransactionService(uow)
             await service.apply_classification(
-                user_id=event.user_id,
-                transaction_id=event.transaction_id,
+                user_id=event.payload.user_id,
+                transaction_id=event.payload.transaction_id,
                 category_id=self._extract_category_id(event),
             )
 
     def _parse_event(
         self,
-        topic: str,
         payload: dict[str, Any],
-    ) -> TransactionClassifiedMessage | TransactionCategoryUpdatedMessage:
-        """Парсит Kafka payload по topic."""
-        event_payload = payload.get("payload", payload)
+    ) -> EventEnvelope[TransactionClassifiedPayload] | EventEnvelope[TransactionCategoryUpdatedPayload] | None:
+        """Парсит Kafka envelope по event_type."""
+        event_type = payload.get("event_type")
 
-        if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_CATEGORY_UPDATED:
-            return TransactionCategoryUpdatedMessage.model_validate(event_payload)
+        if event_type == ClassificationEventType.TRANSACTION_CLASSIFIED.value:
+            return ClassifiedEnvelopeAdapter.validate_python(payload)
 
-        if topic == settings.KAFKA.KAFKA_TOPIC_TRANSACTION_CLASSIFIED:
-            return TransactionClassifiedMessage.model_validate(event_payload)
+        if event_type == ClassificationEventType.TRANSACTION_CATEGORY_UPDATED.value:
+            return CategoryUpdatedEnvelopeAdapter.validate_python(payload)
 
-        raise ValueError(f"Unknown Kafka topic for transactions service: {topic}")
+        logger.debug(
+            "Kafka event ignored by transactions service: %s",
+            event_type,
+        )
+        return None
 
     @staticmethod
     def _extract_category_id(
-        event: TransactionClassifiedMessage | TransactionCategoryUpdatedMessage,
+        event: EventEnvelope[TransactionClassifiedPayload]
+        | EventEnvelope[TransactionCategoryUpdatedPayload],
     ) -> int:
         """Возвращает новую категорию из event."""
-        if isinstance(event, TransactionClassifiedMessage):
-            return event.category_id
+        if event.event_type == ClassificationEventType.TRANSACTION_CLASSIFIED.value:
+            return event.payload.category_id
 
-        return event.new_category_id
+        return event.payload.new_category_id
 
 
 async def consume_classified_loop(db_session_maker: Any) -> None:

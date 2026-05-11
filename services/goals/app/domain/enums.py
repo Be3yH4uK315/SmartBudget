@@ -11,20 +11,15 @@ class GoalStatus(str, Enum):
 
 
 class GoalEventType(str, Enum):
-    """Типы событий goal service."""
+    """Типы событий целей."""
 
-    GOAL_CREATED = "goal.created"
-    GOAL_CHANGED = "goal.changed"
-    GOAL_UPDATED = "goal.updated"
-    GOAL_DELETED = "goal.deleted"
-    GOAL_ACHIEVED = "goal.achieved"
-    GOAL_EXPIRED = "goal.expired"
-    GOAL_APPROACHING = "goal.approaching"
-    GOAL_ALERT = "goal.alert"
-    GOAL_COMPLETED = "goal.completed"
-    GOAL_PROGRESS_CHANGED = "goal.progress_changed"
-    GOAL_TRANSACTION_CREATED = "goal.transaction.created"
-    GOAL_TRANSACTION_DELETED = "goal.transaction.deleted"
+    CREATED = "goal.created"
+    UPDATED = "goal.updated"
+    DELETED = "goal.deleted"
+    COMPLETED = "goal.completed"
+    EXPIRED = "goal.expired"
+    PROGRESS_CHANGED = "goal.progress_changed"
+    THRESHOLD_REACHED = "goal.threshold_reached"
 
 
 class TransactionType(str, Enum):

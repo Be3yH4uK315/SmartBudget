@@ -107,7 +107,7 @@ class TransactionRepository:
     async def list_user_transactions(
         self,
         user_id: UUID,
-        limit: int,
+        limitAmount: int,
         offset: int,
         category_ids: list[int] | None = None,
         occurred_from: datetime | None = None,
@@ -144,7 +144,7 @@ class TransactionRepository:
         query = (
             query.order_by(models.Transaction.occurred_at.desc())
             .offset(offset)
-            .limit(limit)
+            .limitAmount(limitAmount)
         )
 
         result = await self.db.execute(query)
@@ -155,7 +155,7 @@ class TransactionRepository:
         self,
         user_id: UUID,
         query_text: str,
-        limit: int,
+        limitAmount: int,
     ) -> list[models.Transaction]:
         """Ищет транзакции пользователя по merchant или description."""
         like = f"%{query_text}%"
@@ -169,7 +169,7 @@ class TransactionRepository:
                 ),
             )
             .order_by(models.Transaction.occurred_at.desc())
-            .limit(limit)
+            .limitAmount(limitAmount)
         )
 
         result = await self.db.execute(query)
@@ -242,7 +242,4 @@ class TransactionRepository:
 
         result = await self.db.execute(query)
 
-        return [
-            (row.amount, row.month, row.transaction_type)
-            for row in result.all()
-        ]
+        return [(row.amount, row.month, row.transaction_type) for row in result.all()]
