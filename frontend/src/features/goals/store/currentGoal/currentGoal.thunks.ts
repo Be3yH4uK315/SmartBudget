@@ -16,7 +16,7 @@ export const getGoal = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('getGoal', async ({ goalId }, { rejectWithValue }) => {
   try {
-    const response = await goalsMock.getGoal(goalId)
+    const response = await goalsApi.getGoal(goalId)
 
     return response
   } catch (e: any) {
@@ -32,7 +32,7 @@ export const getGoalTransactions = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('getGoalTransactions', async ({ goalId }, { rejectWithValue }) => {
   try {
-    const response = await goalsMock.getGoalTransactions(goalId)
+    const response = await goalsApi.getGoalTransactions(goalId)
 
     return response
   } catch (e: any) {
@@ -48,7 +48,7 @@ export const editGoal = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('editGoal', async ({ ...payload }, { rejectWithValue }) => {
   try {
-    await goalsMock.editGoal(payload)
+    await goalsApi.editGoal(payload)
 
     showToast({ messageKey: 'goalEdited', type: 'success' })
 
@@ -82,7 +82,7 @@ export const updateArchivedStatus = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('updateArchivedStatus', async (goalId, { rejectWithValue }) => {
   try {
-    const response = await goalsMock.updateArchivedStatus(goalId)
+    const response = await goalsApi.updateArchivedStatus(goalId)
 
     return response
   } catch (e: any) {

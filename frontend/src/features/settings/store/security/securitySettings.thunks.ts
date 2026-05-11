@@ -11,7 +11,7 @@ export const getSessions = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('getSessions', async (_, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.getSessions()
+    const response = await settingsApi.getSessions()
 
     return response
   } catch (e: any) {
@@ -27,7 +27,7 @@ export const deleteSession = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('deleteSession', async (sessionId, { rejectWithValue }) => {
   try {
-    await settingsMock.deleteSession(sessionId)
+    await settingsApi.deleteSession(sessionId)
 
     showToast({ messageKey: 'sessionDeleted', type: 'success' })
   } catch (e: any) {
@@ -43,7 +43,7 @@ export const deleteOtherSessions = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('deleteOtherSessions', async (_, { rejectWithValue }) => {
   try {
-    await settingsMock.deleteOtherSessions()
+    await settingsApi.deleteOtherSessions()
 
     showToast({ messageKey: 'sessionsDeleted', type: 'success' })
   } catch (e: any) {
@@ -59,7 +59,7 @@ export const changePassword = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('changePassword', async (payload, { rejectWithValue }) => {
   try {
-    await settingsMock.changePassword({ ...payload })
+    await settingsApi.changePassword({ ...payload })
 
     showToast({ messageKey: 'passwordChanged', type: 'success' })
   } catch (e: any) {
@@ -75,7 +75,7 @@ export const setRefreshTokenDuration = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('setRefreshTokenDuration', async ({ days }, { rejectWithValue }) => {
   try {
-    await settingsMock.setRefreshTokenDuration(days)
+    await settingsApi.setRefreshTokenDuration(days)
 
     showToast({ messageKey: 'refreshTokenDurationChanged', type: 'success' })
   } catch (e: any) {
@@ -91,7 +91,7 @@ export const getRefreshTokenDuration = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('getRefreshTokenDuration', async (_, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.getRefreshTokenDuration()
+    const response = await settingsApi.getRefreshTokenDuration()
 
     return response
   } catch (e: any) {

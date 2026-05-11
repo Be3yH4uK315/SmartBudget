@@ -9,7 +9,7 @@ export const getBudgetData = createAsyncThunk<
   { rejectValue: 'cannotGetBudgetData' }
 >('getBudgetData', async (_, { rejectWithValue }) => {
   try {
-    const response = await budgetMock.getBudgetData()
+    const response = await budgetApi.getBudgetData()
 
     return response
   } catch (e: any) {

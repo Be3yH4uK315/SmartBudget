@@ -14,7 +14,7 @@ export const getTransactions = createAsyncThunk<
 
     const offset = state.transactions?.offset ?? 0
 
-    const response = await transactionsMock.getTransactions(offset, filters)
+    const response = await transactionsApi.getTransactions(offset, filters)
 
     return { transactions: response, length: response.length }
   } catch (e: any) {
@@ -30,7 +30,7 @@ export const changeCategory = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('changeCategory', async (payload, { rejectWithValue }) => {
   try {
-    const response = await transactionsMock.changeCategory(payload)
+    const response = await transactionsApi.changeCategory(payload)
 
     showToast({ messageKey: 'categoryChanged', type: 'success' })
 
