@@ -46,7 +46,7 @@ export const BudgetForm = ({
       >
         <NumberField
           label={translate('BudgetLimit.valueLabel')}
-          value={values.totalLimit ?? undefined}
+          value={values.totalLimitAmount ?? undefined}
           onChange={setTotalLimit}
         />
       </BudgetFormField>
@@ -72,7 +72,7 @@ export const BudgetForm = ({
         title={translate('CategoriesLimits.title')}
         tooltip={translate('CategoriesLimits.tooltip')}
         subtitle={
-          values.totalLimit && values.categories.length
+          values.totalLimitAmount && values.categories.length
             ? translate('CategoriesLimits.remainingPercent', {
                 value: formatPercent(remainingPercent / 100),
               })
@@ -96,7 +96,7 @@ export const BudgetForm = ({
                   onRemove={() => removeCategory(c.categoryId)}
                   onAmountChange={(v) => updateAmount(index, v)}
                   onPercentChange={(v) => updatePercent(index, v)}
-                  totalLimit={values.totalLimit}
+                  totalLimit={values.totalLimitAmount}
                 />
               ))}
 
@@ -121,7 +121,7 @@ export const BudgetForm = ({
         )}
       </BudgetFormField>
 
-      {!!values.totalLimit && isPercentOverflow && (
+      {!!values.totalLimitAmount && isPercentOverflow && (
         <StyledPaper
           noElevation
           paperSx={{ border: '2px solid', borderColor: 'error.main', textAlign: 'center' }}

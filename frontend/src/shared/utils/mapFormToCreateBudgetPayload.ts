@@ -3,17 +3,17 @@ import { FormValues } from '@shared/types/components'
 
 export const mapFormToBudgetPayload = (values: FormValues): BudgetSettings => {
   return {
-    totalLimit: values.totalLimit ?? 0,
+    totalLimitAmount: values.totalLimitAmount ?? 0,
     isAutoRenew: values.isAutoRenew,
     categories: values.categories.flatMap((c) => {
-      if (c.categoryId == null || c.limit == null) {
+      if (c.categoryId == null || c.limitAmount == null) {
         return []
       }
 
       return [
         {
           categoryId: c.categoryId,
-          limit: c.limit ?? 0,
+          limitAmount: c.limitAmount ?? 0,
         },
       ]
     }),

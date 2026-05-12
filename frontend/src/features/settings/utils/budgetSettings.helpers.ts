@@ -13,13 +13,13 @@ export const getBudgetDateByStatus = (status: 'current' | 'next') => {
 }
 
 export const mapBudgetSettingsToForm = (
-  data: Omit<BudgetSettings, 'totalLimit'> & { totalLimit: number | null },
+  data: Omit<BudgetSettings, 'totalLimitAmount'> & { totalLimitAmount: number | null },
 ): FormValues => ({
-  totalLimit: data.totalLimit !== 0 ? data.totalLimit : null,
+  totalLimitAmount: data.totalLimitAmount !== 0 ? data.totalLimitAmount : null,
   isAutoRenew: data.isAutoRenew,
   categories: data.categories.map((c) => ({
     categoryId: c.categoryId,
-    limit: c.limit,
+    limitAmount: c.limitAmount,
     percent: undefined,
   })),
 })

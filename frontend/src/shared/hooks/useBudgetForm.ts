@@ -18,7 +18,7 @@ const fromAmount = (total: number | null, limit?: number) => {
 
 export const useBudgetForm = (initValues?: FormValues) => {
   const [values, setValues] = useState<FormValues>({
-    totalLimit: null,
+    totalLimitAmount: null,
     isAutoRenew: true,
     categories: [],
     ...initValues,
@@ -45,12 +45,12 @@ export const useBudgetForm = (initValues?: FormValues) => {
 
   const remainingPercent = Math.max(0, 100 - totalPercent)
 
-  const isPercentOverflow = values.totalLimit != null && totalPercent > 100
+  const isPercentOverflow = values.totalLimitAmount != null && totalPercent > 100
 
   const canSubmit = () =>
     !isPercentOverflow &&
-    ((values.totalLimit !== null && values.totalLimit !== 0) ||
-      values.categories.some((c) => c.limit && c.limit > 0))
+    ((values.totalLimitAmount !== null && values.totalLimitAmount !== 0) ||
+      values.categories.some((c) => c.limitAmount && c.limitAmount > 0))
 
   const setTotalLimit = (limit: number) => {
     setValues((prev) => {
@@ -73,8 +73,8 @@ export const useBudgetForm = (initValues?: FormValues) => {
             return { ...c, limit: fromPercent(limit, c.percent) }
           }
 
-          if (c.mode === 'amount' && c.limit != null) {
-            return { ...c, percent: fromAmount(limit, c.limit) }
+          if (c.mode === 'amount' && c.limitAmount != null) {
+            return { ...c, percent: fromAmount(limit, c.limitAmount) }
           }
 
           return c
@@ -105,11 +105,13 @@ export const useBudgetForm = (initValues?: FormValues) => {
     })
   }
 
-  const updateAmount = (index: number, limit: number) => {
+  const updateAmount = (index: number, limitAmount: number) => {
     updateCategory(index, {
-      limit,
+      limitAmount,
       mode: 'amount',
-      percent: values.totalLimit ? fromAmount(values.totalLimit, limit) : undefined,
+      percent: values.totalLimitAmount
+        ? fromAmount(values.totalLimitAmount, limitAmount)
+        : undefined,
     })
   }
 
@@ -117,7 +119,9 @@ export const useBudgetForm = (initValues?: FormValues) => {
     updateCategory(index, {
       percent,
       mode: 'percent',
-      limit: values.totalLimit ? fromPercent(values.totalLimit, percent) : undefined,
+      limitAmount: values.totalLimitAmount
+        ? fromPercent(values.totalLimitAmount, percent)
+        : undefined,
     })
   }
 
