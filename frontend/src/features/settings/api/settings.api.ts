@@ -50,7 +50,7 @@ class SettingsApi {
   async getBudgetSettings(date: string): Promise<BudgetSettings> {
     const url = `${this.baseUrl}/budget`
 
-    const params: Record<string, string> = { date }
+    const params: Record<string, string> = { month: date }
 
     const response = await api.get<BudgetSettings>(url, { params })
     return response.data
