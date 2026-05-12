@@ -42,6 +42,7 @@ export const Header = () => {
       { label: translate('notifications'), to: ROUTES.PAGES.NOTIFICATIONS },
       { label: translate('settings'), to: ROUTES.PAGES.SETTINGS.MAIN },
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [translate, language],
   )
 
