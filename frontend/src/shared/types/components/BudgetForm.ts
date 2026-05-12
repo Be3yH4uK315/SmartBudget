@@ -1,12 +1,12 @@
 export type CategoryRow = {
   categoryId: number
-  limit?: number
+  limitAmount?: number
   percent?: number
   mode?: 'amount' | 'percent'
 }
 
 export type FormValues = {
-  totalLimit: number | null
+  totalLimitAmount: number | null
   isAutoRenew: boolean
   categories: CategoryRow[]
 }

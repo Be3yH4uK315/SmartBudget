@@ -90,7 +90,7 @@ class SettingsApiMock {
 
     if (!budgetStore[date]) {
       budgetStore[date] = {
-        totalLimit: 0,
+        totalLimitAmount: 0,
         isAutoRenew: false,
         categories: [],
       }

@@ -1,41 +1,52 @@
 {
-  "limitAmount.preOverflow.title": "Близость к лимиту",
-  "limitAmount.preOverflow.message": "Расходы по категории {category_id} приближаются к лимиту.",
-  "limitAmount.overflow.title": "Лимит превышен",
-  "limitAmount.overflow.message": "Лимит по категории {category_id} превышен.",
-  "Budget.checkResults.title": "Проверка бюджета",
-  "Budget.checkResults.message": "Проверка бюджета завершена.",
+  "limitAmount.preOverflow.title": "Близость к лимиту категории",
+  "limitAmount.preOverflow.message": "Расходы по категории {category_id} достигли {percent}% от лимита. Потрачено {spent_amount} из {limit_amount}.",
+
+  "limitAmount.overflow.title": "Лимит категории превышен",
+  "limitAmount.overflow.message": "Лимит по категории {category_id} превышен. Потрачено {spent_amount} из {limit_amount}.",
+
+  "Budget.checkResults.title": "Проверка бюджета завершена",
+  "Budget.checkResults.message": "Проверка бюджета завершена. Превышений общего бюджета: {total_exceeded_count}, превышений категорий: {category_exceeded_count}.",
+
   "Budget.overflow.title": "Бюджет превышен",
-  "Budget.overflow.message": "Общий бюджет превышен.",
+  "Budget.overflow.message": "Общий бюджет превышен. Потрачено {spent_amount} из {limit_amount}.",
+
   "Budget.preOverflow.title": "Бюджет почти исчерпан",
-  "Budget.preOverflow.message": "Использовано {percent}% общего бюджета.",
+  "Budget.preOverflow.message": "Использовано {percent}% общего бюджета. Потрачено {spent_amount} из {limit_amount}.",
+
   "Budget.settingsChanged.title": "Настройки бюджета изменены",
   "Budget.settingsChanged.message": "Настройки бюджета {budget_id} обновлены.",
+
   "Goals.goalCreated.title": "Цель создана",
   "Goals.goalCreated.message": "Цель «{name}» создана. Рекомендуемый платеж: {recommended_payment}.",
+
   "Goals.missedPayment.title": "Платеж по цели пропущен",
   "Goals.missedPayment.message": "По цели «{name}» пропущен плановый платеж.",
-  "Goals.almostAchieved.title": "Цель почти достигнута",
-  "Goals.almostAchieved.message": "Цель «{name}» почти достигнута.",
+
   "Goals.achieved.title": "Цель достигнута",
-  "Goals.achieved.message": "Цель «{name}» достигнута.",
+  "Goals.achieved.message": "Цель «{name}» достигнута. Накоплено {current_amount} из {target_amount}.",
+
   "Goals.expired.title": "Срок цели истек",
-  "Goals.expired.message": "Срок цели «{name}» истек.",
+  "Goals.expired.message": "Срок цели «{name}» истек. Прогресс: {progress_percent}%.",
+
   "Goals.deadlineIsComing.title": "Срок цели приближается",
   "Goals.deadlineIsComing.message": "До срока цели «{name}» осталось {days_left} дн., прогресс {current_percent}%.",
+
+  "Goals.thresholdReached.title": "Цель почти достигнута",
+  "Goals.thresholdReached.message": "Цель «{name}» достигла {progress_percent}%. Порог уведомления: {threshold_percent}%.",
+
   "Transactions.unclassified.title": "Есть нераспознанные транзакции",
-  "Transactions.unclassified.message": "Нужно классифицировать транзакции на сумму {amount}.",
+  "Transactions.unclassified.message": "Нужно классифицировать {count} транзакций на сумму {amount}.",
+
   "Transactions.categoryChanged.title": "Категория транзакции изменена",
   "Transactions.categoryChanged.message": "Транзакция {transaction_id}: категория {old_category_id} заменена на {new_category_id}.",
+
   "Security.newLogin.title": "Новый вход",
   "Security.newLogin.message": "Выполнен новый вход в аккаунт.",
+
   "Security.passwordChanged.title": "Пароль изменен",
   "Security.passwordChanged.message": "Пароль аккаунта изменен.",
-  "Security.suspiciousActivity.title": "Подозрительная активность",
-  "Security.suspiciousActivity.message": "Обнаружена подозрительная активность в аккаунте.",
 
-  "Budget.thresholdReached.title": "Лимит бюджета почти достигнут",
-  "Budget.thresholdReached.message": "Расходы достигли {threshold_percent}% от лимита.",
-  "Goals.thresholdReached.title": "Цель почти достигнута",
-  "Goals.thresholdReached.message": "Прогресс цели: {progress_percent}%. Порог: {threshold_percent}%."
+  "Security.suspiciousActivity.title": "Подозрительная активность",
+  "Security.suspiciousActivity.message": "Обнаружена подозрительная активность в аккаунте."
 }

@@ -3,6 +3,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from aiokafka import AIOKafkaConsumer
 from pydantic import TypeAdapter, ValidationError
@@ -24,6 +25,9 @@ from smartbudget_shared.events import (
     EventEnvelope,
     GoalEventType,
     GoalPayload,
+    TransactionCategoryChangedPayload,
+    TransactionEventType,
+    TransactionUnclassifiedFoundPayload,
     create_dlq_event,
 )
 
@@ -38,6 +42,47 @@ ERROR_HEADER = "error"
 AuthEventAdapter = TypeAdapter(EventEnvelope[AuthUserPayload])
 BudgetEventAdapter = TypeAdapter(EventEnvelope[BudgetPayload])
 GoalEventAdapter = TypeAdapter(EventEnvelope[GoalPayload])
+TransactionUnclassifiedFoundEventAdapter = TypeAdapter(
+    EventEnvelope[TransactionUnclassifiedFoundPayload],
+)
+TransactionCategoryChangedEventAdapter = TypeAdapter(
+    EventEnvelope[TransactionCategoryChangedPayload],
+)
+
+AUTH_PROFILE_EVENTS = {
+    AuthEventType.USER_REGISTERED.value,
+    AuthEventType.PROFILE_UPDATED.value,
+    AuthEventType.EMAIL_CHANGED.value,
+}
+
+AUTH_NOTIFICATION_EVENTS = {
+    AuthEventType.DEVICE_NEW_LOGIN.value,
+    AuthEventType.PASSWORD_CHANGED.value,
+    AuthEventType.ACTIVITY_SUSPICIOUS.value,
+}
+
+BUDGET_NOTIFICATION_EVENTS = {
+    BudgetEventType.BUDGET_TOTAL_THRESHOLD_REACHED.value,
+    BudgetEventType.BUDGET_TOTAL_EXCEEDED.value,
+    BudgetEventType.BUDGET_CATEGORY_THRESHOLD_REACHED.value,
+    BudgetEventType.BUDGET_CATEGORY_EXCEEDED.value,
+    BudgetEventType.BUDGET_SETTINGS_CHANGED.value,
+    BudgetEventType.BUDGET_CHECK_RESULTS.value,
+}
+
+GOAL_NOTIFICATION_EVENTS = {
+    GoalEventType.GOAL_CREATED.value,
+    GoalEventType.GOAL_COMPLETED.value,
+    GoalEventType.GOAL_EXPIRED.value,
+    GoalEventType.GOAL_THRESHOLD_REACHED.value,
+    GoalEventType.GOAL_DEADLINE_APPROACHING.value,
+    GoalEventType.GOAL_PAYMENT_MISSED.value,
+}
+
+TRANSACTION_NOTIFICATION_EVENTS = {
+    TransactionEventType.TRANSACTION_UNCLASSIFIED_FOUND.value,
+    TransactionEventType.TRANSACTION_CATEGORY_CHANGED.value,
+}
 
 
 async def keep_alive_task() -> None:
@@ -76,34 +121,111 @@ def _decode_message_value(message: Any) -> dict[str, Any]:
     return json.loads(_raw_message_value(message))
 
 
+def _decimal_to_str(value: Any) -> str | None:
+    """Преобразует Decimal/числовое значение в строку для JSON props."""
+    if value is None:
+        return None
+
+    return str(value)
+
+
+def _uuid_to_str(value: UUID | None) -> str | None:
+    """Преобразует UUID в строку для JSON props."""
+    if value is None:
+        return None
+
+    return str(value)
+
+
+def _compact_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Удаляет из payload поля со значением None."""
+    return {key: value for key, value in payload.items() if value is not None}
+
+
+def _auth_notification_payload(event: EventEnvelope[AuthUserPayload]) -> dict[str, Any]:
+    """Преобразует auth event в payload уведомления."""
+    return _compact_payload(
+        {
+            "email": event.payload.email,
+            "new_email": event.payload.new_email,
+            "name": event.payload.name,
+            "language": event.payload.language,
+            "ip": event.payload.ip,
+            "device": event.payload.device,
+            "location": event.payload.location,
+            "reason": event.payload.reason,
+            "logged_at": event.payload.logged_at.isoformat()
+            if event.payload.logged_at
+            else None,
+            "changed_at": event.payload.changed_at.isoformat()
+            if event.payload.changed_at
+            else None,
+            "detected_at": event.payload.detected_at.isoformat()
+            if event.payload.detected_at
+            else None,
+        },
+    )
+
+
 def _budget_notification_payload(event: EventEnvelope[BudgetPayload]) -> dict[str, Any]:
     """Преобразует budget event в payload уведомления."""
-    return {
-        "budget_id": str(event.payload.budget_id) if event.payload.budget_id else None,
-        "category_id": event.payload.category_id,
-        "limit_amount": str(event.payload.limit_amount)
-        if event.payload.limit_amount is not None
-        else None,
-        "spent_amount": str(event.payload.spent_amount)
-        if event.payload.spent_amount is not None
-        else None,
-        "threshold_percent": event.payload.threshold_percent,
-    }
+    return _compact_payload(
+        {
+            "budget_id": _uuid_to_str(event.payload.budget_id),
+            "category_id": event.payload.category_id,
+            "limit_amount": _decimal_to_str(event.payload.limit_amount),
+            "spent_amount": _decimal_to_str(event.payload.spent_amount),
+            "percent": event.payload.percent,
+            "threshold_percent": event.payload.threshold_percent,
+            "checked_at": event.payload.checked_at.isoformat()
+            if event.payload.checked_at
+            else None,
+            "total_exceeded_count": event.payload.total_exceeded_count,
+            "category_exceeded_count": event.payload.category_exceeded_count,
+        },
+    )
 
 
 def _goal_notification_payload(event: EventEnvelope[GoalPayload]) -> dict[str, Any]:
     """Преобразует goal event в payload уведомления."""
-    return {
-        "goal_id": str(event.payload.goal_id),
-        "target_amount": str(event.payload.target_amount)
-        if event.payload.target_amount is not None
-        else None,
-        "current_amount": str(event.payload.current_amount)
-        if event.payload.current_amount is not None
-        else None,
-        "progress_percent": event.payload.progress_percent,
-        "threshold_percent": event.payload.threshold_percent,
-    }
+    return _compact_payload(
+        {
+            "goal_id": _uuid_to_str(event.payload.goal_id),
+            "name": event.payload.name,
+            "target_amount": _decimal_to_str(event.payload.target_amount),
+            "current_amount": _decimal_to_str(event.payload.current_amount),
+            "recommended_payment": _decimal_to_str(event.payload.recommended_payment),
+            "progress_percent": event.payload.progress_percent,
+            "current_percent": event.payload.current_percent,
+            "threshold_percent": event.payload.threshold_percent,
+            "days_left": event.payload.days_left,
+        },
+    )
+
+
+def _transaction_unclassified_payload(
+    event: EventEnvelope[TransactionUnclassifiedFoundPayload],
+) -> dict[str, Any]:
+    """Преобразует transaction.unclassified.found в payload уведомления."""
+    return _compact_payload(
+        {
+            "amount": _decimal_to_str(event.payload.amount),
+            "count": event.payload.count,
+        },
+    )
+
+
+def _transaction_category_changed_payload(
+    event: EventEnvelope[TransactionCategoryChangedPayload],
+) -> dict[str, Any]:
+    """Преобразует transaction.category.changed в payload уведомления."""
+    return _compact_payload(
+        {
+            "transaction_id": _uuid_to_str(event.payload.transaction_id),
+            "old_category_id": event.payload.old_category_id,
+            "new_category_id": event.payload.new_category_id,
+        },
+    )
 
 
 class KafkaConsumerWorker:
@@ -256,66 +378,127 @@ class KafkaConsumerWorker:
         """Маршрутизирует Kafka envelope в нужный обработчик сервиса."""
         event_type = payload.get("event_type")
 
-        if event_type in {
-            AuthEventType.USER_REGISTERED.value,
-            AuthEventType.PROFILE_UPDATED.value,
-            AuthEventType.EMAIL_CHANGED.value,
-        }:
-            event = AuthEventAdapter.validate_python(payload)
-            await service.process_auth_event(event)
+        if event_type in AUTH_PROFILE_EVENTS:
+            await self._process_auth_profile_event(payload, service)
             return
 
-        if event_type == AuthEventType.PASSWORD_CHANGED.value:
-            event = AuthEventAdapter.validate_python(payload)
-            await service.process_auth_event(event)
-            await service.process_incoming_event(
-                IncomingNotificationEvent(
-                    event_id=event.event_id,
-                    event_type="auth.password.changed",
-                    user_id=event.payload.user_id,
-                    payload={},
-                    timestamp=event.occurred_at,
-                ),
-            )
+        if event_type in AUTH_NOTIFICATION_EVENTS:
+            await self._process_auth_notification_event(payload, service)
             return
 
-        if event_type == BudgetEventType.BUDGET_THRESHOLD_REACHED.value:
-            event = BudgetEventAdapter.validate_python(payload)
-            if not event.payload.user_id:
-                return
-
-            await service.process_incoming_event(
-                IncomingNotificationEvent(
-                    event_id=event.event_id,
-                    event_type=event.event_type,
-                    user_id=event.payload.user_id,
-                    payload=_budget_notification_payload(event),
-                    timestamp=event.occurred_at,
-                ),
-            )
+        if event_type in BUDGET_NOTIFICATION_EVENTS:
+            await self._process_budget_notification_event(payload, service)
             return
 
-        if event_type in {
-            GoalEventType.GOAL_COMPLETED.value,
-            GoalEventType.GOAL_EXPIRED.value,
-            GoalEventType.GOAL_THRESHOLD_REACHED.value,
-        }:
-            event = GoalEventAdapter.validate_python(payload)
-            if not event.payload.user_id:
-                return
+        if event_type in GOAL_NOTIFICATION_EVENTS:
+            await self._process_goal_notification_event(payload, service)
+            return
 
-            await service.process_incoming_event(
-                IncomingNotificationEvent(
-                    event_id=event.event_id,
-                    event_type=event.event_type,
-                    user_id=event.payload.user_id,
-                    payload=_goal_notification_payload(event),
-                    timestamp=event.occurred_at,
-                ),
-            )
+        if event_type in TRANSACTION_NOTIFICATION_EVENTS:
+            await self._process_transaction_notification_event(payload, service)
             return
 
         logger.debug("Kafka event ignored by notifications service: %s", event_type)
+
+    async def _process_auth_profile_event(
+        self,
+        payload: dict[str, Any],
+        service: NotificationService,
+    ) -> None:
+        """Обрабатывает auth events, которые только синхронизируют профиль."""
+        event = AuthEventAdapter.validate_python(payload)
+        await service.process_auth_event(event)
+
+    async def _process_auth_notification_event(
+        self,
+        payload: dict[str, Any],
+        service: NotificationService,
+    ) -> None:
+        """Обрабатывает auth events, которые создают уведомления."""
+        event = AuthEventAdapter.validate_python(payload)
+        await service.process_auth_event(event)
+
+        await service.process_incoming_event(
+            IncomingNotificationEvent(
+                event_id=event.event_id,
+                event_type=event.event_type,
+                user_id=event.payload.user_id,
+                payload=_auth_notification_payload(event),
+                timestamp=event.occurred_at,
+            ),
+        )
+
+    async def _process_budget_notification_event(
+        self,
+        payload: dict[str, Any],
+        service: NotificationService,
+    ) -> None:
+        """Обрабатывает budget events, которые создают уведомления."""
+        event = BudgetEventAdapter.validate_python(payload)
+
+        await service.process_incoming_event(
+            IncomingNotificationEvent(
+                event_id=event.event_id,
+                event_type=event.event_type,
+                user_id=event.payload.user_id,
+                payload=_budget_notification_payload(event),
+                timestamp=event.occurred_at,
+            ),
+        )
+
+    async def _process_goal_notification_event(
+        self,
+        payload: dict[str, Any],
+        service: NotificationService,
+    ) -> None:
+        """Обрабатывает goal events, которые создают уведомления."""
+        event = GoalEventAdapter.validate_python(payload)
+
+        await service.process_incoming_event(
+            IncomingNotificationEvent(
+                event_id=event.event_id,
+                event_type=event.event_type,
+                user_id=event.payload.user_id,
+                payload=_goal_notification_payload(event),
+                timestamp=event.occurred_at,
+            ),
+        )
+
+    async def _process_transaction_notification_event(
+        self,
+        payload: dict[str, Any],
+        service: NotificationService,
+    ) -> None:
+        """Обрабатывает transaction events, которые создают уведомления."""
+        event_type = payload.get("event_type")
+
+        if event_type == TransactionEventType.TRANSACTION_UNCLASSIFIED_FOUND.value:
+            event = TransactionUnclassifiedFoundEventAdapter.validate_python(payload)
+            await service.process_incoming_event(
+                IncomingNotificationEvent(
+                    event_id=event.event_id,
+                    event_type=event.event_type,
+                    user_id=event.payload.user_id,
+                    payload=_transaction_unclassified_payload(event),
+                    timestamp=event.occurred_at,
+                ),
+            )
+            return
+
+        if event_type == TransactionEventType.TRANSACTION_CATEGORY_CHANGED.value:
+            event = TransactionCategoryChangedEventAdapter.validate_python(payload)
+            await service.process_incoming_event(
+                IncomingNotificationEvent(
+                    event_id=event.event_id,
+                    event_type=event.event_type,
+                    user_id=event.payload.user_id,
+                    payload=_transaction_category_changed_payload(event),
+                    timestamp=event.occurred_at,
+                ),
+            )
+            return
+
+        logger.debug("Transaction event ignored by notifications service: %s", event_type)
 
     async def send_to_dlq(
         self,

@@ -62,6 +62,7 @@ class NotificationSettingsResponse(CamelModel):
         description="Включены ли уведомления в общем",
     )
     push_status: bool = Field(..., description="Включены ли PUSH-уведомления")
+    email_status: bool = Field(..., description="Включены ли EMAIL-уведомления")
     goals: bool = Field(..., description="Уведомления целей")
     transactions: bool = Field(..., description="Уведомления транзакций")
     budget: BudgetNotificationSettings = Field(
@@ -73,7 +74,12 @@ class NotificationSettingsResponse(CamelModel):
 class NotificationSettingsUpdate(CamelModel):
     """Запрос на обновление настроек уведомлений."""
 
+    notifications_status: bool = Field(
+        ...,
+        description="Включены ли уведомления в общем",
+    )
     push_status: bool = Field(..., description="Включены ли PUSH-уведомления")
+    email_status: bool = Field(..., description="Включены ли EMAIL-уведомления")
     goals: bool = Field(..., description="Уведомления целей")
     transactions: bool = Field(..., description="Уведомления транзакций")
     budget: BudgetNotificationSettings = Field(

@@ -17,8 +17,10 @@ from smartbudget_shared.events import (
     TransactionCategoryUpdatedPayload,
     TransactionClassifiedPayload,
     TransactionNeedCategoryPayload,
+    TransactionUnclassifiedFoundPayload,
     create_transaction_category_updated_event,
     create_transaction_classified_event,
+    create_transaction_unclassified_found_event,
 )
 from app.infrastructure.db.models import (
     Category,
@@ -67,6 +69,27 @@ def _classification_completed_event(
         source=source,
     )
     event = create_transaction_classified_event(payload)
+
+    return event.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
+
+
+def _transaction_unclassified_found_event(
+    *,
+    user_id: UUID,
+    amount: Decimal,
+    count: int = 1,
+) -> dict[str, Any]:
+    """Формирует transaction.unclassified.found event envelope."""
+    payload = TransactionUnclassifiedFoundPayload(
+        user_id=user_id,
+        amount=amount,
+        count=count,
+    )
+    event = create_transaction_unclassified_found_event(payload)
 
     return event.model_dump(
         mode="json",
@@ -165,9 +188,10 @@ class ClassificationService:
 
             async def classify_with_limit(
                 event: TransactionNeedCategoryPayload,
-            ) -> tuple[ClassificationResult, dict[str, Any]]:
+            ) -> tuple[ClassificationResult, dict[str, Any], TransactionNeedCategoryPayload]:
                 async with semaphore:
-                    return await self._calculate_classification(event)
+                    result_model, outbox_data = await self._calculate_classification(event)
+                    return result_model, outbox_data, event
 
             results_data = await asyncio.gather(
                 *[
@@ -176,10 +200,11 @@ class ClassificationService:
                 ],
             )
 
-            for result_model, outbox_data in results_data:
+            for result_model, outbox_data, source_event in results_data:
                 await self._save_classification_result(
                     result_model=result_model,
                     outbox_data=outbox_data,
+                    source_event=source_event,
                 )
 
     async def get_classification(
@@ -271,14 +296,16 @@ class ClassificationService:
         await self._save_classification_result(
             result_model=result_model,
             outbox_data=outbox_payload,
+            source_event=event,
         )
 
     async def _save_classification_result(
         self,
         result_model: ClassificationResult,
         outbox_data: dict[str, Any],
+        source_event: TransactionNeedCategoryPayload | None = None,
     ) -> None:
-        """Сохраняет результат классификации и связанное outbox event."""
+        """Сохраняет результат классификации и связанные outbox events."""
         await self.uow.results.upsert(result_model)
 
         self.uow.outbox.add_event(
@@ -286,6 +313,17 @@ class ClassificationService:
             outbox_data,
             "transaction.classified",
         )
+
+        if result_model.category_id == UNCATEGORIZED_CATEGORY_ID and source_event:
+            self.uow.outbox.add_event(
+                settings.KAFKA.KAFKA_TOPIC_TRANSACTION_EVENTS,
+                _transaction_unclassified_found_event(
+                    user_id=result_model.user_id,
+                    amount=source_event.amount,
+                    count=1,
+                ),
+                "transaction.unclassified.found",
+            )
 
         if result_model.user_id:
             await self._cache_classification_response(

@@ -50,7 +50,7 @@ class SettingsApi {
   async getBudgetSettings(date: string): Promise<BudgetSettings> {
     const url = `${this.baseUrl}/budget`
 
-    const params: Record<string, string> = { date }
+    const params: Record<string, string> = { month: date }
 
     const response = await api.get<BudgetSettings>(url, { params })
     return response.data
@@ -59,7 +59,7 @@ class SettingsApi {
   async setBudgetSettings(payload: BudgetSettings): Promise<void> {
     const url = `${this.baseUrl}/budget`
 
-    const response = await api.patch<void>(url, { payload })
+    const response = await api.patch<void>(url, { ...payload })
     return response.data
   }
 
@@ -70,7 +70,7 @@ class SettingsApi {
     return response.data
   }
 
-  async changeNotificationsStatus(payload: { status: boolean }): Promise<void> {
+  async changeNotificationsStatus(payload: { notificationsStatus: boolean }): Promise<void> {
     const url = `${this.baseUrl}/notifications/status`
 
     const response = await api.patch<void>(url, payload)

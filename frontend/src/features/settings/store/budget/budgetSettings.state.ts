@@ -3,7 +3,7 @@ import { BudgetSettingsSliceState } from '@features/settings/types'
 export function getBudgetSettingsInitialState(): BudgetSettingsSliceState {
   return {
     budgetSettings: {
-      totalLimit: null,
+      totalLimitAmount: null,
       isAutoRenew: false,
       categories: [],
     },

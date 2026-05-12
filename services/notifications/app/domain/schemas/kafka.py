@@ -8,6 +8,8 @@ from smartbudget_shared.events import (
     BudgetPayload,
     EventEnvelope,
     GoalPayload,
+    TransactionCategoryChangedPayload,
+    TransactionUnclassifiedFoundPayload,
 )
 
 
@@ -31,10 +33,14 @@ class IncomingNotificationEvent(BaseModel):
 AuthEvent = EventEnvelope[AuthUserPayload]
 BudgetEvent = EventEnvelope[BudgetPayload]
 GoalEvent = EventEnvelope[GoalPayload]
+TransactionUnclassifiedFoundEvent = EventEnvelope[TransactionUnclassifiedFoundPayload]
+TransactionCategoryChangedEvent = EventEnvelope[TransactionCategoryChangedPayload]
 
 __all__ = [
     "IncomingNotificationEvent",
     "AuthEvent",
     "BudgetEvent",
     "GoalEvent",
+    "TransactionUnclassifiedFoundEvent",
+    "TransactionCategoryChangedEvent",
 ]

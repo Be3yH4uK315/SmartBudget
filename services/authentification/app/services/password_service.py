@@ -138,6 +138,8 @@ class PasswordService:
             await self.notifier.notify_password_changed(
                 user_id=str(user_id),
                 email=user.email,
+                language=user.language.value,
+                name=user.name,
             )
             await self.uow.commit()
 

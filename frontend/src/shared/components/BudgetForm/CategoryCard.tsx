@@ -46,7 +46,7 @@ export const CategoryCard = ({
 
               <NumberField
                 label={translate('valueLabel')}
-                value={category.limit}
+                value={category.limitAmount}
                 onChange={onAmountChange}
                 textFieldSx={TEXT_FIELD_SX(color)}
               />

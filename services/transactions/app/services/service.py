@@ -11,11 +11,13 @@ from app.domain.schemas import api as api_schemas
 from app.infrastructure.db import models
 from app.infrastructure.db.uow import UnitOfWork
 from smartbudget_shared.events import (
+    TransactionCategoryChangedPayload,
     TransactionDeletedPayload,
     TransactionGoalAppliedPayload,
     TransactionNeedCategoryPayload,
     TransactionPayload,
     TransactionUpdatedPayload,
+    create_transaction_category_changed_event,
     create_transaction_created_event,
     create_transaction_deleted_event,
     create_transaction_goal_applied_event,
@@ -351,6 +353,13 @@ class TransactionService:
                 new_category_id=category_id,
             )
 
+            if old_category_id is not None and old_category_id != category_id:
+                self._queue_category_changed_event(
+                    transaction=transaction,
+                    old_category_id=old_category_id,
+                    new_category_id=category_id,
+                )
+
     def _queue_event(
         self,
         topic: str,
@@ -426,12 +435,19 @@ class TransactionService:
         old_category_id: int | None,
         new_category_id: int | None,
     ) -> None:
-        """Публикует событие изменения транзакции после смены категории."""
+        """Публикует события изменения категории транзакции."""
         self._queue_transaction_updated_event(
             transaction=transaction,
             old_category_id=old_category_id,
             new_category_id=new_category_id,
         )
+
+        if old_category_id is not None and old_category_id != new_category_id:
+            self._queue_category_changed_event(
+                transaction=transaction,
+                old_category_id=old_category_id,
+                new_category_id=new_category_id,
+            )
 
     def _publish_deleted_events(
         self,
@@ -509,6 +525,27 @@ class TransactionService:
             occurred_at=_transaction_occurred_at(transaction),
         )
         event = create_transaction_need_category_event(payload)
+
+        self._queue_event(
+            settings.KAFKA.KAFKA_TOPIC_TRANSACTION_EVENTS,
+            event,
+        )
+
+
+    def _queue_category_changed_event(
+        self,
+        transaction: models.Transaction,
+        old_category_id: int | None,
+        new_category_id: int | None,
+    ) -> None:
+        """Добавляет transaction.category.changed event для уведомлений."""
+        payload = TransactionCategoryChangedPayload(
+            transaction_id=transaction.transaction_id,
+            user_id=transaction.user_id,
+            old_category_id=old_category_id,
+            new_category_id=new_category_id,
+        )
+        event = create_transaction_category_changed_event(payload)
 
         self._queue_event(
             settings.KAFKA.KAFKA_TOPIC_TRANSACTION_EVENTS,

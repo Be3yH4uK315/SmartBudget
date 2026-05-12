@@ -35,6 +35,12 @@ def get_push_url(message_key: str, props: dict[str, Any]) -> str:
     if message_key == "Transactions.unclassified.message":
         return "/transactions/?categoriesIds=1"
 
+    if (
+        message_key == "Transactions.categoryChanged.message"
+        and props.get("transaction_id")
+    ):
+        return f"/transactions/{props['transaction_id']}"
+
     return DEFAULT_NOTIFICATION_URL
 
 

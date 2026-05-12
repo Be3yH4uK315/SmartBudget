@@ -17,13 +17,13 @@ export const mapGoalTransaction = (item: GoalTransaction): TransactionBase => ({
 })
 
 export const mapBudgetCategories = (item: Category): TransactionBase => ({
-  value: item.currentValue,
+  value: item.spentAmount,
   categoryId: item.categoryId,
   type: 'expense',
 })
 
 export const mapPlanedBudgetData = (item: Category): TransactionBase => ({
-  value: item.limit,
+  value: item.limitAmount,
   categoryId: item.categoryId,
   type: 'expense',
 })

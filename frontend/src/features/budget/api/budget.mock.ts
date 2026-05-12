@@ -5,34 +5,34 @@ class BudgetMock {
     await new Promise((r) => setTimeout(r, 800))
 
     return {
-      totalLimit: 12000,
-      currentValue: 26000,
+      totalLimitAmount: 12000,
+      spentAmount: 26000,
       isAutoRenew: true,
       categories: [
         {
           categoryId: 1,
-          limit: 0,
-          currentValue: 2000,
+          limitAmount: 0,
+          spentAmount: 2000,
         },
         {
           categoryId: 2,
-          limit: 2000,
-          currentValue: 2000,
+          limitAmount: 2000,
+          spentAmount: 2000,
         },
         {
           categoryId: 4,
-          limit: 2001,
-          currentValue: 2000,
+          limitAmount: 2001,
+          spentAmount: 2000,
         },
         {
           categoryId: 5,
-          limit: 0,
-          currentValue: 20000,
+          limitAmount: 0,
+          spentAmount: 20000,
         },
         {
           categoryId: 31,
-          limit: 0,
-          currentValue: 0,
+          limitAmount: 0,
+          spentAmount: 0,
         },
       ],
     }

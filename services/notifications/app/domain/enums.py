@@ -14,7 +14,7 @@ class NotificationType(str, Enum):
 class NotificationServiceType(str, Enum):
     """Сервисы-источники уведомлений."""
 
-    limitAmount = "limitAmount"
+    CATEGORY_LIMITS = "limitAmount"
     BUDGET = "Budget"
     GOALS = "Goals"
     TRANSACTIONS = "Transactions"

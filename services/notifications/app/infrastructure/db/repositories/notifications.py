@@ -53,7 +53,7 @@ class NotificationRepository(BaseRepository):
 
         statement = (
             statement.order_by(models.Notification.created_at.desc())
-            .limitAmount(limitAmount)
+            .limit(limitAmount)
             .offset(offset)
         )
 
@@ -78,7 +78,7 @@ class NotificationRepository(BaseRepository):
 
         statement = (
             statement.order_by(models.Notification.created_at.desc())
-            .limitAmount(limitAmount)
+            .limit(limitAmount)
             .offset(offset)
         )
 

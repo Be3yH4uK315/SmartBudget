@@ -47,7 +47,7 @@ class GoalFilters:
 
     def __init__(
         self,
-        limitAmount: int = Query(100, ge=1, le=1000, description="Лимит записей"),
+        limit_amount: int = Query(100, ge=1, le=1000, description="Лимит записей"),
         offset: int = Query(0, ge=0, description="Смещение"),
         tags: str | None = Query(
             None,
@@ -59,7 +59,7 @@ class GoalFilters:
         ),
         is_archived: bool = Query(False, description="Показывать архивные цели"),
     ) -> None:
-        self.limitAmount = limitAmount
+        self.limit_amount = limit_amount
         self.offset = offset
         self.is_archived = is_archived
         self.tags_list = self._parse_tags(tags)
@@ -89,7 +89,7 @@ class GoalFilters:
         except ValueError as exc:
             allowed_values = [priority.value for priority in GoalPriority]
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Invalid priority value. Allowed: {allowed_values}",
             ) from exc
 

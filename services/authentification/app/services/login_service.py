@@ -60,7 +60,7 @@ class LoginService:
                     extra={"email": normalized_email},
                 )
                 raise exceptions.InvalidCredentialsError(
-                    "Account is temporarily locked"
+                    "Account is temporarily locked",
                 )
 
             if user and user.is_locked:
@@ -120,6 +120,7 @@ class LoginService:
                 user_dto,
                 ip,
                 location,
+                device=resolved_user_agent,
             )
 
             await self.uow.commit()
@@ -194,6 +195,13 @@ class LoginService:
                 user.is_locked = True
                 user.locked_until = time.utc_now() + timedelta(
                     minutes=ACCOUNT_LOCK_MINUTES,
+                )
+
+                user_dto = user_to_dto(user)
+                await self.notifier.notify_suspicious_activity(
+                    user=user_dto,
+                    reason="too_many_failed_login_attempts",
+                    device=None,
                 )
 
             await self.uow.commit()

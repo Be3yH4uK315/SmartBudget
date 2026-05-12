@@ -33,13 +33,21 @@ def _create_outbox_event(
     threshold_percent: int | None = None,
 ) -> dict:
     """Создает goal event envelope для outbox_events."""
+    current_percent = int(_goal_current_percent(goal))
+
     payload = GoalPayload(
         goal_id=goal.goal_id,
         user_id=goal.user_id,
+        name=goal.name,
         target_amount=goal.target_amount,
         current_amount=goal.current_amount,
-        progress_percent=int(_goal_current_percent(goal)),
+        recommended_payment=goal.calculate_recommended_payment(
+            net_change_this_month=Decimal("0"),
+        ),
+        progress_percent=current_percent,
+        current_percent=current_percent,
         threshold_percent=threshold_percent,
+        days_left=goal.days_left,
     )
     event = create_goal_event(
         event_type=event_type,
@@ -162,7 +170,7 @@ class GoalService:
         self,
         user_id: UUID,
         query: str,
-        limitAmount: int,
+        limit_amount: int,
     ) -> list[api_schemas.GoalSearchResponse]:
         """Ищет цели пользователя по названию."""
         normalized_query = query.strip()
@@ -173,7 +181,7 @@ class GoalService:
             goals = await self.uow.goals.search_goals(
                 user_id,
                 normalized_query,
-                limitAmount,
+                limit_amount,
             )
 
         return [api_schemas.GoalSearchResponse.model_validate(goal) for goal in goals]
@@ -181,7 +189,7 @@ class GoalService:
     async def get_all_goals(
         self,
         user_id: UUID,
-        limitAmount: int = 100,
+        limit_amount: int = 100,
         offset: int = 0,
         tags: list[str] | None = None,
         priorities: list[GoalPriority] | None = None,
@@ -191,7 +199,7 @@ class GoalService:
         async with self.uow:
             goals = await self.uow.goals.get_all_goals(
                 user_id,
-                limitAmount=limitAmount,
+                limit_amount=limit_amount,
                 offset=offset,
                 tags=tags,
                 priorities=priorities,
@@ -501,7 +509,7 @@ class GoalService:
             async with self.uow:
                 batch = await self.uow.goals.get_expired_goals_batch(
                     today=today,
-                    limitAmount=DEADLINE_BATCH_SIZE,
+                    limit_amount=DEADLINE_BATCH_SIZE,
                     last_id=last_id,
                 )
 
@@ -535,7 +543,7 @@ class GoalService:
             async with self.uow:
                 approaching_batch = await self.uow.goals.get_approaching_goals_batch(
                     today,
-                    limitAmount=DEADLINE_BATCH_SIZE,
+                    limit_amount=DEADLINE_BATCH_SIZE,
                 )
 
                 if not approaching_batch:
@@ -571,7 +579,7 @@ class GoalService:
                 batch = await self.uow.goals.get_goals_without_income_batch(
                     period_start=period_start,
                     period_end=period_end,
-                    limitAmount=batch_size,
+                    limit_amount=batch_size,
                     last_id=last_id,
                 )
 
@@ -581,10 +589,7 @@ class GoalService:
                 last_id = batch[-1].goal_id
 
                 for goal in batch:
-                    self._add_goal_threshold_reached_event(
-                        goal=goal,
-                        threshold_percent=int(_goal_current_percent(goal)),
-                    )
+                    self._add_goal_payment_missed_event(goal)
 
     async def _add_almost_achieved_notification_in_uow(
         self,
@@ -682,6 +687,19 @@ class GoalService:
             ),
             event_type=event_type.value,
         )
+    
+    def _add_goal_payment_missed_event(self, goal: models.Goal) -> None:
+        """Добавляет goal.payment_missed event."""
+        event_type = SharedGoalEventType.GOAL_PAYMENT_MISSED
+
+        self.uow.outbox.add_event(
+            topic=settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
+            payload=_create_outbox_event(
+                event_type=event_type,
+                goal=goal,
+            ),
+            event_type=event_type.value,
+        )
 
     def _build_expired_goal_events(self, goal: models.Goal) -> list[dict]:
         """Формирует outbox-события истечения цели."""
@@ -702,11 +720,10 @@ class GoalService:
             {
                 "topic": settings.KAFKA.KAFKA_TOPIC_GOAL_EVENTS,
                 "payload": _create_outbox_event(
-                    event_type=SharedGoalEventType.GOAL_THRESHOLD_REACHED,
+                    event_type=SharedGoalEventType.GOAL_DEADLINE_APPROACHING,
                     goal=goal,
-                    threshold_percent=int(_goal_current_percent(goal)),
                 ),
-                "event_type": SharedGoalEventType.GOAL_THRESHOLD_REACHED.value,
+                "event_type": SharedGoalEventType.GOAL_DEADLINE_APPROACHING.value,
             },
         ]
 

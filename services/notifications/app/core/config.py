@@ -27,6 +27,7 @@ class KafkaSettings(BaseSettings):
     KAFKA_TOPIC_AUTH_EVENTS: str = KafkaTopic.AUTH_EVENTS
     KAFKA_TOPIC_BUDGET_EVENTS: str = KafkaTopic.BUDGET_EVENTS
     KAFKA_TOPIC_GOAL_EVENTS: str = KafkaTopic.GOAL_EVENTS
+    KAFKA_TOPIC_TRANSACTION_EVENTS: str = KafkaTopic.TRANSACTION_EVENTS
     KAFKA_TOPIC_DLQ: str = KafkaTopic.DLQ
 
     @property
@@ -35,12 +36,13 @@ class KafkaSettings(BaseSettings):
         return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str, str, str]:
+    def consumer_topics(self) -> tuple[str, str, str, str]:
         """Возвращает topics, которые читает notification consumer."""
         return (
             self.KAFKA_TOPIC_AUTH_EVENTS,
             self.KAFKA_TOPIC_BUDGET_EVENTS,
             self.KAFKA_TOPIC_GOAL_EVENTS,
+            self.KAFKA_TOPIC_TRANSACTION_EVENTS,
         )
 
     @property

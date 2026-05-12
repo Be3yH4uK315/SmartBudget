@@ -3,9 +3,9 @@ import { PayloadAction, SliceCaseReducers } from '@shared/types'
 
 export type BudgetSettingsSliceState = {
   budgetSettings: {
-    totalLimit: number | null
+    totalLimitAmount: number | null
     isAutoRenew: boolean
-    categories: Omit<Category, 'currentValue'>[]
+    categories: Omit<Category, 'spentAmount'>[]
   }
   status: BudgetSettingsStatus
   isLoading: boolean

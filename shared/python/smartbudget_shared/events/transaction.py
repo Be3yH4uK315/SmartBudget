@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
@@ -7,7 +5,12 @@ from uuid import UUID
 
 from pydantic import Field
 
-from smartbudget_shared.events.base import BaseEventPayload, EventEnvelope, EventSource
+from smartbudget_shared.events.base import (
+    BaseEventPayload,
+    EventEnvelope,
+    EventSource,
+    enum_value,
+)
 
 
 class TransactionEventType(StrEnum):
@@ -16,8 +19,12 @@ class TransactionEventType(StrEnum):
     TRANSACTION_CREATED = "transaction.created"
     TRANSACTION_UPDATED = "transaction.updated"
     TRANSACTION_DELETED = "transaction.deleted"
+
     TRANSACTION_NEED_CATEGORY = "transaction.need_category"
     TRANSACTION_GOAL_APPLIED = "transaction.goal_applied"
+
+    TRANSACTION_UNCLASSIFIED_FOUND = "transaction.unclassified.found"
+    TRANSACTION_CATEGORY_CHANGED = "transaction.category.changed"
 
 
 class TransactionPayload(BaseEventPayload):
@@ -25,18 +32,23 @@ class TransactionPayload(BaseEventPayload):
 
     transaction_id: UUID = Field(..., description="ID транзакции")
     user_id: UUID = Field(..., description="ID пользователя")
+
     account_id: UUID | None = Field(None, description="ID счета")
     category_id: int | None = Field(None, description="ID категории")
     category_name_snapshot: str | None = Field(
         None,
         description="Snapshot названия категории",
     )
+
     goal_id: UUID | None = Field(None, description="ID цели, если транзакция относится к цели")
+
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
+
     merchant: str | None = Field(None, description="Название merchant")
     mcc: int | None = Field(None, description="MCC код")
     description: str | None = Field(None, description="Описание транзакции")
+
     occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
 
 
@@ -45,6 +57,7 @@ class TransactionUpdatedPayload(TransactionPayload):
 
     old_category_id: int | None = Field(None, description="Старый ID категории")
     new_category_id: int | None = Field(None, description="Новый ID категории")
+
     old_amount: Decimal | None = Field(None, description="Старая сумма транзакции")
     new_amount: Decimal | None = Field(None, description="Новая сумма транзакции")
 
@@ -54,9 +67,11 @@ class TransactionDeletedPayload(BaseEventPayload):
 
     transaction_id: UUID = Field(..., description="ID транзакции")
     user_id: UUID = Field(..., description="ID пользователя")
+
     account_id: UUID | None = Field(None, description="ID счета")
     category_id: int | None = Field(None, description="ID категории")
     goal_id: UUID | None = Field(None, description="ID цели")
+
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
     occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
@@ -67,10 +82,12 @@ class TransactionNeedCategoryPayload(BaseEventPayload):
 
     transaction_id: UUID = Field(..., description="ID транзакции")
     user_id: UUID = Field(..., description="ID пользователя")
+
     account_id: UUID | None = Field(None, description="ID счета")
     merchant: str | None = Field(None, description="Название merchant")
     mcc: int | None = Field(None, description="MCC код")
     description: str | None = Field(None, description="Описание транзакции")
+
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
     occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
@@ -82,9 +99,48 @@ class TransactionGoalAppliedPayload(BaseEventPayload):
     transaction_id: UUID = Field(..., description="ID транзакции")
     goal_id: UUID = Field(..., description="ID цели")
     user_id: UUID = Field(..., description="ID пользователя")
+
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
     occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
+
+
+class TransactionUnclassifiedFoundPayload(BaseEventPayload):
+    """Payload события найденных неклассифицированных транзакций."""
+
+    user_id: UUID = Field(..., description="ID пользователя")
+    amount: Decimal = Field(..., description="Общая сумма неклассифицированных транзакций")
+    count: int = Field(..., description="Количество неклассифицированных транзакций")
+
+
+class TransactionCategoryChangedPayload(BaseEventPayload):
+    """Payload события изменения категории транзакции."""
+
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    user_id: UUID = Field(..., description="ID пользователя")
+
+    old_category_id: int | None = Field(None, description="Старый ID категории")
+    new_category_id: int | None = Field(None, description="Новый ID категории")
+
+
+def create_transaction_event(
+    *,
+    event_type: TransactionEventType | str,
+    payload: BaseEventPayload,
+    aggregate_id: UUID,
+    user_id: UUID,
+) -> EventEnvelope[BaseEventPayload]:
+    """Создает универсальное событие transaction service."""
+    resolved_event_type = str(enum_value(event_type))
+
+    return EventEnvelope.create(
+        event_type=resolved_event_type,
+        source_service=EventSource.TRANSACTIONS,
+        payload=payload,
+        aggregate_id=aggregate_id,
+        user_id=user_id,
+        idempotency_key=f"{resolved_event_type}:{aggregate_id}",
+    )
 
 
 def create_transaction_created_event(
@@ -154,4 +210,32 @@ def create_transaction_goal_applied_event(
         aggregate_id=payload.transaction_id,
         user_id=payload.user_id,
         idempotency_key=f"transaction.goal_applied:{payload.transaction_id}",
+    )
+
+
+def create_transaction_unclassified_found_event(
+    payload: TransactionUnclassifiedFoundPayload,
+) -> EventEnvelope[TransactionUnclassifiedFoundPayload]:
+    """Создает событие найденных неклассифицированных транзакций."""
+    return EventEnvelope.create(
+        event_type=TransactionEventType.TRANSACTION_UNCLASSIFIED_FOUND,
+        source_service=EventSource.TRANSACTIONS,
+        payload=payload,
+        aggregate_id=payload.user_id,
+        user_id=payload.user_id,
+        idempotency_key=f"transaction.unclassified.found:{payload.user_id}",
+    )
+
+
+def create_transaction_category_changed_event(
+    payload: TransactionCategoryChangedPayload,
+) -> EventEnvelope[TransactionCategoryChangedPayload]:
+    """Создает событие изменения категории транзакции."""
+    return EventEnvelope.create(
+        event_type=TransactionEventType.TRANSACTION_CATEGORY_CHANGED,
+        source_service=EventSource.TRANSACTIONS,
+        payload=payload,
+        aggregate_id=payload.transaction_id,
+        user_id=payload.user_id,
+        idempotency_key=f"transaction.category.changed:{payload.transaction_id}",
     )

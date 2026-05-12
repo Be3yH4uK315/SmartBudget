@@ -60,7 +60,7 @@ class GoalRepository:
                 models.Goal.is_archived.is_(False),
             )
             .order_by(remaining_amount.asc())
-            .limitAmount(5)
+            .limit(5)
         )
 
         result = await self.db.execute(query)
@@ -70,7 +70,7 @@ class GoalRepository:
         self,
         user_id: UUID,
         query: str,
-        limitAmount: int = 10,
+        limit_amount: int = 10,
     ) -> list[models.Goal]:
         """Ищет цели пользователя по названию."""
         statement = (
@@ -80,7 +80,7 @@ class GoalRepository:
                 models.Goal.name.ilike(f"%{query}%"),
             )
             .order_by(models.Goal.updated_at.desc(), models.Goal.goal_id.asc())
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
         )
 
         result = await self.db.execute(statement)
@@ -89,7 +89,7 @@ class GoalRepository:
     async def get_all_goals(
         self,
         user_id: UUID,
-        limitAmount: int = 100,
+        limit_amount: int = 100,
         offset: int = 0,
         tags: list[str] | None = None,
         priorities: list[GoalPriority] | None = None,
@@ -137,7 +137,7 @@ class GoalRepository:
                 priority_order.asc(),
                 completion_percentage.desc(),
             )
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
             .offset(offset)
         )
 
@@ -458,7 +458,7 @@ class GoalRepository:
     async def get_expired_goals_batch(
         self,
         today: date,
-        limitAmount: int = 100,
+        limit_amount: int = 100,
         last_id: UUID | None = None,
     ) -> list[models.Goal]:
         """Получает batch целей, срок которых истек до today."""
@@ -470,7 +470,7 @@ class GoalRepository:
                 models.Goal.is_archived.is_(False),
             )
             .order_by(models.Goal.goal_id.asc())
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
         )
 
         if last_id:
@@ -482,7 +482,7 @@ class GoalRepository:
     async def get_approaching_goals_batch(
         self,
         check_date: date,
-        limitAmount: int = 100,
+        limit_amount: int = 100,
     ) -> list[models.Goal]:
         """Получает цели, срок которых истекает в течение недели."""
         query = (
@@ -498,7 +498,7 @@ class GoalRepository:
                 models.Goal.finish_date <= check_date + timedelta(days=7),
                 models.GoalNotification.goal_id.is_(None),
             )
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
         )
 
         result = await self.db.execute(query)
@@ -508,7 +508,7 @@ class GoalRepository:
         self,
         period_start: datetime,
         period_end: datetime,
-        limitAmount: int = 100,
+        limit_amount: int = 100,
         last_id: UUID | None = None,
     ) -> list[models.Goal]:
         """Получает ongoing-цели без income-транзакций за период."""
@@ -533,7 +533,7 @@ class GoalRepository:
                 ~income_exists,
             )
             .order_by(models.Goal.goal_id.asc())
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
         )
 
         if last_id:

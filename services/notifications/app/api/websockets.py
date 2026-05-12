@@ -39,7 +39,8 @@ class ConnectionManager:
 
     async def send_personal_message(self, user_id: str, message: dict) -> None:
         """Отправляет JSON-сообщение во все открытые вкладки пользователя."""
-        connections = self.active_connections.get(user_id, [])
+        connections = list(self.active_connections.get(user_id, []))
+        dead_connections: list[WebSocket] = []
 
         for connection in connections:
             try:
@@ -51,6 +52,10 @@ class ConnectionManager:
                     exc,
                     exc_info=True,
                 )
+                dead_connections.append(connection)
+
+        for connection in dead_connections:
+            self.disconnect(connection, user_id)
 
 
 ws_manager = ConnectionManager()

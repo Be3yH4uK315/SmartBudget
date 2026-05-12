@@ -80,6 +80,14 @@ def _category_expense(category: models.CategoryLimit | None) -> Decimal:
     return category.spent_amount
 
 
+def _percent_used(spent_amount: Decimal, limit_amount: Decimal | None) -> int:
+    """Считает процент использования лимита."""
+    if not limit_amount or limit_amount <= 0:
+        return 0
+
+    return int((spent_amount / limit_amount * Decimal("100")).quantize(Decimal("1")))
+
+
 def _threshold_crossed(
     limitAmount: Decimal,
     before: Decimal,
@@ -189,17 +197,28 @@ def _budget_event(
     event_type: BudgetEventType | str,
     user_id: UUID,
     budget: models.Budget,
-    category_id: int | None = None,
+    category: models.CategoryLimit | None = None,
     threshold_percent: int | None = None,
 ) -> dict[str, Any]:
     """Создает budget event envelope."""
+    is_category_event = category is not None
+
+    limit_amount = category.limit_amount if is_category_event else budget.total_limit_amount
+    spent_amount = _category_expense(category) if is_category_event else _expense_total(budget)
+
     payload = BudgetPayload(
         budget_id=budget.budget_id,
         user_id=user_id,
-        category_id=category_id,
-        limit_amount=budget.total_limit_amount,
-        spent_amount=_expense_total(budget),
+        category_id=category.category_id if category else None,
+        limit_amount=limit_amount,
+        spent_amount=spent_amount,
+        percent=_percent_used(spent_amount, limit_amount),
         threshold_percent=threshold_percent,
+        checked_at=_utc_now()
+        if event_type == BudgetEventType.BUDGET_CHECK_RESULTS
+        else None,
+        total_exceeded_count=None,
+        category_exceeded_count=None,
     )
     event = create_budget_event(
         event_type=event_type,
@@ -592,8 +611,8 @@ class BudgetService:
         user_id: UUID,
         budget: models.Budget,
     ) -> None:
-        """Добавляет budget.updated event при изменении настроек бюджета."""
-        event_type = BudgetEventType.BUDGET_UPDATED
+        """Добавляет budget.settings.changed event при изменении настроек бюджета."""
+        event_type = BudgetEventType.BUDGET_SETTINGS_CHANGED
 
         self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
@@ -883,10 +902,10 @@ class BudgetService:
             total_after,
             BUDGET_PRE_OVERFLOW_RATIO,
         ):
-            self._queue_budget_threshold_reached_event(
+            self._queue_total_budget_event(
                 user_id=user_id,
                 budget=budget,
-                category_id=None,
+                event_type=BudgetEventType.BUDGET_TOTAL_THRESHOLD_REACHED,
                 threshold_percent=80,
             )
 
@@ -896,10 +915,10 @@ class BudgetService:
             total_after,
             BUDGET_OVERFLOW_RATIO,
         ):
-            self._queue_budget_threshold_reached_event(
+            self._queue_total_budget_event(
                 user_id=user_id,
                 budget=budget,
-                category_id=None,
+                event_type=BudgetEventType.BUDGET_TOTAL_EXCEEDED,
                 threshold_percent=100,
             )
 
@@ -919,10 +938,11 @@ class BudgetService:
             category_after,
             BUDGET_PRE_OVERFLOW_RATIO,
         ):
-            self._queue_budget_threshold_reached_event(
+            self._queue_category_budget_event(
                 user_id=user_id,
                 budget=budget,
-                category_id=category.category_id,
+                category=category,
+                event_type=BudgetEventType.BUDGET_CATEGORY_THRESHOLD_REACHED,
                 threshold_percent=80,
             )
 
@@ -932,30 +952,50 @@ class BudgetService:
             category_after,
             BUDGET_OVERFLOW_RATIO,
         ):
-            self._queue_budget_threshold_reached_event(
+            self._queue_category_budget_event(
                 user_id=user_id,
                 budget=budget,
-                category_id=category.category_id,
+                category=category,
+                event_type=BudgetEventType.BUDGET_CATEGORY_EXCEEDED,
                 threshold_percent=100,
             )
 
-    def _queue_budget_threshold_reached_event(
+    def _queue_total_budget_event(
         self,
         user_id: UUID,
         budget: models.Budget,
-        category_id: int | None,
-        threshold_percent: int,
+        event_type: BudgetEventType,
+        threshold_percent: int | None = None,
     ) -> None:
-        """Добавляет budget.threshold_reached event в outbox."""
-        event_type = BudgetEventType.BUDGET_THRESHOLD_REACHED
-
+        """Добавляет событие по общему бюджету в outbox."""
         self.uow.outbox.add_event(
             topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
             payload=_budget_event(
                 event_type=event_type,
                 user_id=user_id,
                 budget=budget,
-                category_id=category_id,
+                threshold_percent=threshold_percent,
+            ),
+            event_type=event_type.value,
+        )
+
+
+    def _queue_category_budget_event(
+        self,
+        user_id: UUID,
+        budget: models.Budget,
+        category: models.CategoryLimit,
+        event_type: BudgetEventType,
+        threshold_percent: int | None = None,
+    ) -> None:
+        """Добавляет событие по лимиту категории в outbox."""
+        self.uow.outbox.add_event(
+            topic=settings.KAFKA.KAFKA_TOPIC_BUDGET_EVENTS,
+            payload=_budget_event(
+                event_type=event_type,
+                user_id=user_id,
+                budget=budget,
+                category=category,
                 threshold_percent=threshold_percent,
             ),
             event_type=event_type.value,

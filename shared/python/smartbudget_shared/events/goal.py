@@ -18,10 +18,14 @@ class GoalEventType(StrEnum):
     GOAL_CREATED = "goal.created"
     GOAL_UPDATED = "goal.updated"
     GOAL_DELETED = "goal.deleted"
+
     GOAL_COMPLETED = "goal.completed"
     GOAL_EXPIRED = "goal.expired"
     GOAL_PROGRESS_CHANGED = "goal.progress_changed"
     GOAL_THRESHOLD_REACHED = "goal.threshold_reached"
+
+    GOAL_DEADLINE_APPROACHING = "goal.deadline_approaching"
+    GOAL_PAYMENT_MISSED = "goal.payment_missed"
 
 
 class GoalPayload(BaseEventPayload):
@@ -29,10 +33,18 @@ class GoalPayload(BaseEventPayload):
 
     goal_id: UUID = Field(..., description="ID цели")
     user_id: UUID = Field(..., description="ID пользователя")
+
+    name: str | None = Field(None, description="Название цели")
+
     target_amount: Decimal | None = Field(None, description="Целевая сумма")
     current_amount: Decimal | None = Field(None, description="Текущая накопленная сумма")
+    recommended_payment: Decimal | None = Field(None, description="Рекомендуемый платеж")
+
     progress_percent: int | None = Field(None, description="Процент выполнения цели")
+    current_percent: int | None = Field(None, description="Текущий процент выполнения цели")
     threshold_percent: int | None = Field(None, description="Порог уведомления в процентах")
+
+    days_left: int | None = Field(None, description="Количество дней до дедлайна")
 
 
 def create_goal_event(

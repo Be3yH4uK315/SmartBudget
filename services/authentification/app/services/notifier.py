@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,11 @@ from smartbudget_shared.events import (
 )
 
 settings = config.settings
+
+
+def _utc_now() -> datetime:
+    """Возвращает текущее UTC-время."""
+    return datetime.now(timezone.utc)
 
 
 class AuthNotifier:
@@ -49,7 +55,12 @@ class AuthNotifier:
             name=_none_if_empty(payload_fields.get("name")),
             language=_none_if_empty(payload_fields.get("language")),
             ip=_none_if_empty(payload_fields.get("ip")),
+            device=_none_if_empty(payload_fields.get("device")),
             location=_none_if_empty(payload_fields.get("location")),
+            reason=_none_if_empty(payload_fields.get("reason")),
+            logged_at=payload_fields.get("logged_at"),
+            changed_at=payload_fields.get("changed_at"),
+            detected_at=payload_fields.get("detected_at"),
         )
 
         event = create_auth_event(
@@ -135,14 +146,19 @@ class AuthNotifier:
         user: dtos.UserDTO,
         ip: str,
         location: str,
+        device: str | None = None,
     ) -> None:
-        """Сохраняет событие успешного входа пользователя."""
+        """Сохраняет событие нового входа пользователя для security-уведомления."""
         await self._save_event(
-            AuthEventType.USER_LOGIN,
+            AuthEventType.DEVICE_NEW_LOGIN,
             user_id=str(user.user_id),
             email=user.email,
+            language=user.language.value,
+            name=user.name,
             ip=ip,
+            device=device,
             location=location,
+            logged_at=_utc_now(),
         )
 
     async def notify_login_failed(
@@ -151,12 +167,33 @@ class AuthNotifier:
         ip: str,
         location: str,
     ) -> None:
-        """Сохраняет событие неуспешного входа.
+        """Обрабатывает неуспешный вход.
 
-        Для login_failed во внешнюю Kafka-схему требуется user_id,
-        поэтому событие без пользователя не публикуется.
+        Событие не публикуется, потому что для внешнего auth-события нужен user_id.
         """
         return None
+
+    async def notify_suspicious_activity(
+        self,
+        user: dtos.UserDTO,
+        reason: str,
+        ip: str | None = None,
+        location: str | None = None,
+        device: str | None = None,
+    ) -> None:
+        """Сохраняет событие подозрительной активности."""
+        await self._save_event(
+            AuthEventType.ACTIVITY_SUSPICIOUS,
+            user_id=str(user.user_id),
+            email=user.email,
+            language=user.language.value,
+            name=user.name,
+            reason=reason,
+            ip=ip,
+            device=device,
+            location=location,
+            detected_at=_utc_now(),
+        )
 
     async def notify_email_verified(self, email: str) -> None:
         """Обрабатывает успешную валидацию email-токена."""
@@ -172,20 +209,32 @@ class AuthNotifier:
             AuthEventType.PASSWORD_CHANGED,
             user_id=str(user.user_id),
             email=user.email,
+            language=user.language.value,
+            name=user.name,
+            changed_at=_utc_now(),
         )
 
     async def notify_password_changed(
         self,
         user_id: str,
         email: str | None = None,
+        language: str | None = None,
+        name: str | None = None,
     ) -> None:
         """Сохраняет событие смены пароля."""
-        payload: dict[str, str] = {
+        payload: dict[str, Any] = {
             "user_id": user_id,
+            "changed_at": _utc_now(),
         }
 
         if email:
             payload["email"] = email
+
+        if language:
+            payload["language"] = language
+
+        if name:
+            payload["name"] = name
 
         await self._save_event(
             AuthEventType.PASSWORD_CHANGED,
@@ -216,6 +265,7 @@ class AuthNotifier:
         user_id: str,
         email: str | None = None,
         language: str | None = None,
+        name: str | None = None,
     ) -> None:
         """Сохраняет событие обновления профиля."""
         payload: dict[str, str] = {"user_id": user_id}
@@ -225,6 +275,9 @@ class AuthNotifier:
 
         if language:
             payload["language"] = language
+
+        if name:
+            payload["name"] = name
 
         await self._save_event(
             AuthEventType.PROFILE_UPDATED,

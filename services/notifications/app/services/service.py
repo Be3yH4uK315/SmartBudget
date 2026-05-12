@@ -216,11 +216,13 @@ class NotificationService:
     ) -> api_schemas.NotificationSettingsResponse:
         """Обновляет настройки уведомлений пользователя."""
         async with self.uow:
+            await self._get_or_create_settings_in_uow(user_id)
+
             changes = self._settings_update_to_changes(request)
 
-            settings = await self._get_or_create_settings_in_uow(user_id)
-            if not settings.notifications_enabled:
+            if not request.notifications_status:
                 changes["push_enabled"] = False
+                changes["email_enabled"] = False
 
             updated_settings = await self.uow.settings.update_settings(
                 user_id,
@@ -248,6 +250,7 @@ class NotificationService:
 
         if not notifications_status:
             changes["push_enabled"] = False
+            changes["email_enabled"] = False
 
         async with self.uow:
             settings = await self.uow.settings.update_settings(user_id, changes)
@@ -515,11 +518,12 @@ class NotificationService:
         return api_schemas.NotificationSettingsResponse(
             notifications_status=settings.notifications_enabled,
             push_status=settings.push_enabled,
+            email_status=settings.email_enabled,
             goals=NotificationServiceType.GOALS.value not in disabled,
             transactions=NotificationServiceType.TRANSACTIONS.value not in disabled,
             budget=api_schemas.BudgetNotificationSettings(
                 total_limit=NotificationServiceType.BUDGET.value not in disabled,
-                categories_limit=NotificationServiceType.limitAmount.value
+                categories_limit=NotificationServiceType.CATEGORY_LIMITS.value
                 not in disabled,
             ),
         )
@@ -541,10 +545,12 @@ class NotificationService:
             disabled_services.append(NotificationServiceType.BUDGET.value)
 
         if not request.budget.categories_limit:
-            disabled_services.append(NotificationServiceType.limitAmount.value)
+            disabled_services.append(NotificationServiceType.CATEGORY_LIMITS.value)
 
         return {
+            "notifications_enabled": request.notifications_status,
             "push_enabled": request.push_status,
+            "email_enabled": request.email_status,
             "disabled_services": disabled_services,
         }
 

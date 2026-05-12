@@ -33,7 +33,7 @@ class NotificationsApi {
   }
 
   async markAllAsRead(): Promise<void> {
-    const url = `${this.baseUrl}`
+    const url = `${this.baseUrl}/read-all`
 
     const response = await api.patch<void>(url)
     return response.data

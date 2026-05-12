@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
@@ -19,7 +20,17 @@ class BudgetEventType(StrEnum):
     BUDGET_UPDATED = "budget.updated"
     BUDGET_DELETED = "budget.deleted"
     BUDGET_PROGRESS_CHANGED = "budget.progress_changed"
+
     BUDGET_THRESHOLD_REACHED = "budget.threshold_reached"
+
+    BUDGET_TOTAL_THRESHOLD_REACHED = "budget.total.threshold_reached"
+    BUDGET_TOTAL_EXCEEDED = "budget.total.exceeded"
+
+    BUDGET_CATEGORY_THRESHOLD_REACHED = "budget.category.threshold_reached"
+    BUDGET_CATEGORY_EXCEEDED = "budget.category.exceeded"
+
+    BUDGET_SETTINGS_CHANGED = "budget.settings.changed"
+    BUDGET_CHECK_RESULTS = "budget.check.results"
 
 
 class BudgetPayload(BaseEventPayload):
@@ -27,10 +38,24 @@ class BudgetPayload(BaseEventPayload):
 
     budget_id: UUID = Field(..., description="ID бюджета")
     user_id: UUID = Field(..., description="ID пользователя")
+
     category_id: int | None = Field(None, description="ID категории")
+
     limit_amount: Decimal | None = Field(None, description="Лимит бюджета")
     spent_amount: Decimal | None = Field(None, description="Потраченная сумма")
+
+    percent: int | None = Field(None, description="Текущий процент использования")
     threshold_percent: int | None = Field(None, description="Порог уведомления в процентах")
+
+    checked_at: datetime | None = Field(None, description="Время проверки бюджета")
+    total_exceeded_count: int | None = Field(
+        None,
+        description="Количество превышений общего бюджета",
+    )
+    category_exceeded_count: int | None = Field(
+        None,
+        description="Количество превышений категорий",
+    )
 
 
 def create_budget_event(

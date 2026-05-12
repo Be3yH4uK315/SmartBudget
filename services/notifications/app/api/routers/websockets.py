@@ -3,8 +3,11 @@ from uuid import UUID
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 
 from app.api.websockets import ws_manager
+from app.core.config import settings
 
 router = APIRouter(tags=["Notification WebSockets"])
+
+DEV_ENVIRONMENTS = {"dev", "local", "test"}
 
 
 @router.websocket("/ws")
@@ -37,6 +40,9 @@ def _resolve_websocket_user_id(
     if user_id:
         return user_id
 
+    if not _is_dev_environment():
+        return None
+
     if not token:
         return None
 
@@ -44,3 +50,12 @@ def _resolve_websocket_user_id(
         return str(UUID(token))
     except ValueError:
         return None
+
+
+def _is_dev_environment() -> bool:
+    """Проверяет, можно ли использовать dev-token для WebSocket."""
+    env = getattr(settings.APP, "ENV", None)
+    if not env:
+        return False
+
+    return str(env).lower() in DEV_ENVIRONMENTS

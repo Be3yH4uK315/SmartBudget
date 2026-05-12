@@ -1,36 +1,52 @@
 {
-  "limitAmount.preOverflow.title": "Approaching category limitAmount",
-  "limitAmount.preOverflow.message": "Spending in category {category_id} is approaching the limitAmount.",
-  "limitAmount.overflow.title": "Category limitAmount exceeded",
-  "limitAmount.overflow.message": "The limitAmount for category {category_id} has been exceeded.",
-  "Budget.checkResults.title": "Budget check",
-  "Budget.checkResults.message": "Budget check completed.",
+  "limitAmount.preOverflow.title": "Category limit is almost reached",
+  "limitAmount.preOverflow.message": "Expenses for category {category_id} reached {percent}% of the limit. Spent {spent_amount} of {limit_amount}.",
+
+  "limitAmount.overflow.title": "Category limit exceeded",
+  "limitAmount.overflow.message": "Limit for category {category_id} exceeded. Spent {spent_amount} of {limit_amount}.",
+
+  "Budget.checkResults.title": "Budget check completed",
+  "Budget.checkResults.message": "Budget check completed. Total budget exceeded: {total_exceeded_count}, category limits exceeded: {category_exceeded_count}.",
+
   "Budget.overflow.title": "Budget exceeded",
-  "Budget.overflow.message": "The total budget has been exceeded.",
-  "Budget.preOverflow.title": "Budget almost used",
-  "Budget.preOverflow.message": "{percent}% of the total budget has been used.",
+  "Budget.overflow.message": "Total budget exceeded. Spent {spent_amount} of {limit_amount}.",
+
+  "Budget.preOverflow.title": "Budget is almost exhausted",
+  "Budget.preOverflow.message": "{percent}% of the total budget has been used. Spent {spent_amount} of {limit_amount}.",
+
   "Budget.settingsChanged.title": "Budget settings changed",
   "Budget.settingsChanged.message": "Budget settings {budget_id} have been updated.",
+
   "Goals.goalCreated.title": "Goal created",
   "Goals.goalCreated.message": "Goal \"{name}\" has been created. Recommended payment: {recommended_payment}.",
+
   "Goals.missedPayment.title": "Goal payment missed",
-  "Goals.missedPayment.message": "A scheduled payment was missed for goal \"{name}\".",
-  "Goals.almostAchieved.title": "Goal almost achieved",
-  "Goals.almostAchieved.message": "Goal \"{name}\" is almost achieved.",
+  "Goals.missedPayment.message": "Scheduled payment for goal \"{name}\" was missed.",
+
   "Goals.achieved.title": "Goal achieved",
-  "Goals.achieved.message": "Goal \"{name}\" has been achieved.",
+  "Goals.achieved.message": "Goal \"{name}\" has been achieved. Saved {current_amount} of {target_amount}.",
+
   "Goals.expired.title": "Goal expired",
-  "Goals.expired.message": "Goal \"{name}\" has expired.",
-  "Goals.deadlineIsComing.title": "Goal deadline is coming",
-  "Goals.deadlineIsComing.message": "Goal \"{name}\" is due in {days_left} days, progress is {current_percent}%.",
-  "Transactions.unclassified.title": "Unclassified transactions",
-  "Transactions.unclassified.message": "Transactions worth {amount} need to be classified.",
+  "Goals.expired.message": "Goal \"{name}\" has expired. Progress: {progress_percent}%.",
+
+  "Goals.deadlineIsComing.title": "Goal deadline is approaching",
+  "Goals.deadlineIsComing.message": "{days_left} days left until goal \"{name}\" deadline. Progress: {current_percent}%.",
+
+  "Goals.thresholdReached.title": "Goal is almost achieved",
+  "Goals.thresholdReached.message": "Goal \"{name}\" reached {progress_percent}%. Notification threshold: {threshold_percent}%.",
+
+  "Transactions.unclassified.title": "Unclassified transactions found",
+  "Transactions.unclassified.message": "{count} transactions totaling {amount} need to be classified.",
+
   "Transactions.categoryChanged.title": "Transaction category changed",
   "Transactions.categoryChanged.message": "Transaction {transaction_id}: category {old_category_id} changed to {new_category_id}.",
+
   "Security.newLogin.title": "New login",
   "Security.newLogin.message": "A new login to your account was detected.",
+
   "Security.passwordChanged.title": "Password changed",
   "Security.passwordChanged.message": "Your account password has been changed.",
+
   "Security.suspiciousActivity.title": "Suspicious activity",
   "Security.suspiciousActivity.message": "Suspicious activity was detected in your account."
 }

@@ -51,7 +51,7 @@ class OutboxRepository:
         self.db.add(self._build_event(topic, payload, event_type))
 
     async def get_pending_events(
-        self, limitAmount: int = 100
+        self, limit_amount: int = 100
     ) -> list[models.OutboxEvent]:
         """Получает pending-события, готовые к отправке."""
         now = datetime.now(timezone.utc)
@@ -66,7 +66,7 @@ class OutboxRepository:
                 ),
             )
             .order_by(models.OutboxEvent.created_at.asc())
-            .limitAmount(limitAmount)
+            .limit(limit_amount)
             .with_for_update(skip_locked=True),
         )
 

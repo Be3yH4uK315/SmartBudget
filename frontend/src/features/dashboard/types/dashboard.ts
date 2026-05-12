@@ -1,9 +1,9 @@
 export type DashboardGoal = {
   name: string
 
-  totalValue: number
+  targetAmount: number
 
-  currentValue: number
+  currentAmount: number
 }
 
 export type DashboardCategory = {
