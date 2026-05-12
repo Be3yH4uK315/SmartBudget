@@ -43,16 +43,16 @@ export const getGoalTransactions = createAsyncThunk<
 })
 
 export const editGoal = createAsyncThunk<
-  EditGoalPayload,
   EditGoalPayload & { recommendedPayment: number | null },
+  EditGoalPayload,
   { state: RootState; rejectWithValue: string }
 >('editGoal', async ({ ...payload }, { rejectWithValue }) => {
   try {
-    await goalsMock.editGoal(payload)
+    const response = await goalsApi.editGoal(payload)
 
     showToast({ messageKey: 'goalEdited', type: 'success' })
 
-    return payload
+    return response
   } catch (e: any) {
     showToast({ messageKey: 'cannotEditGoal', type: 'error' })
 
