@@ -16,10 +16,10 @@ export const toastsDict: LocaleDictionary = {
 
   en: {
     Toasts: {
-      error: 'An error has occurred',
+      error: '',
       success: '',
       message: {
-        noInfo: 'Error when receiving user data',
+        noInfo: '',
         cannotChangeCategory: '',
         cannotGetTransactions: '',
         categoryChanged: '',

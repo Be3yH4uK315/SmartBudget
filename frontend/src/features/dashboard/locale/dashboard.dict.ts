@@ -50,13 +50,13 @@ export const dashboardDict: LocaleDictionary = {
 
       Goal: {
         title: 'Goals',
-        emptyTitle: 'There are no active goals',
-        createButton: 'New goal',
+        emptyTitle: 'No active goals',
+        createButton: 'Create goal',
       },
 
       Budget: {
         title: 'Budget',
-        emptyTitle: 'There is no active budget',
+        emptyTitle: 'No budget',
         createButton: 'Create budget',
       },
 
@@ -67,9 +67,9 @@ export const dashboardDict: LocaleDictionary = {
       },
 
       Buttons: {
-        Profile: {
-          title: 'Profile',
-          subtitle: 'Profile data and notifications',
+        Notifications: {
+          title: 'Notifications',
+          subtitle: 'Notification Center',
         },
         Security: {
           title: 'Security',

@@ -126,5 +126,129 @@ export const notificationsDict: LocaleDictionary = {
     },
   },
 
-  en: {},
+  en: {
+    Notifications: {
+      title: 'Notifications',
+      date: '{{date}} at {{time}}',
+      unread: 'New notification',
+      markAllAsRead: 'Mark all as read',
+
+      Limit: {
+        preOverflow: {
+          title: '80% of category limit reached',
+          message:
+            'You have used 80% of the monthly limit for category <strong>"{{value}}"</strong>. We recommend monitoring further spending.',
+        },
+
+        overflow: {
+          title: 'Category limit reached',
+          message:
+            'The limit for category <strong>"{{value}}"</strong> has been reached. Further spending will exceed the planned budget.',
+        },
+      },
+
+      Budget: {
+        checkResults: {
+          title: 'Monthly Results',
+          message:
+            'The budget month is complete. Review your expenses and plan for the next month.',
+        },
+
+        overflow: {
+          title: 'Budget limit reached',
+          message:
+            'You have used the entire monthly budget. Consider reviewing your budget or expenses.',
+        },
+
+        preOverflow: {
+          title: 'Budget nearing limit',
+          message: 'You have used 80% of the total monthly budget. Remaining: {{value}}',
+        },
+
+        settingsChanged: {
+          title: 'Budget settings changed',
+          message: 'New limits are now reflected in the budget',
+        },
+      },
+
+      Goals: {
+        goalCreated: {
+          title: 'Goal Created',
+          message:
+            'Goal <strong>"{{name}}"</strong> has been successfully created. Recommended monthly contribution: {{recommendedPayment}}',
+        },
+
+        missedPayment: {
+          title: 'Goal contribution missed',
+          message:
+            'The contribution for goal <strong>"{{name}}"</strong> has not been made this month. This may affect achieving the goal on time.',
+        },
+
+        almostAchieved: {
+          title: 'Goal nearly achieved',
+          message:
+            'Goal <strong>"{{name}}"</strong> is 90% complete. You are close to reaching the goal.',
+        },
+
+        achieved: {
+          title: 'Goal achieved',
+          message:
+            'Congratulations! Goal <strong>"{{name}}"</strong> has been successfully achieved.',
+        },
+
+        expired: {
+          title: 'Goal expired',
+          message:
+            'The deadline for goal <strong>"{{name}}"</strong> has passed. You can extend the deadline or adjust the amount.',
+        },
+
+        deadlineIsComing: {
+          title: 'Goal deadline approaching',
+          message_one:
+            'Goal <strong>"{{name}}"</strong> has {{count}} day left until the deadline. Current progress: {{currentPercent}}.',
+          message_few:
+            'Goal <strong>"{{name}}"</strong> has {{count}} days left until the deadline. Current progress: {{currentPercent}}.',
+          message_many:
+            'Goal <strong>"{{name}}"</strong> has {{count}} days left until the deadline. Current progress: {{currentPercent}}.',
+        },
+      },
+
+      Transactions: {
+        unclassified: {
+          title: 'Uncategorized transactions found',
+          message_one:
+            '{{count}} transaction is uncategorized. Assign a category for proper budget tracking.',
+          message_few:
+            '{{count}} transactions are uncategorized. Assign categories for proper budget tracking.',
+          message_many:
+            '{{count}} transactions are uncategorized. Assign categories for proper budget tracking.',
+        },
+
+        categoryChanged: {
+          title: 'Transaction category changed',
+          message:
+            'Transaction category changed from <strong>"{{oldCategory}}"</strong> to <strong>"{{newCategory}}"</strong>.',
+        },
+      },
+
+      Security: {
+        passwordChanged: {
+          title: 'Password changed',
+          message: 'Your account password has been successfully changed.',
+        },
+
+        suspiciousActivity: {
+          title: 'Suspicious activity detected',
+          message:
+            'Suspicious activity has been detected in your account. We recommend changing your password immediately.',
+        },
+
+        newLogin: {
+          title: 'New device login',
+          message:
+            'Your account was accessed from a new device. If this wasn’t you, we recommend changing your password.',
+        },
+      },
+    },
+  },
 }

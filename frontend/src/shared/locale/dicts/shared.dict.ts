@@ -69,5 +69,21 @@ export const sharedDict: LocaleDictionary = {
     ScreenContentComponent: {
       goBack: 'Back',
     },
+
+    SearchBar: {
+      emptyResult: 'Unfortunately, nothing was found',
+      placeholder: 'Search...',
+    },
+
+    UndefinedScreen: {
+      title: 'Page not found',
+      subtitle: 'It may have been removed, moved, or the address is incorrect',
+      button: 'Go to Main Page',
+    },
+
+    ListDate: {
+      today: 'Today',
+      yesterday: 'Yesterday',
+    },
   },
 }
