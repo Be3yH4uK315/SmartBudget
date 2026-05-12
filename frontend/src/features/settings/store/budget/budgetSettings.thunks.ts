@@ -9,7 +9,7 @@ export const getBudgetSettings = createAsyncThunk<
   { rejectValue: 'cannotGetBudgetSettings' }
 >('getBudgetSettings', async (date, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.getBudgetSettings(date)
+    const response = await settingsApi.getBudgetSettings(date)
 
     return response
   } catch (e: any) {
@@ -25,7 +25,7 @@ export const setBudgetSettings = createAsyncThunk<
   { rejectValue: 'cannotSetBudgetSettings' }
 >('setBudgetSettings', async (payload, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.setBudgetSettings(payload)
+    const response = await settingsApi.setBudgetSettings(payload)
 
     showToast({ messageKey: 'BudgetSettingsSet', type: 'success' })
 

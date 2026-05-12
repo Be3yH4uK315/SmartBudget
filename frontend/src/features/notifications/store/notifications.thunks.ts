@@ -14,8 +14,7 @@ export const getNotifications = createAsyncThunk<
 
     const offset = state.notifications?.offset ?? 0
 
-    const response = await notificationsMock.getNotifications()
-    // const response = await notificationsApi.getNotifications(offset)
+    const response = await notificationsApi.getNotifications(offset)
 
     return { notifications: response, length: response.length }
   } catch (e: any) {
