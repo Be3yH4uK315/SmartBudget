@@ -2,7 +2,7 @@ import { Notification } from '@features/notifications/types'
 import { Category, Transaction } from '@features/transactions/types'
 import dayjs from 'dayjs'
 
-const dates = [
+const createdAts = [
   '2026-02-15T10:12:00Z',
   '2026-02-14T08:30:00Z',
   '2026-02-13T19:45:00Z',
@@ -26,77 +26,77 @@ const createMockTransaction = (id: string, i: number, date: string): Transaction
 })
 
 const createNotification = (i: number, txId: string): Notification[] => {
-  const date = dates[i % dates.length]
+  const createdAt = createdAts[i % createdAts.length]
 
   return [
     {
-      id: `limit_pre_${i}`,
-      date,
+      notificationId: `limit_pre_${i}`,
+      createdAt,
       titleKey: 'Limit.preOverflow.title',
       messageKey: 'Limit.preOverflow.message',
-      type: 'warning',
+      notificationType: 'warning',
       isRead: !!(i % 2),
       service: 'Limit',
       props: { categoryId: (i % 10) + 1 },
     },
     {
-      id: `limit_over_${i}`,
-      date,
+      notificationId: `limit_over_${i}`,
+      createdAt,
       titleKey: 'Limit.overflow.title',
       messageKey: 'Limit.overflow.message',
-      type: 'alert',
+      notificationType: 'alert',
       isRead: !!(i % 2),
       service: 'Limit',
       props: { categoryId: (i % 10) + 1 },
     },
 
     {
-      id: `budget_check_${i}`,
-      date,
+      notificationId: `budget_check_${i}`,
+      createdAt,
       titleKey: 'Budget.checkResults.title',
       messageKey: 'Budget.checkResults.message',
-      type: 'info',
+      notificationType: 'info',
       isRead: !!(i % 2),
       service: 'Budget',
       props: undefined,
     },
     {
-      id: `budget_over_${i}`,
-      date,
+      notificationId: `budget_over_${i}`,
+      createdAt,
       titleKey: 'Budget.overflow.title',
       messageKey: 'Budget.overflow.message',
-      type: 'alert',
+      notificationType: 'alert',
       isRead: !!(i % 2),
       service: 'Budget',
       props: undefined,
     },
     {
-      id: `budget_pre_${i}`,
-      date,
+      notificationId: `budget_pre_${i}`,
+      createdAt,
       titleKey: 'Budget.preOverflow.title',
       messageKey: 'Budget.preOverflow.message',
-      type: 'warning',
+      notificationType: 'warning',
       isRead: !!(i % 2),
       service: 'Budget',
-      props: { value: 0.8 },
+      props: { limitAmount: 1, spentAmount: 0.2 },
     },
     {
-      id: `budget_settings_${i}`,
-      date,
+      notificationId: `budget_settings_${i}`,
+      createdAt,
       titleKey: 'Budget.settingsChanged.title',
       messageKey: 'Budget.settingsChanged.message',
-      type: 'info',
+      notificationType: 'info',
       isRead: !!(i % 2),
       service: 'Budget',
       props: { budgetId: `budget_${i}` },
     },
 
     {
-      id: `goal_created_${i}`,
-      date,
+      notificationId: `goal_created_${i}`,
+      createdAt,
       titleKey: 'Goals.goalCreated.title',
       messageKey: 'Goals.goalCreated.message',
-      type: 'success',
+      notificationType: 'success',
       isRead: !!(i % 2),
       service: 'Goals',
       props: {
@@ -106,11 +106,11 @@ const createNotification = (i: number, txId: string): Notification[] => {
       },
     },
     {
-      id: `goal_missed_${i}`,
-      date,
+      notificationId: `goal_missed_${i}`,
+      createdAt,
       titleKey: 'Goals.missedPayment.title',
       messageKey: 'Goals.missedPayment.message',
-      type: 'warning',
+      notificationType: 'warning',
       isRead: !!(i % 2),
       service: 'Goals',
       props: {
@@ -119,11 +119,11 @@ const createNotification = (i: number, txId: string): Notification[] => {
       },
     },
     {
-      id: `goal_almost_${i}`,
-      date,
-      titleKey: 'Goals.almostAchieved.title',
-      messageKey: 'Goals.almostAchieved.message',
-      type: 'info',
+      notificationId: `goal_almost_${i}`,
+      createdAt,
+      titleKey: 'Goals.thresholdReached.title',
+      messageKey: 'Goals.thresholdReached.message',
+      notificationType: 'info',
       isRead: !!(i % 2),
       service: 'Goals',
       props: {
@@ -132,11 +132,11 @@ const createNotification = (i: number, txId: string): Notification[] => {
       },
     },
     {
-      id: `goal_achieved_${i}`,
-      date,
+      notificationId: `goal_achieved_${i}`,
+      createdAt,
       titleKey: 'Goals.achieved.title',
       messageKey: 'Goals.achieved.message',
-      type: 'success',
+      notificationType: 'success',
       isRead: !!(i % 2),
       service: 'Goals',
       props: {
@@ -145,11 +145,11 @@ const createNotification = (i: number, txId: string): Notification[] => {
       },
     },
     {
-      id: `goal_expired_${i}`,
-      date,
+      notificationId: `goal_expired_${i}`,
+      createdAt,
       titleKey: 'Goals.expired.title',
       messageKey: 'Goals.expired.message',
-      type: 'alert',
+      notificationType: 'alert',
       isRead: !!(i % 2),
       service: 'Goals',
       props: {
@@ -158,11 +158,11 @@ const createNotification = (i: number, txId: string): Notification[] => {
       },
     },
     {
-      id: `goal_deadline_${i}`,
-      date,
+      notificationId: `goal_deadline_${i}`,
+      createdAt,
       titleKey: 'Goals.deadlineIsComing.title',
       messageKey: 'Goals.deadlineIsComing.message',
-      type: 'warning',
+      notificationType: 'warning',
       isRead: !!(i % 2),
       service: 'Goals',
       props: {
@@ -174,56 +174,56 @@ const createNotification = (i: number, txId: string): Notification[] => {
     },
 
     {
-      id: `tx_unclassified_${i}`,
-      date,
+      notificationId: `tx_unclassified_${i}`,
+      createdAt,
       titleKey: 'Transactions.unclassified.title',
       messageKey: 'Transactions.unclassified.message',
-      type: 'info',
+      notificationType: 'info',
       isRead: !!(i % 2),
       service: 'Transactions',
-      props: { value: (i % 10) + 1 },
+      props: { count: (i % 10) + 1 },
     },
     {
-      id: `tx_changed_${i}`,
-      date,
+      notificationId: `tx_changed_${i}`,
+      createdAt,
       titleKey: 'Transactions.categoryChanged.title',
       messageKey: 'Transactions.categoryChanged.message',
-      type: 'info',
+      notificationType: 'info',
       isRead: !!(i % 2),
       service: 'Transactions',
       props: {
         transactionId: txId,
-        oldCategory: (i % 5) + 1,
-        newCategory: ((i + 2) % 5) + 1,
+        oldCategoryId: (i % 5) + 1,
+        newCategoryId: ((i + 2) % 5) + 1,
       },
     },
 
     {
-      id: `sec_login_${i}`,
-      date,
+      notificationId: `sec_login_${i}`,
+      createdAt,
       titleKey: 'Security.newLogin.title',
       messageKey: 'Security.newLogin.message',
-      type: 'system',
+      notificationType: 'system',
       isRead: !!(i % 2),
       service: 'Security',
       props: undefined,
     },
     {
-      id: `sec_pass_${i}`,
-      date,
+      notificationId: `sec_pass_${i}`,
+      createdAt,
       titleKey: 'Security.passwordChanged.title',
       messageKey: 'Security.passwordChanged.message',
-      type: 'system',
+      notificationType: 'system',
       isRead: !!(i % 2),
       service: 'Security',
       props: undefined,
     },
     {
-      id: `sec_suspicious_${i}`,
-      date,
+      notificationId: `sec_suspicious_${i}`,
+      createdAt,
       titleKey: 'Security.suspiciousActivity.title',
       messageKey: 'Security.suspiciousActivity.message',
-      type: 'alert',
+      notificationType: 'alert',
       isRead: !!(i % 2),
       service: 'Security',
       props: undefined,
@@ -236,10 +236,10 @@ function generateMockData(total = 20) {
   const transactions = new Map<string, Transaction>()
 
   for (let i = 0; i < total; i++) {
-    const date = dates[i % dates.length]
+    const createdAt = createdAts[i % createdAts.length]
     const txId = `trx_${i}`
 
-    transactions.set(txId, createMockTransaction(txId, i, date))
+    transactions.set(txId, createMockTransaction(txId, i, createdAt))
 
     notifications.push(...createNotification(i, txId))
   }
@@ -250,7 +250,7 @@ function generateMockData(total = 20) {
 const { notifications, transactions } = generateMockData()
 
 const ALL_NOTIFICATIONS: Notification[] = notifications.sort((a, b) =>
-  dayjs(a.date).isAfter(dayjs(b.date)) ? -1 : 1,
+  dayjs(a.createdAt).isAfter(dayjs(b.createdAt)) ? -1 : 1,
 )
 
 class NotificationsMock {
@@ -283,7 +283,7 @@ class NotificationsMock {
 
   async markAsRead(notificationId: string): Promise<void> {
     await this.delay(300)
-    const n = this.data.find((n) => n.id === notificationId)
+    const n = this.data.find((n) => n.notificationId === notificationId)
     if (n) n.isRead = true
   }
 

@@ -59,7 +59,7 @@ export const notificationsDict: LocaleDictionary = {
             'В текущем месяце взнос по цели <strong>"{{name}}"</strong> ещё не внесён. Это может повлиять на достижение цели в срок.',
         },
 
-        almostAchieved: {
+        thresholdReached: {
           title: 'Цель почти достигнута',
           message:
             'Цель <strong>"{{name}}"</strong> выполнена на 90%. Вы близки к достижению результата.',

@@ -34,7 +34,7 @@ export const notificationsSlice = createSlice<
           return
         }
 
-        const blocks = groupByDate(payload.notifications)
+        const blocks = groupByDate(payload.notifications.map((n) => ({ ...n, date: n.createdAt })))
 
         if (state.notifications.length === 0) {
           state.notifications = blocks

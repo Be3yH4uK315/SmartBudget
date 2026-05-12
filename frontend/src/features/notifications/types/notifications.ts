@@ -2,10 +2,10 @@ export type NotificationType = 'info' | 'success' | 'alert' | 'warning' | 'syste
 export type NotificationService = 'Goals' | 'Transactions' | 'Budget' | 'Limit' | 'Security'
 
 export type NotificationBase = {
-  id: string
-  date: string
+  notificationId: string
+  createdAt: string
   titleKey: string
-  type: NotificationType
+  notificationType: NotificationType
   isRead: boolean
   link?: string
 }
@@ -29,7 +29,8 @@ export type NotificationPropsMap = {
   'Budget.checkResults.message': undefined
   'Budget.overflow.message': undefined
   'Budget.preOverflow.message': {
-    value: number
+    spentAmount: number
+    limitAmount: number
   }
 
   'Budget.settingsChanged.message': {
@@ -47,7 +48,7 @@ export type NotificationPropsMap = {
     name: string
   }
 
-  'Goals.almostAchieved.message': {
+  'Goals.thresholdReached.message': {
     goalId: string
     name: string
   }
@@ -70,13 +71,13 @@ export type NotificationPropsMap = {
   }
 
   'Transactions.unclassified.message': {
-    value: number
+    count: number
   }
 
   'Transactions.categoryChanged.message': {
     transactionId: string
-    oldCategory: number
-    newCategory: number
+    oldCategoryId: number
+    newCategoryId: number
   }
 
   'Security.newLogin.message': undefined
