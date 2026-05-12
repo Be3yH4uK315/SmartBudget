@@ -1,9 +1,9 @@
 export type BudgetPayload = {
   categories: Category[]
 
-  totalLimit: number
+  totalLimitAmount: number
 
-  currentValue: number
+  spentAmount: number
 
   isAutoRenew: boolean
 }
@@ -11,15 +11,15 @@ export type BudgetPayload = {
 export type Category = {
   categoryId: number
 
-  limit: number
+  limitAmount: number
 
-  currentValue: number
+  spentAmount: number
 }
 
 export type BudgetSettings = {
-  totalLimit: number
+  totalLimitAmount: number
 
   isAutoRenew: boolean
 
-  categories: Omit<Category, 'currentValue'>[]
+  categories: Omit<Category, 'spentAmount'>[]
 }

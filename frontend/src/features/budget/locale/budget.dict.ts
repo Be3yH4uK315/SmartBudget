@@ -69,15 +69,63 @@ export const budgetDict: LocaleDictionary = {
 
   en: {
     Budget: {
-      CategoryBlock: {
-        category: '',
-        category_one: '',
-        category_few: '',
-        category_many: '',
+      title: 'Budget',
+      settingsButtonTitle: 'Manage Budget',
+      settingsButtonSubtitle: 'Set and edit your budget limit, manage category limits',
 
-        title: '',
-        subtitle: '',
+      transactionsBlockTitle: 'Current Expenses',
+      income: 'Income',
+
+      cannotFindData: 'Unfortunately, something went wrong :(',
+      tryAgain: 'Try refreshing the page or check back later – we’ll fix it!',
+
+      CategoryInfoBlock: {
+        category: 'No limits set',
+        category_one: '{{count}} category',
+        category_other: '{{count}} categories',
+
+        title: 'Number of categories with set limits',
+        subtitle: 'We’ll send a push notification when you reach 80% and 100% of the limit',
       },
+
+      FactExpense: {
+        title: 'Actual Expenses',
+        subtitle: 'Based on your transactions',
+      },
+
+      PlanExpense: {
+        title: 'Planned Expenses',
+        subtitle: 'Based on category limits and overall budget limit',
+        subtitleByCategories: 'Based on category limits',
+      },
+
+      IsAutoRenew: {
+        title: 'Auto-renew Budget',
+        on: 'Enabled',
+        off: 'Disabled',
+      },
+
+      Modal: {
+        createTitle: 'Create Budget',
+        submitButton: 'Create Budget',
+      },
+    },
+
+    Overflow: {
+      overflowTitle: 'Over Budget',
+      overflowSubtitle_one: 'You have exceeded the limit in {{count}} category:',
+      overflowSubtitle_other: 'You have exceeded the limit in {{count}} categories:',
+
+      preOverflowTitle: 'Near Budget Limit',
+      preOverflowSubtitle_one: 'You are close to the limit in {{count}} category:',
+      preOverflowSubtitle_other: 'You are close to the limit in {{count}} categories:',
+    },
+
+    CategoryLimitBlock: {
+      limitedTitle: 'Category Limits',
+      limitedSubtitle: 'Categories for which you have set a limit',
+      unlimitedTitle: 'Categories without Limits',
+      unlimitedSubtitle: 'Set a limit to keep your spending under control',
     },
   },
 }

@@ -1,4 +1,4 @@
-import { Notification } from '@features/notifications/types'
+import { Notification, NotificationPropsMap } from '@features/notifications/types'
 import { CATEGORY_IDS } from '@shared/constants'
 import { ROUTES } from '@shared/constants/routes'
 import { formatCurrency, formatPercent } from '@shared/utils'
@@ -21,30 +21,31 @@ export const mapNotificationMessage = (
     }
 
     case 'Transactions.categoryChanged.message': {
-      const { oldCategory, newCategory } = notification.props as {
-        oldCategory: number
-        newCategory: number
+      const { oldCategoryId, newCategoryId } = notification.props as {
+        oldCategoryId: number
+        newCategoryId: number
       }
 
       return translate(notification.messageKey, {
-        oldCategory: translateCategories(String(oldCategory)),
-        newCategory: translateCategories(String(newCategory)),
+        oldCategory: translateCategories(String(oldCategoryId)),
+        newCategory: translateCategories(String(newCategoryId)),
       })
     }
 
     case 'Transactions.unclassified.message': {
-      const { value } = notification.props as { value: number }
+      const { count } = notification.props as { count: number }
 
       return translate(notification.messageKey, {
-        count: value,
+        count: count,
       })
     }
 
     case 'Budget.preOverflow.message': {
-      const { value } = notification.props as { value: number }
+      const { spentAmount, limitAmount } =
+        notification.props as NotificationPropsMap['Budget.preOverflow.message']
 
       return translate(notification.messageKey, {
-        value: formatCurrency(value),
+        value: formatCurrency(limitAmount - spentAmount),
       })
     }
 

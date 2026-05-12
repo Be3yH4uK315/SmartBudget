@@ -6,6 +6,16 @@ export const mapSettingsToBlocks = (
 ): ServiceBlock[] => {
   return [
     {
+      title: 'email.title',
+      options: [
+        {
+          title: 'email.subtitle',
+          isChecked: settings.emailStatus,
+          onClick: () => onChange(['emailStatus'], !settings.emailStatus),
+        },
+      ],
+    },
+    {
       title: 'goals.title',
       options: [
         {

@@ -69,23 +69,72 @@ export const transactionsDict: LocaleDictionary = {
       },
     },
   },
+
   en: {
     Transactions: {
       title: 'Transactions',
-      debitCard: 'Debit card',
-      noTransactions: 'There is no transactions',
+      debitCard: 'Debit Card',
+      noTransactions: 'No transactions',
       loading: 'Loading...',
       loadMore: 'Load more',
+      emptyCategory: 'Clear filter',
+      categoryFilter: 'Category',
 
       today: 'Today',
       yesterday: 'Yesterday',
+
+      Filters: {
+        selected: 'Selected: {{value}}',
+        clear: 'Clear filters',
+
+        placeholder: {
+          categories: 'Categories',
+          type: 'Type',
+        },
+
+        Popover: {
+          button: 'Apply',
+
+          value: {
+            emptyLabel: 'Amount',
+            label: 'Amount from {{from}} to {{to}}',
+            from: 'From',
+            to: 'To',
+          },
+
+          date: {
+            emptyLabel: 'Date',
+            label: 'Date from {{from}} to {{to}}',
+            from: 'From',
+            to: 'To',
+          },
+        },
+
+        Date: {
+          range: 'from {{from}} to {{to}}',
+          from: 'from {{from}}',
+          to: 'to {{to}}',
+        },
+
+        Value: {
+          range: 'from {{from}} to {{to}}',
+          from: 'from {{from}}',
+          to: 'to {{to}}',
+        },
+
+        Type: {
+          income: 'Income',
+          expense: 'Expense',
+          empty: 'Not set',
+        },
+      },
 
       Modal: {
         changeCategory: 'Change category',
 
         ChangeCategory: {
-          title: 'Category change',
-          currentCategory: 'Current category',
+          title: 'Change Category',
+          currentCategory: 'Current category:',
           confirm: 'Change category',
           selectPlaceholder: 'New category',
         },

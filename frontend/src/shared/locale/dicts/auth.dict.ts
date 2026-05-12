@@ -59,26 +59,32 @@ export const authDict: LocaleDictionary = {
         subtitle: 'Enter your email to sign in or sign up',
         placeholder: 'Email address',
       },
+
       password: {
-        title: 'Hello, {{name}}',
+        title: 'Enter your password',
         placeholder: 'Password',
         forgotPassword: 'Forgot password',
+        wrongPassword: 'Incorrect password',
+        tooManyAttempts: 'Too many attempts, please try again later',
       },
+
       verifyEmail: {
-        title: 'Check your Inbox',
-        subtitle: 'A confirmation email has been sent to {{email}}',
-        buttonText: 'Resend confirmation mail',
+        title: 'Check your email',
+        subtitleEmail: 'A registration confirmation email has been sent to {{email}}',
+        subtitlePassword: 'A password reset email has been sent to {{email}}',
+        buttonText: 'Didn’t receive the email?',
       },
+
       signIn: 'Sign In',
     },
 
     RegistrationScreen: {
       title: 'Registration',
-      caption: 'By clicking the "Register" button, you agree to the terms of use',
+      caption: 'By clicking "Register" you agree to the terms of use',
       name: 'Name',
       country: 'Country',
       password: 'Password',
-      repeatPassword: 'Confirm the password',
+      repeatPassword: 'Confirm password',
       passwordsNotMatch: 'Passwords do not match',
       continue: 'Register',
     },
@@ -86,14 +92,14 @@ export const authDict: LocaleDictionary = {
     ResetPasswordScreen: {
       title: 'Password Recovery',
       password: 'Password',
-      repeatPassword: 'Confirm the password',
+      repeatPassword: 'Confirm password',
       passwordsNotMatch: 'Passwords do not match',
-      continue: 'Reset password',
+      continue: 'Reset Password',
     },
 
     WrongLink: {
-      incorrectLink: 'Unfortunately, this page is unavailable.',
-      incorrectLinkCaption: 'Check the correctness of the link or try again',
+      incorrectLink: 'Unfortunately, this page is unavailable',
+      incorrectLinkCaption: 'Please check the link or try again',
     },
   },
 }

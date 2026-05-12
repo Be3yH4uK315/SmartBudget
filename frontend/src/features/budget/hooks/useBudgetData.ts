@@ -12,18 +12,22 @@ export const useBudgetData = ({ categories }: Props) => {
       limitedSum: 0,
       limited: [] as Category[],
       unlimited: [] as Category[],
-      incomeCategory: { categoryId: INCOME_CATEGORY_ID, limit: 0, currentValue: 0 } as Category,
+      incomeCategory: {
+        categoryId: INCOME_CATEGORY_ID,
+        limitAmount: 0,
+        spentAmount: 0,
+      } as Category,
     }
 
     return categories.reduce((acc, c) => {
       if (c.categoryId === INCOME_CATEGORY_ID) {
-        acc.incomeCategory.currentValue = c.currentValue
+        acc.incomeCategory.spentAmount = c.spentAmount
         return acc
       }
 
-      if (c.limit > 0) {
+      if (c.limitAmount > 0) {
         acc.limited.push(c)
-        acc.limitedSum += c.limit
+        acc.limitedSum += c.limitAmount
       } else {
         acc.unlimited.push(c)
       }
@@ -37,7 +41,7 @@ export const useBudgetData = ({ categories }: Props) => {
     const overflow: Category[] = []
 
     limited.forEach((c) => {
-      const ratio = c.currentValue / c.limit
+      const ratio = c.spentAmount / c.limitAmount
       if (ratio >= 0.9) overflow.push(c)
       else if (ratio >= 0.8) preOverflow.push(c)
     })

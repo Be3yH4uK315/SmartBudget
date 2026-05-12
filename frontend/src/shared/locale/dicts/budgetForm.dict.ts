@@ -47,5 +47,50 @@ export const budgetFormDict: LocaleDictionary = {
       },
     },
   },
-  en: {},
+  en: {
+    BudgetForm: {
+      EmptyList: {
+        title: 'No limits set',
+        subtitle: 'You can add a category and set a limit using the button below',
+      },
+
+      CategoriesLimits: {
+        title: 'Category limits',
+        tooltip:
+          'If a budget limit is set, the total percentage of category limits cannot exceed 100%',
+
+        percentOverflow: 'Category limits exceed the budget limit by {{value}}',
+        remainingPercent: '{{value}} of the budget left to allocate',
+
+        CategoryCard: {
+          percentHelperText: 'Percentage of the budget',
+          percentLabel: 'Percentage',
+
+          valueHelperText: 'Amount limit',
+          valueLabel: 'Amount',
+        },
+
+        AddCategoryCard: {
+          newCategory: 'Add category',
+          addCategoryButton: 'Add category',
+          cancelButton: 'Cancel',
+          placeholder: 'Category',
+        },
+      },
+
+      BudgetLimit: {
+        title: 'Budget limit',
+        subtitle: 'Plan the maximum amount of spending for your budget',
+        valueLabel: 'Amount',
+        tooltip:
+          'When setting a budget limit, you can define category limits as a percentage of the total limit',
+      },
+
+      AutoRenew: {
+        title: 'Auto-renew budget',
+        subtitle: 'Automatically set up a new budget at the beginning of the month',
+        tooltip: 'Automatically creates the next month’s budget based on the current one',
+      },
+    },
+  },
 }

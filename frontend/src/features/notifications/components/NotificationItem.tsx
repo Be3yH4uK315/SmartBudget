@@ -1,5 +1,6 @@
 import React from 'react'
 import { notificationsApi, notificationsMock } from '@features/notifications/api'
+import { markAsRead } from '@features/notifications/store'
 import { Notification, NotificationType } from '@features/notifications/types'
 import {
   getNotificationOnClickLink,
@@ -14,7 +15,6 @@ import { useAppDispatch } from '@shared/store'
 import { openModal } from '@shared/store/modal'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router'
-import { markAsRead } from '../store'
 
 type Props = {
   notification: Notification
@@ -33,15 +33,15 @@ export const NotificationItem = React.memo(function NotificationItem({ notificat
     system: 'grayButton.dark',
   }
 
-  const color = colorMap[notification.type]
+  const color = colorMap[notification.notificationType]
 
   const handleClick = async (notification: Notification) => {
     const route = getNotificationOnClickLink(notification)
 
-    dispatch(markAsRead(notification.id))
+    dispatch(markAsRead(notification.notificationId))
 
     if (!route && isTransactionCategoryChanged(notification)) {
-      const transaction = await notificationsMock.getTransactionById(
+      const transaction = await notificationsApi.getTransactionById(
         notification.props.transactionId,
       )
 
@@ -86,8 +86,8 @@ export const NotificationItem = React.memo(function NotificationItem({ notificat
 
           <Typography variant="caption">
             {translate('date', {
-              time: dayjs(notification.date).format('HH.MM'),
-              date: dayjs(notification.date).format('DD.MM.YYYY'),
+              time: dayjs(notification.createdAt).format('HH.MM'),
+              date: dayjs(notification.createdAt).format('DD.MM.YYYY'),
             })}
           </Typography>
         </Stack>

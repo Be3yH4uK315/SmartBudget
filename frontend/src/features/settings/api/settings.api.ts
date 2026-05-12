@@ -40,10 +40,10 @@ class SettingsApi {
     return response.data
   }
 
-  async setRefreshTokenDuration(payload: number): Promise<void> {
+  async setRefreshTokenDuration(days: number): Promise<void> {
     const url = `${this.baseUrl}/sessions/retention`
 
-    const response = await api.patch<void>(url, payload)
+    const response = await api.patch<void>(url, { days })
     return response.data
   }
 
