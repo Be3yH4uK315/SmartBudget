@@ -14,7 +14,7 @@ import {
 } from '@mui/material'
 import { TypographyWithAdornment } from '@shared/components'
 import { ROUTES } from '@shared/constants'
-import { useTranslate } from '@shared/hooks'
+import { useLocalization, useTranslate } from '@shared/hooks'
 import { useAppDispatch } from '@shared/store'
 import { logoutHelper } from '@shared/utils'
 import { Link as RouterLink, useLocation } from 'react-router'
@@ -26,6 +26,7 @@ export const Header = () => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('HeaderTabs')
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down(800))
+  const language = useLocalization()
 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
@@ -41,7 +42,7 @@ export const Header = () => {
       { label: translate('notifications'), to: ROUTES.PAGES.NOTIFICATIONS },
       { label: translate('settings'), to: ROUTES.PAGES.SETTINGS.MAIN },
     ],
-    [translate],
+    [translate, language],
   )
 
   const value = useMemo(() => {
