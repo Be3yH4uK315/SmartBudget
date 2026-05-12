@@ -25,7 +25,7 @@ export const Header = () => {
   const { pathname } = useLocation()
   const dispatch = useAppDispatch()
   const translate = useTranslate('HeaderTabs')
-  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('sm'))
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down(800))
 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
