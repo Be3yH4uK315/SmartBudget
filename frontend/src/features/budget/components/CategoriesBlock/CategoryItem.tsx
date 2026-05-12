@@ -31,9 +31,11 @@ export const CategoryItem = ({ isLimited = true, category }: Props) => {
           {translate(category.categoryId)}
         </Typography>
 
-        {isLimited && <PercentLine currentValue={category.currentValue} limit={category.limit} />}
+        {isLimited && (
+          <PercentLine currentValue={category.spentAmount} limit={category.limitAmount} />
+        )}
 
-        {!isLimited && <Typography>{formatCurrency(category.currentValue)}</Typography>}
+        {!isLimited && <Typography>{formatCurrency(category.spentAmount)}</Typography>}
       </Stack>
     </StyledPaper>
   )

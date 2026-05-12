@@ -4,9 +4,9 @@ import { Category } from './budget'
 export type BudgetSliceState = {
   isLoading: boolean
 
-  totalLimit: number
+  totalLimitAmount: number
 
-  currentValue: number
+  spentAmount: number
 
   isAutoRenew: boolean
 

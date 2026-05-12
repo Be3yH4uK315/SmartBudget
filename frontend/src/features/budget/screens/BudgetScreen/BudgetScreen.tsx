@@ -123,7 +123,7 @@ export default function BudgetScreen() {
 
                 <InfoBlock
                   title={translate('income')}
-                  subtitle={formatCurrency(incomeCategory.currentValue)}
+                  subtitle={formatCurrency(incomeCategory.spentAmount)}
                 />
 
                 <IconButton

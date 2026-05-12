@@ -7,8 +7,8 @@ export const selectBudgetCategories = sliceStateSelector((state) => state.catego
 
 export const selectIsAutoRenew = sliceStateSelector((state) => state.isAutoRenew)
 
-export const selectBudgetCurrentValue = sliceStateSelector((state) => state.currentValue)
+export const selectBudgetCurrentValue = sliceStateSelector((state) => state.spentAmount)
 
-export const selectBudgetTotalLimit = sliceStateSelector((state) => state.totalLimit)
+export const selectBudgetTotalLimit = sliceStateSelector((state) => state.totalLimitAmount)
 
 export const selectIsBudgetLoading = sliceStateSelector((state) => state.isLoading)
