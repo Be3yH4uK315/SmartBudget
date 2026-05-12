@@ -44,7 +44,7 @@ export const getGoalTransactions = createAsyncThunk<
 
 export const editGoal = createAsyncThunk<
   EditGoalPayload,
-  EditGoalPayload,
+  EditGoalPayload & { recommendedPayment: number | null },
   { state: RootState; rejectWithValue: string }
 >('editGoal', async ({ ...payload }, { rejectWithValue }) => {
   try {
