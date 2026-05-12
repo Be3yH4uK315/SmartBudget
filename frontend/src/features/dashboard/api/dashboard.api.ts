@@ -4,10 +4,10 @@ import { api } from '@shared/api'
 class DashboardApi {
   baseUrl = '/dashboard'
 
-  async getDashboardGoals(): Promise<DashboardGoal[]> {
+  async getDashboardGoals(): Promise<{ goals: DashboardGoal[] }> {
     const url = `${this.baseUrl}/goals`
 
-    const response = await api.get<DashboardGoal[]>(url)
+    const response = await api.get<{ goals: DashboardGoal[] }>(url)
     return response.data
   }
 

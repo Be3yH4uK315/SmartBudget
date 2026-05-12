@@ -10,7 +10,7 @@ export const getDashboardGoals = createAsyncThunk<
   try {
     const response = await dashboardApi.getDashboardGoals()
 
-    return response
+    return response.goals
   } catch (e: any) {
     return rejectWithValue('cannotGetDashboardGoals')
   }
