@@ -13,11 +13,11 @@ class DashboardApi {
 
   async getDashboardBudget(): Promise<{
     categories: DashboardCategory[]
-    budgetTotalLimit: number
+    totalLimitAmount: number
   }> {
     const url = `${this.baseUrl}/budget`
 
-    const response = await api.get<{ categories: DashboardCategory[]; budgetTotalLimit: number }>(
+    const response = await api.get<{ categories: DashboardCategory[]; totalLimitAmount: number }>(
       url,
     )
     return response.data

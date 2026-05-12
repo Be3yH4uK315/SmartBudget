@@ -8,7 +8,7 @@ export const getDashboardGoals = createAsyncThunk<
   { rejectValue: 'cannotGetDashboardGoals' }
 >('getDashboardGoals', async (_, { rejectWithValue }) => {
   try {
-    const response = await dashboardMock.getDashboardGoals()
+    const response = await dashboardApi.getDashboardGoals()
 
     return response
   } catch (e: any) {
@@ -17,12 +17,12 @@ export const getDashboardGoals = createAsyncThunk<
 })
 
 export const getDashboardBudget = createAsyncThunk<
-  { categories: DashboardCategory[]; budgetTotalLimit: number },
+  { categories: DashboardCategory[]; totalLimitAmount: number },
   void,
   { rejectValue: 'cannotGetDashboardBudget' }
 >('getDashboardBudget', async (_, { rejectWithValue }) => {
   try {
-    const response = await dashboardMock.getDashboardBudget()
+    const response = await dashboardApi.getDashboardBudget()
 
     return response
   } catch (e: any) {
