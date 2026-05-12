@@ -28,6 +28,7 @@ export type RefreshTokenFormItem = {
 export type NotificationsSettings = {
   notificationsStatus: boolean
   pushStatus: boolean
+  emailStatus: boolean
   goals: boolean
   transactions: boolean
   budget: {

@@ -29,6 +29,7 @@ const budgetStore: Record<string, BudgetSettings> = {}
 let notificationsSettingsStore: NotificationsSettings = {
   notificationsStatus: true,
   pushStatus: true,
+  emailStatus: false,
 
   goals: true,
   transactions: true,

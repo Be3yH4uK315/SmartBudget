@@ -91,6 +91,11 @@ export const settingsDict: LocaleDictionary = {
           subtitle: 'Разрешить отправку push-уведомлений',
         },
 
+        email: {
+          title: 'Email-уведомления',
+          subtitle: 'Разрешить отправку email-уведомлений',
+        },
+
         goals: {
           title: 'Цели',
           subtitle: 'Уведомлять о достижении цели, дедлайнах, и прочих действиях',
@@ -199,6 +204,11 @@ export const settingsDict: LocaleDictionary = {
         pushNotifications: {
           title: 'Push Notifications',
           subtitle: 'Allow sending push notifications',
+        },
+
+        email: {
+          title: 'Email Notifications',
+          subtitle: 'Allow sending Email notifications',
         },
 
         goals: {

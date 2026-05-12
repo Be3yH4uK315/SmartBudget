@@ -4,6 +4,7 @@ export type NotificationsSettingsSliceState = {
   notificationsStatus: boolean
   notificationsSettings: {
     pushStatus: boolean
+    emailStatus: boolean
 
     goals: boolean
     transactions: boolean

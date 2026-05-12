@@ -28,9 +28,11 @@ export const notificationsSettingsSlice = createSlice<
   extraReducers: (builder) => {
     builder
       .addCase(getNotificationsSettings.fulfilled, (state, { payload }) => {
-        const { notificationsStatus, pushStatus, goals, transactions, budget } = payload
+        const { notificationsStatus, pushStatus, goals, transactions, budget, emailStatus } =
+          payload
         state.notificationsStatus = notificationsStatus
         state.notificationsSettings.budget = budget
+        state.notificationsSettings.emailStatus = emailStatus
         state.notificationsSettings.goals = goals
         state.notificationsSettings.pushStatus = pushStatus
         state.notificationsSettings.transactions = transactions

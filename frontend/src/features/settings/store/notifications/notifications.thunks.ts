@@ -9,7 +9,7 @@ export const getNotificationsSettings = createAsyncThunk<
   { rejectValue: 'cannotGetNotificationsSettings' }
 >('getNotificationsSettings', async (_, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.getNotificationsSettings()
+    const response = await settingsApi.getNotificationsSettings()
 
     return response
   } catch (e: any) {
@@ -25,7 +25,7 @@ export const changeNotificationsStatus = createAsyncThunk<
   { rejectValue: 'cannotChangeNotificationsStatus' }
 >('changeNotificationsStatus', async (status, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.changeNotificationsStatus({ status })
+    const response = await settingsApi.changeNotificationsStatus({ status })
 
     showToast({ messageKey: 'NotificationsSettingsUpdated', type: 'success' })
 
@@ -43,7 +43,7 @@ export const updateNotificationsSettings = createAsyncThunk<
   { rejectValue: 'cannotUpdateNotificationsSettings' }
 >('updateNotificationsSettings', async (payload, { rejectWithValue }) => {
   try {
-    const response = await settingsMock.updateNotificationsSettings(payload)
+    const response = await settingsApi.updateNotificationsSettings(payload)
 
     showToast({ messageKey: 'NotificationsSettingsUpdated', type: 'success' })
 

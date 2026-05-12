@@ -5,6 +5,7 @@ export function getNotificationsSettingsInitialState(): NotificationsSettingsSli
     notificationsStatus: false,
     notificationsSettings: {
       pushStatus: false,
+      emailStatus: false,
 
       goals: false,
       transactions: false,
