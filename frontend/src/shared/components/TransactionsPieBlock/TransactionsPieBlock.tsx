@@ -10,11 +10,12 @@ type Props = {
   activeType?: FilterType
   pieData: PieDataItem[]
   centerLabel?: CenterLabel
+  remainingValue?: PieDataItem
   toggleFilter?: (type: FilterType) => void
 }
 
 export const TransactionsPieBlock = React.memo(
-  ({ title, activeType, pieData, centerLabel, toggleFilter }: Props) => {
+  ({ title, activeType, pieData, centerLabel, toggleFilter, remainingValue }: Props) => {
     const translate = useTranslate('TransactionsPieBlock')
 
     function renderFallback() {
@@ -87,7 +88,7 @@ export const TransactionsPieBlock = React.memo(
               }}
             >
               <PieChartWithCenterLabel
-                pieData={pieData}
+                pieData={remainingValue ? [...pieData, remainingValue] : pieData}
                 innerRadius={80}
                 width={200}
                 height={200}

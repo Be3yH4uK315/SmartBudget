@@ -15,7 +15,7 @@ export function useTranslate<BlockName extends keyof LocaleDictionary['ru']>(blo
   )
 }
 
-function useLocalization() {
+export function useLocalization() {
   const ctx = useContext(LocalizationContext)
   if (!ctx) {
     throw new Error('useLocalization must be used within <LocalizationProvider />')

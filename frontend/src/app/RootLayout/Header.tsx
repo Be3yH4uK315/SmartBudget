@@ -18,6 +18,8 @@ import { useTranslate } from '@shared/hooks'
 import { useAppDispatch } from '@shared/store'
 import { logoutHelper } from '@shared/utils'
 import { Link as RouterLink, useLocation } from 'react-router'
+import { LanguageMenu } from './LanguageMenu'
+import { ThemeButton } from './ThemeButton'
 
 export const Header = () => {
   const { pathname } = useLocation()
@@ -95,6 +97,10 @@ export const Header = () => {
 
             <Box sx={{ flexGrow: 1 }} />
 
+            <LanguageMenu />
+
+            <ThemeButton />
+
             <Button
               onClick={handleLogout}
               disabled={isLoggingOut}
@@ -112,9 +118,7 @@ export const Header = () => {
 
         {isMobile && (
           <>
-            <Box sx={{ flexGrow: 1 }} />
-
-            <IconButton onClick={handleOpenMenu}>
+            <IconButton onClick={handleOpenMenu} sx={{ color: 'gray.main' }}>
               <MenuIcon />
             </IconButton>
 
@@ -160,6 +164,12 @@ export const Header = () => {
                 />
               </MenuItem>
             </Menu>
+
+            <Box sx={{ flexGrow: 1 }} />
+
+            <ThemeButton />
+
+            <LanguageMenu />
           </>
         )}
       </Container>

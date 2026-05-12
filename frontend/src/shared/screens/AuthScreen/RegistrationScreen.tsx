@@ -10,13 +10,11 @@ const RegistrationScreen = () => {
   const { email, token, isVerifying, verified, isSubmitting, wrapSubmit } = useVerifyLinkFlow()
 
   const [name, setName] = useState('')
-  const [country, setCountry] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const mismatch = confirmPassword && confirmPassword !== password
-  const canSubmit =
-    verified && !isSubmitting && name && country && password && confirmPassword && !mismatch
+  const canSubmit = verified && !isSubmitting && name && password && confirmPassword && !mismatch
 
   const onSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -29,11 +27,11 @@ const RegistrationScreen = () => {
           token,
           password,
           name,
-          country,
+          language: localStorage.getItem('language') ?? '',
         }),
       )
     },
-    [canSubmit, wrapSubmit, email, token, password, name, country],
+    [canSubmit, wrapSubmit, email, token, password, name],
   )
 
   return (
@@ -74,16 +72,6 @@ const RegistrationScreen = () => {
                   autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  disabled={isSubmitting}
-                  fullWidth
-                />
-
-                {/** TODO: список стран */}
-                <TextField
-                  label={translate('country')}
-                  autoComplete="country-name"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
                   disabled={isSubmitting}
                   fullWidth
                 />
