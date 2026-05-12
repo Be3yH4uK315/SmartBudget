@@ -53,7 +53,7 @@ export default function GoalsScreen() {
     >
       <Stack spacing={2} sx={{ maxWidth: '800px' }}>
         <SearchBar<GoalSearchOption>
-          apiFunc={goalsMock.searchGoals}
+          apiFunc={goalsApi.searchGoals}
           getOptionLabel={(option) => option.name}
           renderOption={(props, option) => (
             <GoalSearchItem {...props} key={option.goalId} goal={option} />
