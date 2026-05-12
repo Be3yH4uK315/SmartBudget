@@ -59,7 +59,7 @@ class SettingsApi {
   async setBudgetSettings(payload: BudgetSettings): Promise<void> {
     const url = `${this.baseUrl}/budget`
 
-    const response = await api.patch<void>(url, { payload })
+    const response = await api.patch<void>(url, { ...payload })
     return response.data
   }
 
