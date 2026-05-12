@@ -70,7 +70,7 @@ class SettingsApi {
     return response.data
   }
 
-  async changeNotificationsStatus(payload: { status: boolean }): Promise<void> {
+  async changeNotificationsStatus(payload: { notificationsStatus: boolean }): Promise<void> {
     const url = `${this.baseUrl}/notifications/status`
 
     const response = await api.patch<void>(url, payload)
