@@ -33,7 +33,7 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
       ? 'gray.main'
       : transaction.status === 'rejected'
         ? 'error.main'
-        : transaction.type === 'income'
+        : transaction.transactionType === 'income'
           ? 'success.main'
           : 'text.primary'
 
@@ -72,7 +72,7 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
         />
 
         <Stack>
-          <Typography variant="h5">{transaction.name}</Typography>
+          <Typography variant="h5">{transaction.merchant}</Typography>
 
           <Typography variant="caption">{translateCategory(transaction.categoryId)}</Typography>
         </Stack>
@@ -80,7 +80,7 @@ export const TransactionLine = React.memo(function TransactionLine({ transaction
 
       <Stack sx={{ textAlign: 'right', alignItems: 'end' }}>
         <TypographyWithAdornment
-          text={formatCurrency(transaction.value, transaction.type)}
+          text={formatCurrency(transaction.amount, transaction.transactionType)}
           position="end"
           typographyVariant="h5"
           typographySx={{ textAlign: 'right', whiteSpace: 'nowrap' }}

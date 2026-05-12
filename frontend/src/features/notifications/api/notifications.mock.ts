@@ -15,14 +15,14 @@ const goalNames = ['Новая машина', 'Отпуск', 'Квартира'
 
 const createMockTransaction = (id: string, i: number, date: string): Transaction => ({
   transactionId: id,
-  value: 1000 + i * 250,
+  amount: 1000 + i * 250,
   categoryId: ((i % 10) + 1) as Category,
   description: i % 2 ? 'Покупка' : null,
-  name: ['Pyaterochka', 'Yandex Go', 'Ozon', 'Steam'][i % 4],
+  merchant: ['Pyaterochka', 'Yandex Go', 'Ozon', 'Steam'][i % 4],
   mcc: null,
   status: 'confirmed',
   date,
-  type: i % 2 ? 'expense' : 'income',
+  transactionType: i % 2 ? 'expense' : 'income',
 })
 
 const createNotification = (i: number, txId: string): Notification[] => {

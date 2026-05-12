@@ -26,13 +26,13 @@ function generateMockTransactions(total = 600): Transaction[] {
   for (let i = 0; i < total; i++) {
     result.push({
       transactionId: `tx_${i}_${Math.random().toString(36).slice(2, 8)}`,
-      value: Math.round(Math.random() * 5000),
+      amount: Math.round(Math.random() * 5000),
       categoryId: ((i % 5) + 1) as Category,
       description: `Описание #${i}`,
-      name: `Операция #${i}`,
+      merchant: `Операция #${i}`,
       mcc: `${1000 + (i % 500)}`,
       status: statuses[i % statuses.length],
-      type: types[i % types.length],
+      transactionType: types[i % types.length],
       date: dates[i % dates.length],
     })
   }
@@ -63,9 +63,9 @@ class TransactionsMock {
       res = res.filter((t) => set.has(t.categoryId))
     }
 
-    if (filters.type !== '') res = res.filter((t) => t.type === filters.type)
-    if (filters.valueFrom !== undefined) res = res.filter((t) => t.value >= filters.valueFrom!)
-    if (filters.valueTo !== undefined) res = res.filter((t) => t.value <= filters.valueTo!)
+    if (filters.type !== '') res = res.filter((t) => t.transactionType === filters.type)
+    if (filters.valueFrom !== undefined) res = res.filter((t) => t.amount >= filters.valueFrom!)
+    if (filters.valueTo !== undefined) res = res.filter((t) => t.amount <= filters.valueTo!)
     if (filters.dateFrom) res = res.filter((t) => t.date >= filters.dateFrom)
     if (filters.dateTo) res = res.filter((t) => t.date <= filters.dateTo)
 
@@ -100,7 +100,7 @@ class TransactionsMock {
     return this.data
       .filter(
         (t) =>
-          t.name.toLowerCase().includes(normalizedQuery) ||
+          t.merchant.toLowerCase().includes(normalizedQuery) ||
           t.description?.toLowerCase().includes(normalizedQuery) ||
           t.mcc?.includes(normalizedQuery),
       )

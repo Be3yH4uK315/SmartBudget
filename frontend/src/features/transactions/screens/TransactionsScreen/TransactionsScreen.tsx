@@ -37,8 +37,8 @@ export default function TransactionsScreen() {
       <Stack spacing={1} maxWidth={'800px'}>
         <Stack spacing={2}>
           <SearchBar<Transaction>
-            apiFunc={transactionsMock.searchTransactions}
-            getOptionLabel={(option) => option.name}
+            apiFunc={transactionsApi.searchTransactions}
+            getOptionLabel={(option) => option.merchant}
             renderOption={(props, option) => (
               <TransactionLine {...props} key={option.transactionId} transaction={option} />
             )}
