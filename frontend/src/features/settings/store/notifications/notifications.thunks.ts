@@ -23,9 +23,9 @@ export const changeNotificationsStatus = createAsyncThunk<
   void,
   boolean,
   { rejectValue: 'cannotChangeNotificationsStatus' }
->('changeNotificationsStatus', async (status, { rejectWithValue }) => {
+>('changeNotificationsStatus', async (notificationsStatus, { rejectWithValue }) => {
   try {
-    const response = await settingsApi.changeNotificationsStatus({ status })
+    const response = await settingsApi.changeNotificationsStatus({ notificationsStatus })
 
     showToast({ messageKey: 'NotificationsSettingsUpdated', type: 'success' })
 

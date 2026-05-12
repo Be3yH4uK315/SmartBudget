@@ -2,20 +2,20 @@ import { STATUS_PRIORITY } from '@features/goals/constants/sortOrder'
 import { GoalsStats, SimplifiedGoal } from '@features/goals/types'
 
 export function getGoalsStats(goals: SimplifiedGoal[]): GoalsStats {
-  const { targetValue, currentValue } = goals.reduce<GoalsStats>(
+  const { targetAmount, currentAmount } = goals.reduce<GoalsStats>(
     (acc, goal) => {
-      acc.currentValue += goal.currentValue
-      acc.targetValue += goal.targetValue
+      acc.currentAmount += goal.currentAmount
+      acc.targetAmount += goal.targetAmount
 
       return acc
     },
     {
-      targetValue: 0,
-      currentValue: 0,
+      targetAmount: 0,
+      currentAmount: 0,
     },
   )
 
-  return { targetValue, currentValue }
+  return { targetAmount, currentAmount }
 }
 
 export const sortGoals = (goals: SimplifiedGoal[]): SimplifiedGoal[] =>
@@ -26,7 +26,7 @@ export const sortGoals = (goals: SimplifiedGoal[]): SimplifiedGoal[] =>
       return statusDiff
     }
 
-    return b.currentValue / b.targetValue - a.currentValue / a.targetValue
+    return b.currentAmount / b.targetAmount - a.currentAmount / a.targetAmount
   })
 
 export const pushIntoSorted = (

@@ -17,11 +17,11 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
   extraReducers: (builder) => {
     builder
       .addCase(getGoals.fulfilled, (state, { payload }) => {
-        const { goals, targetValue, currentValue } = payload
+        const { goals, targetAmount, currentAmount } = payload
 
         state.goals = goals
-        state.goalsStats.currentValue = currentValue
-        state.goalsStats.targetValue = targetValue
+        state.goalsStats.currentAmount = currentAmount
+        state.goalsStats.targetAmount = targetAmount
         state.isLoading = false
       })
 
@@ -37,13 +37,13 @@ export const goalsSlice = createSlice<GoalsSliceState, GoalsSliceReducers, 'goal
         const newGoal: SimplifiedGoal = {
           goalId: payload.goalId,
           ...meta.arg.payload,
-          currentValue: 0,
+          currentAmount: 0,
           isArchived: false,
           status: 'ongoing',
         }
 
         state.goals = pushIntoSorted(state.goals, newGoal)
-        state.goalsStats.targetValue += meta.arg.payload.targetValue
+        state.goalsStats.targetAmount += meta.arg.payload.targetAmount
 
         state.isCreateLoading = false
       })

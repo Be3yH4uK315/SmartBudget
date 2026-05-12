@@ -21,7 +21,7 @@ export const GoalSearchItem = ({ goal }: Props) => {
   const theme = useTheme()
   const muiTheme = useMUITheme()
 
-  const { goalId, name, targetValue, currentValue, status, isArchived } = goal
+  const { goalId, name, targetAmount, currentAmount, status, isArchived } = goal
   const hoverColor = theme.colorMode === 'light' ? 'surface.dark' : 'surface.main'
 
   const { pieColor } = STATUS_STYLES[status](muiTheme)
@@ -66,14 +66,14 @@ export const GoalSearchItem = ({ goal }: Props) => {
             <Stack spacing={1} alignItems={{ xs: 'center', sm: 'end' }}>
               <TypographyWithAdornment
                 Icon={TaskAltOutlined}
-                text={translate('currentValue', { value: formatCurrency(currentValue) })}
+                text={translate('currentValue', { value: formatCurrency(currentAmount) })}
               />
 
               {status !== 'achieved' && (
                 <TypographyWithAdornment
                   Icon={FlagOutlined}
                   text={translate('targetValue', {
-                    value: formatCurrency(Math.max(targetValue - currentValue, 0)),
+                    value: formatCurrency(Math.max(targetAmount - currentAmount, 0)),
                   })}
                 />
               )}
@@ -81,7 +81,7 @@ export const GoalSearchItem = ({ goal }: Props) => {
           </Stack>
         </Stack>
 
-        <PercentLine limit={targetValue} currentValue={currentValue} color={pieColor} />
+        <PercentLine limit={targetAmount} currentValue={currentAmount} color={pieColor} />
       </Stack>
     </StyledPaper>
   )

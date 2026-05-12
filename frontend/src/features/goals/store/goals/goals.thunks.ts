@@ -7,15 +7,15 @@ import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getGoals = createAsyncThunk<
-  { goals: SimplifiedGoal[]; targetValue: number; currentValue: number },
+  { goals: SimplifiedGoal[]; targetAmount: number; currentAmount: number },
   GoalsFilters,
   { state: RootState; rejectWithValue: string }
 >('getGoals', async (filters, { rejectWithValue }) => {
   try {
-    const response = await goalsMock.getGoals(filters)
-    const { targetValue, currentValue } = getGoalsStats(response)
+    const response = await goalsApi.getGoals(filters)
+    const { targetAmount, currentAmount } = getGoalsStats(response)
 
-    return { goals: response, targetValue, currentValue }
+    return { goals: response, targetAmount, currentAmount }
   } catch (e: any) {
     showToast({ messageKey: 'cannotGetGoals', type: 'error' })
 
@@ -29,7 +29,7 @@ export const createGoal = createAsyncThunk<
   { state: RootState; rejectWithValue: string }
 >('createGoal', async ({ payload }, { rejectWithValue }) => {
   try {
-    const response = await goalsMock.createGoal(payload)
+    const response = await goalsApi.createGoal(payload)
 
     return response
   } catch (e: any) {

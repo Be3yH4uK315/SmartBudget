@@ -13,16 +13,16 @@ type Props = {
   finishDate: string | null
   status: GoalStatus
   isArchived: boolean
-  targetValue: number
-  currentValue: number
+  targetAmount: number
+  currentAmount: number
 }
 export const GoalInfoBlock = ({
   name,
   finishDate,
   status,
   isArchived,
-  targetValue,
-  currentValue,
+  targetAmount,
+  currentAmount,
 }: Props) => {
   const translate = useTranslate('CurrentGoal')
 
@@ -50,7 +50,7 @@ export const GoalInfoBlock = ({
           <TypographyWithAdornment
             Icon={FlagOutlined}
             text={translate('targetValue', {
-              value: formatCurrency(Math.max(targetValue - currentValue, 0)),
+              value: formatCurrency(Math.max(targetAmount - currentAmount, 0)),
             })}
           />
         )}

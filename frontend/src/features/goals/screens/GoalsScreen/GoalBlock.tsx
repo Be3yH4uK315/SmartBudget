@@ -32,8 +32,8 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
   const {
     goalId,
     name,
-    targetValue,
-    currentValue,
+    targetAmount,
+    currentAmount,
     finishDate,
     status,
     tags,
@@ -46,13 +46,13 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
   const width = isMobile ? '100%' : 'auto'
 
   const pieData: PieDataItem[] = [
-    { value: currentValue, color: pieColor },
-    { value: Math.max(targetValue - currentValue, 0), color: theme.palette.grayButton.dark },
+    { value: currentAmount, color: pieColor },
+    { value: Math.max(targetAmount - currentAmount, 0), color: theme.palette.grayButton.dark },
   ]
 
   const centerLabel: CenterLabel = {
     type: 'percent',
-    value: currentValue / targetValue,
+    value: currentAmount / targetAmount,
   }
 
   return (
@@ -82,14 +82,14 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
               <Stack>
                 <TypographyWithAdornment
                   Icon={TaskAltOutlined}
-                  text={translate('currentValue', { value: formatCurrency(currentValue) })}
+                  text={translate('currentValue', { value: formatCurrency(currentAmount) })}
                 />
 
                 {status !== 'achieved' && (
                   <TypographyWithAdornment
                     Icon={FlagOutlined}
                     text={translate('targetValue', {
-                      value: formatCurrency(Math.max(targetValue - currentValue, 0)),
+                      value: formatCurrency(Math.max(targetAmount - currentAmount, 0)),
                     })}
                   />
                 )}
@@ -112,7 +112,7 @@ export const GoalBlock = React.memo(({ goal }: Props) => {
                 <>
                   <Divider sx={{ bgcolor: 'text.primary' }} />
 
-                  <PercentLine limit={targetValue} currentValue={currentValue} color={pieColor} />
+                  <PercentLine limit={targetAmount} currentValue={currentAmount} color={pieColor} />
                 </>
               )}
             </Stack>

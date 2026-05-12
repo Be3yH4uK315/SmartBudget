@@ -8,7 +8,7 @@ export function useGoalModalForm(goal?: Goal) {
 
   const initialValues: ModalFormValues = {
     name: goal?.name ?? '',
-    targetValue: goal?.targetValue ?? '',
+    targetAmount: goal?.targetAmount ?? '',
     finishDate: goal?.finishDate ?? null,
     priority: goal?.priority ?? null,
     tags: goal?.tags ?? [],
@@ -24,7 +24,7 @@ export function useGoalModalForm(goal?: Goal) {
       setValues((prev) => ({
         ...prev,
         [key]:
-          key === 'targetValue'
+          key === 'targetAmount'
             ? value === '' || Number.isNaN(Number(value))
               ? ''
               : Number(value)
@@ -62,14 +62,14 @@ export function useGoalModalForm(goal?: Goal) {
 
   const dirty =
     values.name !== initialValues.name ||
-    values.targetValue !== initialValues.targetValue ||
+    values.targetAmount !== initialValues.targetAmount ||
     values.finishDate !== initialValues.finishDate ||
     values.priority !== initialValues.priority ||
     values.tags.length !== initialValues.tags.length ||
     values.tags.some((t) => !initialValues.tags.includes(t))
 
   const canSubmit = () => {
-    if (!values.name.trim() || values.targetValue === '' || values.targetValue < 1) return false
+    if (!values.name.trim() || values.targetAmount === '' || values.targetAmount < 1) return false
 
     if (!values.finishDate) return true
 
@@ -78,7 +78,7 @@ export function useGoalModalForm(goal?: Goal) {
 
   const setPayload = (goalStatus?: GoalStatus) => ({
     name: values.name.trim(),
-    targetValue: Number(values.targetValue),
+    targetAmount: Number(values.targetAmount),
     finishDate: values.finishDate,
     tags: values.tags,
     priority: values.priority,
