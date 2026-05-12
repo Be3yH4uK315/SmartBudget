@@ -29,7 +29,12 @@ export const GoalsBlock = ({ goals }: Props) => {
       <Stack spacing={2}>
         <Stack>
           {goals.map((g, i) => (
-            <Goal key={i} title={g.name} totalValue={g.totalValue} currentValue={g.currentValue} />
+            <Goal
+              key={i}
+              title={g.name}
+              totalValue={g.targetAmount}
+              currentValue={g.currentAmount}
+            />
           ))}
         </Stack>
 
