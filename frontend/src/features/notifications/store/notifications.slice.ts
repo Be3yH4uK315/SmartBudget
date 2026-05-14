@@ -45,6 +45,7 @@ export const notificationsSlice = createSlice<
           })
         }
 
+        state.unreadCount = payload.unreadCount
         state.offset += length
         state.isLoading = false
 

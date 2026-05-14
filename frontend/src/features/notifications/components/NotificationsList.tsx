@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import 'dayjs/locale/ru'
 import { getNotifications } from '@features/notifications/store'
-import { NotificationsBlock } from '@features/notifications/types'
+import { NotificationsBlock, NotificationsFilters } from '@features/notifications/types'
 import { Typography } from '@mui/material'
 import { ListFooter, MUIComponents } from '@shared/components/GroupedVirtuoso'
 import { useTranslate } from '@shared/hooks'
@@ -15,17 +15,23 @@ type Props = {
   isLast: boolean
   isLoading: boolean
   notifications: NotificationsBlock[]
+  appliedFiltersRef: React.RefObject<NotificationsFilters>
 }
 
-export const NotificationsList = ({ isLast, isLoading, notifications }: Props) => {
+export const NotificationsList = ({
+  isLast,
+  isLoading,
+  notifications,
+  appliedFiltersRef,
+}: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('ListDate')
 
   const normalizedBlocks = useMemo(() => normalizeBlocks(notifications), [notifications])
 
   const loadMore = useCallback(() => {
-    dispatch(getNotifications())
-  }, [dispatch])
+    dispatch(getNotifications(appliedFiltersRef.current))
+  }, [dispatch, appliedFiltersRef])
 
   const formatGroupDate = (inputDate: string) => {
     const date = dayjs.utc(inputDate).local()

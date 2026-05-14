@@ -1,5 +1,5 @@
 import { NOTIFICATIONS_LIMIT } from '@features/notifications/constants'
-import { NotificationsListResponse } from '@features/notifications/types'
+import { NotificationsFilters, NotificationsListResponse } from '@features/notifications/types'
 import { Transaction } from '@features/transactions/types'
 import { api } from '@shared/api'
 
@@ -7,12 +7,18 @@ class NotificationsApi {
   baseUrl = '/notifications'
   transactionsUrl = '/transactions'
 
-  async getNotifications(offset: number): Promise<NotificationsListResponse> {
+  async getNotifications(
+    offset: number,
+    filters: NotificationsFilters,
+  ): Promise<NotificationsListResponse> {
     const url = `${this.baseUrl}`
 
-    const params = {
-      limit: NOTIFICATIONS_LIMIT,
-      offset,
+    const params: Record<string, string> = {
+      offset: String(offset),
+      limit: String(NOTIFICATIONS_LIMIT),
+      ...(filters?.services?.length > 0 ? { services: filters.services.join(',') } : {}),
+      ...(filters?.statuses?.length > 0 ? { statuses: filters.statuses } : {}),
+      ...(filters?.types?.length > 0 ? { types: filters.types.join(',') } : {}),
     }
 
     const response = await api.get<NotificationsListResponse>(url, { params })

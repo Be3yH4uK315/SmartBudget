@@ -9,3 +9,4 @@ const sliceStateSelector = createLazySliceStateSelector(
 export const selectIsNotificationsLoading = sliceStateSelector((state) => state.isLoading)
 export const selectNotifications = sliceStateSelector((state) => state.notifications)
 export const selectIsLastNotification = sliceStateSelector((state) => state.isLast)
+export const selectUnreadCount = sliceStateSelector((state) => state.unreadCount)
