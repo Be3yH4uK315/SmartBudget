@@ -28,6 +28,8 @@ class CamelModel(BaseModel):
 class CreateManualTransactionRequest(CamelModel):
     """Запрос на создание ручной транзакции."""
 
+    transaction_id: UUID = Field(..., description="ID транзакции внешнего банка")
+
     account_id: UUID | None = Field(None, description="ID счета")
     amount: Decimal = Field(..., gt=0, description="Сумма транзакции")
     transaction_type: TransactionType = Field(..., description="Тип транзакции")
@@ -109,24 +111,6 @@ class TransactionResponse(CamelModel):
     transaction_type: TransactionType = Field(..., description="Тип транзакции")
 
 
-class ListTransactionsResponse(CamelModel):
-    """Ответ со списком транзакций."""
-
-    transactions: list[TransactionResponse] = Field(
-        default_factory=list,
-        description="Список транзакций",
-    )
-
-
-class SearchTransactionsResponse(CamelModel):
-    """Ответ с результатами поиска транзакций."""
-
-    transactions: list[TransactionResponse] = Field(
-        default_factory=list,
-        description="Найденные транзакции",
-    )
-
-
 class TransactionDetailResponse(CamelModel):
     """Детальная модель транзакции."""
 
@@ -152,15 +136,6 @@ class TransactionsByMonthResponse(CamelModel):
     amount: Decimal = Field(..., description="Сумма транзакций")
     period_start: datetime = Field(..., description="Начало периода")
     transaction_type: TransactionType = Field(..., description="Тип транзакции")
-
-
-class GoalTransactionsByMonthResponse(CamelModel):
-    """Ответ с транзакциями цели, сгруппированными по месяцам."""
-
-    items: list[TransactionsByMonthResponse] = Field(
-        default_factory=list,
-        description="Транзакции цели по месяцам",
-    )
 
 
 class HealthCheckResponse(CamelModel):

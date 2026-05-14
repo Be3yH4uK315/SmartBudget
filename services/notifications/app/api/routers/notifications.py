@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path
 
 from app.api import dependencies
+from app.api.dependencies import NotificationFilters
 from app.domain.schemas import api as schemas
 from app.services.service import NotificationService
 
@@ -16,18 +17,18 @@ router = APIRouter(tags=["Notifications"])
     summary="Получить список уведомлений",
 )
 async def get_notifications(
-    is_read: bool | None = Query(None, description="Фильтр по статусу прочтения"),
-    limit_amount: int = Query(20, ge=1, le=100, alias="limitAmount"),
-    offset: int = Query(0, ge=0),
+    filters: NotificationFilters = Depends(),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
 ):
     """Возвращает список уведомлений пользователя с пагинацией."""
     return await service.get_paginated_notifications(
         user_id=user_id,
-        is_read=is_read,
-        limit_amount=limit_amount,
-        offset=offset,
+        limit=filters.limit,
+        offset=filters.offset,
+        services=filters.services,
+        notification_types=filters.types,
+        statuses=filters.statuses,
     )
 
 

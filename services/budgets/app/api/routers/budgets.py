@@ -38,3 +38,19 @@ async def create_budget(
 ):
     """Создает бюджет пользователя за выбранный месяц."""
     return await service.create_budget(user_id, request, target_date)
+
+
+@router.post(
+    "/backfill",
+    response_model=schemas.BackfillBudgetTransactionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Восстановить бюджет по транзакциям",
+)
+async def backfill_budget_transactions(
+    request: schemas.BackfillBudgetTransactionsRequest = Body(...),
+    target_date: date | None = Query(None, alias="month"),
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: BudgetService = Depends(dependencies.get_budget_service),
+):
+    """Идемпотентно применяет переданные транзакции к бюджету."""
+    return await service.backfill_transactions(user_id, request, target_date)

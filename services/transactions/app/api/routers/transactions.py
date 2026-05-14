@@ -11,7 +11,7 @@ router = APIRouter(tags=["Transactions"])
 
 @router.get(
     "",
-    response_model=schemas.ListTransactionsResponse,
+    response_model=list[schemas.TransactionResponse],
     response_model_exclude_none=True,
     summary="Получить список транзакций",
 )
@@ -23,7 +23,7 @@ async def list_transactions(
     """Возвращает список транзакций пользователя с фильтрами."""
     return await service.list_transactions(
         user_id=user_id,
-        limit_amount=filters.limit_amount,
+        limit_amount=filters.limit,
         offset=filters.offset,
         category_ids=filters.category_ids,
         occurred_from=filters.occurred_from,
@@ -36,13 +36,13 @@ async def list_transactions(
 
 @router.get(
     "/search",
-    response_model=schemas.SearchTransactionsResponse,
+    response_model=list[schemas.TransactionResponse],
     response_model_exclude_none=True,
     summary="Поиск транзакций",
 )
 async def search_transactions(
     query: str = Query(..., min_length=1, max_length=255),
-    limit_amount: int = Query(10, ge=1, le=100, alias="limitAmount"),
+    limit: int = Query(10, ge=1, le=100),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
@@ -50,7 +50,7 @@ async def search_transactions(
     return await service.search_transactions(
         user_id=user_id,
         query=query,
-        limit_amount=limit_amount,
+        limit_amount=limit,
     )
 
 

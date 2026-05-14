@@ -30,6 +30,7 @@ export const notificationsSettingsSlice = createSlice<
       .addCase(getNotificationsSettings.fulfilled, (state, { payload }) => {
         const { notificationsStatus, pushStatus, goals, transactions, budget, emailStatus } =
           payload
+
         state.notificationsStatus = notificationsStatus
         state.notificationsSettings.budget = budget
         state.notificationsSettings.emailStatus = emailStatus
@@ -45,8 +46,16 @@ export const notificationsSettingsSlice = createSlice<
         state.isLoading = true
       })
 
-      .addCase(changeNotificationsStatus.fulfilled, (state, { meta }) => {
-        state.notificationsStatus = meta.arg
+      .addCase(changeNotificationsStatus.fulfilled, (state, { payload }) => {
+        const { notificationsStatus, pushStatus, goals, transactions, budget, emailStatus } =
+          payload
+
+        state.notificationsStatus = notificationsStatus
+        state.notificationsSettings.budget = budget
+        state.notificationsSettings.emailStatus = emailStatus
+        state.notificationsSettings.goals = goals
+        state.notificationsSettings.pushStatus = pushStatus
+        state.notificationsSettings.transactions = transactions
       })
 
       .addCase(updateNotificationsSettings.fulfilled, (state, { meta }) => {

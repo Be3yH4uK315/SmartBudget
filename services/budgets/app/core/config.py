@@ -53,7 +53,7 @@ class ArqSettings(SharedArqSettings):
 class AppSettings(SharedAppSettings):
     """Настройки приложения."""
 
-    pass
+    GOAL_CATEGORY_ID: int = 24
 
 
 class Settings(BaseSettings):

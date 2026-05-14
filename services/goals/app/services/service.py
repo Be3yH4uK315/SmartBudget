@@ -324,7 +324,7 @@ class GoalService:
                 transaction_id=event.transaction_id,
                 raw_amount=event.amount,
                 transaction_type=transaction_type.value,
-                occurred_at=event.occurred_at,
+                date=event.date,
             )
 
             if goal is None:

@@ -64,6 +64,19 @@ export const mapNotificationMessage = (
       })
     }
 
+    case 'Goals.thresholdReached.message': {
+      const { progressPercent, ...rest } = notification.props as {
+        goalId: string
+        name: string
+        progressPercent: number
+      }
+
+      return translate(notification.messageKey, {
+        ...rest,
+        percent: formatPercent(progressPercent / 100),
+      })
+    }
+
     case 'Goals.goalCreated.message': {
       const { recommendedPayment, ...rest } = notification.props as {
         goalId: string

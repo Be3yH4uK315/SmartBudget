@@ -1,8 +1,8 @@
 """initial notifications schema
 
-Revision ID: 20260508_notification_contracts
+Revision ID: 3cbbc1bf1931
 Revises:
-Create Date: 2026-05-08 00:00:00.000000
+Create Date: 2026-05-08 09:15:06.001257+00:00
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "20260508_notification_contracts"
+revision: str = "3cbbc1bf1931"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

@@ -1,10 +1,22 @@
 from uuid import UUID
 
 from arq import ArqRedis
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Query, Request, status
 
+from app.domain.enums import (
+    NotificationServiceType,
+    NotificationStatus,
+    NotificationType,
+)
 from app.infrastructure.db.uow import UnitOfWork
 from app.services.service import NotificationService
+
+FILTERABLE_NOTIFICATION_SERVICES = {
+    NotificationServiceType.BUDGET,
+    NotificationServiceType.GOALS,
+    NotificationServiceType.TRANSACTIONS,
+    NotificationServiceType.SECURITY,
+}
 
 
 async def get_uow(request: Request) -> UnitOfWork:
@@ -51,3 +63,92 @@ async def get_current_user_id(request: Request) -> UUID:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid User ID format",
         ) from exc
+
+
+class NotificationFilters:
+    """Query-фильтры для получения списка уведомлений."""
+
+    def __init__(
+        self,
+        services: str | None = Query(
+            None,
+            description="Сервисы через запятую: Budget,Goals,Transactions,Security",
+        ),
+        types: str | None = Query(
+            None,
+            description="Типы через запятую: info,success,alert,warning,system",
+        ),
+        statuses: str | None = Query(
+            None,
+            description="Статусы через запятую: unread,read",
+        ),
+        limit: int = Query(20, ge=1, le=100, description="Лимит записей"),
+        offset: int = Query(0, ge=0, description="Смещение"),
+    ) -> None:
+        self.limit = limit
+        self.offset = offset
+        self.services = self._parse_services(services)
+        self.types = self._parse_enum_values(types, NotificationType, "types")
+        self.statuses = self._parse_enum_values(statuses, NotificationStatus, "statuses")
+
+    @staticmethod
+    def _split_values(raw: str | None) -> list[str]:
+        """Преобразует query-параметр в список значений."""
+        if not raw:
+            return []
+
+        return [item.strip() for item in raw.split(",") if item.strip()]
+
+    @classmethod
+    def _parse_services(
+        cls,
+        raw: str | None,
+    ) -> list[NotificationServiceType] | None:
+        """Парсит список сервисов уведомлений."""
+        values = cls._split_values(raw)
+        if not values:
+            return None
+
+        parsed: list[NotificationServiceType] = []
+        for value in values:
+            try:
+                service_type = NotificationServiceType(value)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid services filter value: {value}",
+                ) from exc
+
+            if service_type not in FILTERABLE_NOTIFICATION_SERVICES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid services filter value: {value}",
+                )
+
+            parsed.append(service_type)
+
+        return parsed
+
+    @classmethod
+    def _parse_enum_values(
+        cls,
+        raw: str | None,
+        enum_type: type[NotificationType] | type[NotificationStatus],
+        field_name: str,
+    ) -> list[NotificationType] | list[NotificationStatus] | None:
+        """Парсит список enum-значений из CSV query-параметра."""
+        values = cls._split_values(raw)
+        if not values:
+            return None
+
+        parsed = []
+        for value in values:
+            try:
+                parsed.append(enum_type(value))
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid {field_name} filter value: {value}",
+                ) from exc
+
+        return parsed

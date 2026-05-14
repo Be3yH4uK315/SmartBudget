@@ -11,7 +11,7 @@ router = APIRouter(tags=["Goal Transactions"])
 
 @router.get(
     "/transactions/{account_id}",
-    response_model=schemas.GoalTransactionsByMonthResponse,
+    response_model=list[schemas.TransactionsByMonthResponse],
     response_model_exclude_none=True,
     summary="Получить транзакции цели по месяцам",
 )

@@ -241,7 +241,7 @@ class ProcessedTransaction(Base):
     goal_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     amount = Column(DECIMAL(18, 2), nullable=False)
     transaction_type = Column(String(50), nullable=False)
-    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -250,7 +250,7 @@ class ProcessedTransaction(Base):
     )
 
     __table_args__ = (
-        Index("ix_processed_goal_transactions_goal_occurred", "goal_id", "occurred_at"),
+        Index("ix_processed_goal_transactions_goal_occurred", "goal_id", "date"),
         {"postgresql_partition_by": "RANGE (created_at)"},
     )
 

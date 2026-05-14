@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -79,6 +80,7 @@ class CategoryResponse(CamelModel):
     category_id: int = Field(..., description="ID категории")
     limit_amount: Decimal = Field(..., description="Лимит по категории")
     spent_amount: Decimal = Field(..., description="Потраченная сумма")
+    income_amount: Decimal = Field(..., description="Полученная сумма")
 
 
 class CreateBudgetResponse(CamelModel):
@@ -107,6 +109,7 @@ class CategorySettingsResponse(CamelModel):
 
     category_id: int = Field(..., description="ID категории")
     limit_amount: Decimal = Field(..., description="Лимит по категории")
+    income_amount: Decimal = Field(..., description="Полученная сумма")
 
 
 class BudgetResponse(CamelModel):
@@ -138,6 +141,7 @@ class DashboardCategoryResponse(CamelModel):
 
     category_id: int = Field(..., description="ID категории")
     amount: Decimal = Field(..., description="Сумма по категории")
+    income_amount: Decimal = Field(..., description="Полученная сумма")
     transaction_type: TransactionType = Field(..., description="Тип транзакции")
 
 
@@ -166,3 +170,30 @@ class ReadinessResponse(CamelModel):
         default_factory=dict,
         description="Статусы внешних зависимостей",
     )
+
+
+class BackfillTransactionItemRequest(CamelModel):
+    """Транзакция для ручного восстановления бюджетной статистики."""
+
+    transaction_id: UUID = Field(..., description="ID транзакции")
+    account_id: UUID | None = Field(None, description="ID счета")
+    category_id: int | None = Field(None, description="ID категории")
+    amount: Decimal = Field(..., ge=0, description="Сумма транзакции")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
+    date: datetime = Field(..., description="Время операции")
+
+
+class BackfillBudgetTransactionsRequest(CamelModel):
+    """Запрос восстановления бюджетной статистики по транзакциям."""
+
+    transactions: list[BackfillTransactionItemRequest] = Field(
+        default_factory=list,
+        description="Транзакции для применения к бюджету",
+    )
+
+
+class BackfillBudgetTransactionsResponse(CamelModel):
+    """Результат восстановления бюджетной статистики."""
+
+    applied_count: int = Field(..., ge=0, description="Количество примененных транзакций")
+    skipped_count: int = Field(..., ge=0, description="Количество пропущенных транзакций")

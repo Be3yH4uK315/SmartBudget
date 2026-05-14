@@ -24,7 +24,7 @@ def _amount_delta(amount: Decimal, transaction_type: TransactionType | str) -> D
         else TransactionType(transaction_type)
     )
 
-    return amount if tx_type == TransactionType.EXPENSE else -amount
+    return amount if tx_type == TransactionType.EXPENSE else Decimal("0.00")
 
 
 class BudgetRepository:
@@ -134,7 +134,7 @@ class BudgetRepository:
         category_id: int | None,
         amount: Decimal,
         transaction_type: TransactionType,
-        occurred_at: datetime,
+        date: datetime,
     ) -> models.ProcessedBudgetTransaction:
         """Добавляет запись об обработанной транзакции без commit."""
         now = _utc_now()
@@ -150,7 +150,7 @@ class BudgetRepository:
                 if hasattr(transaction_type, "value")
                 else str(transaction_type)
             ),
-            occurred_at=occurred_at,
+            date=date,
             created_at=now,
             updated_at=now,
         )
@@ -184,6 +184,7 @@ class BudgetRepository:
             category_id=category_id,
             limit_amount=Decimal("0.00"),
             spent_amount=Decimal("0.00"),
+            income_amount=Decimal("0.00"),
             created_at=now,
             updated_at=now,
         )
@@ -199,22 +200,32 @@ class BudgetRepository:
         transaction_type: TransactionType,
         multiplier: int = 1,
     ) -> models.CategoryLimit | None:
-        """Обновляет spent_amount категории и total_income_amount бюджета."""
+        """Обновляет расход/доход категории и total_income_amount бюджета."""
         if category_id is None:
             return None
 
         category = self.get_or_create_category(budget, category_id)
-        delta = _amount_delta(amount, transaction_type) * multiplier
+        tx_type = (
+            transaction_type
+            if isinstance(transaction_type, TransactionType)
+            else TransactionType(transaction_type)
+        )
+        delta = _amount_delta(amount, tx_type) * multiplier
 
         category.spent_amount = max(
             Decimal("0.00"),
             category.spent_amount + delta,
         )
 
-        if transaction_type == TransactionType.INCOME:
+        if tx_type == TransactionType.INCOME:
+            income_delta = amount * multiplier
+            category.income_amount = max(
+                Decimal("0.00"),
+                category.income_amount + income_delta,
+            )
             budget.total_income_amount = max(
                 Decimal("0.00"),
-                budget.total_income_amount + amount * multiplier,
+                budget.total_income_amount + income_delta,
             )
 
         now = _utc_now()

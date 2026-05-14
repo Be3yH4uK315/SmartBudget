@@ -1,8 +1,8 @@
 """initial budgets schema
 
-Revision ID: 20260508_budget_contracts
+Revision ID: 9353ef7b3aec
 Revises:
-Create Date: 2026-05-08 00:00:00.000000
+Create Date: 2026-05-08 18:52:44.605321+00:00
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "20260508_budget_contracts"
+revision: str = "9353ef7b3aec"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -63,7 +63,7 @@ def upgrade() -> None:
         sa.Column("category_id", sa.Integer(), nullable=True),
         sa.Column("amount", sa.DECIMAL(18, 2), nullable=False),
         sa.Column("transaction_type", sa.String(length=50), nullable=False),
-        sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("date", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("transaction_id"),
@@ -95,7 +95,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_processed_budget_transactions_occurred_at",
         "processed_budget_transactions",
-        ["occurred_at"],
+        ["date"],
         unique=False,
     )
 

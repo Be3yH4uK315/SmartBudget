@@ -1,8 +1,8 @@
 """initial goals schema
 
-Revision ID: 20260508_goal_contract_fields
+Revision ID: 414215a4cf44
 Revises:
-Create Date: 2026-05-08 00:00:00.000000+00:00
+Create Date: 2026-05-08 23:47:19.983045+00:00
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "20260508_goal_contract_fields"
+revision: str = "414215a4cf44"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -62,7 +62,7 @@ def upgrade() -> None:
         sa.Column("goal_id", sa.UUID(), nullable=False),
         sa.Column("amount", sa.DECIMAL(precision=18, scale=2), nullable=False),
         sa.Column("transaction_type", sa.String(length=50), nullable=False),
-        sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("date", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.PrimaryKeyConstraint("transaction_id", "created_at"),
         postgresql_partition_by="RANGE (created_at)",
@@ -76,7 +76,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_processed_goal_transactions_goal_occurred",
         "processed_goal_transactions",
-        ["goal_id", "occurred_at"],
+        ["goal_id", "date"],
         unique=False,
     )
 

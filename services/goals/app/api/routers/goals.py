@@ -38,7 +38,7 @@ async def get_goals(
     """Возвращает список целей пользователя с фильтрацией."""
     return await service.get_all_goals(
         user_id=user_id,
-        limit_amount=filters.limit_amount,
+        limit_amount=filters.limit,
         offset=filters.offset,
         tags=filters.tags_list,
         priorities=filters.priorities_list,
@@ -53,12 +53,12 @@ async def get_goals(
 )
 async def search_goals(
     query: str = Query(..., min_length=1, max_length=255),
-    limit_amount: int = Query(10, ge=1, le=100, alias="limitAmount"),
+    limit: int = Query(10, ge=1, le=100),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: GoalService = Depends(dependencies.get_goal_service),
 ):
     """Ищет цели пользователя по текстовому запросу."""
-    return await service.search_goals(user_id, query, limit_amount)
+    return await service.search_goals(user_id, query, limit)
 
 
 @router.get(

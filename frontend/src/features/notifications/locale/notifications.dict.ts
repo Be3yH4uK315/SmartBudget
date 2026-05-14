@@ -62,7 +62,7 @@ export const notificationsDict: LocaleDictionary = {
         thresholdReached: {
           title: 'Цель почти достигнута',
           message:
-            'Цель <strong>"{{name}}"</strong> выполнена на 90%. Вы близки к достижению результата.',
+            'Цель <strong>"{{name}}"</strong> выполнена на {{percent}}. Вы близки к достижению результата.',
         },
 
         achieved: {

@@ -72,12 +72,41 @@ def _expense_total(budget: models.Budget) -> Decimal:
     )
 
 
+def _income_total(budget: models.Budget) -> Decimal:
+    """Считает общую сумму доходов по бюджету."""
+    return sum(
+        (
+            category.income_amount
+            for category in budget.category_limits
+            if category.income_amount > 0
+        ),
+        ZERO_AMOUNT,
+    )
+
+
 def _category_expense(category: models.CategoryLimit | None) -> Decimal:
     """Возвращает расход категории."""
     if category is None or category.spent_amount <= 0:
         return ZERO_AMOUNT
 
     return category.spent_amount
+
+
+def _budget_total_exceeded_count(budget: models.Budget) -> int:
+    """Возвращает 1, если общий бюджет превышен."""
+    if budget.total_limit_amount <= 0:
+        return 0
+
+    return int(_expense_total(budget) > budget.total_limit_amount)
+
+
+def _budget_category_exceeded_count(budget: models.Budget) -> int:
+    """Считает количество превышенных категорий."""
+    return sum(
+        1
+        for category in budget.category_limits
+        if category.limit_amount > 0 and _category_expense(category) > category.limit_amount
+    )
 
 
 def _percent_used(spent_amount: Decimal, limit_amount: Decimal | None) -> int:
@@ -123,6 +152,17 @@ def _category_response(category: models.CategoryLimit) -> api_schemas.CategoryRe
         category_id=category.category_id,
         limit_amount=category.limit_amount,
         spent_amount=category.spent_amount,
+        income_amount=category.income_amount,
+    )
+
+
+def _sort_categories_by_spent(
+    categories: list[models.CategoryLimit],
+) -> list[models.CategoryLimit]:
+    """Сортирует категории по убыванию потраченной суммы."""
+    return sorted(
+        categories,
+        key=lambda item: (-item.spent_amount, item.category_id),
     )
 
 
@@ -133,19 +173,17 @@ def _category_settings_response(
     return api_schemas.CategorySettingsResponse(
         category_id=category.category_id,
         limit_amount=category.limit_amount,
+        income_amount=category.income_amount,
     )
 
 
 def _budget_to_response(budget: models.Budget) -> api_schemas.BudgetResponse:
     """Преобразует Budget в основной API response."""
-    categories = sorted(
-        budget.category_limits,
-        key=lambda item: item.category_id,
-    )
+    categories = _sort_categories_by_spent(list(budget.category_limits))
 
     return api_schemas.BudgetResponse(
         total_limit_amount=budget.total_limit_amount,
-        total_income_amount=budget.total_income_amount,
+        total_income_amount=_income_total(budget),
         spent_amount=_expense_total(budget),
         is_auto_renew=budget.is_auto_renew,
         categories=[_category_response(category) for category in categories],
@@ -164,7 +202,7 @@ def _budget_to_create_response(
     return api_schemas.CreateBudgetResponse(
         budget_id=budget.budget_id,
         total_limit_amount=budget.total_limit_amount,
-        total_income_amount=budget.total_income_amount,
+        total_income_amount=_income_total(budget),
         spent_amount=_expense_total(budget),
         is_auto_renew=budget.is_auto_renew,
         categories=[_category_response(category) for category in categories],
@@ -199,18 +237,19 @@ def _budget_to_dashboard_response(
         api_schemas.DashboardCategoryResponse(
             category_id=category.category_id,
             amount=category.spent_amount,
+            income_amount=category.income_amount,
             transaction_type=TransactionType.EXPENSE,
         )
         for category in sorted(
             budget.category_limits,
-            key=lambda item: item.category_id,
+            key=lambda item: (-item.spent_amount, item.category_id),
         )
     ]
 
     return api_schemas.DashboardBudgetResponse(
         categories=categories,
         total_limit_amount=budget.total_limit_amount,
-        total_income_amount=budget.total_income_amount,
+        total_income_amount=_income_total(budget),
     )
 
 
@@ -238,8 +277,12 @@ def _budget_event(
         checked_at=_utc_now()
         if event_type == BudgetEventType.BUDGET_CHECK_RESULTS
         else None,
-        total_exceeded_count=None,
-        category_exceeded_count=None,
+        total_exceeded_count=_budget_total_exceeded_count(budget)
+        if event_type == BudgetEventType.BUDGET_CHECK_RESULTS
+        else None,
+        category_exceeded_count=_budget_category_exceeded_count(budget)
+        if event_type == BudgetEventType.BUDGET_CHECK_RESULTS
+        else None,
     )
     event = create_budget_event(
         event_type=event_type,
@@ -453,6 +496,75 @@ class BudgetService:
 
         return created_count
 
+    async def backfill_transactions(
+        self,
+        user_id: UUID,
+        request: api_schemas.BackfillBudgetTransactionsRequest,
+        target_date: date | None = None,
+    ) -> api_schemas.BackfillBudgetTransactionsResponse:
+        """Восстанавливает бюджетную статистику по переданным транзакциям."""
+        target_month = _month_start(target_date) if target_date else None
+        applied_count = 0
+        skipped_count = 0
+
+        async with self.uow:
+            for item in request.transactions:
+                category_id = item.category_id
+                if category_id is None and item.account_id is not None:
+                    category_id = settings.APP.GOAL_CATEGORY_ID
+
+                if category_id is None:
+                    skipped_count += 1
+                    continue
+
+                transaction_month = _month_start(item.date)
+                if target_month and transaction_month != target_month:
+                    skipped_count += 1
+                    continue
+
+                if await self._transaction_already_processed(item.transaction_id):
+                    skipped_count += 1
+                    continue
+
+                budget = await self.uow.budgets.get_by_user_id_for_update(
+                    user_id,
+                    transaction_month,
+                )
+                if not budget:
+                    logger.warning(
+                        "Budget not found for backfill",
+                        extra={
+                            "user_id": str(user_id),
+                            "month": transaction_month.isoformat(),
+                        },
+                    )
+                    skipped_count += 1
+                    continue
+
+                self._apply_new_transaction_to_budget(
+                    user_id=user_id,
+                    budget=budget,
+                    category_id=category_id,
+                    amount=item.amount,
+                    transaction_type=item.transaction_type,
+                )
+
+                self.uow.budgets.add_processed_transaction(
+                    transaction_id=item.transaction_id,
+                    user_id=user_id,
+                    month=transaction_month,
+                    category_id=category_id,
+                    amount=item.amount,
+                    transaction_type=item.transaction_type,
+                    date=item.date,
+                )
+                applied_count += 1
+
+        return api_schemas.BackfillBudgetTransactionsResponse(
+            applied_count=applied_count,
+            skipped_count=skipped_count,
+        )
+
     async def process_new_transaction(
         self,
         message: TransactionPayload,
@@ -461,8 +573,8 @@ class BudgetService:
         if message.category_id is None:
             return
 
-        occurred_at = message.occurred_at or _utc_now()
-        month = _month_start(occurred_at)
+        date = message.date or _utc_now()
+        month = _month_start(date)
 
         async with self.uow:
             if await self._transaction_already_processed(message.transaction_id):
@@ -491,7 +603,7 @@ class BudgetService:
                 category_id=message.category_id,
                 amount=message.amount,
                 transaction_type=message.transaction_type,
-                occurred_at=occurred_at,
+                date=date,
             )
 
     async def process_updated_transaction(
@@ -522,10 +634,10 @@ class BudgetService:
                 )
                 return
 
-            occurred_at = message.occurred_at or (
-                processed.occurred_at if processed else _utc_now()
+            date = message.date or (
+                processed.date if processed else _utc_now()
             )
-            new_month = _month_start(occurred_at)
+            new_month = _month_start(date)
             old_month = processed.month if processed else new_month
 
             old_budget = await self.uow.budgets.get_by_user_id_for_update(
@@ -563,7 +675,7 @@ class BudgetService:
                     category_id=resolved_category_id,
                     amount=message.amount,
                     transaction_type=TransactionType(message.transaction_type),
-                    occurred_at=occurred_at,
+                    date=date,
                 )
             else:
                 self.uow.budgets.add_processed_transaction(
@@ -573,7 +685,7 @@ class BudgetService:
                     category_id=resolved_category_id,
                     amount=message.amount,
                     transaction_type=message.transaction_type,
-                    occurred_at=occurred_at,
+                    date=date,
                 )
 
     async def process_deleted_transaction(
@@ -707,6 +819,7 @@ class BudgetService:
                     category_id=incoming.category_id,
                     limit_amount=_request_limit_amount(incoming),
                     spent_amount=ZERO_AMOUNT,
+                    income_amount=ZERO_AMOUNT,
                     created_at=now,
                     updated_at=now,
                 ),
@@ -1040,7 +1153,7 @@ class BudgetService:
         category_id: int | None,
         amount: Decimal,
         transaction_type: TransactionType,
-        occurred_at: datetime,
+        date: datetime,
     ) -> None:
         """Обновляет запись обработанной транзакции."""
         processed.user_id = user_id
@@ -1048,7 +1161,7 @@ class BudgetService:
         processed.category_id = category_id
         processed.amount = amount
         processed.transaction_type = transaction_type.value
-        processed.occurred_at = occurred_at
+        processed.date = date
         processed.updated_at = _utc_now()
 
     @staticmethod
@@ -1088,6 +1201,7 @@ class BudgetService:
                 category_id=category.category_id,
                 limit_amount=_request_limit_amount(category),
                 spent_amount=ZERO_AMOUNT,
+                income_amount=ZERO_AMOUNT,
                 created_at=now,
                 updated_at=now,
             )
@@ -1117,6 +1231,7 @@ class BudgetService:
                 category_id=category.category_id,
                 limit_amount=category.limit_amount,
                 spent_amount=ZERO_AMOUNT,
+                income_amount=ZERO_AMOUNT,
                 created_at=now,
                 updated_at=now,
             )

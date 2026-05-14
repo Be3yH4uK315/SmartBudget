@@ -20,7 +20,7 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
     # Общий бюджет
     "budget.total.threshold_reached": EventRouteConfig(
         service=NotificationServiceType.BUDGET,
-        notification_type=NotificationType.WARNING,
+        notification_type=NotificationType.ALERT,
         title_key="Budget.preOverflow.title",
         message_key="Budget.preOverflow.message",
         default_channels=["IN_APP", "PUSH"],
@@ -34,7 +34,7 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
     ),
     "budget.total.exceeded": EventRouteConfig(
         service=NotificationServiceType.BUDGET,
-        notification_type=NotificationType.ALERT,
+        notification_type=NotificationType.WARNING,
         title_key="Budget.overflow.title",
         message_key="Budget.overflow.message",
         default_channels=["IN_APP", "PUSH", "EMAIL"],
@@ -49,7 +49,7 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
     # Лимиты категорий
     "budget.category.threshold_reached": EventRouteConfig(
         service=NotificationServiceType.CATEGORY_LIMITS,
-        notification_type=NotificationType.WARNING,
+        notification_type=NotificationType.ALERT,
         title_key="limit.preOverflow.title",
         message_key="limit.preOverflow.message",
         default_channels=["IN_APP", "PUSH"],
@@ -64,7 +64,7 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
     ),
     "budget.category.exceeded": EventRouteConfig(
         service=NotificationServiceType.CATEGORY_LIMITS,
-        notification_type=NotificationType.ALERT,
+        notification_type=NotificationType.WARNING,
         title_key="limit.overflow.title",
         message_key="limit.overflow.message",
         default_channels=["IN_APP", "PUSH", "EMAIL"],

@@ -20,7 +20,7 @@ export const getNotificationsSettings = createAsyncThunk<
 })
 
 export const changeNotificationsStatus = createAsyncThunk<
-  void,
+  NotificationsSettings,
   boolean,
   { rejectValue: 'cannotChangeNotificationsStatus' }
 >('changeNotificationsStatus', async (notificationsStatus, { rejectWithValue }) => {

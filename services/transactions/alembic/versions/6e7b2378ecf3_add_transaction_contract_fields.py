@@ -1,8 +1,8 @@
 """initial transactions schema
 
-Revision ID: 20260508_tx_contract_fields
+Revision ID: 6e7b2378ecf3
 Revises:
-Create Date: 2026-05-08 00:00:00.000000+00:00
+Create Date: 2026-05-08 14:28:51.374829+00:00
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "20260508_tx_contract_fields"
+revision: str = "6e7b2378ecf3"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

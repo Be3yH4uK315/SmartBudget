@@ -8,7 +8,11 @@ from arq import ArqRedis
 from app.api.websockets import ws_manager
 from app.core import config, exceptions, metrics
 from app.core.registry import EVENT_REGISTRY, EventRouteConfig
-from app.domain.enums import NotificationServiceType
+from app.domain.enums import (
+    NotificationServiceType,
+    NotificationStatus,
+    NotificationType,
+)
 from app.domain.schemas import api as api_schemas
 from app.domain.schemas.kafka import IncomingNotificationEvent
 from smartbudget_shared.events import AuthUserPayload, EventEnvelope
@@ -137,28 +141,49 @@ class NotificationService:
     async def get_paginated_notifications(
         self,
         user_id: UUID,
-        is_read: bool | None,
-        limit_amount: int,
+        limit: int,
         offset: int,
+        services: list[NotificationServiceType] | None = None,
+        notification_types: list[NotificationType] | None = None,
+        statuses: list[NotificationStatus] | None = None,
     ) -> api_schemas.PaginatedNotificationsResponse:
         """Получает историю уведомлений пользователя для UI."""
+        resolved_is_read = self._resolve_is_read_filter(statuses)
+
         async with self.uow:
-            notifications, total = await self.uow.notifications.get_paginated(
+            notifications, total_count = await self.uow.notifications.get_paginated(
                 user_id=user_id,
-                is_read=is_read,
-                limit_amount=limit_amount,
+                is_read=resolved_is_read,
+                limit=limit,
                 offset=offset,
+                services=services,
+                notification_types=notification_types,
             )
             unread_count = await self.uow.notifications.get_unread_count(user_id)
 
         return api_schemas.PaginatedNotificationsResponse(
-            total=total,
+            total_count=total_count,
             unread_count=unread_count,
             items=[
                 self._notification_to_response(notification)
                 for notification in notifications
             ],
         )
+
+    @staticmethod
+    def _resolve_is_read_filter(
+        statuses: list[NotificationStatus] | None,
+    ) -> bool | None:
+        """Возвращает is_read-фильтр по статусам уведомлений."""
+        if not statuses:
+            return None
+
+        unique_statuses = set(statuses)
+        if len(unique_statuses) != 1:
+            return None
+
+        status_value = next(iter(unique_statuses))
+        return status_value == NotificationStatus.READ
 
     async def get_unread_count(
         self,

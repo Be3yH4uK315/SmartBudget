@@ -88,6 +88,7 @@ class CategoryLimit(Base):
     category_id = Column(Integer, nullable=False)
     limit_amount = Column(DECIMAL(18, 2), nullable=False, default=0)
     spent_amount = Column(DECIMAL(18, 2), nullable=False, default=0)
+    income_amount = Column(DECIMAL(18, 2), nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -102,7 +103,7 @@ class CategoryLimit(Base):
         ),
     )
 
-    @validates("limit_amount", "spent_amount")
+    @validates("limit_amount", "spent_amount", "income_amount")
     def validate_category_decimals(self, key: str, value) -> Decimal:
         """Валидирует денежные поля лимита категории."""
         resolved_value = value if isinstance(value, Decimal) else Decimal(str(value))
@@ -128,7 +129,7 @@ class ProcessedBudgetTransaction(Base):
     category_id = Column(Integer, nullable=True)
     amount = Column(DECIMAL(18, 2), nullable=False)
     transaction_type = Column(String(50), nullable=False)
-    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -150,7 +151,7 @@ class ProcessedBudgetTransaction(Base):
             "user_id",
             "month",
         ),
-        Index("ix_processed_budget_transactions_occurred_at", "occurred_at"),
+        Index("ix_processed_budget_transactions_occurred_at", "date"),
     )
 
 

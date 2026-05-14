@@ -132,6 +132,9 @@ services:
     volumes:
       - ../../services/authentification:/app
       - ../../services/authentification/certs:/app/certs
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     restart: unless-stopped
     command: >
       sh -c "
@@ -163,6 +166,9 @@ services:
     volumes:
       - ../../services/authentification:/app
       - ../../services/authentification/certs:/app/certs
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -211,6 +217,9 @@ services:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: >
       sh -c "
         alembic upgrade head &&
@@ -243,6 +252,9 @@ services:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -271,6 +283,9 @@ services:
       - ../../services/classification:/app
       - models_data:/models
       - datasets_data:/app/datasets
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
@@ -318,6 +333,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/transactions:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     restart: unless-stopped
     command: >
       sh -c "
@@ -347,6 +365,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/transactions:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
@@ -373,6 +394,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/transactions:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -420,6 +444,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/budgets:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     restart: unless-stopped
     command: >
       sh -c "
@@ -449,6 +476,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/budgets:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
@@ -475,6 +505,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/budgets:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -524,6 +557,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     restart: unless-stopped
     command: >
       sh -c "
@@ -554,6 +590,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -579,6 +618,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/goals:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:
@@ -627,6 +669,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/notifications:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     restart: unless-stopped
     command: >
       sh -c "
@@ -657,6 +702,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/notifications:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -682,6 +730,9 @@ services:
         condition: service_healthy
     volumes:
       - ../../services/notifications:/app
+      - ../../shared/python:/shared/python:ro
+    environment:
+      PYTHONPATH: /app:/shared/python
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:

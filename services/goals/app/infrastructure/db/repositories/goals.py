@@ -173,7 +173,7 @@ class GoalRepository:
             ),
         ).where(
             models.ProcessedTransaction.goal_id == goal_id,
-            models.ProcessedTransaction.occurred_at >= start_of_month,
+            models.ProcessedTransaction.date >= start_of_month,
         )
 
         result = await self.db.execute(query)
@@ -189,7 +189,7 @@ class GoalRepository:
         transaction_id: UUID,
         raw_amount: Decimal,
         transaction_type: str,
-        occurred_at: datetime,
+        date: datetime,
     ) -> models.Goal | None:
         """Обновляет баланс цели на основе входящей транзакции."""
         insert_transaction = insert(models.ProcessedTransaction).values(
@@ -197,7 +197,7 @@ class GoalRepository:
             goal_id=goal_id,
             amount=raw_amount,
             transaction_type=transaction_type,
-            occurred_at=occurred_at,
+            date=date,
         )
 
         try:
@@ -518,8 +518,8 @@ class GoalRepository:
                 models.ProcessedTransaction.goal_id == models.Goal.goal_id,
                 models.ProcessedTransaction.transaction_type
                 == TransactionType.INCOME.value,
-                models.ProcessedTransaction.occurred_at >= period_start,
-                models.ProcessedTransaction.occurred_at < period_end,
+                models.ProcessedTransaction.date >= period_start,
+                models.ProcessedTransaction.date < period_end,
             )
             .exists()
         )

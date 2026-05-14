@@ -219,13 +219,11 @@ def _transaction_category_changed_payload(
     event: EventEnvelope[TransactionCategoryChangedPayload],
 ) -> dict[str, Any]:
     """Преобразует transaction.category.changed в payload уведомления."""
-    return _compact_payload(
-        {
-            "transaction_id": _uuid_to_str(event.payload.transaction_id),
-            "old_category_id": event.payload.old_category_id,
-            "new_category_id": event.payload.new_category_id,
-        },
-    )
+    return {
+        "transaction_id": _uuid_to_str(event.payload.transaction_id),
+        "old_category_id": event.payload.old_category_id,
+        "new_category_id": event.payload.new_category_id,
+    }
 
 
 class KafkaConsumerWorker:
@@ -424,7 +422,7 @@ class KafkaConsumerWorker:
                 event_type=event.event_type,
                 user_id=event.payload.user_id,
                 payload=_auth_notification_payload(event),
-                timestamp=event.occurred_at,
+                timestamp=event.date,
             ),
         )
 
@@ -442,7 +440,7 @@ class KafkaConsumerWorker:
                 event_type=event.event_type,
                 user_id=event.payload.user_id,
                 payload=_budget_notification_payload(event),
-                timestamp=event.occurred_at,
+                timestamp=event.date,
             ),
         )
 
@@ -460,7 +458,7 @@ class KafkaConsumerWorker:
                 event_type=event.event_type,
                 user_id=event.payload.user_id,
                 payload=_goal_notification_payload(event),
-                timestamp=event.occurred_at,
+                timestamp=event.date,
             ),
         )
 
@@ -480,7 +478,7 @@ class KafkaConsumerWorker:
                     event_type=event.event_type,
                     user_id=event.payload.user_id,
                     payload=_transaction_unclassified_payload(event),
-                    timestamp=event.occurred_at,
+                    timestamp=event.date,
                 ),
             )
             return
@@ -493,7 +491,7 @@ class KafkaConsumerWorker:
                     event_type=event.event_type,
                     user_id=event.payload.user_id,
                     payload=_transaction_category_changed_payload(event),
-                    timestamp=event.occurred_at,
+                    timestamp=event.date,
                 ),
             )
             return

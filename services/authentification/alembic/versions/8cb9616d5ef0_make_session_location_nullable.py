@@ -1,8 +1,8 @@
 """initial authentification schema
 
-Revision ID: 20260508_auth_location_nullable
+Revision ID: 8cb9616d5ef0
 Revises:
-Create Date: 2026-05-08 00:00:00.000000+00:00
+Create Date: 2026-05-08 12:11:58.450266+00:00
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = "20260508_auth_location_nullable"
+revision: str = "8cb9616d5ef0"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

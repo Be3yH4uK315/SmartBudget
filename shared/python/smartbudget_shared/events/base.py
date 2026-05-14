@@ -73,7 +73,7 @@ class EventEnvelope(BaseModel, Generic[PayloadT]):
     event_type: str = Field(..., description="Строковый тип события")
     source_service: str = Field(..., description="Сервис-источник события")
     version: int = Field(default=1, ge=1, description="Версия контракта события")
-    occurred_at: datetime = Field(
+    date: datetime = Field(
         default_factory=utc_now,
         description="Время возникновения события",
     )
@@ -108,7 +108,7 @@ class EventEnvelope(BaseModel, Generic[PayloadT]):
         payload: PayloadT,
         event_id: UUID | None = None,
         version: int = 1,
-        occurred_at: datetime | None = None,
+        date: datetime | None = None,
         aggregate_id: UUID | None = None,
         user_id: UUID | None = None,
         correlation_id: UUID | None = None,
@@ -121,7 +121,7 @@ class EventEnvelope(BaseModel, Generic[PayloadT]):
             event_type=str(enum_value(event_type)),
             source_service=str(enum_value(source_service)),
             version=version,
-            occurred_at=occurred_at or utc_now(),
+            date=date or utc_now(),
             aggregate_id=aggregate_id,
             user_id=user_id,
             correlation_id=correlation_id,

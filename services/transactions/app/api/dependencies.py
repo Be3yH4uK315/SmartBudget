@@ -92,7 +92,7 @@ class TransactionFilters:
 
     def __init__(
         self,
-        limit_amount: int = Query(50, ge=1, le=1000, alias="limitAmount"),
+        limit: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
         category_id: str | None = Query(None, alias="categoryId"),
         category_ids: str | None = Query(None, alias="categoryIds"),
@@ -120,7 +120,7 @@ class TransactionFilters:
                 detail="amountFrom must be less than or equal to amountTo",
             )
 
-        self.limit_amount = limit_amount
+        self.limit = limit
         self.offset = offset
         self.category_ids = _parse_category_ids(category_ids or category_id)
         self.occurred_from = (

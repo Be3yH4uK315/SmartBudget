@@ -42,7 +42,7 @@ class NotificationResponse(CamelModel):
 class PaginatedNotificationsResponse(CamelModel):
     """Ответ для списка уведомлений с пагинацией."""
 
-    total: int = Field(..., ge=0, description="Всего уведомлений")
+    total_count: int = Field(..., ge=0, description="Всего уведомлений")
     unread_count: int = Field(..., ge=0, description="Количество непрочитанных")
     items: list[NotificationResponse] = Field(
         default_factory=list,

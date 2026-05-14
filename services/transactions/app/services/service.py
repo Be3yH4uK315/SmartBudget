@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from app.core import exceptions
 from app.core.config import settings
@@ -140,7 +140,7 @@ class TransactionService:
         transaction_type: enums.TransactionType | None = None,
         amount_from: Decimal | None = None,
         amount_to: Decimal | None = None,
-    ) -> api_schemas.ListTransactionsResponse:
+    ) -> list[api_schemas.TransactionResponse]:
         """Возвращает список транзакций пользователя с фильтрацией."""
         async with self.uow:
             transactions = await self.uow.transactions.list_user_transactions(
@@ -155,20 +155,18 @@ class TransactionService:
                 amount_to=amount_to,
             )
 
-        return api_schemas.ListTransactionsResponse(
-            transactions=[_model_to_api(transaction) for transaction in transactions],
-        )    
+        return [_model_to_api(transaction) for transaction in transactions]
 
     async def search_transactions(
         self,
         user_id: UUID,
         query: str,
         limit_amount: int,
-    ) -> api_schemas.SearchTransactionsResponse:
+    ) -> list[api_schemas.TransactionResponse]:
         """Ищет транзакции пользователя по merchant или description."""
         normalized_query = query.strip()
         if not normalized_query:
-            return api_schemas.SearchTransactionsResponse(transactions=[])
+            return []
 
         async with self.uow:
             transactions = await self.uow.transactions.search_user_transactions(
@@ -177,9 +175,7 @@ class TransactionService:
                 limit_amount=limit_amount,
             )
 
-        return api_schemas.SearchTransactionsResponse(
-            transactions=[_model_to_api(transaction) for transaction in transactions],
-        )
+        return [_model_to_api(transaction) for transaction in transactions]
 
     async def get_transaction(
         self,
@@ -312,7 +308,7 @@ class TransactionService:
         self,
         user_id: UUID,
         account_id: UUID,
-    ) -> api_schemas.GoalTransactionsByMonthResponse:
+    ) -> list[api_schemas.TransactionsByMonthResponse]:
         """Возвращает транзакции цели, агрегированные по месяцам."""
         async with self.uow:
             rows = await self.uow.transactions.aggregate_by_month_for_account(
@@ -320,16 +316,14 @@ class TransactionService:
                 account_id,
             )
 
-        return api_schemas.GoalTransactionsByMonthResponse(
-            items=[
-                api_schemas.TransactionsByMonthResponse(
-                    amount=amount,
-                    period_start=period_start,
-                    transaction_type=enums.TransactionType(transaction_type),
+        return [
+            api_schemas.TransactionsByMonthResponse(
+                amount=amount,
+                period_start=period_start,
+                transaction_type=enums.TransactionType(transaction_type),
                 )
                 for amount, period_start, transaction_type in rows
-            ],
-        )
+            ]
 
     async def apply_classification(
         self,
@@ -603,7 +597,7 @@ class TransactionService:
 
         return models.Transaction(
             user_id=user_id,
-            transaction_id=uuid4(),
+            transaction_id=request.transaction_id,
             account_id=request.account_id,
             category_id=category_id,
             date=_ensure_aware(request.date or now),

@@ -25,7 +25,7 @@ export const GoalsStats = React.memo(
     const hasDays = typeof daysLeft === 'number'
     const remaining = Math.max(targetAmount - currentAmount, 0)
     const nextPeriod = hasDays
-      ? Math.min(daysLeft, dayjs().endOf('month').diff(dayjs().startOf('day'), 'day'))
+      ? Math.min(daysLeft, dayjs().endOf('month').diff(dayjs().startOf('day'), 'day')) + 1
       : 0
 
     const paymentLabel =
