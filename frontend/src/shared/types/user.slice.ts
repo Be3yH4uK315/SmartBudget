@@ -6,6 +6,7 @@ export type userSliceState = {
   name: string
   email: string
   isAuth: boolean
+  unreadCount: number
 }
 
 export type userSliceReducers = SliceCaseReducers<userSliceState> & {

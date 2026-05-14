@@ -16,3 +16,19 @@ export const getUserInfo = createAsyncThunk<User, void, { rejectValue: 'noInfo' 
     return user
   },
 )
+
+export const getUnreadNotificationsCount = createAsyncThunk<
+  { unreadCount: number },
+  void,
+  { rejectValue: 'cannotGetUnreadCount' }
+>('getUnreadNotificationsCount', async (_, { rejectWithValue }) => {
+  try {
+    const response = await user_api.getUnreadNotificationsCount()
+
+    return response
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotGetUnreadCount', type: 'error' })
+
+    return rejectWithValue('cannotGetUnreadCount')
+  }
+})
