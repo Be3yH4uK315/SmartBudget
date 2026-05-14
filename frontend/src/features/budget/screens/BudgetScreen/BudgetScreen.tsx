@@ -150,7 +150,7 @@ export default function BudgetScreen() {
 
             {limited.length !== 0 && <CategoriesBlock categories={limited} />}
 
-            <CategoriesBlock categories={unlimited} isLimited={false} />
+            {unlimited.length !== 0 && <CategoriesBlock categories={unlimited} isLimited={false} />}
           </Stack>
         </Stack>
       </Stack>
