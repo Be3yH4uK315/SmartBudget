@@ -1,5 +1,5 @@
 import { NOTIFICATIONS_LIMIT } from '@features/notifications/constants'
-import { Notification, NotificationsListResponse } from '@features/notifications/types'
+import { NotificationsListResponse } from '@features/notifications/types'
 import { Transaction } from '@features/transactions/types'
 import { api } from '@shared/api'
 
