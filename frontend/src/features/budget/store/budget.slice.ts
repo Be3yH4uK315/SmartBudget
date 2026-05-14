@@ -9,7 +9,7 @@ export const budgetSlice = createSlice<BudgetSliceState, BudgetSliceReducers, 'b
   initialState: getBudgetInitialState(),
   reducers: {
     clearBudgetState() {
-      getBudgetInitialState()
+      return getBudgetInitialState()
     },
   },
 

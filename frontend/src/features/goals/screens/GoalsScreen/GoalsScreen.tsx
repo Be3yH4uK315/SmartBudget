@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { goalsApi, goalsMock } from '@features/goals/api'
+import { goalsApi } from '@features/goals/api'
 import { GoalSearchItem, GoalsStats } from '@features/goals/components'
 import { useGoalsFilters } from '@features/goals/hooks'
 import { selectGoals, selectGoalsStats, selectIsGoalsLoading } from '@features/goals/store/goals'

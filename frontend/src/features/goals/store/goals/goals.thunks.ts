@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { goalsApi, goalsMock } from '@features/goals/api'
+import { goalsApi } from '@features/goals/api'
 import { EditGoalPayload, GoalsFilters, SimplifiedGoal } from '@features/goals/types'
 import { getGoalsStats } from '@features/goals/utils'
 import { createAsyncThunk } from '@reduxjs/toolkit'
