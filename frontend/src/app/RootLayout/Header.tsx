@@ -19,6 +19,7 @@ import { useAppDispatch } from '@shared/store'
 import { logoutHelper } from '@shared/utils'
 import { Link as RouterLink, useLocation } from 'react-router'
 import { LanguageMenu } from './LanguageMenu'
+import { NotificationsButton } from './NotificationsButton'
 import { ThemeButton } from './ThemeButton'
 
 export const Header = () => {
@@ -39,7 +40,6 @@ export const Header = () => {
       { label: translate('budget'), to: ROUTES.PAGES.BUDGET },
       { label: translate('goals'), to: ROUTES.PAGES.GOALS.MAIN },
       { label: translate('transactions'), to: ROUTES.PAGES.TRANSACTIONS },
-      { label: translate('notifications'), to: ROUTES.PAGES.NOTIFICATIONS },
       { label: translate('settings'), to: ROUTES.PAGES.SETTINGS.MAIN },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,9 +99,11 @@ export const Header = () => {
 
             <Box sx={{ flexGrow: 1 }} />
 
-            <LanguageMenu />
+            <NotificationsButton />
 
             <ThemeButton />
+
+            <LanguageMenu />
 
             <Button
               onClick={handleLogout}
@@ -168,6 +170,8 @@ export const Header = () => {
             </Menu>
 
             <Box sx={{ flexGrow: 1 }} />
+
+            <NotificationsButton />
 
             <ThemeButton />
 
