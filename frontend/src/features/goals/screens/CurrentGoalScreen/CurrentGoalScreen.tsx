@@ -56,7 +56,7 @@ export default function GoalScreen() {
     isArchived,
   } = goal
 
-  const { activeType, toggleFilter, normalizedData } = useTransactionFilters(
+  const { activeType, toggleFilter, normalizedData, total } = useTransactionFilters(
     transactions,
     mapGoalTransaction,
     'income',
@@ -64,7 +64,7 @@ export default function GoalScreen() {
 
   const centerLabel: CenterLabel = {
     type: 'amount',
-    total: currentAmount,
+    total: activeType === 'income' ? currentAmount : total,
     label: translate(`TransactionsPieBlock.${activeType}`).toLowerCase(),
   }
 
