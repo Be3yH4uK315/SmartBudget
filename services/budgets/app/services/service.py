@@ -152,6 +152,25 @@ def _budget_to_response(budget: models.Budget) -> api_schemas.BudgetResponse:
     )
 
 
+def _budget_to_create_response(
+    budget: models.Budget,
+) -> api_schemas.CreateBudgetResponse:
+    """Преобразует Budget в response создания бюджета."""
+    categories = sorted(
+        budget.category_limits,
+        key=lambda item: item.category_id,
+    )
+
+    return api_schemas.CreateBudgetResponse(
+        budget_id=budget.budget_id,
+        total_limit_amount=budget.total_limit_amount,
+        total_income_amount=budget.total_income_amount,
+        spent_amount=_expense_total(budget),
+        is_auto_renew=budget.is_auto_renew,
+        categories=[_category_response(category) for category in categories],
+    )
+
+
 def _budget_to_settings_response(
     budget: models.Budget,
 ) -> api_schemas.BudgetSettingsResponse:
@@ -180,7 +199,7 @@ def _budget_to_dashboard_response(
         api_schemas.DashboardCategoryResponse(
             category_id=category.category_id,
             amount=category.spent_amount,
-            transaction_type="expense",
+            transaction_type=TransactionType.EXPENSE,
         )
         for category in sorted(
             budget.category_limits,
@@ -306,7 +325,7 @@ class BudgetService:
         user_id: UUID,
         request: api_schemas.CreateBudgetRequest,
         target_date: date | None = None,
-    ) -> str:
+    ) -> api_schemas.CreateBudgetResponse:
         """Создает бюджет пользователя."""
         _ensure_unique_categories(request.categories)
 
@@ -343,17 +362,18 @@ class BudgetService:
                     budget=budget,
                 )
 
+                return _budget_to_create_response(budget)
+
         except IntegrityError as exc:
             raise exceptions.BudgetAlreadyExistsError("Budget already exists") from exc
 
-        return str(budget_id)
 
     async def patch_budget(
         self,
         user_id: UUID,
         request: api_schemas.PatchBudgetRequest,
         target_date: date | None = None,
-    ) -> None:
+    ) -> api_schemas.PatchBudgetResponse:
         """Создает или обновляет настройки бюджета пользователя."""
         if request.categories is not None:
             _ensure_unique_categories(request.categories)
@@ -377,8 +397,13 @@ class BudgetService:
                     budget=budget,
                 )
 
+                return api_schemas.PatchBudgetResponse(
+                    budget_id=budget.budget_id,
+                    updated=True,
+                )
+
         except IntegrityError:
-            await self._retry_patch_after_integrity_error(
+            return await self._retry_patch_after_integrity_error(
                 user_id=user_id,
                 request=request,
                 target_date=target_date,
@@ -728,7 +753,7 @@ class BudgetService:
         user_id: UUID,
         request: api_schemas.PatchBudgetRequest,
         target_date: date | None,
-    ) -> None:
+    ) -> api_schemas.PatchBudgetResponse:
         """Повторяет patch как update после конфликта уникальности."""
         logger.info(
             "Budget settings upsert conflicted, retrying as update",
@@ -758,6 +783,11 @@ class BudgetService:
             self._queue_budget_settings_changed_events(
                 user_id=user_id,
                 budget=budget,
+            )
+
+            return api_schemas.PatchBudgetResponse(
+                budget_id=budget.budget_id,
+                updated=True,
             )
 
     def _apply_new_transaction_to_budget(
@@ -980,7 +1010,6 @@ class BudgetService:
             ),
             event_type=event_type.value,
         )
-
 
     def _queue_category_budget_event(
         self,

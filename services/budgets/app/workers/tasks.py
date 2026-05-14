@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from app.infrastructure.db import models
 from app.infrastructure.db.uow import UnitOfWork
@@ -189,9 +190,9 @@ def _build_headers(event: models.OutboxEvent) -> list[tuple[str, bytes]]:
 def _apply_outbox_results(
     events: list[models.OutboxEvent],
     results: list[bool],
-) -> list:
+) -> list[UUID]:
     """Применяет результаты отправки Kafka batch к outbox events."""
-    successful_ids = []
+    successful_ids: list[UUID] = []
     now = datetime.now(timezone.utc)
 
     for event, success in zip(events, results, strict=False):

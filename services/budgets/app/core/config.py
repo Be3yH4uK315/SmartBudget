@@ -34,7 +34,7 @@ class KafkaSettings(BaseSettings):
         return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str]:
+    def consumer_topics(self) -> tuple[str, ...]:
         """Возвращает topics, которые читает budgets consumer."""
         return (self.KAFKA_TOPIC_TRANSACTION_EVENTS,)
 

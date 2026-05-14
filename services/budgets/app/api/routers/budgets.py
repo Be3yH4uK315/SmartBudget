@@ -37,6 +37,4 @@ async def create_budget(
     service: BudgetService = Depends(dependencies.get_budget_service),
 ):
     """Создает бюджет пользователя за выбранный месяц."""
-    budget_id = await service.create_budget(user_id, request, target_date)
-
-    return schemas.CreateBudgetResponse(budget_id=budget_id)
+    return await service.create_budget(user_id, request, target_date)

@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 from aiokafka import AIOKafkaConsumer
 from pydantic import TypeAdapter, ValidationError
@@ -35,6 +35,12 @@ ERROR_HEADER = "error"
 TransactionCreatedAdapter = TypeAdapter(EventEnvelope[TransactionPayload])
 TransactionUpdatedAdapter = TypeAdapter(EventEnvelope[TransactionUpdatedPayload])
 TransactionDeletedAdapter = TypeAdapter(EventEnvelope[TransactionDeletedPayload])
+
+BudgetConsumedEvent: TypeAlias = (
+    EventEnvelope[TransactionPayload]
+    | EventEnvelope[TransactionUpdatedPayload]
+    | EventEnvelope[TransactionDeletedPayload]
+)
 
 
 async def keep_alive_task() -> None:
@@ -191,7 +197,16 @@ class KafkaConsumerWorker:
 
         try:
             payload = _decode_message_value(message)
-            await self.process_payload(payload)
+            event = self._parse_event(payload)
+
+            if event is None:
+                logger.debug(
+                    "Kafka message skipped",
+                    extra={"topic": message.topic, "offset": message.offset},
+                )
+                return
+
+            await self.process_event(event)
 
             logger.info(
                 "Kafka message processed",
@@ -207,30 +222,37 @@ class KafkaConsumerWorker:
         finally:
             clear_request_id()
 
-    async def process_payload(
-        self,
-        payload: dict[str, Any],
-    ) -> None:
-        """Маршрутизирует Kafka envelope в обработчик budget service."""
-        service = BudgetService(UnitOfWork(self.db_session_maker))
+    def _parse_event(self, payload: dict[str, Any]) -> BudgetConsumedEvent | None:
+        """Парсит Kafka envelope по event_type."""
         event_type = payload.get("event_type")
 
         if event_type == TransactionEventType.TRANSACTION_CREATED.value:
-            event = TransactionCreatedAdapter.validate_python(payload)
+            return TransactionCreatedAdapter.validate_python(payload)
+
+        if event_type == TransactionEventType.TRANSACTION_UPDATED.value:
+            return TransactionUpdatedAdapter.validate_python(payload)
+
+        if event_type == TransactionEventType.TRANSACTION_DELETED.value:
+            return TransactionDeletedAdapter.validate_python(payload)
+
+        logger.debug("Kafka event ignored by budgets service: %s", event_type)
+        return None
+
+    async def process_event(self, event: BudgetConsumedEvent) -> None:
+        """Маршрутизирует событие транзакции в budget service."""
+        service = BudgetService(UnitOfWork(self.db_session_maker))
+
+        if event.event_type == TransactionEventType.TRANSACTION_CREATED.value:
             await service.process_new_transaction(event.payload)
             return
 
-        if event_type == TransactionEventType.TRANSACTION_UPDATED.value:
-            event = TransactionUpdatedAdapter.validate_python(payload)
+        if event.event_type == TransactionEventType.TRANSACTION_UPDATED.value:
             await service.process_updated_transaction(event.payload)
             return
 
-        if event_type == TransactionEventType.TRANSACTION_DELETED.value:
-            event = TransactionDeletedAdapter.validate_python(payload)
+        if event.event_type == TransactionEventType.TRANSACTION_DELETED.value:
             await service.process_deleted_transaction(event.payload)
             return
-
-        logger.debug("Kafka event ignored by budgets service: %s", event_type)
 
     async def send_to_dlq(
         self,

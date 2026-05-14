@@ -1,6 +1,9 @@
 from decimal import Decimal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.domain.enums import TransactionType
 
 
 def to_camel(string: str) -> str:
@@ -49,15 +52,7 @@ class PatchCategoryLimitRequest(CamelModel):
     """Запрос на обновление лимита категории."""
 
     category_id: int = Field(..., gt=0, description="ID категории")
-    limit_amount: Decimal = Field(default=0, ge=0, description="Новый лимит категории")
-
-    @model_validator(mode="after")
-    def require_limit(self):
-        """Проверяет, что limit_amount передан."""
-        if self.limit_amount is None:
-            raise ValueError("limitAmount is required")
-
-        return self
+    limit_amount: Decimal = Field(..., ge=0, description="Новый лимит категории")
 
 
 class PatchBudgetRequest(CamelModel):
@@ -84,6 +79,27 @@ class CategoryResponse(CamelModel):
     category_id: int = Field(..., description="ID категории")
     limit_amount: Decimal = Field(..., description="Лимит по категории")
     spent_amount: Decimal = Field(..., description="Потраченная сумма")
+
+
+class CreateBudgetResponse(CamelModel):
+    """Ответ после создания бюджета."""
+
+    budget_id: UUID = Field(..., description="ID созданного бюджета")
+    total_limit_amount: Decimal = Field(..., description="Общий лимит бюджета")
+    total_income_amount: Decimal = Field(..., description="Общая сумма доходов")
+    spent_amount: Decimal = Field(..., description="Потраченная сумма")
+    is_auto_renew: bool = Field(..., description="Автопродление бюджета")
+    categories: list[CategoryResponse] = Field(
+        default_factory=list,
+        description="Категории бюджета",
+    )
+
+
+class PatchBudgetResponse(CamelModel):
+    """Ответ после обновления бюджета."""
+
+    budget_id: UUID = Field(..., description="ID бюджета")
+    updated: bool = Field(..., description="Признак успешного обновления")
 
 
 class CategorySettingsResponse(CamelModel):
@@ -122,7 +138,7 @@ class DashboardCategoryResponse(CamelModel):
 
     category_id: int = Field(..., description="ID категории")
     amount: Decimal = Field(..., description="Сумма по категории")
-    transaction_type: str = Field(..., description="Тип транзакции")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
 
 
 class DashboardBudgetResponse(CamelModel):
@@ -136,7 +152,17 @@ class DashboardBudgetResponse(CamelModel):
     total_income_amount: Decimal = Field(..., description="Общая сумма доходов")
 
 
-class CreateBudgetResponse(CamelModel):
-    """Ответ после создания бюджета."""
+class HealthCheckResponse(CamelModel):
+    """Ответ health check."""
 
-    budget_id: str = Field(..., description="ID созданного бюджета")
+    status: str = Field(..., description="Статус сервиса")
+
+
+class ReadinessResponse(CamelModel):
+    """Ответ readiness check."""
+
+    status: str = Field(..., description="Статус готовности сервиса")
+    components: dict[str, str] = Field(
+        default_factory=dict,
+        description="Статусы внешних зависимостей",
+    )

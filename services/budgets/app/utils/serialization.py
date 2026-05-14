@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -15,7 +15,13 @@ def to_jsonable(value: Any) -> Any:
     if isinstance(value, UUID):
         return str(value)
 
-    if isinstance(value, (date, datetime)):
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+
+        return value.isoformat()
+
+    if isinstance(value, date):
         return value.isoformat()
 
     if isinstance(value, Enum):

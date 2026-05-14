@@ -2,7 +2,6 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Query
-from fastapi.responses import ORJSONResponse
 
 from app.api import dependencies
 from app.domain.schemas import api as schemas
@@ -27,6 +26,7 @@ async def get_budget_settings(
 
 @router.patch(
     "/budget",
+    response_model=schemas.PatchBudgetResponse,
     summary="Обновление настроек бюджета",
 )
 async def patch_budget_settings(
@@ -36,6 +36,4 @@ async def patch_budget_settings(
     service: BudgetService = Depends(dependencies.get_budget_service),
 ):
     """Обновляет настройки бюджета пользователя."""
-    await service.patch_budget(user_id, request, target_date)
-
-    return ORJSONResponse(content=None)
+    return await service.patch_budget(user_id, request, target_date)
