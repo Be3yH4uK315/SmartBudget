@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+
 export type DateBlock<T> = {
   date: string
   items: T[]
@@ -9,8 +11,15 @@ type MergeBlocksProps<T> = {
 }
 
 export function groupByDate<T extends { date: string }>(items: T[]): DateBlock<T>[] {
-  return items.reduce<DateBlock<T>[]>((blocks, item) => {
-    const date = item.date.split('T')[0]
+  const sortedItems = [...items].sort((a, b) => {
+    const dateA = dayjs.utc(a.date).local().valueOf()
+    const dateB = dayjs.utc(b.date).local().valueOf()
+    return dateB - dateA
+  })
+
+  return sortedItems.reduce<DateBlock<T>[]>((blocks, item) => {
+    const localDate = dayjs.utc(item.date).local()
+    const date = localDate.format('YYYY-MM-DD')
     const lastBlock = blocks[blocks.length - 1]
 
     if (lastBlock && lastBlock.date === date) {

@@ -14,7 +14,7 @@ class BudgetApi {
   async createBudget(payload: BudgetSettings): Promise<void> {
     const url = `${this.baseUrl}`
 
-    const response = await api.post<void>(url, { payload })
+    const response = await api.post<void>(url, payload)
     return response.data
   }
 }

@@ -28,7 +28,7 @@ export const NotificationsList = ({ isLast, isLoading, notifications }: Props) =
   }, [dispatch])
 
   const formatGroupDate = (inputDate: string) => {
-    const date = dayjs(inputDate)
+    const date = dayjs.utc(inputDate).local()
 
     if (date.isSame(dayjs(), 'day')) return translate('today')
     if (date.isSame(dayjs().subtract(1, 'day'), 'day')) return translate('yesterday')
