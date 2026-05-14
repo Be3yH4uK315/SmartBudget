@@ -43,8 +43,8 @@ class TransactionsApi {
   }
 
   async changeCategory(payload: Pick<Transaction, 'categoryId' | 'transactionId'>): Promise<void> {
-    const url = `${this.baseUrl}/edit/${payload.transactionId}`
-    const response = await api.patch<void>(url, payload.categoryId)
+    const url = `${this.baseUrl}/${payload.transactionId}`
+    const response = await api.patch<void>(url, { categoryId: payload.categoryId })
 
     return response.data
   }
