@@ -47,11 +47,16 @@ class GoalsApi {
     return response.data
   }
 
-  async editGoal(payload: EditGoalPayload): Promise<void> {
+  async editGoal(
+    payload: EditGoalPayload,
+  ): Promise<EditGoalPayload & { recommendedPayment: number | null }> {
     const { goalId, ...body } = payload
     const url = `${this.baseUrl}/${goalId}`
 
-    const response = await api.patch<void>(url, body)
+    const response = await api.patch<EditGoalPayload & { recommendedPayment: number | null }>(
+      url,
+      body,
+    )
     return response.data
   }
 

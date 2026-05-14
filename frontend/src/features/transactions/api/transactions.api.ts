@@ -13,11 +13,11 @@ class TransactionsApi {
       offset: String(offset),
       limit: String(PAGE_SIZE),
       ...(filters?.categoryIds?.length ? { categoryId: filters.categoryIds.join(',') } : {}),
-      ...(filters?.dateFrom ? { dateFrom: filters.dateFrom } : {}),
-      ...(filters?.dateTo ? { dateTo: filters.dateTo } : {}),
-      ...(filters?.type ? { type: filters.type } : {}),
-      ...(filters?.valueFrom !== undefined ? { valueFrom: String(filters.valueFrom) } : {}),
-      ...(filters?.valueTo !== undefined ? { valueTo: String(filters.valueTo) } : {}),
+      ...(filters?.dateFrom ? { occurredFrom: filters.dateFrom } : {}),
+      ...(filters?.dateTo ? { occurredTo: filters.dateTo } : {}),
+      ...(filters?.type ? { transactionType: filters.type } : {}),
+      ...(filters?.valueFrom !== undefined ? { amountFrom: String(filters.valueFrom) } : {}),
+      ...(filters?.valueTo !== undefined ? { amountTo: String(filters.valueTo) } : {}),
     }
 
     const response = await api.get<Transaction[]>(url, { params })

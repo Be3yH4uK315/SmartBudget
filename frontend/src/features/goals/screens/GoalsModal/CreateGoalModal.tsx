@@ -73,8 +73,8 @@ export const GoalModal = ({ onClose, goal }: Props) => {
             <TextField
               label={translate('Modal.value')}
               type="number"
-              value={values.targetValue}
-              onChange={handleChange('targetValue')}
+              value={values.targetAmount}
+              onChange={handleChange('targetAmount')}
               slotProps={{ htmlInput: { min: 1 } }}
               required
             />

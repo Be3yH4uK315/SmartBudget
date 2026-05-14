@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("account_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("category_id", sa.Integer(), nullable=True),
-        sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("date", sa.DateTime(timezone=True), nullable=False),
         sa.Column("amount", sa.Numeric(18, 2), nullable=False),
         sa.Column("transaction_type", sa.String(length=20), nullable=False),
         sa.Column("status", sa.String(length=20), nullable=False),
@@ -52,13 +52,13 @@ def upgrade() -> None:
     op.create_index(
         "ix_transactions_user_occurred",
         "transactions",
-        ["user_id", "occurred_at"],
+        ["user_id", "date"],
         unique=False,
     )
     op.create_index(
         "ix_transactions_filters_v2",
         "transactions",
-        ["user_id", "category_id", "transaction_type", "occurred_at"],
+        ["user_id", "category_id", "transaction_type", "date"],
         unique=False,
     )
 

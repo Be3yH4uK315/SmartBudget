@@ -4,20 +4,20 @@ import { api } from '@shared/api'
 class DashboardApi {
   baseUrl = '/dashboard'
 
-  async getDashboardGoals(): Promise<DashboardGoal[]> {
+  async getDashboardGoals(): Promise<{ goals: DashboardGoal[] }> {
     const url = `${this.baseUrl}/goals`
 
-    const response = await api.get<DashboardGoal[]>(url)
+    const response = await api.get<{ goals: DashboardGoal[] }>(url)
     return response.data
   }
 
   async getDashboardBudget(): Promise<{
     categories: DashboardCategory[]
-    budgetTotalLimit: number
+    totalLimitAmount: number
   }> {
     const url = `${this.baseUrl}/budget`
 
-    const response = await api.get<{ categories: DashboardCategory[]; budgetTotalLimit: number }>(
+    const response = await api.get<{ categories: DashboardCategory[]; totalLimitAmount: number }>(
       url,
     )
     return response.data

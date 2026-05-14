@@ -63,7 +63,7 @@ def _transaction_status(transaction: models.Transaction) -> enums.TransactionSta
 
 def _transaction_occurred_at(transaction: models.Transaction) -> datetime:
     """Возвращает время транзакции в UTC."""
-    return _ensure_aware(transaction.occurred_at)
+    return _ensure_aware(transaction.date)
 
 
 def _transaction_event_date(transaction: models.Transaction) -> datetime:
@@ -96,7 +96,7 @@ def _model_to_api(transaction: models.Transaction) -> api_schemas.TransactionRes
         merchant=transaction.merchant,
         mcc=transaction.mcc,
         status=_transaction_status(transaction),
-        occurred_at=_transaction_occurred_at(transaction),
+        date=_transaction_occurred_at(transaction),
         transaction_type=_transaction_type(transaction),
     )
 
@@ -110,7 +110,7 @@ def _model_to_detail(
         transaction_id=transaction.transaction_id,
         account_id=transaction.account_id,
         category_id=transaction.category_id,
-        occurred_at=_transaction_occurred_at(transaction),
+        date=_transaction_occurred_at(transaction),
         amount=_transaction_amount(transaction),
         transaction_type=_transaction_type(transaction),
         status=_transaction_status(transaction),
@@ -405,7 +405,7 @@ class TransactionService:
             merchant=transaction.merchant,
             mcc=transaction.mcc,
             description=transaction.description,
-            occurred_at=_transaction_occurred_at(transaction),
+            date=_transaction_occurred_at(transaction),
         )
         event = create_transaction_created_event(payload)
 
@@ -466,7 +466,7 @@ class TransactionService:
             ),
             amount=_transaction_amount(transaction),
             transaction_type=_transaction_type(transaction).value,
-            occurred_at=_transaction_event_date(transaction),
+            date=_transaction_event_date(transaction),
         )
         event = create_transaction_deleted_event(payload)
 
@@ -498,7 +498,7 @@ class TransactionService:
             merchant=transaction.merchant,
             mcc=transaction.mcc,
             description=transaction.description,
-            occurred_at=_transaction_occurred_at(transaction),
+            date=_transaction_occurred_at(transaction),
             old_category_id=old_category_id,
             new_category_id=new_category_id,
             old_amount=None,
@@ -522,7 +522,7 @@ class TransactionService:
             description=transaction.description,
             amount=_transaction_amount(transaction),
             transaction_type=_transaction_type(transaction).value,
-            occurred_at=_transaction_occurred_at(transaction),
+            date=_transaction_occurred_at(transaction),
         )
         event = create_transaction_need_category_event(payload)
 
@@ -563,7 +563,7 @@ class TransactionService:
             user_id=transaction.user_id,
             amount=_transaction_amount(transaction),
             transaction_type=_transaction_type(transaction).value,
-            occurred_at=_transaction_occurred_at(transaction),
+            date=_transaction_occurred_at(transaction),
         )
         event = create_transaction_goal_applied_event(payload)
 
@@ -600,7 +600,7 @@ class TransactionService:
             transaction_id=uuid4(),
             account_id=request.account_id,
             category_id=category_id,
-            occurred_at=_ensure_aware(request.occurred_at or now),
+            date=_ensure_aware(request.date or now),
             amount=request.amount,
             transaction_type=transaction_type.value,
             status=enums.TransactionStatus.CONFIRMED.value,
@@ -684,7 +684,7 @@ class TransactionService:
             transaction_id=item.transaction_id,
             account_id=item.account_id,
             category_id=category_id,
-            occurred_at=_ensure_aware(item.occurred_at),
+            date=_ensure_aware(item.date),
             amount=item.amount,
             transaction_type=transaction_type.value,
             status=(item.status or enums.TransactionStatus.PENDING).value,

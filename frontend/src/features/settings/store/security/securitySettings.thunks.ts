@@ -1,5 +1,4 @@
 import { settingsApi } from '@features/settings/api'
-import { settingsMock } from '@features/settings/api/settings.mock'
 import { changePasswordApiRequest, Session } from '@features/settings/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'

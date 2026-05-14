@@ -6,8 +6,8 @@ import { formatCurrency, formatPercent } from '@shared/utils'
 import dayjs from 'dayjs'
 
 type Props = {
-  targetValue: number
-  currentValue: number
+  targetAmount: number
+  currentAmount: number
   recommendedPayment?: number | null
   daysLeft?: number | null
 }
@@ -19,11 +19,11 @@ type BlockProps = {
 }
 
 export const GoalsStats = React.memo(
-  ({ targetValue, currentValue, recommendedPayment = null, daysLeft = null }: Props) => {
+  ({ targetAmount, currentAmount, recommendedPayment = null, daysLeft = null }: Props) => {
     const translate = useTranslate('Goals')
 
     const hasDays = typeof daysLeft === 'number'
-    const remaining = Math.max(targetValue - currentValue, 0)
+    const remaining = Math.max(targetAmount - currentAmount, 0)
     const nextPeriod = hasDays
       ? Math.min(daysLeft, dayjs().endOf('month').diff(dayjs().startOf('day'), 'day'))
       : 0
@@ -54,17 +54,17 @@ export const GoalsStats = React.memo(
       : [
           {
             type: 'percent',
-            value: currentValue / targetValue,
+            value: currentAmount / targetAmount,
             label: translate('GoalsStats.progress'),
           },
           {
             type: 'currency',
-            value: currentValue,
+            value: currentAmount,
             label: translate('GoalsStats.currentValue'),
           },
           {
             type: 'currency',
-            value: targetValue,
+            value: targetAmount,
             label: translate('GoalsStats.targetValue'),
           },
         ]

@@ -89,16 +89,16 @@ def _percent_used(spent_amount: Decimal, limit_amount: Decimal | None) -> int:
 
 
 def _threshold_crossed(
-    limitAmount: Decimal,
+    limit_amount: Decimal,
     before: Decimal,
     after: Decimal,
     ratio: Decimal,
 ) -> bool:
     """Проверяет пересечение порога лимита."""
-    if limitAmount <= 0:
+    if limit_amount <= 0:
         return False
 
-    boundary = limitAmount * ratio
+    boundary = limit_amount * ratio
 
     return before < boundary <= after
 
@@ -145,6 +145,7 @@ def _budget_to_response(budget: models.Budget) -> api_schemas.BudgetResponse:
 
     return api_schemas.BudgetResponse(
         total_limit_amount=budget.total_limit_amount,
+        total_income_amount=budget.total_income_amount,
         spent_amount=_expense_total(budget),
         is_auto_renew=budget.is_auto_renew,
         categories=[_category_response(category) for category in categories],
@@ -190,6 +191,7 @@ def _budget_to_dashboard_response(
     return api_schemas.DashboardBudgetResponse(
         categories=categories,
         total_limit_amount=budget.total_limit_amount,
+        total_income_amount=budget.total_income_amount,
     )
 
 
@@ -1100,6 +1102,7 @@ class BudgetService:
         """Возвращает пустой budget response."""
         return api_schemas.BudgetResponse(
             total_limit_amount=ZERO_AMOUNT,
+            total_income_amount=ZERO_AMOUNT,
             spent_amount=ZERO_AMOUNT,
             is_auto_renew=False,
             categories=[],
@@ -1120,4 +1123,5 @@ class BudgetService:
         return api_schemas.DashboardBudgetResponse(
             categories=[],
             total_limit_amount=ZERO_AMOUNT,
+            total_income_amount=ZERO_AMOUNT,
         )

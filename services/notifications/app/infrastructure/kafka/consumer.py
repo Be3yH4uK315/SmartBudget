@@ -50,12 +50,12 @@ TransactionCategoryChangedEventAdapter = TypeAdapter(
 )
 
 AUTH_PROFILE_EVENTS = {
-    AuthEventType.USER_REGISTERED.value,
     AuthEventType.PROFILE_UPDATED.value,
     AuthEventType.EMAIL_CHANGED.value,
 }
 
 AUTH_NOTIFICATION_EVENTS = {
+    AuthEventType.USER_REGISTERED.value,
     AuthEventType.DEVICE_NEW_LOGIN.value,
     AuthEventType.PASSWORD_CHANGED.value,
     AuthEventType.ACTIVITY_SUSPICIOUS.value,

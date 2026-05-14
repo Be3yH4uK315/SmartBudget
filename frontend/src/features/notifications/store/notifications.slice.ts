@@ -7,7 +7,7 @@ import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { groupByDate, mergeDateBlocks } from '@shared/utils'
 import { getNotificationsInitialState } from './notifications.state'
-import { getNotifications, markAllAsRead } from './notifications.thunks'
+import { getNotifications, markAllAsRead, markAsRead } from './notifications.thunks'
 
 export const notificationsSlice = createSlice<
   NotificationsSliceState,
@@ -62,6 +62,12 @@ export const notificationsSlice = createSlice<
       })
 
       .addCase(markAllAsRead.fulfilled, (state) => {
+        state.notifications.forEach((block) => {
+          block.items.forEach((notification) => {
+            notification.isRead = true
+          })
+        })
+
         state.isMarkLoading = false
       })
 
@@ -71,6 +77,20 @@ export const notificationsSlice = createSlice<
 
       .addCase(markAllAsRead.pending, (state) => {
         state.isMarkLoading = true
+      })
+
+      .addCase(markAsRead.fulfilled, (state, { meta }) => {
+        const id = meta.arg
+
+        state.notifications.forEach((block) => {
+          const notification = block.items.find((item) => item.notificationId === id)
+
+          if (notification) {
+            notification.isRead = true
+          }
+        })
+
+        state.isMarkLoading = false
       })
   },
 })

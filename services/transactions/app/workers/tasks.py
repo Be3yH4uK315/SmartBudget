@@ -82,7 +82,7 @@ async def process_outbox_task(ctx: dict[str, Any]) -> int:
     await touch_health_file()
 
     async with UnitOfWork(db_maker) as uow:
-        events = await uow.outbox.get_pending_events(limitAmount=OUTBOX_BATCH_SIZE)
+        events = await uow.outbox.get_pending_events(limit_amount=OUTBOX_BATCH_SIZE)
         if not events:
             return 0
 

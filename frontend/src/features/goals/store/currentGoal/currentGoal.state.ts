@@ -5,8 +5,8 @@ export function getCurrentGoalInitialState(): CurrentGoalSliceState {
     goal: {
       goalId: '',
       name: '',
-      targetValue: 0,
-      currentValue: 0,
+      targetAmount: 0,
+      currentAmount: 0,
       status: 'closed',
       isArchived: false,
       tags: [],

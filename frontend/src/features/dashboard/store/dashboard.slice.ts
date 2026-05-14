@@ -17,7 +17,7 @@ export const dashboardSlice = createSlice<
   extraReducers: (builder) => {
     builder
       .addCase(getDashboardBudget.fulfilled, (state, { payload }) => {
-        state.budgetLimit = payload.budgetTotalLimit
+        state.budgetLimit = payload.totalLimitAmount
         state.categories = payload.categories
         state.isBudgetLoading = false
       })

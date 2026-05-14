@@ -10,13 +10,13 @@ export type TransactionsApiRequestPayload = {
 export type Transaction = {
   transactionId: string
   /** Сумма */
-  value: number
+  amount: number
   /** ID категории */
   categoryId: Category
   /** Описание */
   description: string | null
   /** Продавец / название */
-  name: string
+  merchant: string
   /** МСС */
   mcc: string | null
   /** Статус */
@@ -24,7 +24,7 @@ export type Transaction = {
   /** Дата транзакции */
   date: string
   /** Тип транзакции */
-  type: TransactionType
+  transactionType: TransactionType
 }
 
 export type TransactionType = 'income' | 'expense'

@@ -1,9 +1,9 @@
 {
-  "limitAmount.preOverflow.title": "Близость к лимиту категории",
-  "limitAmount.preOverflow.message": "Расходы по категории {category_id} достигли {percent}% от лимита. Потрачено {spent_amount} из {limit_amount}.",
+  "limit.preOverflow.title": "Близость к лимиту категории",
+  "limit.preOverflow.message": "Расходы по категории {category_id} достигли {percent}% от лимита. Потрачено {spent_amount} из {limit_amount}.",
 
-  "limitAmount.overflow.title": "Лимит категории превышен",
-  "limitAmount.overflow.message": "Лимит по категории {category_id} превышен. Потрачено {spent_amount} из {limit_amount}.",
+  "limit.overflow.title": "Лимит категории превышен",
+  "limit.overflow.message": "Лимит по категории {category_id} превышен. Потрачено {spent_amount} из {limit_amount}.",
 
   "Budget.checkResults.title": "Проверка бюджета завершена",
   "Budget.checkResults.message": "Проверка бюджета завершена. Превышений общего бюджета: {total_exceeded_count}, превышений категорий: {category_exceeded_count}.",
@@ -40,6 +40,9 @@
 
   "Transactions.categoryChanged.title": "Категория транзакции изменена",
   "Transactions.categoryChanged.message": "Транзакция {transaction_id}: категория {old_category_id} заменена на {new_category_id}.",
+
+  "Security.registration.title": "Регистрация завершена",
+  "Security.registration.message": "Аккаунт успешно создан. Добро пожаловать в SmartBudget!",
 
   "Security.newLogin.title": "Новый вход",
   "Security.newLogin.message": "Выполнен новый вход в аккаунт.",

@@ -1,7 +1,6 @@
-from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends
 
 from app.api import dependencies
 from app.domain.schemas import api as schemas
@@ -43,25 +42,12 @@ async def update_settings(
     summary="Включить/выключить уведомления",
 )
 async def update_notifications_status(
-    payload: Any = Body(...),
+    request: schemas.NotificationStatusUpdate = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
 ):
-    """Включает или выключает уведомления пользователя."""
-    notifications_status = _extract_notifications_status(payload)
-
-    return await service.update_notifications_status(user_id, notifications_status)
-
-
-def _extract_notifications_status(payload: Any) -> bool:
-    """Извлекает boolean status из body."""
-    if isinstance(payload, bool):
-        return payload
-
-    if isinstance(payload, dict) and isinstance(payload.get("status"), bool):
-        return payload["status"]
-
-    raise HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail="Payload must be boolean or object with boolean 'status'",
+    """Включает или выключает все уведомления пользователя."""
+    return await service.update_notifications_status(
+        user_id,
+        request.notifications_status,
     )

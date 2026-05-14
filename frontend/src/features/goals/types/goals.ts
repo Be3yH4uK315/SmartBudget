@@ -5,8 +5,8 @@ export type GoalStatus = 'ongoing' | 'achieved' | 'expired' | 'closed'
 export type Goal = {
   goalId: string
   name: string
-  targetValue: number
-  currentValue: number
+  targetAmount: number
+  currentAmount: number
   status: GoalStatus
   isArchived: boolean
   tags: Tag[]
@@ -19,15 +19,15 @@ export type Goal = {
 export type SimplifiedGoal = Omit<Goal, 'daysLeft' | 'recommendedPayment'>
 
 export type GoalTransaction = {
-  date: string
-  value: number
-  type: 'income' | 'expense'
+  periodStart: string
+  amount: number
+  transactionType: 'income' | 'expense'
 }
 
 export type EditGoalPayload = {
   goalId: string
   name: string
-  targetValue: number
+  targetAmount: number
   tags: Tag[]
   priority: Priority | null
   status: GoalStatus
@@ -35,13 +35,13 @@ export type EditGoalPayload = {
 }
 
 export type GoalsStats = {
-  targetValue: number
-  currentValue: number
+  targetAmount: number
+  currentAmount: number
 }
 
 export type ModalFormValues = {
   name: string
-  targetValue: number | ''
+  targetAmount: number | ''
   finishDate: string | null
   tags: Tag[]
   priority: Priority | null

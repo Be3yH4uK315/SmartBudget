@@ -29,7 +29,7 @@ class ModelRepository(BaseRepository):
             select(ClassificationModel)
             .where(ClassificationModel.is_active.is_(False))
             .order_by(ClassificationModel.created_at.desc())
-            .limitAmount(1),
+            .limit_amount(1),
         )
 
         return result.scalar_one_or_none()
@@ -73,7 +73,7 @@ class DatasetRepository(BaseRepository):
             select(TrainingDataset)
             .where(TrainingDataset.status == TrainingDatasetStatus.READY)
             .order_by(TrainingDataset.created_at.desc())
-            .limitAmount(1),
+            .limit_amount(1),
         )
 
         return result.scalar_one_or_none()

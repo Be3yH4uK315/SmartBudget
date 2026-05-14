@@ -49,11 +49,7 @@ class PatchCategoryLimitRequest(CamelModel):
     """Запрос на обновление лимита категории."""
 
     category_id: int = Field(..., gt=0, description="ID категории")
-    limit_amount: Decimal | None = Field(
-        default=None,
-        ge=0,
-        description="Новый лимит категории",
-    )
+    limit_amount: Decimal = Field(default=0, ge=0, description="Новый лимит категории")
 
     @model_validator(mode="after")
     def require_limit(self):
@@ -101,6 +97,7 @@ class BudgetResponse(CamelModel):
     """Ответ с бюджетом пользователя."""
 
     total_limit_amount: Decimal = Field(..., description="Общий лимит бюджета")
+    total_income_amount: Decimal = Field(..., description="Общая сумма доходов")
     spent_amount: Decimal = Field(..., description="Потраченная сумма")
     is_auto_renew: bool = Field(..., description="Автопродление бюджета")
     categories: list[CategoryResponse] = Field(
@@ -136,6 +133,7 @@ class DashboardBudgetResponse(CamelModel):
         description="Категории для главного экрана",
     )
     total_limit_amount: Decimal = Field(..., description="Общий лимит бюджета")
+    total_income_amount: Decimal = Field(..., description="Общая сумма доходов")
 
 
 class CreateBudgetResponse(CamelModel):

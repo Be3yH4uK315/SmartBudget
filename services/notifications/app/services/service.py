@@ -72,15 +72,14 @@ class NotificationService:
                     email=email,
                     language=language,
                 )
+                action = "Synchronized profile"
             else:
                 await self._get_or_create_settings_in_uow(user_id)
+                action = "Ensured placeholder notification settings"
 
             await self.uow.commit()
 
-        logger.info(
-            "Synchronized profile for user %s from auth event",
-            user_id,
-        )
+        logger.info("%s for user %s from auth event", action, user_id)
 
     async def process_incoming_event(
         self,
@@ -139,7 +138,7 @@ class NotificationService:
         self,
         user_id: UUID,
         is_read: bool | None,
-        limitAmount: int,
+        limit_amount: int,
         offset: int,
     ) -> list[api_schemas.NotificationResponse]:
         """Получает историю уведомлений пользователя для UI."""
@@ -147,7 +146,7 @@ class NotificationService:
             notifications = await self.uow.notifications.list_paginated(
                 user_id,
                 is_read,
-                limitAmount,
+                limit_amount,
                 offset,
             )
 
@@ -214,15 +213,19 @@ class NotificationService:
         user_id: UUID,
         request: api_schemas.NotificationSettingsUpdate,
     ) -> api_schemas.NotificationSettingsResponse:
-        """Обновляет настройки уведомлений пользователя."""
+        """Обновляет частичные настройки уведомлений пользователя."""
         async with self.uow:
-            await self._get_or_create_settings_in_uow(user_id)
+            settings = await self._get_or_create_settings_in_uow(user_id)
+
+            if not settings.notifications_enabled:
+                raise exceptions.InvalidNotificationDataError(
+                    "Notifications are disabled",
+                )
 
             changes = self._settings_update_to_changes(request)
 
-            if not request.notifications_status:
+            if changes.get("push_enabled") is True and not settings.push_subscriptions:
                 changes["push_enabled"] = False
-                changes["email_enabled"] = False
 
             updated_settings = await self.uow.settings.update_settings(
                 user_id,
@@ -243,30 +246,34 @@ class NotificationService:
         user_id: UUID,
         notifications_status: bool,
     ) -> api_schemas.NotificationSettingsResponse:
-        """Включает или выключает уведомления пользователя."""
-        changes: dict[str, bool] = {
-            "notifications_enabled": notifications_status,
-        }
-
-        if not notifications_status:
-            changes["push_enabled"] = False
-            changes["email_enabled"] = False
-
+        """Включает или выключает все уведомления пользователя."""
         async with self.uow:
-            settings = await self.uow.settings.update_settings(user_id, changes)
+            settings = await self._get_or_create_settings_in_uow(user_id)
 
-            if not settings:
-                await self._get_or_create_settings_in_uow(user_id)
-                settings = await self.uow.settings.update_settings(user_id, changes)
+            changes: dict[str, bool] = {
+                "notifications_enabled": notifications_status,
+            }
 
-            if not settings:
+            if notifications_status:
+                changes["email_enabled"] = True
+                changes["push_enabled"] = bool(settings.push_subscriptions)
+            else:
+                changes["email_enabled"] = False
+                changes["push_enabled"] = False
+
+            updated_settings = await self.uow.settings.update_settings(
+                user_id,
+                changes,
+            )
+
+            if not updated_settings:
                 raise exceptions.InvalidNotificationDataError(
                     "Notification settings were not created",
                 )
 
             await self.uow.commit()
 
-        return self._settings_to_response(settings)
+        return self._settings_to_response(updated_settings)
 
     async def subscribe_push(
         self,
@@ -375,6 +382,19 @@ class NotificationService:
         """Ставит email/push доставки в ARQ."""
         if not self.arq_pool:
             return
+
+        logger.info(
+            "Notification delivery resolved",
+            extra={
+                "user_id": str(user_id),
+                "channels": list(channels),
+                "email_enabled": settings.email_enabled,
+                "push_enabled": settings.push_enabled,
+                "has_push_subscriptions": bool(settings.push_subscriptions),
+                "push_subscriptions_count": len(settings.push_subscriptions or []),
+                "smtp_enabled": config.settings.SMTP.SMTP_ENABLED,
+            },
+        )
 
         if self._should_send_email(channels, settings):
             await self.arq_pool.enqueue_job(
@@ -513,10 +533,23 @@ class NotificationService:
         settings: _NotificationSettingsRow,
     ) -> api_schemas.NotificationSettingsResponse:
         """Преобразует настройки пользователя в API response."""
+        if not settings.notifications_enabled:
+            return api_schemas.NotificationSettingsResponse(
+                notifications_status=False,
+                push_status=False,
+                email_status=False,
+                goals=False,
+                transactions=False,
+                budget=api_schemas.BudgetNotificationSettings(
+                    total_limit=False,
+                    categories_limit=False,
+                ),
+            )
+
         disabled = set(settings.disabled_services or [])
 
         return api_schemas.NotificationSettingsResponse(
-            notifications_status=settings.notifications_enabled,
+            notifications_status=True,
             push_status=settings.push_enabled,
             email_status=settings.email_enabled,
             goals=NotificationServiceType.GOALS.value not in disabled,
@@ -532,7 +565,7 @@ class NotificationService:
     def _settings_update_to_changes(
         request: api_schemas.NotificationSettingsUpdate,
     ) -> dict[str, bool | list[str]]:
-        """Преобразует API request настроек в изменения для БД."""
+        """Преобразует API request частичных настроек в изменения для БД."""
         disabled_services: list[str] = []
 
         if not request.goals:
@@ -548,7 +581,6 @@ class NotificationService:
             disabled_services.append(NotificationServiceType.CATEGORY_LIMITS.value)
 
         return {
-            "notifications_enabled": request.notifications_status,
             "push_enabled": request.push_status,
             "email_enabled": request.email_status,
             "disabled_services": disabled_services,

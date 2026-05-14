@@ -8,8 +8,8 @@ export function getGoalsInitialState(): GoalsSliceState {
     isCreateLoading: false,
 
     goalsStats: {
-      targetValue: 0,
-      currentValue: 0,
+      targetAmount: 0,
+      currentAmount: 0,
     },
   }
 }

@@ -106,6 +106,11 @@ export const notificationsDict: LocaleDictionary = {
       },
 
       Security: {
+        registration: {
+          title: 'Регистрация завершена',
+          message: 'Аккаунт успешно создан. Добро пожаловать в SmartBudget!',
+        },
+
         passwordChanged: {
           title: 'Пароль изменен',
           message: 'Пароль аккаунта успешно изменён.',
@@ -232,6 +237,11 @@ export const notificationsDict: LocaleDictionary = {
       },
 
       Security: {
+        registration: {
+          title: 'Registration completed',
+          message: 'Your account has been created successfully. Welcome to SmartBudget!',
+        },
+
         passwordChanged: {
           title: 'Password changed',
           message: 'Your account password has been successfully changed.',

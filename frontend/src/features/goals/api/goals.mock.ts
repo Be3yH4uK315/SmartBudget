@@ -17,21 +17,21 @@ function generateMockGoals(total = 0): Goal[] {
   const availableTags: Tag[] = ['Health', 'Education', 'Sport', 'Travel', 'Family']
 
   return Array.from({ length: total }, (_, i) => {
-    const targetValue = 100000 + i * 25000
-    const currentValue = Math.round(Math.random() * targetValue)
+    const targetAmount = 100000 + i * 25000
+    const currentAmount = Math.round(Math.random() * targetAmount)
 
     return {
       goalId: `goal_${i}_${Math.random().toString(36).slice(2, 8)}`,
       name: `Цель #${i}`,
-      targetValue,
-      currentValue,
+      targetAmount,
+      currentAmount,
       status: statuses[i % statuses.length],
       isArchived: i % 3 !== 0,
       tags: availableTags.slice(0, i % availableTags.length),
       priority: priorities[i % priorities.length],
       finishDate: i % 2 === 0 ? '2026-12-31' : null,
       daysLeft: i % 2 === 0 ? 120 - i * 3 : null,
-      recommendedPayment: i % 2 === 0 ? Math.round((targetValue - currentValue) / 6) : null,
+      recommendedPayment: i % 2 === 0 ? Math.round((targetAmount - currentAmount) / 6) : null,
     }
   })
 }
@@ -47,9 +47,9 @@ function generateMockGoalTransactions(goalId: string, total = 20): GoalTransacti
   ]
 
   return Array.from({ length: total }, (_, i) => ({
-    date: dates[i % dates.length],
-    value: Math.round(Math.random() * 10000),
-    type: types[i % types.length],
+    periodStart: dates[i % dates.length],
+    amount: Math.round(Math.random() * 10000),
+    transactionType: types[i % types.length],
   }))
 }
 
@@ -124,15 +124,15 @@ class GoalsMock {
     ALL_GOALS.unshift({
       goalId,
       name: payload.name,
-      targetValue: payload.targetValue,
-      currentValue: 0,
+      targetAmount: payload.targetAmount,
+      currentAmount: 0,
       status: 'ongoing',
       isArchived: false,
       tags: payload.tags,
       priority: payload.priority ?? null,
       finishDate: payload.finishDate,
       daysLeft: 180,
-      recommendedPayment: Math.round(payload.targetValue / 6),
+      recommendedPayment: Math.round(payload.targetAmount / 6),
     })
 
     GOAL_TRANSACTIONS_MAP[goalId] = []
@@ -176,7 +176,6 @@ class GoalsMock {
   ): Promise<GoalSearchOption[]> => {
     console.log('%cMOCK CALL searchGoals', 'color: orange', { query })
 
-    const requestId = Date.now()
     let canceled = false
 
     if (signal) {
@@ -195,11 +194,11 @@ class GoalsMock {
       g.name.toLowerCase().includes(normalizedQuery),
     )
       .slice(0, limit)
-      .map(({ goalId, name, targetValue, currentValue, status, isArchived }) => ({
+      .map(({ goalId, name, targetAmount, currentAmount, status, isArchived }) => ({
         goalId,
         name,
-        targetValue,
-        currentValue,
+        targetAmount,
+        currentAmount,
         status,
         isArchived,
       }))

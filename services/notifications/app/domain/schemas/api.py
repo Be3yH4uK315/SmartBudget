@@ -54,6 +54,15 @@ class BudgetNotificationSettings(CamelModel):
     categories_limit: bool = Field(..., description="Уведомления по лимитам категорий")
 
 
+class NotificationStatusUpdate(CamelModel):
+    """Запрос на включение или выключение всех уведомлений."""
+
+    notifications_status: bool = Field(
+        ...,
+        description="Включены ли уведомления в общем",
+    )
+
+
 class NotificationSettingsResponse(CamelModel):
     """Текущие настройки уведомлений пользователя."""
 
@@ -72,12 +81,8 @@ class NotificationSettingsResponse(CamelModel):
 
 
 class NotificationSettingsUpdate(CamelModel):
-    """Запрос на обновление настроек уведомлений."""
+    """Запрос на обновление частичных настроек уведомлений."""
 
-    notifications_status: bool = Field(
-        ...,
-        description="Включены ли уведомления в общем",
-    )
     push_status: bool = Field(..., description="Включены ли PUSH-уведомления")
     email_status: bool = Field(..., description="Включены ли EMAIL-уведомления")
     goals: bool = Field(..., description="Уведомления целей")

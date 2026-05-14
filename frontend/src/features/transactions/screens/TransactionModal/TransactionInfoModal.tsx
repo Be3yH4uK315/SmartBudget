@@ -48,12 +48,12 @@ export const TransactionInfoModal = ({ transaction, onClose }: Props) => {
         <CategoryIcon categoryId={transaction.categoryId} />
 
         <Stack spacing={1} sx={{ alignItems: 'center', textAlign: 'center', width: '100%' }}>
-          <Typography>{transaction.name}</Typography>
+          <Typography>{transaction.merchant}</Typography>
 
           <Typography variant="caption">{`${translateCategory(transaction.categoryId)}, MCC ${transaction.mcc}`}</Typography>
 
           <Typography variant="h4">
-            {formatCurrency(transaction.value, transaction.type)}
+            {formatCurrency(transaction.amount, transaction.transactionType)}
           </Typography>
 
           <Button onClick={handleChangeCategory}>{translate('changeCategory')}</Button>

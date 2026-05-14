@@ -27,7 +27,7 @@ class Transaction(Base):
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     account_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     category_id = Column(Integer, nullable=True, index=True)
-    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False)
     amount = Column(Numeric(18, 2), nullable=False, default=Decimal("0.00"))
     transaction_type = Column(String(20), nullable=False)
     status = Column(String(20), nullable=False)
@@ -55,13 +55,13 @@ class Transaction(Base):
     )
 
     __table_args__ = (
-        Index("ix_transactions_user_occurred", "user_id", "occurred_at"),
+        Index("ix_transactions_user_occurred", "user_id", "date"),
         Index(
             "ix_transactions_filters_v2",
             "user_id",
             "category_id",
             "transaction_type",
-            "occurred_at",
+            "date",
         ),
         CheckConstraint("amount >= 0", name="ck_transactions_amount_non_negative"),
         CheckConstraint(

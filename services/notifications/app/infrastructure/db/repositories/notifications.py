@@ -27,7 +27,7 @@ class NotificationRepository(BaseRepository):
         self,
         user_id: UUID,
         is_read: bool | None = None,
-        limitAmount: int = 20,
+        limit_amount: int = 20,
         offset: int = 0,
     ) -> tuple[list[models.Notification], int]:
         """Получает страницу уведомлений и общее количество."""
@@ -53,7 +53,7 @@ class NotificationRepository(BaseRepository):
 
         statement = (
             statement.order_by(models.Notification.created_at.desc())
-            .limit(limitAmount)
+            .limit(limit_amount)
             .offset(offset)
         )
 
@@ -65,7 +65,7 @@ class NotificationRepository(BaseRepository):
         self,
         user_id: UUID,
         is_read: bool | None = None,
-        limitAmount: int = 20,
+        limit_amount: int = 20,
         offset: int = 0,
     ) -> list[models.Notification]:
         """Получает страницу уведомлений без отдельного подсчета total."""
@@ -78,7 +78,7 @@ class NotificationRepository(BaseRepository):
 
         statement = (
             statement.order_by(models.Notification.created_at.desc())
-            .limit(limitAmount)
+            .limit(limit_amount)
             .offset(offset)
         )
 

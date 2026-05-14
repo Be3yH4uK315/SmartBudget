@@ -45,10 +45,10 @@ export default function GoalScreen() {
   const {
     goalId,
     name,
-    currentValue,
+    currentAmount,
     finishDate,
     status,
-    targetValue,
+    targetAmount,
     tags,
     priority,
     recommendedPayment,
@@ -64,12 +64,12 @@ export default function GoalScreen() {
 
   const centerLabel: CenterLabel = {
     type: 'amount',
-    total: currentValue,
+    total: currentAmount,
     label: translate(`TransactionsPieBlock.${activeType}`).toLowerCase(),
   }
 
   const remainingValue: PieDataItem = {
-    value: targetValue - currentValue,
+    value: targetAmount - currentAmount,
     color: theme.palette.grayButton.dark,
   }
 
@@ -122,11 +122,11 @@ export default function GoalScreen() {
               status={status}
               finishDate={finishDate}
               isArchived={isArchived}
-              targetValue={targetValue}
-              currentValue={currentValue}
+              targetAmount={targetAmount}
+              currentAmount={currentAmount}
             />
 
-            <ProgressBlock currentValue={currentValue} targetValue={targetValue} />
+            <ProgressBlock currentAmount={currentAmount} targetAmount={targetAmount} />
 
             <CurrentGoalTagsBlock tags={tags} priority={priority} onClick={handleOpenModal} />
           </Stack>
@@ -143,8 +143,8 @@ export default function GoalScreen() {
 
             {finishDate && (
               <GoalsStats
-                targetValue={targetValue}
-                currentValue={currentValue}
+                targetAmount={targetAmount}
+                currentAmount={currentAmount}
                 recommendedPayment={recommendedPayment}
                 daysLeft={daysLeft}
               />

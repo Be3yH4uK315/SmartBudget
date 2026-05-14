@@ -17,7 +17,7 @@ class UserNotificationSettings(Base):
     language = Column(String(10), default="ru", nullable=False)
     notifications_enabled = Column(Boolean, default=True, nullable=False)
     email_enabled = Column(Boolean, default=True, nullable=False)
-    push_enabled = Column(Boolean, default=True, nullable=False)
+    push_enabled = Column(Boolean, default=False, nullable=False)
     disabled_services = Column(ARRAY(String), default=list, nullable=False)
     push_subscriptions = Column(JSONB, default=list, nullable=False)
 

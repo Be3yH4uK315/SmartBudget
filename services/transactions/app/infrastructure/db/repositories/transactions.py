@@ -124,10 +124,10 @@ class TransactionRepository:
             query = query.where(models.Transaction.category_id.in_(category_ids))
 
         if occurred_from:
-            query = query.where(models.Transaction.occurred_at >= occurred_from)
+            query = query.where(models.Transaction.date >= occurred_from)
 
         if occurred_to:
-            query = query.where(models.Transaction.occurred_at <= occurred_to)
+            query = query.where(models.Transaction.date <= occurred_to)
 
         if transaction_type:
             query = query.where(models.Transaction.transaction_type == transaction_type)
@@ -141,7 +141,7 @@ class TransactionRepository:
             query = query.where(absolute_amount <= amount_to)
 
         query = (
-            query.order_by(models.Transaction.occurred_at.desc())
+            query.order_by(models.Transaction.date.desc())
             .offset(offset)
             .limit(limit_amount)
         )
@@ -168,7 +168,7 @@ class TransactionRepository:
                     models.Transaction.description.ilike(like),
                 ),
             )
-            .order_by(models.Transaction.occurred_at.desc())
+            .order_by(models.Transaction.date.desc())
             .limit(limit_amount)
         )
 
@@ -223,7 +223,7 @@ class TransactionRepository:
         """Агрегирует транзакции счета по месяцам и типу."""
         month = func.date_trunc(
             "month",
-            models.Transaction.occurred_at,
+            models.Transaction.date,
         ).label("month")
 
         query = (

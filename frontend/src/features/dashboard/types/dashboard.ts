@@ -9,7 +9,7 @@ export type DashboardGoal = {
 export type DashboardCategory = {
   categoryId: number
 
-  value: number
+  amount: number
 
-  type: 'income' | 'expense'
+  transactionType: 'income' | 'expense'
 }

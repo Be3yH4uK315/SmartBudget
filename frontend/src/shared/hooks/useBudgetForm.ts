@@ -57,7 +57,7 @@ export const useBudgetForm = (initValues?: FormValues) => {
       if (!limit) {
         return {
           ...prev,
-          totalLimit: null,
+          totalLimitAmount: null,
           categories: prev.categories.map((c) => ({
             ...c,
             percent: undefined,
@@ -67,10 +67,10 @@ export const useBudgetForm = (initValues?: FormValues) => {
 
       return {
         ...prev,
-        totalLimit: limit,
+        totalLimitAmount: limit,
         categories: prev.categories.map((c) => {
           if (c.mode === 'percent' && c.percent != null) {
-            return { ...c, limit: fromPercent(limit, c.percent) }
+            return { ...c, limitAmount: fromPercent(limit, c.percent) }
           }
 
           if (c.mode === 'amount' && c.limitAmount != null) {
@@ -86,7 +86,10 @@ export const useBudgetForm = (initValues?: FormValues) => {
   const addCategory = (value: number) => {
     setValues((prev) => ({
       ...prev,
-      categories: [...prev.categories, { categoryId: value, limit: undefined, percent: undefined }],
+      categories: [
+        ...prev.categories,
+        { categoryId: value, limitAmount: undefined, percent: undefined },
+      ],
     }))
   }
 

@@ -1,9 +1,9 @@
 {
-  "limitAmount.preOverflow.title": "Category limit is almost reached",
-  "limitAmount.preOverflow.message": "Expenses for category {category_id} reached {percent}% of the limit. Spent {spent_amount} of {limit_amount}.",
+  "limit.preOverflow.title": "Category limit is almost reached",
+  "limit.preOverflow.message": "Expenses for category {category_id} reached {percent}% of the limit. Spent {spent_amount} of {limit_amount}.",
 
-  "limitAmount.overflow.title": "Category limit exceeded",
-  "limitAmount.overflow.message": "Limit for category {category_id} exceeded. Spent {spent_amount} of {limit_amount}.",
+  "limit.overflow.title": "Category limit exceeded",
+  "limit.overflow.message": "Limit for category {category_id} exceeded. Spent {spent_amount} of {limit_amount}.",
 
   "Budget.checkResults.title": "Budget check completed",
   "Budget.checkResults.message": "Budget check completed. Total budget exceeded: {total_exceeded_count}, category limits exceeded: {category_exceeded_count}.",
@@ -40,6 +40,9 @@
 
   "Transactions.categoryChanged.title": "Transaction category changed",
   "Transactions.categoryChanged.message": "Transaction {transaction_id}: category {old_category_id} changed to {new_category_id}.",
+
+  "Security.registration.title": "Registration completed",
+  "Security.registration.message": "Your account has been created successfully. Welcome to SmartBudget!",
 
   "Security.newLogin.title": "New login",
   "Security.newLogin.message": "A new login to your account was detected.",

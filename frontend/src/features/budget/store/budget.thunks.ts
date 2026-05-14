@@ -1,4 +1,4 @@
-import { budgetApi, budgetMock } from '@features/budget/api'
+import { budgetApi } from '@features/budget/api'
 import { BudgetPayload, BudgetSettings } from '@features/budget/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { showToast } from '@shared/utils'
