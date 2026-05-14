@@ -89,3 +89,9 @@ export type NotificationsBlock = {
   date: string
   items: Notification[]
 }
+
+export type NotificationsListResponse = {
+  totalCount: number
+  unreadCount: number
+  items: Notification[]
+}

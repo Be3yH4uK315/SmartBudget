@@ -5,7 +5,7 @@ import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getNotifications = createAsyncThunk<
-  { notifications: Notification[]; length: number },
+  { notifications: Notification[]; length: number; totalCount: number; unreadCount: number },
   void,
   { state: RootState }
 >('getNotifications', async (_, { getState }) => {
@@ -16,11 +16,16 @@ export const getNotifications = createAsyncThunk<
 
     const response = await notificationsApi.getNotifications(offset)
 
-    return { notifications: response, length: response.length }
+    return {
+      notifications: response.items,
+      length: response.items.length,
+      totalCount: response.totalCount,
+      unreadCount: response.unreadCount,
+    }
   } catch (e: any) {
     showToast({ messageKey: 'cannotGetNotifications', type: 'error' })
 
-    return { notifications: [], length: 0 }
+    return { notifications: [], length: 0, totalCount: 0, unreadCount: 0 }
   }
 })
 

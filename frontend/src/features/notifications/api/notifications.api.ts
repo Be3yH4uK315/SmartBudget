@@ -1,12 +1,12 @@
 import { NOTIFICATIONS_LIMIT } from '@features/notifications/constants'
-import { Notification } from '@features/notifications/types'
+import { Notification, NotificationsListResponse } from '@features/notifications/types'
 import { Transaction } from '@features/transactions/types'
 import { api } from '@shared/api'
 
 class NotificationsApi {
   baseUrl = '/notifications'
 
-  async getNotifications(offset: number): Promise<Notification[]> {
+  async getNotifications(offset: number): Promise<NotificationsListResponse> {
     const url = `${this.baseUrl}`
 
     const params = {
@@ -14,7 +14,7 @@ class NotificationsApi {
       offset,
     }
 
-    const response = await api.get<Notification[]>(url, { params })
+    const response = await api.get<NotificationsListResponse>(url, { params })
     return response.data
   }
 
