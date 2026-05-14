@@ -140,7 +140,7 @@ class TransactionService:
         transaction_type: enums.TransactionType | None = None,
         amount_from: Decimal | None = None,
         amount_to: Decimal | None = None,
-    ) -> list[api_schemas.TransactionResponse]:
+    ) -> api_schemas.ListTransactionsResponse:
         """Возвращает список транзакций пользователя с фильтрацией."""
         async with self.uow:
             transactions = await self.uow.transactions.list_user_transactions(
@@ -155,18 +155,20 @@ class TransactionService:
                 amount_to=amount_to,
             )
 
-        return [_model_to_api(transaction) for transaction in transactions]
+        return api_schemas.ListTransactionsResponse(
+            transactions=[_model_to_api(transaction) for transaction in transactions],
+        )    
 
     async def search_transactions(
         self,
         user_id: UUID,
         query: str,
         limit_amount: int,
-    ) -> list[api_schemas.TransactionResponse]:
+    ) -> api_schemas.SearchTransactionsResponse:
         """Ищет транзакции пользователя по merchant или description."""
         normalized_query = query.strip()
         if not normalized_query:
-            return []
+            return api_schemas.SearchTransactionsResponse(transactions=[])
 
         async with self.uow:
             transactions = await self.uow.transactions.search_user_transactions(
@@ -175,7 +177,9 @@ class TransactionService:
                 limit_amount=limit_amount,
             )
 
-        return [_model_to_api(transaction) for transaction in transactions]
+        return api_schemas.SearchTransactionsResponse(
+            transactions=[_model_to_api(transaction) for transaction in transactions],
+        )
 
     async def get_transaction(
         self,
@@ -197,7 +201,7 @@ class TransactionService:
         self,
         user_id: UUID,
         request: api_schemas.CreateManualTransactionRequest,
-    ) -> str:
+    ) -> api_schemas.CreateManualTransactionResponse:
         """Создает ручную транзакцию пользователя."""
         now = _utc_now()
         transaction = self._build_manual_transaction(
@@ -211,20 +215,25 @@ class TransactionService:
             await self.uow.flush()
             self._publish_created_events(transaction)
 
-        return str(transaction.transaction_id)
+        return api_schemas.CreateManualTransactionResponse(
+            transaction_id=transaction.transaction_id,
+        )
 
     async def import_mock_transactions(
         self,
-        items: list[api_schemas.ImportTransactionItem],
+        request: api_schemas.ImportMockTransactionsRequest,
         request_user_id: UUID | None = None,
-    ) -> int:
+    ) -> api_schemas.ImportMockTransactionsResponse:
         """Импортирует mock-транзакции."""
+        raw_items = request.root
+        items = raw_items if isinstance(raw_items, list) else [raw_items]
+
         prepared_transactions = self._prepare_import_transactions(
             items=items,
             request_user_id=request_user_id,
         )
         if not prepared_transactions:
-            return 0
+            return api_schemas.ImportMockTransactionsResponse(imported_count=0)
 
         imported_count = 0
 
@@ -241,14 +250,14 @@ class TransactionService:
                 self._publish_imported_events(transaction)
                 imported_count += 1
 
-        return imported_count
+        return api_schemas.ImportMockTransactionsResponse(imported_count=imported_count)
 
     async def patch_category(
         self,
         user_id: UUID,
         transaction_id: UUID,
-        category_id: int | None,
-    ) -> str:
+        request: api_schemas.PatchTransactionCategoryRequest,
+    ) -> api_schemas.PatchTransactionCategoryResponse:
         """Изменяет категорию транзакции пользователя."""
         async with self.uow:
             transaction = await self.uow.transactions.get_user_transaction_for_update(
@@ -259,7 +268,7 @@ class TransactionService:
                 raise exceptions.TransactionNotFoundError("Transaction not found")
 
             old_category_id = transaction.category_id
-            transaction.category_id = category_id
+            transaction.category_id = request.category_id
             transaction.updated_at = _utc_now()
 
             await self.uow.flush()
@@ -267,29 +276,20 @@ class TransactionService:
             self._publish_category_changed_events(
                 transaction=transaction,
                 old_category_id=old_category_id,
-                new_category_id=category_id,
+                new_category_id=request.category_id,
             )
 
-        return "OK"
-
-    async def delete_transaction(self, transaction_id: UUID) -> None:
-        """Удаляет транзакцию без проверки владельца."""
-        async with self.uow:
-            transaction = await self.uow.transactions.delete_by_transaction_id(
-                transaction_id,
-            )
-            if not transaction:
-                return
-
-            await self.uow.flush()
-
-            self._publish_deleted_events(transaction)
+        return api_schemas.PatchTransactionCategoryResponse(
+            transaction_id=transaction_id,
+            old_category_id=old_category_id,
+            new_category_id=request.category_id,
+        )
 
     async def delete_user_transaction(
         self,
         user_id: UUID,
         transaction_id: UUID,
-    ) -> None:
+    ) -> api_schemas.DeleteTransactionResponse:
         """Удаляет транзакцию пользователя."""
         async with self.uow:
             transaction = await self.uow.transactions.delete_user_transaction(
@@ -297,17 +297,22 @@ class TransactionService:
                 transaction_id,
             )
             if not transaction:
-                return
+                raise exceptions.TransactionNotFoundError("Transaction not found")
 
             await self.uow.flush()
 
             self._publish_deleted_events(transaction)
 
+        return api_schemas.DeleteTransactionResponse(
+            transaction_id=transaction_id,
+            deleted=True,
+        )
+
     async def get_transactions_by_month_for_goal(
         self,
         user_id: UUID,
         account_id: UUID,
-    ) -> list[api_schemas.TransactionsByMonth]:
+    ) -> api_schemas.GoalTransactionsByMonthResponse:
         """Возвращает транзакции цели, агрегированные по месяцам."""
         async with self.uow:
             rows = await self.uow.transactions.aggregate_by_month_for_account(
@@ -315,14 +320,16 @@ class TransactionService:
                 account_id,
             )
 
-        return [
-            api_schemas.TransactionsByMonth(
-                amount=amount,
-                period_start=period_start,
-                transaction_type=enums.TransactionType(transaction_type),
-            )
-            for amount, period_start, transaction_type in rows
-        ]
+        return api_schemas.GoalTransactionsByMonthResponse(
+            items=[
+                api_schemas.TransactionsByMonthResponse(
+                    amount=amount,
+                    period_start=period_start,
+                    transaction_type=enums.TransactionType(transaction_type),
+                )
+                for amount, period_start, transaction_type in rows
+            ],
+        )
 
     async def apply_classification(
         self,
@@ -353,7 +360,7 @@ class TransactionService:
                 new_category_id=category_id,
             )
 
-            if old_category_id is not None and old_category_id != category_id:
+            if old_category_id != category_id:
                 self._queue_category_changed_event(
                     transaction=transaction,
                     old_category_id=old_category_id,
@@ -442,7 +449,7 @@ class TransactionService:
             new_category_id=new_category_id,
         )
 
-        if old_category_id is not None and old_category_id != new_category_id:
+        if old_category_id != new_category_id:
             self._queue_category_changed_event(
                 transaction=transaction,
                 old_category_id=old_category_id,
@@ -531,7 +538,6 @@ class TransactionService:
             event,
         )
 
-
     def _queue_category_changed_event(
         self,
         transaction: models.Transaction,
@@ -613,7 +619,7 @@ class TransactionService:
 
     def _prepare_import_transactions(
         self,
-        items: list[api_schemas.ImportTransactionItem],
+        items: list[api_schemas.ImportTransactionItemRequest],
         request_user_id: UUID | None,
     ) -> list[models.Transaction]:
         """Подготавливает импортируемые транзакции и убирает дубли внутри request."""
@@ -643,7 +649,7 @@ class TransactionService:
 
     @staticmethod
     def _resolve_import_user_id(
-        item: api_schemas.ImportTransactionItem,
+        item: api_schemas.ImportTransactionItemRequest,
         request_user_id: UUID | None,
     ) -> UUID | None:
         """Определяет user_id для импортируемой транзакции."""
@@ -666,7 +672,7 @@ class TransactionService:
 
     @staticmethod
     def _build_import_transaction(
-        item: api_schemas.ImportTransactionItem,
+        item: api_schemas.ImportTransactionItemRequest,
         user_id: UUID,
     ) -> models.Transaction:
         """Создает ORM-модель импортируемой транзакции."""

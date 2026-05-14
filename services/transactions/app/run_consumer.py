@@ -20,7 +20,10 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
         stop_event.set()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, signal_handler)
+        try:
+            loop.add_signal_handler(sig, signal_handler)
+        except NotImplementedError:
+            signal.signal(sig, lambda *_: signal_handler())
 
 
 async def main() -> None:

@@ -49,7 +49,7 @@ class TransactionPayload(BaseEventPayload):
     mcc: int | None = Field(None, description="MCC код")
     description: str | None = Field(None, description="Описание транзакции")
 
-    occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
+    date: datetime = Field(..., description="Бизнес-время транзакции")
 
 
 class TransactionUpdatedPayload(TransactionPayload):
@@ -74,7 +74,7 @@ class TransactionDeletedPayload(BaseEventPayload):
 
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
-    occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
+    date: datetime = Field(..., description="Бизнес-время транзакции")
 
 
 class TransactionNeedCategoryPayload(BaseEventPayload):
@@ -90,7 +90,7 @@ class TransactionNeedCategoryPayload(BaseEventPayload):
 
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
-    occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
+    date: datetime = Field(..., description="Бизнес-время транзакции")
 
 
 class TransactionGoalAppliedPayload(BaseEventPayload):
@@ -102,7 +102,7 @@ class TransactionGoalAppliedPayload(BaseEventPayload):
 
     amount: Decimal = Field(..., description="Сумма транзакции")
     transaction_type: str = Field(..., description="Тип транзакции")
-    occurred_at: datetime = Field(..., description="Бизнес-время транзакции")
+    date: datetime = Field(..., description="Бизнес-время транзакции")
 
 
 class TransactionUnclassifiedFoundPayload(BaseEventPayload):

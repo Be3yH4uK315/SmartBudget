@@ -1,16 +1,6 @@
-from typing import Any
 from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Body,
-    Depends,
-    HTTPException,
-    Path,
-    Query,
-    Response,
-    status,
-)
+from fastapi import APIRouter, Body, Depends, Path, Query, status
 
 from app.api import dependencies
 from app.domain.schemas import api as schemas
@@ -21,7 +11,7 @@ router = APIRouter(tags=["Transactions"])
 
 @router.get(
     "",
-    response_model=list[schemas.TransactionResponse],
+    response_model=schemas.ListTransactionsResponse,
     response_model_exclude_none=True,
     summary="Получить список транзакций",
 )
@@ -46,7 +36,7 @@ async def list_transactions(
 
 @router.get(
     "/search",
-    response_model=list[schemas.TransactionResponse],
+    response_model=schemas.SearchTransactionsResponse,
     response_model_exclude_none=True,
     summary="Поиск транзакций",
 )
@@ -81,6 +71,8 @@ async def get_transaction(
 
 @router.post(
     "/manual",
+    response_model=schemas.CreateManualTransactionResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="Создать ручную транзакцию",
 )
 async def create_manual_transaction(
@@ -94,49 +86,41 @@ async def create_manual_transaction(
 
 @router.post(
     "/import/mock",
+    response_model=schemas.ImportMockTransactionsResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="Импортировать mock-транзакции",
 )
 async def import_mock_transactions(
-    payload: Any = Body(...),
+    request: schemas.ImportMockTransactionsRequest = Body(...),
     user_id: UUID | None = Depends(dependencies.get_optional_current_user_id),
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
     """Импортирует одну или несколько mock-транзакций."""
-    raw_items = payload if isinstance(payload, list) else [payload]
-
-    try:
-        items = [
-            schemas.ImportTransactionItem.model_validate(item) for item in raw_items
-        ]
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid body",
-        ) from exc
-
-    return await service.import_mock_transactions(items, user_id)
+    return await service.import_mock_transactions(request, user_id)
 
 
 @router.patch(
     "/{transaction_id}",
+    response_model=schemas.PatchTransactionCategoryResponse,
     summary="Изменить категорию транзакции",
 )
 async def patch_category(
-    payload: Any = Body(...),
+    request: schemas.PatchTransactionCategoryRequest = Body(...),
     transaction_id: UUID = Path(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
     """Изменяет категорию транзакции."""
     return await service.patch_category(
-        user_id,
-        transaction_id,
-        _parse_patch_category(payload),
+        user_id=user_id,
+        transaction_id=transaction_id,
+        request=request,
     )
 
 
 @router.delete(
     "/{transaction_id}",
+    response_model=schemas.DeleteTransactionResponse,
     status_code=status.HTTP_200_OK,
     summary="Удалить транзакцию",
 )
@@ -146,21 +130,4 @@ async def delete_transaction(
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
     """Удаляет транзакцию пользователя."""
-    await service.delete_user_transaction(user_id, transaction_id)
-
-    return Response(status_code=status.HTTP_200_OK)
-
-
-def _parse_patch_category(payload: Any) -> int | None:
-    """Извлекает category_id из PATCH payload."""
-    if isinstance(payload, int) or payload is None:
-        return payload
-
-    if isinstance(payload, dict):
-        request = schemas.PatchTransactionCategoryRequest.model_validate(payload)
-        return request.category_id
-
-    raise HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail="Payload must be categoryId object, integer, or null",
-    )
+    return await service.delete_user_transaction(user_id, transaction_id)

@@ -55,15 +55,6 @@ class OutboxRepository:
         )
         self.db.add(event)
 
-    def add_events(self, events: list[dict[str, Any]]) -> None:
-        """Добавляет несколько outbox-событий без commit."""
-        for event in events:
-            self.add_event(
-                topic=event["topic"],
-                payload=event.get("payload", event),
-                event_type=event.get("event_type"),
-            )
-
     async def get_pending_events(
         self,
         limit_amount: int = 100,

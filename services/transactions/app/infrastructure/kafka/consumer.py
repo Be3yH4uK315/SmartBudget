@@ -208,7 +208,7 @@ class KafkaConsumerWorker:
 
         except Exception as exc:
             await self._handle_processing_error(message, exc, request_id)
-        
+
         finally:
             clear_request_id()
 

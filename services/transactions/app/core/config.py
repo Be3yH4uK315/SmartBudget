@@ -34,10 +34,10 @@ class KafkaSettings(BaseSettings):
         return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str]:
+    def consumer_topics(self) -> tuple[str, ...]:
         """Возвращает topics, которые читает transactions consumer."""
         return (self.KAFKA_TOPIC_CLASSIFICATION_EVENTS,)
-    
+
     @property
     def dlq_topic(self) -> str:
         """Возвращает DLQ topic."""

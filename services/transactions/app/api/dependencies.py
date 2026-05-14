@@ -61,22 +61,30 @@ async def get_optional_current_user_id(request: Request) -> UUID | None:
         ) from exc
 
 
-def _parse_category_ids(category_id: str | None) -> list[int] | None:
-    """Парсит category_id из одного числа или comma-separated строки."""
-    if not category_id:
+def _parse_category_ids(raw_value: str | None) -> list[int] | None:
+    """Парсит category ids из одного числа или comma-separated строки."""
+    if not raw_value:
         return None
 
     try:
-        result = [int(part.strip()) for part in category_id.split(",") if part.strip()]
+        category_ids = [
+            int(part.strip())
+            for part in raw_value.split(",")
+            if part.strip()
+        ]
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="categoryId must be an integer or comma-separated integers",
+            detail="categoryId/categoryIds must be integer or comma-separated integers",
         ) from exc
 
-    result = [item for item in result if item != 0]
+    if any(category_id <= 0 for category_id in category_ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="categoryId/categoryIds values must be positive integers",
+        )
 
-    return result or None
+    return category_ids or None
 
 
 class TransactionFilters:
@@ -87,15 +95,34 @@ class TransactionFilters:
         limit_amount: int = Query(50, ge=1, le=1000, alias="limitAmount"),
         offset: int = Query(0, ge=0),
         category_id: str | None = Query(None, alias="categoryId"),
+        category_ids: str | None = Query(None, alias="categoryIds"),
         occurred_from: date | None = Query(None, alias="occurredFrom"),
         occurred_to: date | None = Query(None, alias="occurredTo"),
         transaction_type: TransactionType | None = Query(None, alias="transactionType"),
-        amount_from: Decimal | None = Query(None, alias="amountFrom"),
-        amount_to: Decimal | None = Query(None, alias="amountTo"),
+        amount_from: Decimal | None = Query(None, ge=0, alias="amountFrom"),
+        amount_to: Decimal | None = Query(None, ge=0, alias="amountTo"),
     ) -> None:
+        if category_id and category_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Use either categoryId or categoryIds, not both",
+            )
+
+        if occurred_from and occurred_to and occurred_from > occurred_to:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="occurredFrom must be less than or equal to occurredTo",
+            )
+
+        if amount_from is not None and amount_to is not None and amount_from > amount_to:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="amountFrom must be less than or equal to amountTo",
+            )
+
         self.limit_amount = limit_amount
         self.offset = offset
-        self.category_ids = _parse_category_ids(category_id)
+        self.category_ids = _parse_category_ids(category_ids or category_id)
         self.occurred_from = (
             datetime.combine(occurred_from, time.min, tzinfo=timezone.utc)
             if occurred_from
