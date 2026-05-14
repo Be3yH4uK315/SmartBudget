@@ -51,6 +51,7 @@ export type NotificationPropsMap = {
   'Goals.thresholdReached.message': {
     goalId: string
     name: string
+    thresholdPercent: number
   }
 
   'Goals.achieved.message': {
