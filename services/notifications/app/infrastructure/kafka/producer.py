@@ -28,6 +28,7 @@ class KafkaProducerWrapper:
 
         self.producer = AIOKafkaProducer(
             bootstrap_servers=settings.KAFKA.KAFKA_BOOTSTRAP_SERVERS,
+            security_protocol=settings.KAFKA.KAFKA_SECURITY_PROTOCOL,
             acks="all",
             linger_ms=50,
             request_timeout_ms=SEND_TIMEOUT_SECONDS * 1000,

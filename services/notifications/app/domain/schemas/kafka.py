@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeAlias
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -30,11 +30,16 @@ class IncomingNotificationEvent(BaseModel):
     timestamp: datetime = Field(default_factory=_utc_now, description="Время события")
 
 
-AuthEvent = EventEnvelope[AuthUserPayload]
-BudgetEvent = EventEnvelope[BudgetPayload]
-GoalEvent = EventEnvelope[GoalPayload]
-TransactionUnclassifiedFoundEvent = EventEnvelope[TransactionUnclassifiedFoundPayload]
-TransactionCategoryChangedEvent = EventEnvelope[TransactionCategoryChangedPayload]
+AuthEvent: TypeAlias = EventEnvelope[AuthUserPayload]
+BudgetEvent: TypeAlias = EventEnvelope[BudgetPayload]
+GoalEvent: TypeAlias = EventEnvelope[GoalPayload]
+TransactionUnclassifiedFoundEvent: TypeAlias = EventEnvelope[
+    TransactionUnclassifiedFoundPayload
+]
+TransactionCategoryChangedEvent: TypeAlias = EventEnvelope[
+    TransactionCategoryChangedPayload
+]
+
 
 __all__ = [
     "IncomingNotificationEvent",

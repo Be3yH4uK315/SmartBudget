@@ -1,19 +1,41 @@
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Request, status
 from fastapi.responses import ORJSONResponse
 
 from app.api import health_helpers
+from app.domain.schemas import api as schemas
 
 router = APIRouter(tags=["Health"])
 
 
-@router.get("/health/live", status_code=status.HTTP_200_OK, summary="Liveness probe")
-async def liveness_check() -> dict[str, str]:
+@router.get(
+    "/health/live",
+    response_model=schemas.HealthCheckResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Liveness probe",
+)
+async def liveness_check() -> schemas.HealthCheckResponse:
     """Легкая проверка доступности приложения."""
-    return {"status": "ok"}
+    return schemas.HealthCheckResponse(status="ok")
 
 
-@router.get("/health/ready", status_code=status.HTTP_200_OK, summary="Readiness probe")
-async def readiness_check(request: Request) -> Response:
+@router.get(
+    "/health",
+    response_model=schemas.HealthCheckResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Health check",
+)
+async def health_check() -> schemas.HealthCheckResponse:
+    """Проверка совместимости со старым health endpoint."""
+    return schemas.HealthCheckResponse(status="Healthy")
+
+
+@router.get(
+    "/health/ready",
+    response_model=schemas.ReadinessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Readiness probe",
+)
+async def readiness_check(request: Request) -> schemas.ReadinessResponse | ORJSONResponse:
     """Проверка готовности приложения и внешних зависимостей."""
     app = request.app
     health_status: dict[str, str] = {}
@@ -34,18 +56,15 @@ async def readiness_check(request: Request) -> Response:
     health_status["arq"] = arq_status
     has_error = has_error or not arq_ok
 
+    response = schemas.ReadinessResponse(
+        status="not_ready" if has_error else "ready",
+        components=health_status,
+    )
+
     if has_error:
         return ORJSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "status": "not_ready",
-                "components": health_status,
-            },
+            content=response.model_dump(mode="json", by_alias=True),
         )
 
-    return ORJSONResponse(
-        content={
-            "status": "ready",
-            "components": health_status,
-        },
-    )
+    return response

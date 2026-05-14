@@ -11,7 +11,7 @@ router = APIRouter(tags=["Notifications"])
 
 @router.get(
     "",
-    response_model=list[schemas.NotificationResponse],
+    response_model=schemas.PaginatedNotificationsResponse,
     response_model_exclude_none=True,
     summary="Получить список уведомлений",
 )
@@ -24,15 +24,16 @@ async def get_notifications(
 ):
     """Возвращает список уведомлений пользователя с пагинацией."""
     return await service.get_paginated_notifications(
-        user_id,
-        is_read,
-        limit_amount,
-        offset,
+        user_id=user_id,
+        is_read=is_read,
+        limit_amount=limit_amount,
+        offset=offset,
     )
 
 
 @router.get(
     "/unread-count",
+    response_model=schemas.UnreadCountResponse,
     summary="Получить количество непрочитанных для бейджа",
 )
 async def get_unread_count(
@@ -45,6 +46,7 @@ async def get_unread_count(
 
 @router.patch(
     "/read-all",
+    response_model=schemas.MarkAllNotificationsReadResponse,
     summary="Отметить все уведомления пользователя прочитанными",
 )
 async def mark_all_as_read_by_contract(
@@ -57,6 +59,7 @@ async def mark_all_as_read_by_contract(
 
 @router.patch(
     "/{notification_id}",
+    response_model=schemas.MarkNotificationReadResponse,
     summary="Отметить одно уведомление прочитанным",
 )
 async def mark_as_read_by_contract(

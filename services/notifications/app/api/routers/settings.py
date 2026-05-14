@@ -28,7 +28,7 @@ async def get_settings(
     summary="Обновить настройки уведомлений",
 )
 async def update_settings(
-    request: schemas.NotificationSettingsUpdate = Body(...),
+    request: schemas.NotificationSettingsUpdateRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
 ):
@@ -42,12 +42,12 @@ async def update_settings(
     summary="Включить/выключить уведомления",
 )
 async def update_notifications_status(
-    request: schemas.NotificationStatusUpdate = Body(...),
+    request: schemas.NotificationStatusUpdateRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
 ):
     """Включает или выключает все уведомления пользователя."""
     return await service.update_notifications_status(
-        user_id,
-        request.notifications_status,
+        user_id=user_id,
+        notifications_status=request.notifications_status,
     )

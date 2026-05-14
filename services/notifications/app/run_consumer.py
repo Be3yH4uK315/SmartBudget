@@ -24,7 +24,10 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
         stop_event.set()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, signal_handler)
+        try:
+            loop.add_signal_handler(sig, signal_handler)
+        except NotImplementedError:
+            signal.signal(sig, lambda *_: signal_handler())
 
 
 async def main() -> None:
@@ -35,24 +38,26 @@ async def main() -> None:
     db_session_maker = get_session_factory(engine)
 
     dlq_producer = KafkaProducerWrapper()
-    arq_pool = await create_pool(
-        RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
-        default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
-    )
+    arq_pool = None
 
     stop_event = asyncio.Event()
     _install_signal_handlers(stop_event)
 
-    worker = KafkaConsumerWorker(
-        db_session_maker=db_session_maker,
-        arq_pool=arq_pool,
-        dlq_producer=dlq_producer,
-    )
     worker_task: asyncio.Task | None = None
     stop_task: asyncio.Task | None = None
 
     try:
+        arq_pool = await create_pool(
+            RedisSettings.from_dsn(settings.ARQ.REDIS_URL),
+            default_queue_name=settings.ARQ.ARQ_QUEUE_NAME,
+        )
         await dlq_producer.start()
+
+        worker = KafkaConsumerWorker(
+            db_session_maker=db_session_maker,
+            arq_pool=arq_pool,
+            dlq_producer=dlq_producer,
+        )
 
         worker_task = asyncio.create_task(worker.run())
         stop_task = asyncio.create_task(stop_event.wait())
@@ -87,7 +92,10 @@ async def main() -> None:
             stop_task.cancel()
 
         await dlq_producer.stop()
-        await arq_pool.close()
+
+        if arq_pool:
+            await arq_pool.close()
+
         await engine.dispose()
 
         logger.info("Kafka consumer service stopped")

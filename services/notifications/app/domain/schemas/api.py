@@ -39,22 +39,52 @@ class NotificationResponse(CamelModel):
     )
 
 
-class PaginatedNotifications(CamelModel):
+class PaginatedNotificationsResponse(CamelModel):
     """Ответ для списка уведомлений с пагинацией."""
 
-    total: int = Field(..., description="Всего уведомлений")
-    unread_count: int = Field(..., description="Количество непрочитанных")
-    items: list[NotificationResponse] = Field(..., description="Список уведомлений")
+    total: int = Field(..., ge=0, description="Всего уведомлений")
+    unread_count: int = Field(..., ge=0, description="Количество непрочитанных")
+    items: list[NotificationResponse] = Field(
+        default_factory=list,
+        description="Список уведомлений",
+    )
 
 
-class BudgetNotificationSettings(CamelModel):
-    """Настройки бюджетных уведомлений."""
+class UnreadCountResponse(CamelModel):
+    """Ответ с количеством непрочитанных уведомлений."""
+
+    unread_count: int = Field(..., ge=0, description="Количество непрочитанных")
+
+
+class MarkNotificationReadResponse(CamelModel):
+    """Ответ после отметки одного уведомления прочитанным."""
+
+    success: bool = Field(..., description="Признак успешной операции")
+    notification_id: UUID = Field(..., description="ID уведомления")
+
+
+class MarkAllNotificationsReadResponse(CamelModel):
+    """Ответ после отметки всех уведомлений прочитанными."""
+
+    success: bool = Field(..., description="Признак успешной операции")
+    updated_count: int = Field(..., ge=0, description="Количество обновленных уведомлений")
+
+
+class BudgetNotificationSettingsRequest(CamelModel):
+    """Настройки бюджетных уведомлений в request."""
 
     total_limit: bool = Field(..., description="Уведомления по общему бюджету")
     categories_limit: bool = Field(..., description="Уведомления по лимитам категорий")
 
 
-class NotificationStatusUpdate(CamelModel):
+class BudgetNotificationSettingsResponse(CamelModel):
+    """Настройки бюджетных уведомлений в response."""
+
+    total_limit: bool = Field(..., description="Уведомления по общему бюджету")
+    categories_limit: bool = Field(..., description="Уведомления по лимитам категорий")
+
+
+class NotificationStatusUpdateRequest(CamelModel):
     """Запрос на включение или выключение всех уведомлений."""
 
     notifications_status: bool = Field(
@@ -74,29 +104,29 @@ class NotificationSettingsResponse(CamelModel):
     email_status: bool = Field(..., description="Включены ли EMAIL-уведомления")
     goals: bool = Field(..., description="Уведомления целей")
     transactions: bool = Field(..., description="Уведомления транзакций")
-    budget: BudgetNotificationSettings = Field(
+    budget: BudgetNotificationSettingsResponse = Field(
         ...,
         description="Настройки бюджетных уведомлений",
     )
 
 
-class NotificationSettingsUpdate(CamelModel):
-    """Запрос на обновление частичных настроек уведомлений."""
+class NotificationSettingsUpdateRequest(CamelModel):
+    """Запрос на обновление настроек уведомлений."""
 
     push_status: bool = Field(..., description="Включены ли PUSH-уведомления")
     email_status: bool = Field(..., description="Включены ли EMAIL-уведомления")
     goals: bool = Field(..., description="Уведомления целей")
     transactions: bool = Field(..., description="Уведомления транзакций")
-    budget: BudgetNotificationSettings = Field(
+    budget: BudgetNotificationSettingsRequest = Field(
         ...,
         description="Настройки бюджетных уведомлений",
     )
 
 
-class WebPushSubscription(CamelModel):
+class WebPushSubscriptionRequest(CamelModel):
     """Browser push подписка."""
 
-    endpoint: str = Field(..., description="Browser push endpoint")
+    endpoint: str = Field(..., min_length=1, description="Browser push endpoint")
     expiration_time: int | None = Field(
         None,
         description="Subscription expiration time",
@@ -107,13 +137,36 @@ class WebPushSubscription(CamelModel):
 class PushSubscribeRequest(CamelModel):
     """Запрос на сохранение browser push подписки."""
 
-    subscription: WebPushSubscription = Field(
+    subscription: WebPushSubscriptionRequest = Field(
         ...,
         description="Browser push subscription",
     )
 
 
+class PushSubscriptionResponse(CamelModel):
+    """Ответ после изменения browser push подписок."""
+
+    success: bool = Field(..., description="Признак успешной операции")
+    subscriptions_count: int = Field(..., ge=0, description="Количество push-подписок")
+
+
 class PushUnsubscribeRequest(CamelModel):
     """Запрос на удаление browser push подписки."""
 
-    endpoint: str = Field(..., description="Browser push endpoint")
+    endpoint: str = Field(..., min_length=1, description="Browser push endpoint")
+
+
+class HealthCheckResponse(CamelModel):
+    """Ответ health check."""
+
+    status: str = Field(..., description="Статус сервиса")
+
+
+class ReadinessResponse(CamelModel):
+    """Ответ readiness check."""
+
+    status: str = Field(..., description="Статус готовности сервиса")
+    components: dict[str, str] = Field(
+        default_factory=dict,
+        description="Статусы внешних зависимостей",
+    )

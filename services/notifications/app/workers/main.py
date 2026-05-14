@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from arq.connections import RedisSettings
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -53,7 +53,7 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     ctx["jinja_env"] = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         enable_async=True,
-        autoescape=True,
+        autoescape=select_autoescape(["html", "xml"]),
     )
     ctx["health_task"] = asyncio.create_task(keep_alive_task())
 

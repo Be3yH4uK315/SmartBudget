@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from smartbudget_shared.config import (
     AppSettings as SharedAppSettings,
@@ -36,7 +37,7 @@ class KafkaSettings(BaseSettings):
         return self.KAFKA_GROUP_ID
 
     @property
-    def consumer_topics(self) -> tuple[str, str, str, str]:
+    def consumer_topics(self) -> tuple[str, ...]:
         """Возвращает topics, которые читает notification consumer."""
         return (
             self.KAFKA_TOPIC_AUTH_EVENTS,

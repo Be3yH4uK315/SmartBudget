@@ -61,7 +61,7 @@ async def db_error_handler(
 
     return ORJSONResponse(
         status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal database error"},
+        content={"detail": "Internal server error"},
     )
 
 

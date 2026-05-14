@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from jinja2 import Environment, TemplateError, TemplateNotFound
+from jinja2 import Environment, Template, TemplateError, TemplateNotFound
 
 from app.infrastructure.external.smtp import send_email
 from app.infrastructure.external.web_push import send_web_push_notifications
@@ -180,7 +180,7 @@ async def _render_email_template(
     )
 
 
-def _get_email_template(jinja_env: Environment, language: str):
+def _get_email_template(jinja_env: Environment, language: str) -> Template:
     """Возвращает локализованный email template или fallback template."""
     localized_template_name = f"base_email_{language}.html"
 

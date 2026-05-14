@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from fastapi import WebSocket
 
@@ -37,7 +38,11 @@ class ConnectionManager:
 
         logger.info("WebSocket disconnected for user %s", user_id)
 
-    async def send_personal_message(self, user_id: str, message: dict) -> None:
+    async def send_personal_message(
+        self,
+        user_id: str,
+        message: dict[str, Any],
+    ) -> None:
         """Отправляет JSON-сообщение во все открытые вкладки пользователя."""
         connections = list(self.active_connections.get(user_id, []))
         dead_connections: list[WebSocket] = []

@@ -140,62 +140,73 @@ class NotificationService:
         is_read: bool | None,
         limit_amount: int,
         offset: int,
-    ) -> list[api_schemas.NotificationResponse]:
+    ) -> api_schemas.PaginatedNotificationsResponse:
         """Получает историю уведомлений пользователя для UI."""
         async with self.uow:
-            notifications = await self.uow.notifications.list_paginated(
-                user_id,
-                is_read,
-                limit_amount,
-                offset,
+            notifications, total = await self.uow.notifications.get_paginated(
+                user_id=user_id,
+                is_read=is_read,
+                limit_amount=limit_amount,
+                offset=offset,
             )
+            unread_count = await self.uow.notifications.get_unread_count(user_id)
 
-        return [
-            self._notification_to_response(notification)
-            for notification in notifications
-        ]
+        return api_schemas.PaginatedNotificationsResponse(
+            total=total,
+            unread_count=unread_count,
+            items=[
+                self._notification_to_response(notification)
+                for notification in notifications
+            ],
+        )
 
-    async def get_unread_count(self, user_id: UUID) -> dict:
+    async def get_unread_count(
+        self,
+        user_id: UUID,
+    ) -> api_schemas.UnreadCountResponse:
         """Возвращает количество непрочитанных уведомлений."""
         async with self.uow:
             count = await self.uow.notifications.get_unread_count(user_id)
 
-        return {"unreadCount": count}
+        return api_schemas.UnreadCountResponse(unread_count=count)
 
     async def mark_as_read(
         self,
         user_id: UUID,
         notification_id: UUID,
-    ) -> dict:
+    ) -> api_schemas.MarkNotificationReadResponse:
         """Отмечает одно уведомление прочитанным."""
         async with self.uow:
             success = await self.uow.notifications.mark_as_read(
-                notification_id,
-                user_id,
+                notification_id=notification_id,
+                user_id=user_id,
             )
 
             if not success:
                 raise exceptions.NotificationNotFoundError(
-                    "Notification not found or already read",
+                    "Notification not found",
                 )
 
             await self.uow.commit()
 
-        return {
-            "success": True,
-            "notificationId": str(notification_id),
-        }
+        return api_schemas.MarkNotificationReadResponse(
+            success=True,
+            notification_id=notification_id,
+        )
 
-    async def mark_all_as_read(self, user_id: UUID) -> dict:
+    async def mark_all_as_read(
+        self,
+        user_id: UUID,
+    ) -> api_schemas.MarkAllNotificationsReadResponse:
         """Отмечает все уведомления пользователя прочитанными."""
         async with self.uow:
             updated_count = await self.uow.notifications.mark_all_as_read(user_id)
             await self.uow.commit()
 
-        return {
-            "success": True,
-            "updatedCount": updated_count,
-        }
+        return api_schemas.MarkAllNotificationsReadResponse(
+            success=True,
+            updated_count=updated_count,
+        )
 
     async def get_settings(
         self,
@@ -208,38 +219,6 @@ class NotificationService:
 
         return self._settings_to_response(settings)
 
-    async def update_settings(
-        self,
-        user_id: UUID,
-        request: api_schemas.NotificationSettingsUpdate,
-    ) -> api_schemas.NotificationSettingsResponse:
-        """Обновляет частичные настройки уведомлений пользователя."""
-        async with self.uow:
-            settings = await self._get_or_create_settings_in_uow(user_id)
-
-            if not settings.notifications_enabled:
-                raise exceptions.InvalidNotificationDataError(
-                    "Notifications are disabled",
-                )
-
-            changes = self._settings_update_to_changes(request)
-
-            if changes.get("push_enabled") is True and not settings.push_subscriptions:
-                changes["push_enabled"] = False
-
-            updated_settings = await self.uow.settings.update_settings(
-                user_id,
-                changes,
-            )
-
-            if not updated_settings:
-                raise exceptions.InvalidNotificationDataError(
-                    "Notification settings were not created",
-                )
-
-            await self.uow.commit()
-
-        return self._settings_to_response(updated_settings)
 
     async def update_notifications_status(
         self,
@@ -278,8 +257,8 @@ class NotificationService:
     async def subscribe_push(
         self,
         user_id: UUID,
-        subscription: api_schemas.WebPushSubscription,
-    ) -> dict:
+        subscription: api_schemas.WebPushSubscriptionRequest,
+    ) -> api_schemas.PushSubscriptionResponse:
         """Сохраняет browser push подписку пользователя."""
         async with self.uow:
             await self._get_or_create_settings_in_uow(user_id)
@@ -299,16 +278,16 @@ class NotificationService:
 
             await self.uow.commit()
 
-        return {
-            "success": True,
-            "subscriptionsCount": len(updated.push_subscriptions or []),
-        }
+        return api_schemas.PushSubscriptionResponse(
+            success=True,
+            subscriptions_count=len(updated.push_subscriptions or []),
+        )
 
     async def unsubscribe_push(
         self,
         user_id: UUID,
         endpoint: str,
-    ) -> dict:
+    ) -> api_schemas.PushSubscriptionResponse:
         """Удаляет browser push подписку пользователя."""
         async with self.uow:
             await self._get_or_create_settings_in_uow(user_id)
@@ -325,10 +304,10 @@ class NotificationService:
 
             await self.uow.commit()
 
-        return {
-            "success": True,
-            "subscriptionsCount": len(updated.push_subscriptions or []),
-        }
+        return api_schemas.PushSubscriptionResponse(
+            success=True,
+            subscriptions_count=len(updated.push_subscriptions or []),
+        )
 
     async def _get_or_create_settings_in_uow(
         self,
@@ -449,8 +428,11 @@ class NotificationService:
         settings: _NotificationSettingsRow,
     ) -> bool:
         """Проверяет пользовательские настройки перед созданием уведомления."""
+        if route_config.service == NotificationServiceType.SECURITY:
+            return False
+
         if not settings.notifications_enabled:
-            logger.info("User %s disabled all notifications. Ignored", user_id)
+            logger.info("User %s disabled all regular notifications. Ignored", user_id)
             return True
 
         disabled_services = settings.disabled_services or []
@@ -471,6 +453,9 @@ class NotificationService:
     ) -> set[str]:
         """Определяет итоговый набор каналов доставки."""
         channels = set(route_config.default_channels)
+
+        if route_config.service == NotificationServiceType.SECURITY:
+            return channels
 
         if not settings.push_enabled:
             channels.discard("PUSH")
@@ -540,7 +525,7 @@ class NotificationService:
                 email_status=False,
                 goals=False,
                 transactions=False,
-                budget=api_schemas.BudgetNotificationSettings(
+                budget=api_schemas.BudgetNotificationSettingsResponse(
                     total_limit=False,
                     categories_limit=False,
                 ),
@@ -554,18 +539,17 @@ class NotificationService:
             email_status=settings.email_enabled,
             goals=NotificationServiceType.GOALS.value not in disabled,
             transactions=NotificationServiceType.TRANSACTIONS.value not in disabled,
-            budget=api_schemas.BudgetNotificationSettings(
+            budget=api_schemas.BudgetNotificationSettingsResponse(
                 total_limit=NotificationServiceType.BUDGET.value not in disabled,
-                categories_limit=NotificationServiceType.CATEGORY_LIMITS.value
-                not in disabled,
+                categories_limit=NotificationServiceType.CATEGORY_LIMITS.value not in disabled,
             ),
         )
 
     @staticmethod
     def _settings_update_to_changes(
-        request: api_schemas.NotificationSettingsUpdate,
+        request: api_schemas.NotificationSettingsUpdateRequest,
     ) -> dict[str, bool | list[str]]:
-        """Преобразует API request частичных настроек в изменения для БД."""
+        """Преобразует API request настроек в изменения для БД."""
         disabled_services: list[str] = []
 
         if not request.goals:
