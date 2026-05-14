@@ -73,7 +73,7 @@ export const mapNotificationMessage = (
 
       return translate(notification.messageKey, {
         ...rest,
-        percent: formatPercent(thresholdPercent),
+        percent: formatPercent(thresholdPercent / 100),
       })
     }
 
