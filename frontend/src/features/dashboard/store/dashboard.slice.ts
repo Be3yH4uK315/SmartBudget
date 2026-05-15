@@ -12,7 +12,11 @@ export const dashboardSlice = createSlice<
 >({
   name: 'dashboard',
   initialState: getDashboardInitialState(),
-  reducers: {},
+  reducers: {
+    clearDashboardState() {
+      return getDashboardInitialState()
+    },
+  },
 
   extraReducers: (builder) => {
     builder
@@ -50,3 +54,4 @@ declare module '@shared/store' {
 }
 
 dashboardSlice.injectInto(rootReducer)
+export const { clearDashboardState } = dashboardSlice.actions

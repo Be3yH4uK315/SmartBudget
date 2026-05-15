@@ -13,4 +13,6 @@ export type DashboardSliceState = {
   isBudgetLoading: boolean
 }
 
-export type DashboardSliceReducers = SliceCaseReducers<DashboardSliceState>
+export type DashboardSliceReducers = SliceCaseReducers<DashboardSliceState> & {
+  clearDashboardState(state: DashboardSliceState): void
+}
