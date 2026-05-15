@@ -16,11 +16,11 @@ export const budgetSlice = createSlice<BudgetSliceState, BudgetSliceReducers, 'b
   extraReducers: (builder) => {
     builder
       .addCase(getBudgetData.fulfilled, (state, { payload }) => {
-        const { totalLimitAmount, spentAmount, isAutoRenew, categories } = payload
+        const { totalLimitAmount, totalIncomeAmount, isAutoRenew, categories } = payload
 
         state.totalLimitAmount = totalLimitAmount
         state.isAutoRenew = isAutoRenew
-        state.spentAmount = spentAmount
+        state.totalIncomeAmount = totalIncomeAmount
         state.categories = categories
         state.isLoading = false
       })

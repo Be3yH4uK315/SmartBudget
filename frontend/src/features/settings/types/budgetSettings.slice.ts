@@ -5,7 +5,7 @@ export type BudgetSettingsSliceState = {
   budgetSettings: {
     totalLimitAmount: number | null
     isAutoRenew: boolean
-    categories: Omit<Category, 'spentAmount'>[]
+    categories: Omit<Category, 'transactionType' | 'amount'>[]
   }
   status: BudgetSettingsStatus
   isLoading: boolean

@@ -1,12 +1,11 @@
 import { useEffect } from 'react'
 import { CategoriesBlock, InfoBlock, OverflowCategoriesBlock } from '@features/budget/components'
-import { INCOME_CATEGORY_ID } from '@features/budget/constants/incomeCategory'
 import { useBudgetData, useBudgetPieData } from '@features/budget/hooks'
 import {
   clearBudgetState,
   getBudgetData,
   selectBudgetCategories,
-  selectBudgetCurrentValue,
+  selectBudgetTotalIncome,
   selectBudgetTotalLimit,
   selectIsAutoRenew,
   selectIsBudgetLoading,
@@ -32,22 +31,22 @@ export default function BudgetScreen() {
   const navigate = useNavigate()
   const translate = useTranslate('Budget')
 
-  const currentValue = useAppSelector(selectBudgetCurrentValue)
   const categories = useAppSelector(selectBudgetCategories)
   const totalLimit = useAppSelector(selectBudgetTotalLimit)
   const isAutoRenew = useAppSelector(selectIsAutoRenew)
   const isLoading = useAppSelector(selectIsBudgetLoading)
+  const totalIncome = useAppSelector(selectBudgetTotalIncome)
 
-  const { limited, unlimited, limitedSum, incomeCategory, preOverflow, overflow } = useBudgetData({
+  const { limited, unlimited, limitedSum, preOverflow, overflow } = useBudgetData({
     categories,
   })
 
-  const factCategories = categories.filter((c) => c.categoryId !== INCOME_CATEGORY_ID)
-  const { normalizedData: factData } = useTransactionFilters(
-    factCategories,
-    mapBudgetCategories,
-    'expense',
-  )
+  const {
+    normalizedData: factData,
+    activeType,
+    toggleFilter,
+    total: factTotal,
+  } = useTransactionFilters(categories, mapBudgetCategories, 'expense')
 
   const { normalizedData: rawPlanedData, total: planedTotal } = useTransactionFilters(
     limited,
@@ -59,7 +58,7 @@ export default function BudgetScreen() {
     totalLimit,
     rawPlanedData,
     limitedSum,
-    currentValue,
+    currentValue: factTotal,
     planedTotal,
   })
 
@@ -121,10 +120,7 @@ export default function BudgetScreen() {
                   }
                 />
 
-                <InfoBlock
-                  title={translate('income')}
-                  subtitle={formatCurrency(incomeCategory.spentAmount)}
-                />
+                <InfoBlock title={translate('income')} subtitle={formatCurrency(totalIncome)} />
 
                 <IconButton
                   onClick={handleRedirect}
@@ -143,6 +139,8 @@ export default function BudgetScreen() {
             </Stack>
 
             <TransactionsPieBlock
+              activeType={activeType}
+              toggleFilter={toggleFilter}
               title={translate('transactionsBlockTitle')}
               pieData={factData}
               centerLabel={factCenterLabel}

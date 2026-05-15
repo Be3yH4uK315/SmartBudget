@@ -2,8 +2,8 @@ export type BudgetPayload = {
   categories: Category[]
 
   totalLimitAmount: number
-
-  spentAmount: number
+  totalSpentAmount: number
+  totalIncomeAmount: number
 
   isAutoRenew: boolean
 }
@@ -13,7 +13,9 @@ export type Category = {
 
   limitAmount: number
 
-  spentAmount: number
+  amount: number
+
+  transactionType: 'expense' | 'income'
 }
 
 export type BudgetSettings = {
@@ -21,5 +23,5 @@ export type BudgetSettings = {
 
   isAutoRenew: boolean
 
-  categories: Omit<Category, 'spentAmount'>[]
+  categories: Omit<Category, 'amount' | 'transactionType'>[]
 }

@@ -1,29 +1,26 @@
 import { useMemo } from 'react'
-import { INCOME_CATEGORY_ID } from '@features/budget/constants/incomeCategory'
 import { Category } from '@features/budget/types'
 
 type Props = {
   categories: Category[]
 }
 
+type BudgetData = {
+  limitedSum: number
+  limited: Category[]
+  unlimited: Category[]
+}
+
 export const useBudgetData = ({ categories }: Props) => {
-  const { limited, unlimited, limitedSum, incomeCategory } = useMemo(() => {
-    const init = {
+  const { limited, unlimited, limitedSum } = useMemo(() => {
+    const init: BudgetData = {
       limitedSum: 0,
-      limited: [] as Category[],
-      unlimited: [] as Category[],
-      incomeCategory: {
-        categoryId: INCOME_CATEGORY_ID,
-        limitAmount: 0,
-        spentAmount: 0,
-      } as Category,
+      limited: [],
+      unlimited: [],
     }
 
     return categories.reduce((acc, c) => {
-      if (c.categoryId === INCOME_CATEGORY_ID) {
-        acc.incomeCategory.spentAmount = c.spentAmount
-        return acc
-      }
+      if (c.transactionType === 'income') return acc
 
       if (c.limitAmount > 0) {
         acc.limited.push(c)
@@ -41,7 +38,7 @@ export const useBudgetData = ({ categories }: Props) => {
     const overflow: Category[] = []
 
     limited.forEach((c) => {
-      const ratio = c.spentAmount / c.limitAmount
+      const ratio = c.amount / c.limitAmount
       if (ratio >= 0.9) overflow.push(c)
       else if (ratio >= 0.8) preOverflow.push(c)
     })
@@ -53,7 +50,6 @@ export const useBudgetData = ({ categories }: Props) => {
     limited,
     unlimited,
     limitedSum,
-    incomeCategory,
     preOverflow,
     overflow,
   }
