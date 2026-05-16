@@ -220,6 +220,8 @@ services:
       - ../../shared/python:/shared/python:ro
     environment:
       PYTHONPATH: /app:/shared/python
+      ML__MODEL_PATH: /models
+      ML__DATASET_PATH: /app/datasets
     command: >
       sh -c "
         alembic upgrade head &&
@@ -255,6 +257,8 @@ services:
       - ../../shared/python:/shared/python:ro
     environment:
       PYTHONPATH: /app:/shared/python
+      ML__MODEL_PATH: /models
+      ML__DATASET_PATH: /app/datasets
     command: arq app.workers.main.WorkerSettings
     restart: unless-stopped
     healthcheck:
@@ -286,6 +290,8 @@ services:
       - ../../shared/python:/shared/python:ro
     environment:
       PYTHONPATH: /app:/shared/python
+      ML__MODEL_PATH: /models
+      ML__DATASET_PATH: /app/datasets
     command: python -m app.run_consumer
     restart: unless-stopped
     healthcheck:

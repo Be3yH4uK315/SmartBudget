@@ -90,6 +90,9 @@ services:
       dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
+    environment:
+      ML__MODEL_PATH: /models
+      ML__DATASET_PATH: /app/datasets
     container_name: class_service_dev
     ports:
       - "8001:8001"
@@ -124,6 +127,9 @@ services:
       dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
+    environment:
+      ML__MODEL_PATH: /models
+      ML__DATASET_PATH: /app/datasets
     container_name: class_worker_dev
     depends_on:
       categorization_service:
@@ -148,6 +154,9 @@ services:
       dockerfile: services/classification/Dockerfile
     env_file:
       - ../../services/classification/.env
+    environment:
+      ML__MODEL_PATH: /models
+      ML__DATASET_PATH: /app/datasets
     container_name: class_consumers_dev
     depends_on:
       categorization_service:

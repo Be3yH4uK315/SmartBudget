@@ -19,6 +19,7 @@ class ModelArtifacts:
     model: Any
     vectorizer: Any
     class_labels: list[int]
+    metadata: dict[str, Any]
     version: str
 
 
@@ -29,6 +30,7 @@ class ModelManager:
     _artifacts: ModelArtifacts | None = None
     last_check: datetime
     _lock: asyncio.Lock
+    _ml_disabled_logged: bool
 
     def __new__(cls):
         if cls._instance is None:
@@ -36,6 +38,7 @@ class ModelManager:
             cls._instance._artifacts = None
             cls._instance.last_check = datetime.min
             cls._instance._lock = asyncio.Lock()
+            cls._instance._ml_disabled_logged = False
 
         return cls._instance
 
@@ -49,6 +52,7 @@ class ModelManager:
             "model": artifacts.model,
             "vectorizer": artifacts.vectorizer,
             "classLabels": artifacts.class_labels,
+            "metadata": artifacts.metadata,
             "modelVersion": artifacts.version,
         }
 
@@ -86,7 +90,7 @@ class ModelManager:
             active_model = await self._get_active_model(db_session_maker)
 
             if not active_model:
-                self._unload_if_needed()
+                self._disable_if_needed()
                 self.last_check = now
                 return
 
@@ -108,26 +112,30 @@ class ModelManager:
         async with uow:
             return await uow.models.get_active_model()
 
-    def _unload_if_needed(self) -> None:
-        """Выгружает текущую модель, если в БД больше нет активной модели."""
+    def _disable_if_needed(self) -> None:
+        """Штатно отключает ML, если в БД нет активной модели."""
         if not self._artifacts:
+            if not self._ml_disabled_logged:
+                logger.info("ML disabled: no active model")
+                self._ml_disabled_logged = True
             return
 
         logger.warning("No active model in DB. Unloading current model")
         self._artifacts = None
+        self._ml_disabled_logged = True
 
     async def _load_model_version(self, version: str) -> None:
         """Загружает конкретную версию модели с диска."""
         logger.info("Found new model version: %s. Loading", version)
 
         loop = asyncio.get_running_loop()
-        model, vectorizer, labels = await loop.run_in_executor(
+        model, vectorizer, labels, metadata = await loop.run_in_executor(
             None,
             MLPipeline.load_model_sync,
             version,
         )
 
-        if not model or not vectorizer:
+        if not model or not vectorizer or not metadata:
             logger.error("Failed to load files for model version %s", version)
             return
 
@@ -135,8 +143,10 @@ class ModelManager:
             model=model,
             vectorizer=vectorizer,
             class_labels=labels or [],
+            metadata=metadata,
             version=version,
         )
+        self._ml_disabled_logged = False
 
         logger.info("Hot reload success: model version %s", version)
 

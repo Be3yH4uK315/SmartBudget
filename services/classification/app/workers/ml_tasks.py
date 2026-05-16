@@ -69,6 +69,7 @@ async def build_dataset_task(ctx: dict[str, Any]) -> None:
             total_rows=total_rows,
             class_distribution=class_distribution,
         )
+        await _mark_training_feedback_processed(db_session_maker)
 
         logger.info(
             "Dataset %s ready. Rows: %s",
@@ -157,6 +158,24 @@ async def promote_model_task(ctx: dict[str, Any]) -> None:
             logger.info("No candidate model found")
             return
 
+        if not _candidate_metrics_are_valid(candidate.metrics):
+            logger.warning(
+                "Candidate %s rejected. Missing or invalid metrics",
+                candidate.version,
+            )
+            return
+
+        artifacts_valid, artifacts_error, _metadata = (
+            MLPipeline.validate_artifacts_sync(candidate.version)
+        )
+        if not artifacts_valid:
+            logger.warning(
+                "Candidate %s rejected. %s",
+                candidate.version,
+                artifacts_error,
+            )
+            return
+
         candidate_f1 = _extract_f1(candidate.metrics or {})
         if candidate_f1 < MIN_CANDIDATE_F1:
             logger.warning(
@@ -170,7 +189,7 @@ async def promote_model_task(ctx: dict[str, Any]) -> None:
             candidate_f1=candidate_f1,
             active_metrics=active_model.metrics if active_model else None,
         ):
-            uow.models.promote(candidate, active_model)
+            await uow.models.promote(candidate, active_model)
             logger.info(
                 "Model %s promoted to ACTIVE",
                 candidate.version,
@@ -238,8 +257,6 @@ async def _write_training_dataset(
             writer.write_table(table)
             total_rows += len(df_chunk)
 
-        await uow.feedback.mark_unprocessed_as_processed()
-
     return total_rows, class_distribution, writer
 
 
@@ -299,6 +316,14 @@ async def _mark_dataset_failed(
         )
 
 
+async def _mark_training_feedback_processed(db_session_maker) -> None:
+    """Помечает feedback обработанным только после успешной сборки датасета."""
+    async with UnitOfWork(db_session_maker) as uow:
+        processed_count = await uow.feedback.mark_unprocessed_as_processed()
+
+    logger.info("Marked %s feedback rows as processed", processed_count)
+
+
 async def _get_latest_ready_dataset_path(db_session_maker) -> str | None:
     """Возвращает путь к последнему READY датасету."""
     async with UnitOfWork(db_session_maker) as uow:
@@ -314,6 +339,14 @@ async def _get_latest_ready_dataset_path(db_session_maker) -> str | None:
 def _extract_f1(metrics: dict[str, Any]) -> float:
     """Извлекает F1 из metrics."""
     return float(metrics.get("val_f1_weighted", metrics.get("val_f1", 0)))
+
+
+def _candidate_metrics_are_valid(metrics: dict[str, Any] | None) -> bool:
+    """Проверяет, что candidate содержит минимальные метрики качества."""
+    if not metrics:
+        return False
+
+    return "val_f1_weighted" in metrics or "val_f1" in metrics
 
 
 def _should_promote_candidate(

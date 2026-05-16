@@ -13,6 +13,7 @@ from app.infrastructure.db.models import (
 from app.infrastructure.db.repositories.base import BaseRepository
 
 ML_LOW_CONFIDENCE_THRESHOLD = 0.8
+UNCATEGORIZED_CATEGORY_ID = 1
 
 
 class ClassificationResultRepository(BaseRepository):
@@ -121,6 +122,7 @@ class FeedbackRepository(BaseRepository):
             )
             .where(
                 Feedback.created_at >= cutoff_date,
+                Feedback.correct_category_id != UNCATEGORIZED_CATEGORY_ID,
                 or_(
                     ClassificationResult.source.in_(
                         [
@@ -164,6 +166,7 @@ class FeedbackRepository(BaseRepository):
             )
             .where(
                 Feedback.created_at >= cutoff_date,
+                Feedback.correct_category_id != UNCATEGORIZED_CATEGORY_ID,
                 or_(
                     ClassificationResult.source.in_(
                         [

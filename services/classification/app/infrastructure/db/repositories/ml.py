@@ -40,7 +40,7 @@ class ModelRepository(BaseRepository):
 
         return model
 
-    def promote(
+    async def promote(
         self,
         candidate: ClassificationModel,
         active: ClassificationModel | None,
@@ -49,6 +49,7 @@ class ModelRepository(BaseRepository):
         if active:
             active.is_active = False
             self.db.add(active)
+            await self.db.flush()
 
         candidate.is_active = True
         self.db.add(candidate)

@@ -38,7 +38,7 @@ UNCATEGORIZED_CATEGORY_ID = 1
 FINANCE_CATEGORY_ID = 24
 CLASSIFICATION_CACHE_TTL_SECONDS = 3600
 BATCH_CLASSIFICATION_CONCURRENCY = 10
-STRONG_ML_CONFIDENCE_THRESHOLD = 0.95
+STRONG_ML_CONFIDENCE_THRESHOLD = 0.85
 INCOME_TRANSACTION_TYPE = "income"
 
 
@@ -361,12 +361,6 @@ class ClassificationService:
             category_name = rule_cat_name
             confidence = 1.0
 
-            if category_id is None and event.transaction_type == INCOME_TRANSACTION_TYPE:
-                category_id, category_name, source, confidence = (
-                    await self._fallback_to_finance(confidence=0.85)
-                )
-                rule_type = "income_fallback"
-
             is_weak_rule = rule_type == "mcc"
 
             if category_id is None or is_weak_rule:
@@ -374,6 +368,7 @@ class ClassificationService:
 
                 if ml_cat_id is not None and self._should_use_ml_result(
                     rule_cat_id=rule_cat_id,
+                    rule_type=rule_type,
                     ml_cat_id=ml_cat_id,
                     ml_confidence=ml_conf,
                 ):
@@ -382,6 +377,25 @@ class ClassificationService:
                     source = ClassificationSource.ML
                     confidence = ml_conf
                     model_version = ml_version
+
+                    if is_weak_rule:
+                        logger.info(
+                            "ML result overrode weak MCC rule",
+                            extra={
+                                "transaction_id": str(event.transaction_id),
+                                "rule_type": rule_type,
+                                "ml_category_id": ml_cat_id,
+                                "ml_confidence": ml_conf,
+                                "model_version": ml_version,
+                                "fallback_reason": "mcc_overridden_by_ml",
+                            },
+                        )
+
+            if category_id is None and event.transaction_type == INCOME_TRANSACTION_TYPE:
+                category_id, category_name, source, confidence = (
+                    await self._fallback_to_finance(confidence=0.85)
+                )
+                rule_type = "income_fallback"
 
         if category_id is None:
             logger.info(
@@ -427,15 +441,24 @@ class ClassificationService:
     ) -> tuple[int | None, str | None, float, str | None]:
         """Применяет ML-классификацию к транзакции."""
         if not self.ml_pipeline:
+            logger.debug(
+                "ML classification skipped: no active model",
+                extra={
+                    "transaction_id": str(event.transaction_id),
+                    "fallback_reason": "no_model",
+                },
+            )
             return None, None, 0.0, None
 
         model_version = self.ml_pipeline.get("modelVersion")
+        accept_threshold = settings.ML.ML_CONFIDENCE_THRESHOLD_ACCEPT
 
         try:
             data = {
                 "merchant": event.merchant,
                 "mcc": event.mcc,
                 "description": event.description,
+                "transaction_type": event.transaction_type,
             }
             category_id, confidence = await MLPipeline.predict_async(
                 self.ml_pipeline["model"],
@@ -449,16 +472,53 @@ class ClassificationService:
                 "ML classification failed for transaction %s: %s",
                 event.transaction_id,
                 exc,
+                extra={
+                    "transaction_id": str(event.transaction_id),
+                    "model_version": model_version,
+                    "fallback_reason": "prediction_error",
+                },
                 exc_info=True,
             )
             return None, None, 0.0, model_version
 
-        if confidence < settings.ML.ML_CONFIDENCE_THRESHOLD_AUDIT:
+        if confidence < accept_threshold:
+            logger.info(
+                "ML classification rejected by confidence threshold",
+                extra={
+                    "transaction_id": str(event.transaction_id),
+                    "predicted_category_id": category_id,
+                    "confidence": confidence,
+                    "threshold": accept_threshold,
+                    "model_version": model_version,
+                    "fallback_reason": "low_confidence",
+                },
+            )
             return None, None, confidence, model_version
 
         category = await self.uow.categories.get_by_id(category_id)
         if not category:
+            logger.warning(
+                "ML classification rejected because category was not found",
+                extra={
+                    "transaction_id": str(event.transaction_id),
+                    "predicted_category_id": category_id,
+                    "confidence": confidence,
+                    "model_version": model_version,
+                    "fallback_reason": "category_not_found",
+                },
+            )
             return None, None, confidence, model_version
+
+        logger.info(
+            "ML classification accepted",
+            extra={
+                "transaction_id": str(event.transaction_id),
+                "category_id": category_id,
+                "confidence": confidence,
+                "threshold": accept_threshold,
+                "model_version": model_version,
+            },
+        )
 
         return category_id, category.name, confidence, model_version
 
@@ -492,16 +552,18 @@ class ClassificationService:
     @staticmethod
     def _should_use_ml_result(
         rule_cat_id: int | None,
+        rule_type: str | None,
         ml_cat_id: int,
         ml_confidence: float,
     ) -> bool:
         """Определяет, можно ли заменить результат правила ML-результатом."""
+        if rule_cat_id is None:
+            return True
+
         return (
-            rule_cat_id is None
-            or (
-                ml_confidence > STRONG_ML_CONFIDENCE_THRESHOLD
-                and ml_cat_id != UNCATEGORIZED_CATEGORY_ID
-            )
+            rule_type == "mcc"
+            and ml_confidence > STRONG_ML_CONFIDENCE_THRESHOLD
+            and ml_cat_id != UNCATEGORIZED_CATEGORY_ID
         )
 
 

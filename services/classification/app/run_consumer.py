@@ -9,6 +9,7 @@ from app.core.logging import setup_logging
 from app.core.redis import close_redis_pool, create_redis_pool
 from app.infrastructure.kafka.consumer import KafkaConsumerWorker
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
+from app.services.ml.bootstrap import seed_model_if_empty
 from init_rules import seed_rules_if_empty
 
 setup_logging()
@@ -46,6 +47,7 @@ async def main() -> None:
 
     try:
         await seed_rules_if_empty(db_session_maker)
+        await seed_model_if_empty(db_session_maker)
 
         redis_pool = await create_redis_pool()
         redis_client = Redis(

@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import get_db_engine, get_session_factory
 from app.core.redis import close_redis_pool, create_redis_pool
 from app.services.classification.rules import ruleManager
+from app.services.ml.bootstrap import seed_model_if_empty
 from app.services.ml.manager import modelManager
 from init_rules import seed_rules_if_empty
 
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Pre-loading models and rules")
     try:
         await seed_rules_if_empty(session_factory)
+        await seed_model_if_empty(session_factory)
         await modelManager.check_for_updates(session_factory)
         await ruleManager.check_for_updates(session_factory)
         logger.info("Models and rules loaded successfully")

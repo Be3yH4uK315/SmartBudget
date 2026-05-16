@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN addgroup --system appgroup && adduser --system --group appuser
 
-RUN mkdir -p /app/datasets /models /app/ml_models \
-    && chown -R appuser:appgroup /app/datasets /models /app/ml_models
+RUN mkdir -p /app/datasets /models \
+    && chown -R appuser:appgroup /app/datasets /models
 
 COPY --from=builder /tmp/wheels /tmp/wheels
 RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
@@ -45,7 +45,8 @@ USER appuser
 
 ENV HOME=/tmp
 ENV PYTHONPATH=/app
-ENV MODEL_PATH=/models
+ENV ML__MODEL_PATH=/models
+ENV ML__DATASET_PATH=/app/datasets
 ENV PATH="/home/appuser/.local/bin:$PATH"
 
 CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8001"]
