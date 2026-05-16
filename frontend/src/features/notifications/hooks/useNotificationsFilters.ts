@@ -43,6 +43,7 @@ export function useNotificationsFilters() {
 
     appliedFiltersRef.current = nextFilters
 
+    dispatch(clearNotificationsState())
     dispatch(getNotifications(nextFilters))
   }
 
@@ -100,11 +101,6 @@ export function useNotificationsFilters() {
 
   useEffect(() => {
     applyFilters(localFilters)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    dispatch(getNotifications(localFilters))
 
     return () => {
       dispatch(clearNotificationsState())
