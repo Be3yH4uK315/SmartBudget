@@ -16,7 +16,7 @@ export const userSlice = createSlice<userSliceState, userSliceReducers, 'user', 
     builder.addCase(getUserInfo.fulfilled, (state, { payload }) => {
       state.name = payload.name
       state.role = payload.role
-      state.userId = payload.id
+      state.userId = payload.userId
       state.email = payload.email
       state.isAuth = true
     })

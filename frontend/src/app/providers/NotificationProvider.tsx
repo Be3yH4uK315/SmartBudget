@@ -8,7 +8,7 @@ const POLLING_INTERVAL = 60_000
 export function NotificationsProvider({ children }: PropsWithChildren) {
   const dispatch = useAppDispatch()
   const isAuth = useAppSelector(selectUser).isAuth
-  const { userId } = useAppSelector(selectUser)
+  const userId = useAppSelector(selectUser).userId
 
   useEffect(() => {
     if (!isAuth || !userId) return

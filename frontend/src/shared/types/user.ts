@@ -1,7 +1,7 @@
 /** Тип описывающий пользователя */
 export type User = {
   /** ID пользователя */
-  id: string
+  userId: string
 
   /** Роль пользователя */
   role: 0 | 1
