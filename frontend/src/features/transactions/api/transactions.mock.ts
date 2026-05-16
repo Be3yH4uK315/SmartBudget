@@ -135,6 +135,10 @@ class TransactionsMock {
   async importTransaction(): Promise<void> {
     await this.delay(10000)
   }
+
+  async addTransaction(...props: any): Promise<void> {
+    await this.delay(10000)
+  }
 }
 
 export const transactionsMock = new TransactionsMock()

@@ -15,7 +15,7 @@ class GoalsApi {
   baseUrl = '/goals'
 
   async getGoals(filters?: GoalsFilters): Promise<SimplifiedGoal[]> {
-    const url = `${this.baseUrl}/`
+    const url = `${this.baseUrl}`
 
     const params: Record<string, string> = {}
 

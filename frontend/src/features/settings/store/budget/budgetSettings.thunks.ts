@@ -27,7 +27,7 @@ export const setBudgetSettings = createAsyncThunk<
   try {
     const response = await settingsApi.setBudgetSettings(payload)
 
-    showToast({ messageKey: 'BudgetSettingsSet', type: 'success' })
+    showToast({ messageKey: 'budgetSettingsSet', type: 'success' })
 
     return response
   } catch (e: any) {
