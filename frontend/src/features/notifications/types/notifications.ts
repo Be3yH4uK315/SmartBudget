@@ -1,5 +1,6 @@
 export type NotificationType = 'info' | 'success' | 'alert' | 'warning' | 'system'
 export type NotificationService = 'Goals' | 'Transactions' | 'Budget' | 'Limit' | 'Security'
+export type NotificationStatus = 'read' | 'unread'
 
 export type NotificationBase = {
   notificationId: string
@@ -95,4 +96,10 @@ export type NotificationsListResponse = {
   totalCount: number
   unreadCount: number
   items: Notification[]
+}
+
+export type NotificationsFilters = {
+  services: Exclude<NotificationService, 'Limit'>[]
+  types: NotificationType[]
+  statuses: NotificationStatus | ''
 }

@@ -3,6 +3,7 @@ import { Languages, User } from '@shared/types'
 
 class User_api {
   baseURL = '/user'
+  notificationsURL = '/notifications'
 
   async getUserInfo(): Promise<User> {
     const url = `${this.baseURL}/me`
@@ -14,6 +15,13 @@ class User_api {
   async updateUserLang(language: Languages): Promise<void> {
     const url = `${this.baseURL}/language`
     const response = await api.patch<void>(url, { language })
+
+    return response.data
+  }
+
+  async getUnreadNotificationsCount(): Promise<{ unreadCount: number }> {
+    const url = `${this.notificationsURL}/unread-count`
+    const response = await api.get<{ unreadCount: number }>(url)
 
     return response.data
   }

@@ -1,6 +1,12 @@
-import { Notification } from '@features/notifications/types'
-import { Category, Transaction } from '@features/transactions/types'
+import {
+  Notification,
+  NotificationService,
+  NotificationsFilters,
+  NotificationsListResponse,
+} from '@features/notifications/types'
+import { CategoryNumber, Transaction } from '@features/transactions/types'
 import dayjs from 'dayjs'
+import { NOTIFICATIONS_LIMIT } from '../constants'
 
 const createdAts = [
   '2026-02-15T10:12:00Z',
@@ -16,7 +22,7 @@ const goalNames = ['Новая машина', 'Отпуск', 'Квартира'
 const createMockTransaction = (id: string, i: number, date: string): Transaction => ({
   transactionId: id,
   amount: 1000 + i * 250,
-  categoryId: ((i % 10) + 1) as Category,
+  categoryId: ((i % 10) + 1) as CategoryNumber,
   description: i % 2 ? 'Покупка' : null,
   merchant: ['Pyaterochka', 'Yandex Go', 'Ozon', 'Steam'][i % 4],
   mcc: null,
@@ -255,21 +261,70 @@ const ALL_NOTIFICATIONS: Notification[] = notifications.sort((a, b) =>
 
 class NotificationsMock {
   baseUrl = '/notifications'
+
+  transactionsUrl = '/transactions'
+
   private data = ALL_NOTIFICATIONS
+
   private transactions = transactions
 
   private delay(ms = 500) {
     return new Promise((r) => setTimeout(r, ms))
   }
 
-  async getNotifications(): Promise<Notification[]> {
-    console.log('%cMOCK getNotifications', 'color: orange')
+  async getNotifications(
+    offset = 0,
+    filters: NotificationsFilters = {
+      services: [],
+      types: [],
+      statuses: '',
+    },
+  ): Promise<NotificationsListResponse> {
+    console.log('%cMOCK getNotifications', 'color: orange', { offset, filters })
+
     await this.delay(600)
-    return [...this.data]
+
+    let filtered = [...this.data]
+
+    // Фильтрация по сервисам
+    if (filters.services.length > 0) {
+      filtered = filtered.filter((notification) =>
+        filters.services.includes(notification.service as Exclude<NotificationService, 'Limit'>),
+      )
+    }
+
+    // Фильтрация по типам
+    if (filters.types.length > 0) {
+      filtered = filtered.filter((notification) =>
+        filters.types.includes(notification.notificationType),
+      )
+    }
+
+    // Фильтрация по статусу
+    if (filters.statuses === 'read') {
+      filtered = filtered.filter((notification) => notification.isRead)
+    }
+
+    if (filters.statuses === 'unread') {
+      filtered = filtered.filter((notification) => !notification.isRead)
+    }
+
+    const totalCount = filtered.length
+    const unreadCount = filtered.filter((notification) => !notification.isRead).length
+
+    // Пагинация
+    const items = filtered.slice(offset, offset + NOTIFICATIONS_LIMIT)
+
+    return {
+      totalCount,
+      unreadCount,
+      items,
+    }
   }
 
   async getTransactionById(transactionId: string): Promise<Transaction> {
     console.log('%cMOCK getTransactionById', 'color: orange', transactionId)
+
     await this.delay(400)
 
     const tx = this.transactions.get(transactionId)
@@ -283,13 +338,20 @@ class NotificationsMock {
 
   async markAsRead(notificationId: string): Promise<void> {
     await this.delay(300)
-    const n = this.data.find((n) => n.notificationId === notificationId)
-    if (n) n.isRead = true
+
+    const notification = this.data.find((n) => n.notificationId === notificationId)
+
+    if (notification) {
+      notification.isRead = true
+    }
   }
 
   async markAllAsRead(): Promise<void> {
     await this.delay(500)
-    this.data.forEach((n) => (n.isRead = true))
+
+    this.data.forEach((notification) => {
+      notification.isRead = true
+    })
   }
 }
 

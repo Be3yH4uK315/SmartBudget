@@ -35,9 +35,11 @@ from app.services.ml.pipeline import MLPipeline
 logger = logging.getLogger(__name__)
 
 UNCATEGORIZED_CATEGORY_ID = 1
+FINANCE_CATEGORY_ID = 24
 CLASSIFICATION_CACHE_TTL_SECONDS = 3600
 BATCH_CLASSIFICATION_CONCURRENCY = 10
 STRONG_ML_CONFIDENCE_THRESHOLD = 0.95
+INCOME_TRANSACTION_TYPE = "income"
 
 
 def _utc_now() -> datetime:
@@ -337,39 +339,60 @@ class ClassificationService:
         event: TransactionNeedCategoryPayload,
     ) -> tuple[ClassificationResult, dict[str, Any]]:
         """Рассчитывает категорию транзакции по правилам и ML."""
-        merchant = event.merchant
+        merchant = event.merchant or ""
         mcc = event.mcc
         description = event.description or ""
-
-        rule_cat_id, rule_cat_name, rule_type = ruleManager.find_match(
-            merchant=merchant,
-            mcc=mcc,
-            description=description,
-        )
-
-        category_id = rule_cat_id
-        category_name = rule_cat_name
         source = ClassificationSource.RULES
-        confidence = 1.0
         model_version = None
 
-        is_weak_rule = rule_type == "mcc"
+        if event.account_id:
+            category_id, category_name, source, confidence = (
+                await self._fallback_to_finance(confidence=1.0)
+            )
+            rule_type = "goal_account"
+        else:
+            rule_cat_id, rule_cat_name, rule_type = ruleManager.find_match(
+                merchant=merchant,
+                mcc=mcc,
+                description=description,
+            )
 
-        if rule_cat_id is None or is_weak_rule:
-            ml_cat_id, ml_cat_name, ml_conf, ml_version = await self._apply_ml(event)
+            category_id = rule_cat_id
+            category_name = rule_cat_name
+            confidence = 1.0
 
-            if ml_cat_id is not None and self._should_use_ml_result(
-                rule_cat_id=rule_cat_id,
-                ml_cat_id=ml_cat_id,
-                ml_confidence=ml_conf,
-            ):
-                category_id = ml_cat_id
-                category_name = ml_cat_name
-                source = ClassificationSource.ML
-                confidence = ml_conf
-                model_version = ml_version
+            if category_id is None and event.transaction_type == INCOME_TRANSACTION_TYPE:
+                category_id, category_name, source, confidence = (
+                    await self._fallback_to_finance(confidence=0.85)
+                )
+                rule_type = "income_fallback"
+
+            is_weak_rule = rule_type == "mcc"
+
+            if category_id is None or is_weak_rule:
+                ml_cat_id, ml_cat_name, ml_conf, ml_version = await self._apply_ml(event)
+
+                if ml_cat_id is not None and self._should_use_ml_result(
+                    rule_cat_id=rule_cat_id,
+                    ml_cat_id=ml_cat_id,
+                    ml_confidence=ml_conf,
+                ):
+                    category_id = ml_cat_id
+                    category_name = ml_cat_name
+                    source = ClassificationSource.ML
+                    confidence = ml_conf
+                    model_version = ml_version
 
         if category_id is None:
+            logger.info(
+                "Transaction classification fell back to uncategorized",
+                extra={
+                    "transaction_id": str(event.transaction_id),
+                    "merchant": merchant,
+                    "mcc": mcc,
+                    "transaction_type": event.transaction_type,
+                },
+            )
             category_id, category_name, source, confidence = (
                 await self._fallback_to_uncategorized()
             )
@@ -450,6 +473,20 @@ class ClassificationService:
             category.name if category else "Other",
             ClassificationSource.RULES,
             0.0,
+        )
+
+    async def _fallback_to_finance(
+        self,
+        confidence: float,
+    ) -> tuple[int, str, ClassificationSource, float]:
+        """Возвращает категорию финансов для доходов, переводов и goal-транзакций."""
+        category = await self.uow.categories.get_by_id(FINANCE_CATEGORY_ID)
+
+        return (
+            FINANCE_CATEGORY_ID,
+            category.name if category else "Финансы",
+            ClassificationSource.RULES,
+            confidence,
         )
 
     @staticmethod

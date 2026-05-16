@@ -14,6 +14,17 @@ RULE_TYPE_REGEX = "regex"
 RULE_TYPE_CONTAINS = "contains"
 
 
+def normalize_rule_text(value: str | None) -> str:
+    """Нормализует текст merchant/description для rule-based поиска."""
+    if not value:
+        return ""
+
+    normalized = value.casefold().replace("ё", "е")
+    normalized = re.sub(r"[^0-9a-zа-я]+", " ", normalized)
+
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
 class RuleManager:
     """
     Singleton manager для правил классификации.
@@ -73,18 +84,19 @@ class RuleManager:
 
     def find_match(
         self,
-        merchant: str,
+        merchant: str | None,
         mcc: int | None,
-        description: str,
+        description: str | None,
     ) -> tuple[int | None, str | None, str | None]:
         """Ищет подходящее правило классификации."""
-        text = self._build_search_text(merchant, description)
+        raw_text = self._build_raw_search_text(merchant, description)
+        normalized_text = normalize_rule_text(raw_text)
 
-        exact_match = self._find_exact_match(text)
+        exact_match = self._find_exact_match(normalized_text)
         if exact_match:
             return exact_match
 
-        complex_match = self._find_complex_match(text)
+        complex_match = self._find_complex_match(raw_text, normalized_text)
         if complex_match:
             return complex_match
 
@@ -122,7 +134,13 @@ class RuleManager:
             elif pattern_type in {RULE_TYPE_REGEX, RULE_TYPE_CONTAINS}:
                 self._add_complex_rule(rule, complex_rules)
 
-        complex_rules.sort(key=lambda item: item["priority"])
+        complex_rules.sort(
+            key=lambda item: (
+                item["priority"],
+                -item.get("specificity", 0),
+                item["rule_id"],
+            ),
+        )
 
         return mcc_rules, exact_rules, complex_rules
 
@@ -136,7 +154,14 @@ class RuleManager:
         if not mcc:
             return
 
-        if mcc not in mcc_rules:
+        existing = mcc_rules.get(mcc)
+        if existing is None or (
+            rule["priority"],
+            rule["rule_id"],
+        ) < (
+            existing["priority"],
+            existing["rule_id"],
+        ):
             mcc_rules[mcc] = rule
 
     @staticmethod
@@ -153,7 +178,7 @@ class RuleManager:
             )
             return
 
-        normalized_pattern = pattern.lower().strip()
+        normalized_pattern = normalize_rule_text(pattern)
         if normalized_pattern not in exact_rules:
             exact_rules[normalized_pattern] = rule
 
@@ -173,6 +198,9 @@ class RuleManager:
                 rule.get("rule_id"),
             )
             return
+
+        rule["normalized_pattern"] = normalize_rule_text(pattern)
+        rule["specificity"] = len(rule["normalized_pattern"] or pattern)
 
         if pattern_type == RULE_TYPE_REGEX:
             try:
@@ -245,9 +273,9 @@ class RuleManager:
         )
 
     @staticmethod
-    def _build_search_text(merchant: str, description: str) -> str:
+    def _build_raw_search_text(merchant: str | None, description: str | None) -> str:
         """Формирует текст для поиска правил."""
-        return f"{merchant} {description}".lower().strip()
+        return f"{merchant or ''} {description or ''}".casefold().strip()
 
     def _find_exact_match(
         self,
@@ -262,19 +290,23 @@ class RuleManager:
 
     def _find_complex_match(
         self,
-        text: str,
+        raw_text: str,
+        normalized_text: str,
     ) -> tuple[int, str, str] | None:
         """Ищет regex/contains match."""
         for rule in self._complex_rules:
             pattern_type = rule["pattern_type"]
-            pattern = rule["pattern"].lower()
+            pattern = rule.get("normalized_pattern", "")
             is_match = False
 
-            if pattern_type == RULE_TYPE_CONTAINS and pattern in text:
+            if pattern_type == RULE_TYPE_CONTAINS and pattern and pattern in normalized_text:
                 is_match = True
 
             elif pattern_type == RULE_TYPE_REGEX and "compiled_regex" in rule:
-                is_match = bool(rule["compiled_regex"].search(text))
+                is_match = bool(
+                    rule["compiled_regex"].search(raw_text)
+                    or rule["compiled_regex"].search(normalized_text),
+                )
 
             if is_match:
                 return rule["category_id"], rule["category_name"], pattern_type

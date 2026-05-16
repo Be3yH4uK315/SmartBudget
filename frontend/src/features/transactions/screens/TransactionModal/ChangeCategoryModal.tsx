@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { changeCategory, selectIsCategoryChanging } from '@features/transactions/store'
-import { Category, Transaction } from '@features/transactions/types'
+import { CategoryNumber, Transaction } from '@features/transactions/types'
 import { ArrowBackOutlined } from '@mui/icons-material'
 import {
   Button,
@@ -43,11 +43,11 @@ export const ChangeCategoryModal = ({ transaction }: Props) => {
     await dispatch(
       changeCategory({
         transactionId: transaction.transactionId,
-        categoryId: selectedCategory as Category,
+        categoryId: selectedCategory as CategoryNumber,
       }),
     ).unwrap()
 
-    openPrev({ ...transaction, categoryId: selectedCategory as Category })
+    openPrev({ ...transaction, categoryId: selectedCategory as CategoryNumber })
   }
 
   const openPrev = (transaction: Transaction) =>

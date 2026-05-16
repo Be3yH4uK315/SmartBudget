@@ -85,7 +85,7 @@ async def create_manual_transaction(
 
 
 @router.post(
-    "/import/mock",
+    "/import",
     response_model=schemas.ImportMockTransactionsResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Импортировать mock-транзакции",

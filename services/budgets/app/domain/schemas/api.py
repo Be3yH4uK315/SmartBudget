@@ -89,12 +89,21 @@ class CreateBudgetResponse(CamelModel):
     budget_id: UUID = Field(..., description="ID созданного бюджета")
     total_limit_amount: Decimal = Field(..., description="Общий лимит бюджета")
     total_income_amount: Decimal = Field(..., description="Общая сумма доходов")
-    spent_amount: Decimal = Field(..., description="Потраченная сумма")
+    total_spent_amount: Decimal = Field(..., description="Потраченная сумма")
     is_auto_renew: bool = Field(..., description="Автопродление бюджета")
     categories: list[CategoryResponse] = Field(
         default_factory=list,
         description="Категории бюджета",
     )
+
+
+class BudgetCategoryResponse(CamelModel):
+    """Агрегат транзакций бюджета по категории и типу."""
+
+    category_id: int = Field(..., description="ID категории")
+    limit_amount: Decimal = Field(..., description="Лимит по категории")
+    amount: Decimal = Field(..., description="Сумма транзакций")
+    transaction_type: TransactionType = Field(..., description="Тип транзакции")
 
 
 class PatchBudgetResponse(CamelModel):
@@ -115,11 +124,12 @@ class CategorySettingsResponse(CamelModel):
 class BudgetResponse(CamelModel):
     """Ответ с бюджетом пользователя."""
 
+    budget_id: UUID | None = Field(None, description="ID бюджета")
     total_limit_amount: Decimal = Field(..., description="Общий лимит бюджета")
     total_income_amount: Decimal = Field(..., description="Общая сумма доходов")
-    spent_amount: Decimal = Field(..., description="Потраченная сумма")
+    total_spent_amount: Decimal = Field(..., description="Потраченная сумма")
     is_auto_renew: bool = Field(..., description="Автопродление бюджета")
-    categories: list[CategoryResponse] = Field(
+    categories: list[BudgetCategoryResponse] = Field(
         default_factory=list,
         description="Категории бюджета",
     )

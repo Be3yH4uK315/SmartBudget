@@ -156,14 +156,31 @@ def _category_response(category: models.CategoryLimit) -> api_schemas.CategoryRe
     )
 
 
-def _sort_categories_by_spent(
+def _budget_category_responses(
     categories: list[models.CategoryLimit],
-) -> list[models.CategoryLimit]:
-    """Сортирует категории по убыванию потраченной суммы."""
-    return sorted(
-        categories,
-        key=lambda item: (-item.spent_amount, item.category_id),
-    )
+) -> list[api_schemas.BudgetCategoryResponse]:
+    """Преобразует категории в агрегаты по типу транзакции."""
+    result: list[api_schemas.BudgetCategoryResponse] = []
+
+    for category in sorted(categories, key=lambda item: item.category_id):
+        result.append(
+            api_schemas.BudgetCategoryResponse(
+                category_id=category.category_id,
+                limit_amount=category.limit_amount,
+                amount=category.spent_amount,
+                transaction_type=TransactionType.EXPENSE,
+            ),
+        )
+        result.append(
+            api_schemas.BudgetCategoryResponse(
+                category_id=category.category_id,
+                limit_amount=ZERO_AMOUNT,
+                amount=category.income_amount,
+                transaction_type=TransactionType.INCOME,
+            ),
+        )
+
+    return result
 
 
 def _category_settings_response(
@@ -179,14 +196,13 @@ def _category_settings_response(
 
 def _budget_to_response(budget: models.Budget) -> api_schemas.BudgetResponse:
     """Преобразует Budget в основной API response."""
-    categories = _sort_categories_by_spent(list(budget.category_limits))
-
     return api_schemas.BudgetResponse(
+        budget_id=budget.budget_id,
         total_limit_amount=budget.total_limit_amount,
         total_income_amount=_income_total(budget),
-        spent_amount=_expense_total(budget),
+        total_spent_amount=_expense_total(budget),
         is_auto_renew=budget.is_auto_renew,
-        categories=[_category_response(category) for category in categories],
+        categories=_budget_category_responses(list(budget.category_limits)),
     )
 
 
@@ -203,7 +219,7 @@ def _budget_to_create_response(
         budget_id=budget.budget_id,
         total_limit_amount=budget.total_limit_amount,
         total_income_amount=_income_total(budget),
-        spent_amount=_expense_total(budget),
+        total_spent_amount=_expense_total(budget),
         is_auto_renew=budget.is_auto_renew,
         categories=[_category_response(category) for category in categories],
     )
@@ -1245,9 +1261,10 @@ class BudgetService:
     def _empty_budget_response() -> api_schemas.BudgetResponse:
         """Возвращает пустой budget response."""
         return api_schemas.BudgetResponse(
+            budget_id=None,
             total_limit_amount=ZERO_AMOUNT,
             total_income_amount=ZERO_AMOUNT,
-            spent_amount=ZERO_AMOUNT,
+            total_spent_amount=ZERO_AMOUNT,
             is_auto_renew=False,
             categories=[],
         )

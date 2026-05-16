@@ -12,7 +12,7 @@ export type Transaction = {
   /** Сумма */
   amount: number
   /** ID категории */
-  categoryId: Category
+  categoryId: CategoryNumber
   /** Описание */
   description: string | null
   /** Продавец / название */
@@ -20,18 +20,20 @@ export type Transaction = {
   /** МСС */
   mcc: string | null
   /** Статус */
-  status: 'confirmed' | 'rejected' | 'pending'
+  status: TransactionStatus
   /** Дата транзакции */
   date: string
   /** Тип транзакции */
   transactionType: TransactionType
 }
 
+export type TransactionStatus = 'confirmed' | 'rejected' | 'pending'
+
 export type TransactionType = 'income' | 'expense'
 
 export type ChangeCategoryRequest = {
   transactionId: string
-  categoryId: Category
+  categoryId: CategoryNumber
 }
 
 export type TransactionsBlock = {
@@ -40,7 +42,7 @@ export type TransactionsBlock = {
 }
 
 export type TransactionsFilters = {
-  categoryIds: Category[]
+  categoryIds: CategoryNumber[]
   valueFrom?: number
   valueTo?: number
   dateFrom: string
@@ -48,10 +50,35 @@ export type TransactionsFilters = {
   type: TransactionType | ''
 }
 
-export type Category = (typeof CATEGORY_IDS)[number]
+export type CategoryNumber = (typeof CATEGORY_IDS)[number]
 
 export type TransactionsChip =
   | { type: 'category'; id: number }
   | { type: 'date'; from?: string; to?: string }
   | { type: 'value'; from?: number; to?: number }
   | { type: 'type'; value: string }
+
+export type ManualTransaction = {
+  accountId?: string
+
+  amount: number
+
+  transactionType?: TransactionType
+
+  date?: string
+
+  categoryId?: CategoryNumber
+
+  description?: string
+
+  merchant: string
+
+  mcc?: number
+
+  status?: TransactionStatus
+}
+
+export type GoalId = {
+  goalId: string
+  name: string
+}

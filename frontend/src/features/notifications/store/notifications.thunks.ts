@@ -1,20 +1,20 @@
-import { notificationsApi, notificationsMock } from '@features/notifications/api'
-import { Notification } from '@features/notifications/types'
+import { notificationsApi } from '@features/notifications/api'
+import { Notification, NotificationsFilters } from '@features/notifications/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
 
 export const getNotifications = createAsyncThunk<
   { notifications: Notification[]; length: number; totalCount: number; unreadCount: number },
-  void,
+  NotificationsFilters,
   { state: RootState }
->('getNotifications', async (_, { getState }) => {
+>('getNotifications', async (filters, { getState }) => {
   try {
     const state = getState()
 
     const offset = state.notifications?.offset ?? 0
 
-    const response = await notificationsApi.getNotifications(offset)
+    const response = await notificationsApi.getNotifications(offset, filters)
 
     return {
       notifications: response.items,

@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import TypeAlias
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
 from app.domain.enums import TransactionStatus, TransactionType
 
@@ -14,6 +14,47 @@ def to_camel(string: str) -> str:
     return parts[0] + "".join(word.capitalize() for word in parts[1:])
 
 
+def _utc_now() -> datetime:
+    """Возвращает текущее UTC-время."""
+    return datetime.now(timezone.utc)
+
+
+def _ensure_utc_datetime(value: datetime) -> datetime:
+    """Возвращает datetime в UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
+
+
+def _serialize_utc_datetime(value: datetime) -> str:
+    """Сериализует datetime в UTC ISO-8601 с Z."""
+    return _ensure_utc_datetime(value).isoformat().replace("+00:00", "Z")
+
+
+def _date_only_to_current_utc_time(value):
+    """Дополняет date-only input текущим временем UTC."""
+    if isinstance(value, datetime):
+        return value
+
+    parsed_date: date | None = None
+    if isinstance(value, date):
+        parsed_date = value
+    elif isinstance(value, str):
+        raw_value = value.strip()
+        if len(raw_value) == 10:
+            try:
+                parsed_date = date.fromisoformat(raw_value)
+            except ValueError:
+                return value
+
+    if parsed_date is None:
+        return value
+
+    now = _utc_now()
+    return datetime.combine(parsed_date, now.timetz())
+
+
 class CamelModel(BaseModel):
     """Базовая Pydantic-модель с camelCase alias."""
 
@@ -21,22 +62,34 @@ class CamelModel(BaseModel):
         alias_generator=to_camel,
         populate_by_name=True,
         from_attributes=True,
-        json_encoders={Decimal: float},
+        json_encoders={Decimal: float, datetime: _serialize_utc_datetime},
     )
 
 
 class CreateManualTransactionRequest(CamelModel):
     """Запрос на создание ручной транзакции."""
 
-    transaction_id: UUID = Field(..., description="ID транзакции внешнего банка")
-
     account_id: UUID | None = Field(None, description="ID счета")
     amount: Decimal = Field(..., gt=0, description="Сумма транзакции")
     transaction_type: TransactionType = Field(..., description="Тип транзакции")
-    date: datetime | None = Field(None, description="Время операции")
+    status: TransactionStatus = Field(..., description="Статус транзакции")
+    date: datetime = Field(..., description="Время операции")
     category_id: int | None = Field(None, description="ID категории")
     description: str | None = Field("", max_length=2000, description="Описание транзакции")
-    merchant: str | None = Field(None, max_length=500, description="Название merchant")
+    merchant: str = Field(..., max_length=500, description="Название merchant")
+    mcc: int | None = Field(None, description="MCC код")
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def fill_date_only_time(cls, value):
+        """Дополняет date-only input текущим временем UTC."""
+        return _date_only_to_current_utc_time(value)
+
+    @field_validator("date")
+    @classmethod
+    def normalize_date_to_utc(cls, value: datetime) -> datetime:
+        """Нормализует время операции в UTC."""
+        return _ensure_utc_datetime(value)
 
 
 class CreateManualTransactionResponse(CamelModel):
@@ -69,17 +122,28 @@ class DeleteTransactionResponse(CamelModel):
 class ImportTransactionItemRequest(CamelModel):
     """Элемент запроса mock-импорта транзакции."""
 
-    user_id: UUID | None = Field(None, description="ID пользователя")
-    transaction_id: UUID = Field(..., description="ID транзакции")
+    user_id: UUID = Field(..., description="ID пользователя")
     account_id: UUID | None = Field(None, description="ID счета")
     date: datetime = Field(..., description="Время операции")
     amount: Decimal = Field(..., gt=0, description="Сумма транзакции")
     transaction_type: TransactionType = Field(..., description="Тип транзакции")
-    status: TransactionStatus | None = Field(None, description="Статус транзакции")
-    merchant: str | None = Field("", max_length=500, description="Название merchant")
+    status: TransactionStatus = Field(..., description="Статус транзакции")
+    merchant: str = Field(..., max_length=500, description="Название merchant")
     mcc: int | None = Field(None, description="MCC код")
     description: str | None = Field("", max_length=2000, description="Описание транзакции")
     category_id: int | None = Field(None, description="ID категории")
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def fill_date_only_time(cls, value):
+        """Дополняет date-only input текущим временем UTC."""
+        return _date_only_to_current_utc_time(value)
+
+    @field_validator("date")
+    @classmethod
+    def normalize_date_to_utc(cls, value: datetime) -> datetime:
+        """Нормализует время операции в UTC."""
+        return _ensure_utc_datetime(value)
 
 
 ImportMockTransactionsPayload: TypeAlias = (

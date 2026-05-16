@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { BudgetBlock, DashboardScreenSkeleton, GoalsBlock } from '@features/dashboard/screens'
 import {
+  clearDashboardState,
   getDashboardBudget,
   getDashboardGoals,
   selectBudgetLimit,
@@ -84,6 +85,10 @@ export default function DashboardScreen() {
   useEffect(() => {
     dispatch(getDashboardBudget())
     dispatch(getDashboardGoals())
+
+    return () => {
+      dispatch(clearDashboardState())
+    }
   }, [dispatch])
 
   return (

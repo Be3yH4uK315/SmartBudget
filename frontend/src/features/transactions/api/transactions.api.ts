@@ -1,10 +1,16 @@
 import { PAGE_SIZE } from '@features/transactions/constants'
-import { Transaction, TransactionsFilters } from '@features/transactions/types'
+import {
+  GoalId,
+  ManualTransaction,
+  Transaction,
+  TransactionsFilters,
+} from '@features/transactions/types'
 import { api } from '@shared/api'
 import { SEARCH_LIMIT } from '@shared/constants'
 
 class TransactionsApi {
   baseUrl = '/transactions'
+  goalsUrl = '/goals'
 
   async getTransactions(offset: number, filters?: TransactionsFilters): Promise<Transaction[]> {
     const url = `${this.baseUrl}`
@@ -45,6 +51,27 @@ class TransactionsApi {
   async changeCategory(payload: Pick<Transaction, 'categoryId' | 'transactionId'>): Promise<void> {
     const url = `${this.baseUrl}/${payload.transactionId}`
     const response = await api.patch<void>(url, { categoryId: payload.categoryId })
+
+    return response.data
+  }
+
+  async addTransaction(payload: ManualTransaction): Promise<void> {
+    const url = `${this.baseUrl}/manual`
+    const response = await api.post<void>(url, payload)
+
+    return response.data
+  }
+
+  async importTransaction(): Promise<void> {
+    const url = `${this.baseUrl}/import`
+    const response = await api.post<void>(url)
+
+    return response.data
+  }
+
+  async getGoalsNames(): Promise<GoalId[]> {
+    const url = `${this.goalsUrl}/names`
+    const response = await api.get<GoalId[]>(url)
 
     return response.data
   }

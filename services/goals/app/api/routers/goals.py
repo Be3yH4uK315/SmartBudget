@@ -62,6 +62,19 @@ async def search_goals(
 
 
 @router.get(
+    "/names",
+    response_model=list[schemas.GoalNameResponse],
+    summary="Получение названий целей",
+)
+async def get_goal_names(
+    user_id: UUID = Depends(dependencies.get_current_user_id),
+    service: GoalService = Depends(dependencies.get_goal_service),
+):
+    """Возвращает компактный список целей пользователя."""
+    return await service.get_goal_names(user_id)
+
+
+@router.get(
     "/{goal_id}",
     response_model=schemas.GoalResponse,
     summary="Получение цели по ID",

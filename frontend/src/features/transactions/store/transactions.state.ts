@@ -9,5 +9,9 @@ export function getTransactionsInitialState(): TransactionsSliceState {
 
     offset: 0,
     isLast: false,
+
+    isImportLoading: false,
+
+    availableGoals: [],
   }
 }

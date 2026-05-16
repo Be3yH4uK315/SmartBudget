@@ -224,6 +224,10 @@ class KafkaConsumerWorker:
                 user_id=event.payload.user_id,
                 transaction_id=event.payload.transaction_id,
                 category_id=self._extract_category_id(event),
+                publish_category_changed=(
+                    event.event_type
+                    == ClassificationEventType.TRANSACTION_CATEGORY_UPDATED.value
+                ),
             )
 
     def _parse_event(

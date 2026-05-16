@@ -96,6 +96,13 @@ class AllGoalsResponse(CamelModel):
     is_archived: bool = Field(..., description="В архиве ли цель")
 
 
+class GoalNameResponse(CamelModel):
+    """Название цели для компактных списков."""
+
+    goal_id: UUID = Field(..., description="ID цели")
+    name: str = Field(..., description="Название цели")
+
+
 class GoalPatchRequest(CamelModel):
     """Запрос на частичное обновление цели."""
 

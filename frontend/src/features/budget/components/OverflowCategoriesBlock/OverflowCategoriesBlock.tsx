@@ -44,8 +44,7 @@ export const OverflowCategoriesBlock = ({ variant, categories }: Props) => {
         >
           {categories.map((c) => (
             <Typography key={c.categoryId} variant="caption" color={fontColor}>
-              {translateCategory(c.categoryId) +
-                ` (${formatPercent(c.spentAmount / c.limitAmount)})`}
+              {translateCategory(c.categoryId) + ` (${formatPercent(c.amount / c.limitAmount)})`}
             </Typography>
           ))}
         </Box>

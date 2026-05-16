@@ -6,7 +6,7 @@ export type BudgetSliceState = {
 
   totalLimitAmount: number
 
-  spentAmount: number
+  totalIncomeAmount: number
 
   isAutoRenew: boolean
 

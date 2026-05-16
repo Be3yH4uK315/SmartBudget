@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getGoals } from '@features/goals/store/goals'
+import { clearGoalsState, getGoals } from '@features/goals/store/goals'
 import { GoalsFilters } from '@features/goals/types'
 import { ROUTES } from '@shared/constants/routes'
 import { useAppDispatch } from '@shared/store'
@@ -103,8 +103,12 @@ export function useGoalsFilters() {
 
   useEffect(() => {
     dispatch(getGoals(localFilters))
+
+    return () => {
+      dispatch(clearGoalsState())
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [dispatch])
 
   return {
     isDirty,

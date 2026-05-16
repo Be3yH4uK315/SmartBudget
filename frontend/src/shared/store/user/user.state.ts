@@ -7,5 +7,6 @@ export function getUserInitialState(): userSliceState {
     name: '',
     email: '',
     isAuth: false,
+    unreadCount: 0,
   }
 }

@@ -144,6 +144,20 @@ class GoalRepository:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def get_goal_names(self, user_id: UUID) -> list[models.Goal]:
+        """Получает ID и названия неархивных целей пользователя."""
+        statement = (
+            select(models.Goal)
+            .where(
+                models.Goal.user_id == user_id,
+                models.Goal.is_archived.is_(False),
+            )
+            .order_by(models.Goal.name.asc(), models.Goal.goal_id.asc())
+        )
+
+        result = await self.db.execute(statement)
+        return list(result.scalars().all())
+
     def create(self, goal_model: models.Goal) -> models.Goal:
         """Создает новую цель без commit."""
         self.db.add(goal_model)

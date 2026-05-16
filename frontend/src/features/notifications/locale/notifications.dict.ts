@@ -8,6 +8,45 @@ export const notificationsDict: LocaleDictionary = {
       unread: 'Новое уведомление',
       markAllAsRead: 'Прочитать все',
 
+      NoNotifications: {
+        Empty: {
+          title: 'Нет уведомлений',
+          subtitle: 'Здесь будут отображаться уведомления сервисов',
+        },
+
+        Filtered: {
+          title: 'Кажется, таких уведомлений нет',
+          subtitle: 'Попробуйте убрать лишние фильтры',
+        },
+      },
+
+      Filters: {
+        selected: 'Выбрано: {{value}}',
+        clear: 'Сбросить фильтры',
+        placeholder: {
+          types: 'Тип',
+          services: 'Сервис',
+          statuses: 'Статус',
+        },
+
+        Statuses: {
+          read: 'Прочитаны',
+          unread: 'Не прочитаны',
+          empty: 'Не установлено',
+        },
+
+        info: 'Информационные',
+        success: 'Успешные',
+        alert: 'Предупреждение',
+        warning: 'Критические',
+        system: 'Системные',
+
+        Goals: 'Цели',
+        Transactions: 'Операции',
+        Budget: 'Бюджет и лимиты',
+        Security: 'Безопасность',
+      },
+
       Limit: {
         preOverflow: {
           title: 'Достижение 80% лимита категории',

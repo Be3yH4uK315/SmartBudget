@@ -75,13 +75,13 @@ class OutboxRepository(BaseRepository):
                 event_type=event.get("event_type"),
             )
 
-    async def get_pending_events(self, limit_amount: int = 100) -> list[OutboxEvent]:
+    async def get_pending_events(self, limit: int = 100) -> list[OutboxEvent]:
         """Получает pending-события для отправки в Kafka."""
         result = await self.db.execute(
             select(OutboxEvent)
             .where(OutboxEvent.status == "pending")
             .order_by(OutboxEvent.created_at.asc())
-            .limit(limit_amount)
+            .limit(limit)
             .with_for_update(skip_locked=True),
         )
 

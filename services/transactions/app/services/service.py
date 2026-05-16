@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.core import exceptions
 from app.core.config import settings
@@ -330,6 +330,7 @@ class TransactionService:
         user_id: UUID,
         transaction_id: UUID,
         category_id: int,
+        publish_category_changed: bool = False,
     ) -> None:
         """Применяет результат классификации к транзакции."""
         async with self.uow:
@@ -354,7 +355,7 @@ class TransactionService:
                 new_category_id=category_id,
             )
 
-            if old_category_id != category_id:
+            if publish_category_changed and old_category_id != category_id:
                 self._queue_category_changed_event(
                     transaction=transaction,
                     old_category_id=old_category_id,
@@ -597,14 +598,15 @@ class TransactionService:
 
         return models.Transaction(
             user_id=user_id,
-            transaction_id=request.transaction_id,
+            transaction_id=uuid4(),
             account_id=request.account_id,
             category_id=category_id,
             date=_ensure_aware(request.date or now),
             amount=request.amount,
             transaction_type=transaction_type.value,
-            status=enums.TransactionStatus.CONFIRMED.value,
+            status=request.status.value,
             merchant=request.merchant or "",
+            mcc=request.mcc,
             description=description,
             created_at=now,
             imported_at=now,
@@ -681,7 +683,7 @@ class TransactionService:
 
         return models.Transaction(
             user_id=user_id,
-            transaction_id=item.transaction_id,
+            transaction_id=uuid4(),
             account_id=item.account_id,
             category_id=category_id,
             date=_ensure_aware(item.date),

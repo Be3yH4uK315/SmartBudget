@@ -1,5 +1,10 @@
-import { transactionsApi, transactionsMock } from '@features/transactions/api'
-import { Transaction, TransactionsFilters } from '@features/transactions/types'
+import { transactionsApi } from '@features/transactions/api'
+import {
+  GoalId,
+  ManualTransaction,
+  Transaction,
+  TransactionsFilters,
+} from '@features/transactions/types'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '@shared/types'
 import { showToast } from '@shared/utils'
@@ -39,5 +44,57 @@ export const changeCategory = createAsyncThunk<
     showToast({ messageKey: 'cannotChangeCategory', type: 'error' })
 
     return rejectWithValue('cannotChangeCategory')
+  }
+})
+
+export const addTransaction = createAsyncThunk<
+  void,
+  ManualTransaction,
+  { state: RootState; rejectValue: string }
+>('addTransaction', async (payload, { rejectWithValue }) => {
+  try {
+    const response = await transactionsApi.addTransaction(payload)
+
+    showToast({ messageKey: 'transactionAdded', type: 'success' })
+
+    return response
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotAddTransaction', type: 'error' })
+
+    return rejectWithValue('cannotAddTransaction')
+  }
+})
+
+export const importTransaction = createAsyncThunk<
+  void,
+  void,
+  { state: RootState; rejectValue: string }
+>('importTransaction', async (_, { rejectWithValue }) => {
+  try {
+    const response = await transactionsApi.importTransaction()
+
+    showToast({ messageKey: 'transactionsImported', type: 'success' })
+
+    return response
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotImportTransaction', type: 'error' })
+
+    return rejectWithValue('cannotImportTransaction')
+  }
+})
+
+export const getGoalsNames = createAsyncThunk<
+  GoalId[],
+  void,
+  { state: RootState; rejectValue: string }
+>('getGoalsNames', async (_, { rejectWithValue }) => {
+  try {
+    const response = await transactionsApi.getGoalsNames()
+
+    return response
+  } catch (e: any) {
+    showToast({ messageKey: 'cannotGetGoalsNames', type: 'error' })
+
+    return rejectWithValue('cannotGetGoalsNames')
   }
 })

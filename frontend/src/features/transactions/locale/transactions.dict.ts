@@ -10,6 +10,8 @@ export const transactionsDict: LocaleDictionary = {
       loadMore: 'Загрузить еще',
       emptyCategory: 'Сбросить фильтр',
       categoryFilter: 'Категория',
+      createTransaction: 'Создать транзакцию',
+      importTransactions: 'Импортировать транзакции',
 
       Filters: {
         selected: 'Выбрано: {{value}}',
@@ -65,6 +67,34 @@ export const transactionsDict: LocaleDictionary = {
           currentCategory: 'Текущая категория:',
           confirm: 'Сменить категорию',
           selectPlaceholder: 'Новая категория',
+        },
+
+        AddTransaction: {
+          title: 'Создание транзакции',
+          selectPlaceholder: 'Выберите категорию',
+
+          goal: 'Цель "{{name}}"',
+          accountId: 'ID цели',
+          amount: 'Сумма',
+          date: 'Дата',
+          type: 'Тип транзакции',
+          status: 'Статус транзакции',
+          description: 'Описание транзакции',
+          mcc: 'MCC',
+          merchant: 'Продавец',
+
+          Types: {
+            income: 'Доход',
+            expense: 'Расход',
+          },
+
+          Statuses: {
+            confirmed: 'Исполнена',
+            rejected: 'Отклонена',
+            pending: 'В обработке',
+          },
+
+          confirm: 'Создать',
         },
       },
     },

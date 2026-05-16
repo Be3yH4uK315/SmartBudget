@@ -244,6 +244,28 @@ class NotificationService:
 
         return self._settings_to_response(settings)
 
+    async def update_settings(
+        self,
+        user_id: UUID,
+        request: api_schemas.NotificationSettingsUpdateRequest,
+    ) -> api_schemas.NotificationSettingsResponse:
+        """Обновляет настройки уведомлений пользователя."""
+        async with self.uow:
+            await self._get_or_create_settings_in_uow(user_id)
+
+            updated_settings = await self.uow.settings.update_settings(
+                user_id,
+                self._settings_update_to_changes(request),
+            )
+
+            if not updated_settings:
+                raise exceptions.InvalidNotificationDataError(
+                    "Notification settings were not created",
+                )
+
+            await self.uow.commit()
+
+        return self._settings_to_response(updated_settings)
 
     async def update_notifications_status(
         self,

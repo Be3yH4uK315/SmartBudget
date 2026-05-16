@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { userSliceReducers, userSliceState } from '@shared/types'
 import { getUserInitialState } from './user.state'
-import { getUserInfo } from './user.thunks'
+import { getUnreadNotificationsCount, getUserInfo } from './user.thunks'
 
 export const userSlice = createSlice<userSliceState, userSliceReducers, 'user', any>({
   name: 'user',
@@ -19,6 +19,10 @@ export const userSlice = createSlice<userSliceState, userSliceReducers, 'user', 
       state.userId = payload.id
       state.email = payload.email
       state.isAuth = true
+    })
+
+    builder.addCase(getUnreadNotificationsCount.fulfilled, (state, { payload }) => {
+      state.unreadCount = payload.unreadCount
     })
   },
 })

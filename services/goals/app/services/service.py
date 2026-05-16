@@ -208,6 +208,16 @@ class GoalService:
 
         return [api_schemas.AllGoalsResponse.model_validate(goal) for goal in goals]
 
+    async def get_goal_names(
+        self,
+        user_id: UUID,
+    ) -> list[api_schemas.GoalNameResponse]:
+        """Получает компактный список названий целей пользователя."""
+        async with self.uow:
+            goals = await self.uow.goals.get_goal_names(user_id)
+
+        return [api_schemas.GoalNameResponse.model_validate(goal) for goal in goals]
+
     async def update_goal(
         self,
         user_id: UUID,
