@@ -27,7 +27,7 @@ export const changeNotificationsStatus = createAsyncThunk<
   try {
     const response = await settingsApi.changeNotificationsStatus({ notificationsStatus })
 
-    showToast({ messageKey: 'NotificationsSettingsUpdated', type: 'success' })
+    showToast({ messageKey: 'notificationsSettingsUpdated', type: 'success' })
 
     return response
   } catch (e: any) {
@@ -45,7 +45,7 @@ export const updateNotificationsSettings = createAsyncThunk<
   try {
     const response = await settingsApi.updateNotificationsSettings(payload)
 
-    showToast({ messageKey: 'NotificationsSettingsUpdated', type: 'success' })
+    showToast({ messageKey: 'notificationsSettingsUpdated', type: 'success' })
 
     return response
   } catch (e: any) {

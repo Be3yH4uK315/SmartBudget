@@ -13,6 +13,8 @@ export const getBudgetData = createAsyncThunk<
 
     return response
   } catch (e: any) {
+    showToast({ messageKey: 'cannotGetBudgetData', type: 'error' })
+
     return rejectWithValue('cannotGetBudgetData')
   }
 })
@@ -27,6 +29,8 @@ export const createBudget = createAsyncThunk<
 
     showToast({ messageKey: 'budgetCreated', type: 'success' })
   } catch (e: any) {
+    showToast({ messageKey: 'cannotCreateBudget', type: 'error' })
+
     return rejectWithValue('cannotCreateBudget')
   }
 })
