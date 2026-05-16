@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { transactionsApi, transactionsMock } from '@features/transactions/api'
+import { transactionsApi } from '@features/transactions/api'
 import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
   clearTransactionsState,
