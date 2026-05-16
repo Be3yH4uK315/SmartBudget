@@ -72,6 +72,7 @@ export const transactionsDict: LocaleDictionary = {
         AddTransaction: {
           title: 'Создание транзакции',
           selectPlaceholder: 'Выберите категорию',
+          infoBlock: 'Необходимо перезагрузить страницу после добавления транзакции',
 
           goal: 'Цель "{{name}}"',
           accountId: 'ID цели',

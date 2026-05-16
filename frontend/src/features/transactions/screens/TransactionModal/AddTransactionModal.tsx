@@ -248,6 +248,8 @@ export const AddTransactionModal = ({ onClose }: Props) => {
                 {translate('confirm')}
               </Button>
             </Stack>
+
+            <Typography variant="caption">{translate('infoBlock')}</Typography>
           </Stack>
         </form>
       </Stack>
