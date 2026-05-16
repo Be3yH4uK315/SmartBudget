@@ -70,7 +70,7 @@ export const TransactionsPieBlock = React.memo(
                 }}
               >
                 {pieData.map((d) => (
-                  <CategoryBlock key={d.value} category={d} />
+                  <CategoryBlock key={d.label} category={d} />
                 ))}
               </Box>
             )}
