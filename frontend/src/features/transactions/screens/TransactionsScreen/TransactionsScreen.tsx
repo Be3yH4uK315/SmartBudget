@@ -3,15 +3,19 @@ import { transactionsApi, transactionsMock } from '@features/transactions/api'
 import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
   clearTransactionsState,
+  importTransaction,
+  selectIsImportLoading,
   selectIsTransactionsLoading,
   selectTransactions,
   selectTransactionsIsLast,
 } from '@features/transactions/store'
 import { Transaction } from '@features/transactions/types'
-import { Stack } from '@mui/material'
+import { Button, Stack } from '@mui/material'
 import { EmptyList, ScreenContent, SearchBar, withAuth } from '@shared/components'
+import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
+import { openModal } from '@shared/store/modal'
 import { TransactionsFiltersBlock } from './TransactionsFilters'
 import { TransactionLine, TransactionsList } from './TransactionsList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
@@ -23,6 +27,7 @@ export default function TransactionsScreen() {
   const isLoading = useAppSelector(selectIsTransactionsLoading)
   const transactions = useAppSelector(selectTransactions)
   const isLast = useAppSelector(selectTransactionsIsLast)
+  const isImportLoading = useAppSelector(selectIsImportLoading)
 
   const { appliedFiltersRef, isDirty, ...props } = useTransactionsFilters()
 
@@ -43,6 +48,25 @@ export default function TransactionsScreen() {
               <TransactionLine {...props} key={option.transactionId} transaction={option} />
             )}
           />
+
+          <Stack direction={'row'} spacing={2} sx={{ alignItems: 'stretch' }}>
+            <Button
+              variant="yellow"
+              onClick={() => dispatch(openModal({ id: MODAL_IDS.TRANSACTION_ADD_MODAL }))}
+              sx={{ flex: 1 }}
+            >
+              {translate('createTransaction')}
+            </Button>
+
+            <Button
+              variant="yellow"
+              disabled={isImportLoading}
+              onClick={() => dispatch(importTransaction())}
+              sx={{ flex: 1 }}
+            >
+              {translate('importTransactions')}
+            </Button>
+          </Stack>
 
           <TransactionsFiltersBlock
             {...props}

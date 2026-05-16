@@ -8,7 +8,12 @@ import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { groupByDate, mergeDateBlocks } from '@shared/utils'
 import { getTransactionsInitialState } from './transactions.state'
-import { changeCategory, getTransactions } from './transactions.thunks'
+import {
+  changeCategory,
+  getGoalsNames,
+  getTransactions,
+  importTransaction,
+} from './transactions.thunks'
 
 export const transactionsSlice = createSlice<
   TransactionsSliceState,
@@ -21,6 +26,10 @@ export const transactionsSlice = createSlice<
   reducers: {
     clearTransactionsState() {
       return getTransactionsInitialState()
+    },
+
+    clearAvailableGoals(state) {
+      state.availableGoals = []
     },
   },
 
@@ -83,6 +92,22 @@ export const transactionsSlice = createSlice<
       .addCase(changeCategory.pending, (state) => {
         state.isCategoryChanging = true
       })
+
+      .addCase(getGoalsNames.fulfilled, (state, { payload }) => {
+        state.availableGoals = payload
+      })
+
+      .addCase(importTransaction.fulfilled, (state) => {
+        state.isImportLoading = false
+      })
+
+      .addCase(importTransaction.rejected, (state) => {
+        state.isImportLoading = false
+      })
+
+      .addCase(importTransaction.pending, (state) => {
+        state.isImportLoading = true
+      })
   },
 })
 
@@ -92,4 +117,4 @@ declare module '@shared/store' {
 
 transactionsSlice.injectInto(rootReducer)
 
-export const { clearTransactionsState } = transactionsSlice.actions
+export const { clearTransactionsState, clearAvailableGoals } = transactionsSlice.actions

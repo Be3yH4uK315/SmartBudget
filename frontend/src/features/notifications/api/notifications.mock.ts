@@ -1,5 +1,5 @@
 import { Notification } from '@features/notifications/types'
-import { Category, Transaction } from '@features/transactions/types'
+import { CategoryNumber, Transaction } from '@features/transactions/types'
 import dayjs from 'dayjs'
 
 const createdAts = [
@@ -16,7 +16,7 @@ const goalNames = ['Новая машина', 'Отпуск', 'Квартира'
 const createMockTransaction = (id: string, i: number, date: string): Transaction => ({
   transactionId: id,
   amount: 1000 + i * 250,
-  categoryId: ((i % 10) + 1) as Category,
+  categoryId: ((i % 10) + 1) as CategoryNumber,
   description: i % 2 ? 'Покупка' : null,
   merchant: ['Pyaterochka', 'Yandex Go', 'Ozon', 'Steam'][i % 4],
   mcc: null,

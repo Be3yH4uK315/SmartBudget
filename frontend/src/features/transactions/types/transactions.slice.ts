@@ -1,5 +1,5 @@
 import { SliceCaseReducers } from '@shared/types'
-import { TransactionsBlock } from './transactions'
+import { GoalId, TransactionsBlock } from './transactions'
 
 export type TransactionsSliceState = {
   transactions: TransactionsBlock[]
@@ -9,8 +9,12 @@ export type TransactionsSliceState = {
 
   offset: number
   isLast: boolean
+  isImportLoading: boolean
+
+  availableGoals: GoalId[]
 }
 
 export type TransactionsSliceReducers = SliceCaseReducers<TransactionsSliceState> & {
   clearTransactionsState(state: TransactionsSliceState): void
+  clearAvailableGoals(state: TransactionsSliceState): void
 }

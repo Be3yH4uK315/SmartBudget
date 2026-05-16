@@ -1,4 +1,3 @@
-import { createSelector } from '@reduxjs/toolkit'
 import { createLazySliceStateSelector } from '@shared/utils/store'
 import { getTransactionsInitialState } from './transactions.state'
 
@@ -13,3 +12,6 @@ export const selectTransactionsIsLast = sliceStateSelector((state) => state.isLa
 export const selectTransactionsOffset = sliceStateSelector((state) => state.offset)
 
 export const selectIsCategoryChanging = sliceStateSelector((state) => state.isCategoryChanging)
+
+export const selectAvailableGoals = sliceStateSelector((state) => state.availableGoals)
+export const selectIsImportLoading = sliceStateSelector((state) => state.isImportLoading)

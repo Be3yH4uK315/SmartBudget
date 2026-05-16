@@ -1,5 +1,10 @@
 import { PAGE_SIZE } from '@features/transactions/constants'
-import { Category, Transaction, TransactionsFilters } from '@features/transactions/types'
+import {
+  CategoryNumber,
+  GoalId,
+  Transaction,
+  TransactionsFilters,
+} from '@features/transactions/types'
 import { SEARCH_LIMIT } from '@shared/constants'
 import dayjs from 'dayjs'
 
@@ -27,7 +32,7 @@ function generateMockTransactions(total = 600): Transaction[] {
     result.push({
       transactionId: `tx_${i}_${Math.random().toString(36).slice(2, 8)}`,
       amount: Math.round(Math.random() * 5000),
-      categoryId: ((i % 5) + 1) as Category,
+      categoryId: ((i % 5) + 1) as CategoryNumber,
       description: `Описание #${i}`,
       merchant: `Операция #${i}`,
       mcc: `${1000 + (i % 500)}`,
@@ -114,6 +119,21 @@ class TransactionsMock {
     this.data = this.data.map((t) =>
       t.transactionId === payload.transactionId ? { ...t, categoryId: payload.categoryId } : t,
     )
+  }
+
+  async getGoalsNames(): Promise<GoalId[]> {
+    console.log('%cMOCK CALL getGoalsNames', 'color: orange')
+    await this.delay(500)
+
+    return [
+      { goalId: 'goal_1x', name: 'Цель1' },
+      { goalId: 'goal_2x', name: 'Цель2' },
+      { goalId: 'goal_3x', name: 'Цель3' },
+    ] as GoalId[]
+  }
+
+  async importTransaction(): Promise<void> {
+    await this.delay(10000)
   }
 }
 
