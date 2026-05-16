@@ -1,4 +1,4 @@
-import { transactionsApi, transactionsMock } from '@features/transactions/api'
+import { transactionsApi } from '@features/transactions/api'
 import {
   GoalId,
   ManualTransaction,
@@ -19,7 +19,7 @@ export const getTransactions = createAsyncThunk<
 
     const offset = state.transactions?.offset ?? 0
 
-    const response = await transactionsMock.getTransactions(offset, filters)
+    const response = await transactionsApi.getTransactions(offset, filters)
 
     return { transactions: response, length: response.length }
   } catch (e: any) {
@@ -71,7 +71,7 @@ export const importTransaction = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('importTransaction', async (_, { rejectWithValue }) => {
   try {
-    const response = await transactionsMock.importTransaction()
+    const response = await transactionsApi.importTransaction()
 
     showToast({ messageKey: 'transactionsImported', type: 'success' })
 
