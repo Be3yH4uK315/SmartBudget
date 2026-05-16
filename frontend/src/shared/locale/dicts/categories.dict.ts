@@ -33,13 +33,11 @@ export const categoriesDict: LocaleDictionary = {
       28: 'Путешествия',
       29: 'Благотворительность',
       30: 'Цветы и подарки',
-      31: 'Не распределено',
     },
   },
 
   en: {
     Categories: {
-      0: '',
       1: 'Other',
       2: 'Groceries',
       3: 'Cafes & Restaurants',
@@ -70,7 +68,6 @@ export const categoriesDict: LocaleDictionary = {
       28: 'Travel',
       29: 'Charity',
       30: 'Flowers & Gifts',
-      31: 'Uncategorized',
     },
   },
 }

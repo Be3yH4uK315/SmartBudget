@@ -109,7 +109,7 @@ export const getNotificationOnClickLink = (notification: Notification) => {
 
     case 'Transactions': {
       if (notification.messageKey === 'Transactions.unclassified.message')
-        return `${ROUTES.PAGES.TRANSACTIONS}/?categoriesIds=${CATEGORY_IDS[30]}`
+        return `${ROUTES.PAGES.TRANSACTIONS}/?categoriesIds=${CATEGORY_IDS[0]}`
 
       return undefined
     }
