@@ -4,6 +4,7 @@ from typing import Any
 
 from arq.connections import RedisSettings
 from arq.cron import cron
+from dadata import Dadata
 
 from app.core.config import settings
 from app.core.database import get_db_engine, get_session_factory
@@ -58,6 +59,20 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     await kafka_producer.start()
     ctx["kafka_producer"] = kafka_producer
 
+    try:
+        if settings.GEO.DADATA_API_KEY and settings.GEO.DADATA_SECRET_KEY:
+            ctx["dadata_client"] = Dadata(
+                settings.GEO.DADATA_API_KEY,
+                settings.GEO.DADATA_SECRET_KEY,
+            )
+            logger.info("DaData client initialized for auth worker")
+        else:
+            ctx["dadata_client"] = None
+            logger.warning("DaData API keys are missing. Geolocation disabled.")
+    except Exception as exc:
+        ctx["dadata_client"] = None
+        logger.error("DaData init error in auth worker: %s", exc, exc_info=True)
+
     ctx["outbox_task"] = asyncio.create_task(run_outbox_processor(ctx))
 
     logger.info("Authentification ARQ worker started")
@@ -78,6 +93,13 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
     kafka_producer: KafkaProducerWrapper | None = ctx.get("kafka_producer")
     if kafka_producer:
         await kafka_producer.stop()
+
+    dadata_client = ctx.get("dadata_client")
+    if dadata_client and hasattr(dadata_client, "close"):
+        try:
+            dadata_client.close()
+        except Exception:
+            logger.debug("DaData client close failed", exc_info=True)
 
     db_engine = ctx.get("db_engine")
     if db_engine:

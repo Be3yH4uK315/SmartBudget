@@ -51,11 +51,13 @@ def get_location(ip: str, dadata_client: Dadata | None) -> LocationData:
         return unknown_location
 
     if dadata_client is None:
+        logger.warning("DaData location lookup skipped for IP %s: client is missing", ip)
         return unknown_location
 
     try:
         response = dadata_client.iplocate(ip)
         if not response:
+            logger.warning("DaData returned empty response for IP %s", ip)
             return unknown_location
 
         data = response.get("data")
