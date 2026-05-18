@@ -107,6 +107,35 @@ class SettingsRepository(BaseRepository):
             },
         )
 
+    async def remove_push_subscriptions_by_session_id(
+        self,
+        user_id: UUID,
+        session_id: UUID,
+    ) -> models.UserNotificationSettings | None:
+        """Удаляет browser push подписки, привязанные к отозванной сессии."""
+        settings = await self.get_by_user_id(user_id)
+        if not settings:
+            return None
+
+        session_id_value = str(session_id)
+        subscriptions = [
+            item
+            for item in (settings.push_subscriptions or [])
+            if item.get("sessionId") != session_id_value
+            and item.get("session_id") != session_id_value
+        ]
+
+        if len(subscriptions) == len(settings.push_subscriptions or []):
+            return settings
+
+        return await self.update_settings(
+            user_id,
+            {
+                "push_subscriptions": subscriptions,
+                "push_enabled": bool(subscriptions),
+            },
+        )
+
     async def remove_push_subscription(
         self,
         user_id: UUID,

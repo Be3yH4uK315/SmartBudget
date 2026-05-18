@@ -224,6 +224,11 @@ class SessionService:
                 user_id,
                 current_fingerprint,
             )
+            for session_id in revoked_ids:
+                await self.notifier.notify_session_revoked(
+                    str(user_id),
+                    str(session_id),
+                )
             await self.uow.commit()
 
         if revoked_ids:
@@ -233,6 +238,11 @@ class SessionService:
         """Отзывает все сессии пользователя."""
         async with self.uow:
             revoked_ids = await self.uow.sessions.revoke_all_for_user(user_id)
+            for session_id in revoked_ids:
+                await self.notifier.notify_session_revoked(
+                    str(user_id),
+                    str(session_id),
+                )
             await self.uow.commit()
 
         if revoked_ids:

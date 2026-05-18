@@ -33,7 +33,10 @@ async def gateway_verify(
 
         return Response(
             status_code=status.HTTP_200_OK,
-            headers={"X-User-Id": user_id},
+            headers={
+                "X-User-Id": user_id,
+                "X-Session-Id": session_id,
+            },
         )
 
     except Exception:

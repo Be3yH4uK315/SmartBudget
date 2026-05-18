@@ -18,10 +18,11 @@ router = APIRouter(tags=["Push Notifications"])
 async def subscribe_push(
     request: schemas.PushSubscribeRequest = Body(...),
     user_id: UUID = Depends(dependencies.get_current_user_id),
+    session_id: UUID | None = Depends(dependencies.get_current_session_id),
     service: NotificationService = Depends(dependencies.get_notification_service),
 ):
     """Сохраняет browser push подписку пользователя."""
-    return await service.subscribe_push(user_id, request.subscription)
+    return await service.subscribe_push(user_id, request.subscription, session_id)
 
 
 @router.post(

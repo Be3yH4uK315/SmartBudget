@@ -26,12 +26,14 @@ class AuthEventType(StrEnum):
 
     DEVICE_NEW_LOGIN = "auth.device.new_login"
     ACTIVITY_SUSPICIOUS = "auth.activity.suspicious"
+    SESSION_REVOKED = "auth.session_revoked"
 
 
 class AuthUserPayload(BaseEventPayload):
     """Payload пользовательского события auth service."""
 
     user_id: UUID = Field(..., description="ID пользователя")
+    session_id: UUID | None = Field(None, description="ID пользовательской сессии")
 
     email: EmailStr | None = Field(None, description="Email пользователя")
     old_email: EmailStr | None = Field(None, description="Старый email пользователя")
@@ -103,6 +105,9 @@ def create_auth_event(
 ) -> EventEnvelope[AuthUserPayload]:
     """Создает событие auth service."""
     resolved_event_type = str(enum_value(event_type))
+    idempotency_parts = [resolved_event_type, str(payload.user_id)]
+    if payload.session_id:
+        idempotency_parts.append(str(payload.session_id))
 
     return EventEnvelope.create(
         event_type=resolved_event_type,
@@ -110,7 +115,7 @@ def create_auth_event(
         payload=payload,
         aggregate_id=payload.user_id,
         user_id=payload.user_id,
-        idempotency_key=f"{resolved_event_type}:{payload.user_id}",
+        idempotency_key=":".join(idempotency_parts),
     )
 
 

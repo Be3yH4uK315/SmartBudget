@@ -65,6 +65,21 @@ async def get_current_user_id(request: Request) -> UUID:
         ) from exc
 
 
+async def get_current_session_id(request: Request) -> UUID | None:
+    """Извлекает session_id из X-Session-Id, который устанавливает API Gateway."""
+    session_id = request.headers.get("X-Session-Id")
+    if not session_id:
+        return None
+
+    try:
+        return UUID(session_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Session ID format",
+        ) from exc
+
+
 class NotificationFilters:
     """Query-фильтры для получения списка уведомлений."""
 

@@ -156,6 +156,10 @@ class LoginService:
                     UUID(user_id),
                     session.session_id,
                 )
+                await self.notifier.notify_session_revoked(
+                    user_id,
+                    str(session.session_id),
+                )
 
             await self.notifier.notify_logout(user_id)
             await self.uow.commit()

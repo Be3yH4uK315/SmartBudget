@@ -54,6 +54,7 @@ class AuthNotifier:
             new_email=_none_if_empty(payload_fields.get("new_email")),
             name=_none_if_empty(payload_fields.get("name")),
             language=_none_if_empty(payload_fields.get("language")),
+            session_id=_none_if_empty(payload_fields.get("session_id")),
             ip=_none_if_empty(payload_fields.get("ip")),
             device=_none_if_empty(payload_fields.get("device")),
             location=_none_if_empty(payload_fields.get("location")),
@@ -257,8 +258,12 @@ class AuthNotifier:
         user_id: str,
         session_id: str,
     ) -> None:
-        """Обрабатывает отзыв сессии без публикации внешнего события."""
-        return None
+        """Сохраняет событие отзыва пользовательской сессии."""
+        await self._save_event(
+            AuthEventType.SESSION_REVOKED,
+            user_id=user_id,
+            session_id=session_id,
+        )
 
     async def notify_profile_updated(
         self,

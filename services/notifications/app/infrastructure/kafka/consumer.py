@@ -54,6 +54,10 @@ AUTH_PROFILE_EVENTS = {
     AuthEventType.EMAIL_CHANGED.value,
 }
 
+AUTH_SESSION_EVENTS = {
+    AuthEventType.SESSION_REVOKED.value,
+}
+
 AUTH_NOTIFICATION_EVENTS = {
     AuthEventType.USER_REGISTERED.value,
     AuthEventType.DEVICE_NEW_LOGIN.value,
@@ -380,6 +384,10 @@ class KafkaConsumerWorker:
             await self._process_auth_profile_event(payload, service)
             return
 
+        if event_type in AUTH_SESSION_EVENTS:
+            await self._process_auth_session_event(payload, service)
+            return
+
         if event_type in AUTH_NOTIFICATION_EVENTS:
             await self._process_auth_notification_event(payload, service)
             return
@@ -424,6 +432,26 @@ class KafkaConsumerWorker:
                 payload=_auth_notification_payload(event),
                 timestamp=event.date,
             ),
+        )
+
+    async def _process_auth_session_event(
+        self,
+        payload: dict[str, Any],
+        service: NotificationService,
+    ) -> None:
+        """Обрабатывает auth events жизненного цикла сессий."""
+        event = AuthEventAdapter.validate_python(payload)
+
+        if not event.payload.session_id:
+            logger.warning(
+                "Session event %s ignored: session_id is missing",
+                event.event_type,
+            )
+            return
+
+        await service.remove_push_subscriptions_by_session(
+            event.payload.user_id,
+            event.payload.session_id,
         )
 
     async def _process_budget_notification_event(

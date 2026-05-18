@@ -305,17 +305,22 @@ class NotificationService:
         self,
         user_id: UUID,
         subscription: api_schemas.WebPushSubscriptionRequest,
+        session_id: UUID | None = None,
     ) -> api_schemas.PushSubscriptionResponse:
         """Сохраняет browser push подписку пользователя."""
         async with self.uow:
             await self._get_or_create_settings_in_uow(user_id)
 
+            subscription_data = subscription.model_dump(
+                by_alias=True,
+                exclude_none=True,
+            )
+            if session_id:
+                subscription_data["sessionId"] = str(session_id)
+
             updated = await self.uow.settings.add_push_subscription(
                 user_id,
-                subscription.model_dump(
-                    by_alias=True,
-                    exclude_none=True,
-                ),
+                subscription_data,
             )
 
             if not updated:
@@ -329,6 +334,29 @@ class NotificationService:
             success=True,
             subscriptions_count=len(updated.push_subscriptions or []),
         )
+
+    async def remove_push_subscriptions_by_session(
+        self,
+        user_id: UUID,
+        session_id: UUID,
+    ) -> None:
+        """Удаляет push подписки, связанные с отозванной auth-сессией."""
+        async with self.uow:
+            updated = await self.uow.settings.remove_push_subscriptions_by_session_id(
+                user_id,
+                session_id,
+            )
+            await self.uow.commit()
+
+        if updated:
+            logger.info(
+                "Removed push subscriptions for revoked session",
+                extra={
+                    "user_id": str(user_id),
+                    "session_id": str(session_id),
+                    "subscriptions_count": len(updated.push_subscriptions or []),
+                },
+            )
 
     async def unsubscribe_push(
         self,
