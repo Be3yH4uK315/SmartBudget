@@ -252,21 +252,8 @@ def _budget_to_dashboard_response(
     budget: models.Budget,
 ) -> api_schemas.DashboardBudgetResponse:
     """Преобразует Budget в response для главного экрана."""
-    categories = sorted(
-        [
-            api_schemas.DashboardCategoryResponse(
-                category_id=category.category_id,
-                amount=category.spent_amount,
-                income_amount=category.income_amount,
-                transaction_type=TransactionType.EXPENSE,
-            )
-            for category in budget.category_limits
-        ],
-        key=lambda item: (-item.amount, item.category_id, item.transaction_type.value),
-    )
-
     return api_schemas.DashboardBudgetResponse(
-        categories=categories,
+        categories=_budget_category_responses(list(budget.category_limits)),
         total_limit_amount=budget.total_limit_amount,
         total_income_amount=_income_total(budget),
     )

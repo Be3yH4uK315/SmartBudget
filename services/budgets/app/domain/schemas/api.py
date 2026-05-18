@@ -158,7 +158,7 @@ class DashboardCategoryResponse(CamelModel):
 class DashboardBudgetResponse(CamelModel):
     """Бюджет для главного экрана."""
 
-    categories: list[DashboardCategoryResponse] = Field(
+    categories: list[BudgetCategoryResponse] = Field(
         default_factory=list,
         description="Категории для главного экрана",
     )
