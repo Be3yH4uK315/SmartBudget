@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends, Request, status
 
 from app.api import dependencies
 from app.domain.schemas import api as schemas
@@ -15,11 +15,14 @@ router = APIRouter(tags=["auth settings"])
     summary="Смена пароля пользователя",
 )
 async def change_password(
+    request: Request,
     body: schemas.ChangePasswordRequest = Body(...),
     pwd_service: PasswordService = Depends(dependencies.get_password_service),
     user: dtos.UserDTO = Depends(dependencies.get_current_active_user),
 ):
-    await pwd_service.change_password(user.user_id, body)
+    refresh_token = request.cookies.get("refresh_token")
+
+    await pwd_service.change_password(user.user_id, body, refresh_token)
 
     return schemas.UnifiedResponse(
         status="success",

@@ -118,8 +118,9 @@ class PasswordService:
         self,
         user_id: UUID,
         body: api_schemas.ChangePasswordRequest,
+        current_refresh_token: str | None,
     ) -> None:
-        """Меняет пароль текущего пользователя и отзывает все его сессии."""
+        """Меняет пароль текущего пользователя и отзывает остальные сессии."""
         async with self.uow:
             user = await self.uow.users.get_by_id(user_id)
             if not user:
@@ -143,5 +144,9 @@ class PasswordService:
             )
             await self.uow.commit()
 
-        await self.session_service.revoke_all_user_sessions(user_id)
+        if current_refresh_token:
+            await self.session_service.revoke_other_sessions(user_id, current_refresh_token)
+        else:
+            await self.session_service.revoke_all_user_sessions(user_id)
+
         await self.session_service.invalidate_user_cache(user_id)
