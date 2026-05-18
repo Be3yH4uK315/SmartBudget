@@ -48,7 +48,7 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     env_file:
-      - ../../infra/.env
+      - ../env/infra.env
     container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
@@ -67,7 +67,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     env_file:
-      - ../../infra/.env
+      - ../env/infra.env
     container_name: kafka
     depends_on:
       zookeeper:
@@ -118,7 +118,8 @@ services:
       context: ../..
       dockerfile: services/authentification/Dockerfile
     env_file:
-      - ../../services/authentification/.env
+      - ../env/infra.env
+      - ../env/auth.env
     container_name: auth_service
     ports:
       - "${AUTH_SERVICE_HOST_PORT}:8000"
@@ -132,6 +133,7 @@ services:
     volumes:
       - ../../services/authentification:/app
       - ../../services/authentification/certs:/app/certs
+      - ../../services/authentification/certs:/run/secrets:ro
       - ../../shared/python:/shared/python:ro
     environment:
       PYTHONPATH: /app:/shared/python
@@ -154,7 +156,8 @@ services:
       context: ../..
       dockerfile: services/authentification/Dockerfile
     env_file:
-      - ../../services/authentification/.env
+      - ../env/infra.env
+      - ../env/auth.env
     container_name: auth_worker
     depends_on:
       auth_service:
@@ -166,6 +169,7 @@ services:
     volumes:
       - ../../services/authentification:/app
       - ../../services/authentification/certs:/app/certs
+      - ../../services/authentification/certs:/run/secrets:ro
       - ../../shared/python:/shared/python:ro
     environment:
       PYTHONPATH: /app:/shared/python
@@ -202,7 +206,8 @@ services:
       context: ../..
       dockerfile: services/classification/Dockerfile
     env_file:
-      - ../../services/classification/.env
+      - ../env/infra.env
+      - ../env/classification.env
     container_name: class_service
     ports:
       - "${CLASS_SERVICE_HOST_PORT}:8000"
@@ -241,7 +246,8 @@ services:
       context: ../..
       dockerfile: services/classification/Dockerfile
     env_file:
-      - ../../services/classification/.env
+      - ../env/infra.env
+      - ../env/classification.env
     container_name: class_worker
     depends_on:
       class_service:
@@ -274,7 +280,8 @@ services:
       context: ../..
       dockerfile: services/classification/Dockerfile
     env_file:
-      - ../../services/classification/.env
+      - ../env/infra.env
+      - ../env/classification.env
     container_name: class_consumers
     depends_on:
       class_service:
@@ -326,7 +333,8 @@ services:
       context: ../..
       dockerfile: services/transactions/Dockerfile
     env_file:
-      - ../../services/transactions/.env
+      - ../env/infra.env
+      - ../env/transactions.env
     container_name: transactions_service
     ports:
       - "${TRANSACTIONS_SERVICE_HOST_PORT}:8000"
@@ -362,7 +370,8 @@ services:
       context: ../..
       dockerfile: services/transactions/Dockerfile
     env_file:
-      - ../../services/transactions/.env
+      - ../env/infra.env
+      - ../env/transactions.env
     container_name: transactions_consumer
     depends_on:
       transactions_service:
@@ -389,7 +398,8 @@ services:
       context: ../..
       dockerfile: services/transactions/Dockerfile
     env_file:
-      - ../../services/transactions/.env
+      - ../env/infra.env
+      - ../env/transactions.env
     container_name: transactions_worker
     depends_on:
       transactions_service:
@@ -437,7 +447,8 @@ services:
       context: ../..
       dockerfile: services/budgets/Dockerfile
     env_file:
-      - ../../services/budgets/.env
+      - ../env/infra.env
+      - ../env/budgets.env
     container_name: budgets_service
     ports:
       - "${BUDGETS_SERVICE_HOST_PORT}:8000"
@@ -473,7 +484,8 @@ services:
       context: ../..
       dockerfile: services/budgets/Dockerfile
     env_file:
-      - ../../services/budgets/.env
+      - ../env/infra.env
+      - ../env/budgets.env
     container_name: budgets_consumer
     depends_on:
       budgets_service:
@@ -500,7 +512,8 @@ services:
       context: ../..
       dockerfile: services/budgets/Dockerfile
     env_file:
-      - ../../services/budgets/.env
+      - ../env/infra.env
+      - ../env/budgets.env
     container_name: budgets_worker
     depends_on:
       budgets_service:
@@ -527,7 +540,7 @@ services:
   goals_postgres:
     image: postgres:16
     env_file:
-      - ../../infra/.env
+      - ../env/infra.env
     container_name: goals_postgres
     environment:
       POSTGRES_USER: ${GOALS_POSTGRES_USER}
@@ -550,7 +563,8 @@ services:
       context: ../..
       dockerfile: services/goals/Dockerfile
     env_file:
-      - ../../services/goals/.env
+      - ../env/infra.env
+      - ../env/goals.env
     container_name: goals_service
     ports:
       - "${GOALS_SERVICE_HOST_PORT}:8000"
@@ -585,7 +599,8 @@ services:
       context: ../..
       dockerfile: services/goals/Dockerfile
     env_file:
-      - ../../services/goals/.env
+      - ../env/infra.env
+      - ../env/goals.env
     container_name: goals_worker
     depends_on:
       goals_service:
@@ -613,7 +628,8 @@ services:
       context: ../..
       dockerfile: services/goals/Dockerfile
     env_file:
-      - ../../services/goals/.env
+      - ../env/infra.env
+      - ../env/goals.env
     container_name: goals_consumer
     depends_on:
       goals_service:
@@ -639,7 +655,7 @@ services:
   notification_postgres:
     image: postgres:16
     env_file:
-      - ../../infra/.env
+      - ../env/infra.env
     container_name: notification_postgres
     environment:
       POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER}
@@ -662,7 +678,8 @@ services:
       context: ../..
       dockerfile: services/notifications/Dockerfile
     env_file:
-      - ../../services/notifications/.env
+      - ../env/infra.env
+      - ../env/notifications.env
     container_name: notification_service
     ports:
       - "${NOTIFICATION_SERVICE_HOST_PORT}:8000"
@@ -697,7 +714,8 @@ services:
       context: ../..
       dockerfile: services/notifications/Dockerfile
     env_file:
-      - ../../services/notifications/.env
+      - ../env/infra.env
+      - ../env/notifications.env
     container_name: notification_worker
     depends_on:
       notification_service:
@@ -725,7 +743,8 @@ services:
       context: ../..
       dockerfile: services/notifications/Dockerfile
     env_file:
-      - ../../services/notifications/.env
+      - ../env/infra.env
+      - ../env/notifications.env
     container_name: notification_consumer
     depends_on:
       notification_service:

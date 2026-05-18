@@ -9,7 +9,7 @@ export default defineConfig({
   },
   output: {
     distPath: {
-      root: 'build',
+      root: 'dist',
     },
   },
   plugins: [pluginReact(), pluginTypeCheck()],

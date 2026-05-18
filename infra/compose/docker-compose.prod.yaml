@@ -1,0 +1,175 @@
+services:
+  api_gateway:
+    ports: !reset []
+    expose:
+      - "80"
+    restart: unless-stopped
+    volumes:
+      - ./../nginx/nginx.prod.conf:/etc/nginx/nginx.conf.source:ro
+
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    env_file:
+      - ../env/infra.env
+    depends_on:
+      api_gateway:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../frontend/dist:/srv/dist:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - smartbudget-net
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    expose:
+      - "80"
+      - "443"
+
+  redis_cache:
+    ports: !reset []
+    expose:
+      - "6379"
+    restart: unless-stopped
+
+  zookeeper:
+    ports: !reset []
+    expose:
+      - "2181"
+    restart: unless-stopped
+
+  kafka:
+    ports: !reset []
+    expose:
+      - "29092"
+      - "9092"
+    restart: unless-stopped
+
+  auth_postgres:
+    ports: !reset []
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  auth_service:
+    ports: !reset []
+    expose:
+      - "8000"
+    volumes:
+      - ../../services/authentification:/app
+      - ../../services/authentification/certs:/app/certs:ro
+      - ../../services/authentification/certs:/run/secrets:ro
+      - ../../shared/python:/shared/python:ro
+    restart: unless-stopped
+
+  auth_worker:
+    volumes:
+      - ../../services/authentification:/app
+      - ../../services/authentification/certs:/app/certs:ro
+      - ../../services/authentification/certs:/run/secrets:ro
+      - ../../shared/python:/shared/python:ro
+    restart: unless-stopped
+
+  class_postgres:
+    ports: !reset []
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  class_service:
+    ports: !reset []
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  class_worker:
+    restart: unless-stopped
+
+  class_consumers:
+    restart: unless-stopped
+
+  transactions_postgres:
+    ports: !reset []
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  transactions_service:
+    ports: !reset []
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  transactions_consumer:
+    restart: unless-stopped
+
+  transactions_worker:
+    restart: unless-stopped
+
+  budgets_postgres:
+    ports: !reset []
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  budgets_service:
+    ports: !reset []
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  budgets_consumer:
+    restart: unless-stopped
+
+  budgets_worker:
+    restart: unless-stopped
+
+  goals_postgres:
+    ports: !reset []
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  goals_service:
+    ports: !reset []
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  goals_worker:
+    restart: unless-stopped
+
+  goals_consumer:
+    restart: unless-stopped
+
+  notification_postgres:
+    ports: !reset []
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  notification_service:
+    ports: !reset []
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  notification_worker:
+    restart: unless-stopped
+
+  notification_consumer:
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -2,7 +2,7 @@ import { dispatch } from '@shared/store/store'
 import { logoutHelper } from '@shared/utils'
 import axios, { AxiosError, AxiosRequestConfig } from 'axios'
 
-const baseURL = 'http://127.0.0.1/api/v1'
+const baseURL = 'https://smartBudget.developers-cv.ru/api/v1'
 
 export const api = axios.create({
   baseURL,
