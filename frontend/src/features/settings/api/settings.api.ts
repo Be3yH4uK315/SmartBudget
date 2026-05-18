@@ -82,7 +82,7 @@ class SettingsApi {
   async updateNotificationsSettings(
     payload: Omit<NotificationsSettings, 'notificationsStatus'>,
   ): Promise<void> {
-    const url = `${this.baseUrl}/notifications/`
+    const url = `${this.baseUrl}/notifications`
 
     const response = await api.patch<void>(url, payload)
     return response.data

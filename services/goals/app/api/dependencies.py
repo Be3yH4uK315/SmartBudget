@@ -57,11 +57,15 @@ class GoalFilters:
             None,
             description="Приоритеты через запятую: High,Medium,Low",
         ),
-        is_archived: bool = Query(False, description="Показывать архивные цели"),
+        is_archived: bool | None = Query(
+            None,
+            alias="isArchived",
+            description="Показывать архивные цели",
+        ),
     ) -> None:
         self.limit = limit
         self.offset = offset
-        self.is_archived = is_archived
+        self.is_archived = is_archived if is_archived is not None else False
         self.tags_list = self._parse_tags(tags)
         self.priorities_list = self._parse_priorities(priorities)
 
