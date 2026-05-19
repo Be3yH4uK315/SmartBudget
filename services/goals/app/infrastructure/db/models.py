@@ -190,7 +190,13 @@ class Goal(Base):
         monthly_quota = daily_rate * Decimal(days_in_period)
         recommendation = monthly_quota - net_change_this_month
 
-        return max(recommendation, Decimal("0.00")).quantize(Decimal("0.01"))
+        if recommendation > 0:
+            return recommendation.quantize(Decimal("0.01"))
+
+        return self._calculate_remaining_period_recommendation(
+            today=today,
+            period_end_date=period_end_date,
+        )
 
     def _calculate_negative_month_recommendation(
         self,
@@ -198,6 +204,17 @@ class Goal(Base):
         period_end_date,
     ) -> Decimal:
         """Рассчитывает рекомендацию при отрицательном изменении за месяц."""
+        return self._calculate_remaining_period_recommendation(
+            today=today,
+            period_end_date=period_end_date,
+        )
+
+    def _calculate_remaining_period_recommendation(
+        self,
+        today,
+        period_end_date,
+    ) -> Decimal:
+        """Рассчитывает рекомендацию от текущего остатка до срока цели."""
         days_total_left = (self.finish_date - today).days
         if days_total_left <= 0:
             return self.remaining_amount
@@ -210,7 +227,7 @@ class Goal(Base):
 
         recommendation = daily_rate * Decimal(days_left_in_month)
 
-        return recommendation.quantize(Decimal("0.01"))
+        return min(recommendation, self.remaining_amount).quantize(Decimal("0.01"))
 
 
 class GoalNotification(Base):
