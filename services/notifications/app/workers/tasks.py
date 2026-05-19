@@ -11,6 +11,72 @@ logger = logging.getLogger(__name__)
 DEFAULT_LANGUAGE = "ru"
 DEFAULT_NOTIFICATION_URL = "/notifications"
 EMAIL_TEMPLATE_NAME = "base_email.html"
+CATEGORY_NAMES_BY_LANGUAGE = {
+    "ru": {
+        1: "Прочее",
+        2: "Продукты",
+        3: "Кафе и рестораны",
+        4: "Одежда и обувь",
+        5: "Электроника",
+        6: "Строительство и ремонт",
+        7: "Товары для дома",
+        8: "Красота и уход",
+        9: "Зоотовары",
+        10: "Книги и канцелярия",
+        11: "Аптеки",
+        12: "Медицинские услуги",
+        13: "Топливо",
+        14: "Автосервисы",
+        15: "Автозапчасти",
+        16: "Парковки и штрафы",
+        17: "Онлайн подписки",
+        18: "Игры",
+        19: "Маркетплейсы",
+        20: "Общественный транспорт",
+        21: "Такси и каршеринг",
+        22: "ЖКХ",
+        23: "Связь и интернет",
+        24: "Финансы",
+        25: "Образование",
+        26: "Развлечения",
+        27: "Спорт",
+        28: "Путешествия",
+        29: "Благотворительность",
+        30: "Цветы и подарки",
+    },
+    "en": {
+        1: "Other",
+        2: "Groceries",
+        3: "Cafes & Restaurants",
+        4: "Clothing & Shoes",
+        5: "Electronics",
+        6: "Construction & Renovation",
+        7: "Home Goods",
+        8: "Beauty & Personal Care",
+        9: "Pet Supplies",
+        10: "Books & Stationery",
+        11: "Pharmacies",
+        12: "Medical Services",
+        13: "Fuel",
+        14: "Car Services",
+        15: "Auto Parts",
+        16: "Parking & Fines",
+        17: "Online Subscriptions",
+        18: "Games",
+        19: "Marketplaces",
+        20: "Public Transport",
+        21: "Taxi & Car Sharing",
+        22: "Utilities",
+        23: "Mobile & Internet",
+        24: "Finance",
+        25: "Education",
+        26: "Entertainment",
+        27: "Sports",
+        28: "Travel",
+        29: "Charity",
+        30: "Flowers & Gifts",
+    },
+}
 
 
 class SafeDict(dict):
@@ -52,6 +118,44 @@ def get_translation(ctx: dict[str, Any], language: str, key: str) -> str:
     return locale_dict.get(key, key)
 
 
+def _prepare_email_props(
+    language: str,
+    message_key: str,
+    props: dict[str, Any],
+) -> dict[str, Any]:
+    """Подготавливает props для email без изменения in-app/push payload."""
+    email_props = dict(props)
+    if not message_key.startswith("Limit."):
+        return email_props
+
+    category_id = _to_int(email_props.get("category_id"))
+    if category_id is None:
+        return email_props
+
+    category_name = _category_name(language, category_id)
+    if category_name:
+        email_props["category_id"] = category_name
+
+    return email_props
+
+
+def _category_name(language: str, category_id: int) -> str | None:
+    """Возвращает локализованное название категории."""
+    names = (
+        CATEGORY_NAMES_BY_LANGUAGE.get(language)
+        or CATEGORY_NAMES_BY_LANGUAGE[DEFAULT_LANGUAGE]
+    )
+    return names.get(category_id)
+
+
+def _to_int(value: Any) -> int | None:
+    """Безопасно приводит значение к int."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 async def send_email_task(
     ctx: dict[str, Any],
     user_id: Any,
@@ -62,7 +166,12 @@ async def send_email_task(
     props: dict[str, Any],
 ) -> None:
     """Фоновая задача отправки email-уведомления."""
-    safe_props = SafeDict(**(props or {}))
+    email_props = _prepare_email_props(
+        language=language,
+        message_key=message_key,
+        props=props or {},
+    )
+    safe_props = SafeDict(**email_props)
 
     subject = _render_translation(
         ctx=ctx,
@@ -82,7 +191,7 @@ async def send_email_task(
         language=language,
         subject=subject,
         message_text=message_text,
-        props=props or {},
+        props=email_props,
     )
 
     await send_email(
