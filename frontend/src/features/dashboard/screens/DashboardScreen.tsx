@@ -26,7 +26,7 @@ import { CenterLabel } from '@shared/types/components'
 import { mapDashboardCategory } from '@shared/utils'
 import dayjs from 'dayjs'
 
-export default function DashboardScreen() {
+export default withAuth(function DashboardScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Dashboard')
   const translateMonth = useTranslate('Month')
@@ -124,4 +124,4 @@ export default function DashboardScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

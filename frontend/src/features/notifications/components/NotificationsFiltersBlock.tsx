@@ -10,7 +10,7 @@ import { Button, Chip, Stack } from '@mui/material'
 import { FiltersSelect, StyledBox } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 
-type LocalNotificationService = Exclude<NotificationService, 'Limit'>
+type LocalNotificationService = NotificationService
 
 type Props = {
   isDirty: boolean

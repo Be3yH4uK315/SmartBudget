@@ -39,7 +39,7 @@ export default function TransactionsScreen() {
 
   return (
     <ScreenContent title={translate('title')}>
-      <Stack spacing={1} maxWidth={'800px'}>
+      <Stack spacing={2} maxWidth={'800px'}>
         <Stack spacing={2}>
           <SearchBar<Transaction>
             apiFunc={transactionsApi.searchTransactions}

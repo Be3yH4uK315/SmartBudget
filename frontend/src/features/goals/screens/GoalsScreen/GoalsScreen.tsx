@@ -5,7 +5,7 @@ import { selectGoals, selectGoalsStats, selectIsGoalsLoading } from '@features/g
 import { GoalSearchOption } from '@features/goals/types'
 import { Add, ArchiveOutlined } from '@mui/icons-material'
 import { Button, Stack } from '@mui/material'
-import { EmptyList, ScreenContent, SearchBar } from '@shared/components'
+import { EmptyList, ScreenContent, SearchBar, withAuth } from '@shared/components'
 import { MODAL_IDS, ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
@@ -15,7 +15,7 @@ import { GoalBlock } from './GoalBlock'
 import { GoalsFiltersBlock } from './GoalsFiltersBlock'
 import { GoalsScreenSkeleton } from './GoalsScreenSkeleton'
 
-export default function GoalsScreen() {
+export default withAuth(function GoalsScreen() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const translate = useTranslate('Goals')
@@ -67,8 +67,7 @@ export default function GoalsScreen() {
         )}
 
         {goals.length === 0 &&
-          props.localFilters.tags.length > 0 &&
-          props.localFilters.priority.length > 0 && (
+          (props.localFilters.tags.length > 0 || props.localFilters.priority.length > 0) && (
             <Button
               onClick={props.handleClearFilters}
               sx={{ height: 'min-content' }}
@@ -109,4 +108,4 @@ export default function GoalsScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

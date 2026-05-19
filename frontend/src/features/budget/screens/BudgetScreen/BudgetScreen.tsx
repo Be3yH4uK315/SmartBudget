@@ -17,6 +17,7 @@ import {
   ScreenContent,
   StyledPaper,
   TransactionsPieBlock,
+  withAuth,
 } from '@shared/components'
 import { ROUTES } from '@shared/constants/routes'
 import { useTransactionFilters, useTranslate } from '@shared/hooks'
@@ -26,7 +27,7 @@ import { useNavigate } from 'react-router'
 import { BudgetScreenSkeleton } from './BudgetScreenSkeleton'
 import { PlannedBudgetBlock } from './PlannedBudgetBlock'
 
-export default function BudgetScreen() {
+export default withAuth(function BudgetScreen() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const translate = useTranslate('Budget')
@@ -154,4 +155,4 @@ export default function BudgetScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

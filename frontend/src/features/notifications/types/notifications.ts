@@ -99,7 +99,7 @@ export type NotificationsListResponse = {
 }
 
 export type NotificationsFilters = {
-  services: Exclude<NotificationService, 'Limit'>[]
+  services: NotificationService[]
   types: NotificationType[]
   statuses: NotificationStatus | ''
 }

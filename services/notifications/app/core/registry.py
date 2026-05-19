@@ -50,8 +50,8 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
     "budget.category.threshold_reached": EventRouteConfig(
         service=NotificationServiceType.CATEGORY_LIMITS,
         notification_type=NotificationType.ALERT,
-        title_key="limit.preOverflow.title",
-        message_key="limit.preOverflow.message",
+        title_key="Limit.preOverflow.title",
+        message_key="Limit.preOverflow.message",
         default_channels=["IN_APP", "PUSH"],
         props=(
             "budget_id",
@@ -65,8 +65,8 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
     "budget.category.exceeded": EventRouteConfig(
         service=NotificationServiceType.CATEGORY_LIMITS,
         notification_type=NotificationType.WARNING,
-        title_key="limit.overflow.title",
-        message_key="limit.overflow.message",
+        title_key="Limit.overflow.title",
+        message_key="Limit.overflow.message",
         default_channels=["IN_APP", "PUSH", "EMAIL"],
         props=(
             "budget_id",
