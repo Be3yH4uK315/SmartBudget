@@ -83,7 +83,7 @@ export const PublicPage = () => {
                 color: '#fff',
                 px: 5,
                 py: 1.5,
-                '&:hover': { bgcolor: 'gray.dark', opacity: 0.85 },
+                '&:hover': { bgcolor: 'gray.dark', color: '#fff', opacity: 0.85 },
               }}
             >
               {translate('heroCta')}
