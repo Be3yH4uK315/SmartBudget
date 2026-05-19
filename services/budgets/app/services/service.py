@@ -146,6 +146,26 @@ def _request_total_limit_amount(
     return request.total_limit_amount
 
 
+def _budget_transaction_type(
+    category_id: int | None,
+    transaction_type: TransactionType | str,
+) -> TransactionType:
+    """Возвращает тип транзакции с точки зрения бюджета."""
+    resolved_type = (
+        transaction_type
+        if isinstance(transaction_type, TransactionType)
+        else TransactionType(transaction_type)
+    )
+
+    if category_id != settings.APP.GOAL_CATEGORY_ID:
+        return resolved_type
+
+    if resolved_type == TransactionType.INCOME:
+        return TransactionType.EXPENSE
+
+    return TransactionType.INCOME
+
+
 def _category_response(category: models.CategoryLimit) -> api_schemas.CategoryResponse:
     """Преобразует CategoryLimit в API response."""
     return api_schemas.CategoryResponse(
@@ -547,12 +567,17 @@ class BudgetService:
                     skipped_count += 1
                     continue
 
+                budget_transaction_type = _budget_transaction_type(
+                    category_id,
+                    item.transaction_type,
+                )
+
                 self._apply_new_transaction_to_budget(
                     user_id=user_id,
                     budget=budget,
                     category_id=category_id,
                     amount=item.amount,
-                    transaction_type=item.transaction_type,
+                    transaction_type=budget_transaction_type,
                 )
 
                 self.uow.budgets.add_processed_transaction(
@@ -561,7 +586,7 @@ class BudgetService:
                     month=transaction_month,
                     category_id=category_id,
                     amount=item.amount,
-                    transaction_type=item.transaction_type,
+                    transaction_type=budget_transaction_type,
                     date=item.date,
                 )
                 applied_count += 1
@@ -594,12 +619,17 @@ class BudgetService:
                 logger.warning("Budget not found for user %s", message.user_id)
                 return
 
+            budget_transaction_type = _budget_transaction_type(
+                message.category_id,
+                message.transaction_type,
+            )
+
             self._apply_new_transaction_to_budget(
                 user_id=message.user_id,
                 budget=budget,
                 category_id=message.category_id,
                 amount=message.amount,
-                transaction_type=message.transaction_type,
+                transaction_type=budget_transaction_type,
             )
 
             self.uow.budgets.add_processed_transaction(
@@ -608,7 +638,7 @@ class BudgetService:
                 month=month,
                 category_id=message.category_id,
                 amount=message.amount,
-                transaction_type=message.transaction_type,
+                transaction_type=budget_transaction_type,
                 date=date,
             )
 
@@ -664,6 +694,11 @@ class BudgetService:
                     logger.warning("Budget not found for user %s", user_id)
                     return
 
+            budget_transaction_type = _budget_transaction_type(
+                resolved_category_id,
+                message.transaction_type,
+            )
+
             self._apply_updated_transaction_to_budget(
                 user_id=user_id,
                 budget=budget,
@@ -671,6 +706,7 @@ class BudgetService:
                 processed=processed,
                 message=message,
                 category_id=resolved_category_id,
+                transaction_type=budget_transaction_type,
             )
 
             if processed:
@@ -680,7 +716,7 @@ class BudgetService:
                     new_month=new_month,
                     category_id=resolved_category_id,
                     amount=message.amount,
-                    transaction_type=TransactionType(message.transaction_type),
+                    transaction_type=budget_transaction_type,
                     date=date,
                 )
             else:
@@ -690,7 +726,7 @@ class BudgetService:
                     month=new_month,
                     category_id=resolved_category_id,
                     amount=message.amount,
-                    transaction_type=message.transaction_type,
+                    transaction_type=budget_transaction_type,
                     date=date,
                 )
 
@@ -953,6 +989,7 @@ class BudgetService:
             | TransactionCategoryUpdatedPayload
         ),
         category_id: int | None,
+        transaction_type: TransactionType,
     ) -> None:
         """Применяет обновление транзакции к бюджету."""
         total_before = _expense_total(budget)
@@ -975,11 +1012,16 @@ class BudgetService:
                 multiplier=-1,
             )
         else:
+            old_category_id = getattr(message, "old_category_id", None)
+            old_transaction_type = _budget_transaction_type(
+                old_category_id,
+                message.transaction_type,
+            )
             self.uow.budgets.adjust_category_spent(
                 old_budget,
-                getattr(message, "old_category_id", None),
+                old_category_id,
                 message.amount,
-                TransactionType(message.transaction_type),
+                old_transaction_type,
                 multiplier=-1,
             )
 
@@ -987,7 +1029,7 @@ class BudgetService:
             budget,
             category_id,
             message.amount,
-            TransactionType(message.transaction_type),
+            transaction_type,
         )
         self._queue_threshold_events(
             user_id=user_id,
