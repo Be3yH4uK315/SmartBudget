@@ -42,7 +42,7 @@ export const TransactionInfoModal = ({ transaction, onClose }: Props) => {
 
       <Stack spacing={4} sx={{ p: 3, alignItems: 'center' }}>
         <Typography fontWeight={'600'}>
-          {dayjs(transaction.date).format('DD.MM.YYYY, hh:mm:ss')}
+          {dayjs.utc(transaction.date).local().format('DD.MM.YYYY, hh:mm:ss')}
         </Typography>
 
         <CategoryIcon categoryId={transaction.categoryId} />
