@@ -41,6 +41,19 @@ export default function NotificationsScreen() {
           />
         )}
 
+        {notifications.length === 0 &&
+          (props.localFilters.services.length > 0 ||
+            props.localFilters.statuses.length > 0 ||
+            props.localFilters.types.length > 0) && (
+            <Button
+              onClick={props.handleClearFilters}
+              sx={{ height: 'min-content' }}
+              variant="yellow"
+            >
+              {translate('clear')}
+            </Button>
+          )}
+
         <Stack spacing={2} direction={'column'} sx={{ display: 'flex' }}>
           {unreadCount > 0 && (
             <Button
