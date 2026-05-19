@@ -6,7 +6,7 @@ const baseURL = 'https://smartbudget.developers-cv.ru/api/v1'
 
 export const api = axios.create({
   baseURL,
-  timeout: 3 * 60 * 1000,
+  timeout: 3 * 1000,
   withCredentials: true,
   headers: {
     Accept: 'application/json',
