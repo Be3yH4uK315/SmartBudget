@@ -69,7 +69,7 @@ export const TransactionsPieBlock = React.memo(
                   alignItems: 'center',
                 }}
               >
-                {pieData.map((d) => (
+                {pieData.slice(0, 8).map((d) => (
                   <CategoryBlock key={d.label} category={d} />
                 ))}
               </Box>
