@@ -67,8 +67,7 @@ export default function GoalsScreen() {
         )}
 
         {goals.length === 0 &&
-          props.localFilters.tags.length > 0 &&
-          props.localFilters.priority.length > 0 && (
+          (props.localFilters.tags.length > 0 || props.localFilters.priority.length > 0) && (
             <Button
               onClick={props.handleClearFilters}
               sx={{ height: 'min-content' }}
