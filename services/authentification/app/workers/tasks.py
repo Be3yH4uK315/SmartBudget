@@ -12,7 +12,7 @@ from aiosmtplib import SMTP
 from app.core.config import settings
 from app.infrastructure.db.uow import UnitOfWork
 from app.infrastructure.kafka.producer import KafkaProducerWrapper
-from app.utils import network
+from app.utils import email_templates, network
 from app.utils.serialization import to_json_bytes
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,8 @@ async def send_email_task(
     message["From"] = settings.SMTP.SMTP_FROM_EMAIL
     message["To"] = to
     message["Subject"] = subject
-    message.set_content(body)
+    message.set_content(email_templates.to_plain_text(body))
+    message.add_alternative(body, subtype="html")
 
     tls_context = ssl.create_default_context()
     use_implicit_tls = settings.SMTP.SMTP_PORT == 465

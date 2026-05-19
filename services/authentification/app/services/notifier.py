@@ -98,7 +98,7 @@ class AuthNotifier:
         await self.arq.enqueue_job(
             "send_email_task",
             to=email,
-            subject="Verify your email",
+            subject="Подтвердите email",
             body=email_templates.get_verification_email_body(email, token),
         )
 
@@ -107,7 +107,7 @@ class AuthNotifier:
         await self.arq.enqueue_job(
             "send_email_task",
             to=email,
-            subject="Reset your password",
+            subject="Сброс пароля",
             body=email_templates.get_password_reset_body(email, token),
         )
 
@@ -121,7 +121,7 @@ class AuthNotifier:
         await self.arq.enqueue_job(
             "send_email_task",
             to=new_email,
-            subject="Confirm Email Change",
+            subject="Подтвердите смену email",
             body=email_templates.get_change_email_body(new_email, token),
         )
 
