@@ -116,6 +116,11 @@
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.28.4.tgz#a70226016fabe25c5783b2f22d3e1c9bc5ca3326"
   integrity sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==
 
+"@babel/runtime@^7.29.2":
+  version "7.29.2"
+  resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.29.2.tgz#9a6e2d05f4b6692e1801cd4fb176ad823930ed5e"
+  integrity sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==
+
 "@babel/template@^7.27.2":
   version "7.27.2"
   resolved "https://registry.yarnpkg.com/@babel/template/-/template-7.27.2.tgz#fa78ceed3c4e7b63ebf6cb39e5852fca45f6809d"
@@ -553,6 +558,18 @@
   dependencies:
     "@babel/runtime" "^7.28.4"
 
+"@mui/lab@^9.0.0-beta.3":
+  version "9.0.0-beta.3"
+  resolved "https://registry.yarnpkg.com/@mui/lab/-/lab-9.0.0-beta.3.tgz#3d21d376eed1fea90a1893f89b9ce0be94f64ebc"
+  integrity sha512-V824ch6JKO14QWcsbzqzyrxQpNKfnbq84NchzEH1e5ry5B4l0n+i8TmJwJWwxjMH0yxyE4tKorywGHu4oKRBlA==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@mui/system" "^9.0.1"
+    "@mui/types" "^9.0.0"
+    "@mui/utils" "^9.0.1"
+    clsx "^2.1.1"
+    prop-types "^15.8.1"
+
 "@mui/material@^7.3.4":
   version "7.3.4"
   resolved "https://registry.yarnpkg.com/@mui/material/-/material-7.3.4.tgz#945d69bafd615aaadd29b3a06b91b02d51c26e09"
@@ -580,6 +597,15 @@
     "@mui/utils" "^7.3.3"
     prop-types "^15.8.1"
 
+"@mui/private-theming@^9.0.1":
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/@mui/private-theming/-/private-theming-9.0.1.tgz#3bd627d10326fb682b824c4a1fa5d07b0401f813"
+  integrity sha512-pSIGq4Yw749KHEwlkYZWVERgHgwJELP6ODtBNUfV8V4oIb5H+h7IQDFXuk/b2oQccODK1enJAtiEzlgLZmq+8g==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@mui/utils" "^9.0.1"
+    prop-types "^15.8.1"
+
 "@mui/styled-engine@^7.3.3":
   version "7.3.3"
   resolved "https://registry.yarnpkg.com/@mui/styled-engine/-/styled-engine-7.3.3.tgz#c943d6c3abcdb3be569625bbbd7c47444f87f8c8"
@@ -590,6 +616,18 @@
     "@emotion/serialize" "^1.3.3"
     "@emotion/sheet" "^1.4.0"
     csstype "^3.1.3"
+    prop-types "^15.8.1"
+
+"@mui/styled-engine@^9.0.0":
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/@mui/styled-engine/-/styled-engine-9.0.0.tgz#ab7b1c25c0193a796ced29da3662191d53ae339b"
+  integrity sha512-9RLGdX4Jg0aQPRuvqh/OLzYSPlgd5zyEw5/1HIRfdavSiOd03WtUaGZH9/w1RoTYuRKwpgy0hpIFaMHIqPVIWg==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@emotion/cache" "^11.14.0"
+    "@emotion/serialize" "^1.3.3"
+    "@emotion/sheet" "^1.4.0"
+    csstype "^3.2.3"
     prop-types "^15.8.1"
 
 "@mui/system@^7.3.3":
@@ -606,6 +644,20 @@
     csstype "^3.1.3"
     prop-types "^15.8.1"
 
+"@mui/system@^9.0.1":
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/@mui/system/-/system-9.0.1.tgz#2c67da0be27216bc1afdc1cfbdd8d7245cb17f83"
+  integrity sha512-WvlioaLxk6ewUIOfh0StxUvOPDS1mCfzaulcudsL1brZNXuh0N9FMk7RpH7ImJKjEz412SEy/V/yvqmtxbqxCQ==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@mui/private-theming" "^9.0.1"
+    "@mui/styled-engine" "^9.0.0"
+    "@mui/types" "^9.0.0"
+    "@mui/utils" "^9.0.1"
+    clsx "^2.1.1"
+    csstype "^3.2.3"
+    prop-types "^15.8.1"
+
 "@mui/types@^7.4.7":
   version "7.4.7"
   resolved "https://registry.yarnpkg.com/@mui/types/-/types-7.4.7.tgz#7231f6c050586b5e732c7169f4a934e1856efd51"
@@ -619,6 +671,13 @@
   integrity sha512-ZNXLBjkPV6ftLCmmRCafak3XmSn8YV0tKE/ZOhzKys7TZXUiE0mZxlH8zKDo6j6TTUaDnuij68gIG+0Ucm7Xhw==
   dependencies:
     "@babel/runtime" "^7.28.4"
+
+"@mui/types@^9.0.0":
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/@mui/types/-/types-9.0.0.tgz#92d8c64e72cb863ee59108cb20cc476d648a3ab9"
+  integrity sha512-i1cuFCAWN44b3AJWO7mh7tuh1sqbQSeVr/94oG0TX5uXivac8XalgE4/6fQZcmGZigzbQ35IXxj/4jLpRIBYZg==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
 
 "@mui/utils@^7.3.3":
   version "7.3.3"
@@ -643,6 +702,18 @@
     clsx "^2.1.1"
     prop-types "^15.8.1"
     react-is "^19.2.0"
+
+"@mui/utils@^9.0.1":
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/@mui/utils/-/utils-9.0.1.tgz#044c89f0f7e61e77f82f9496535744fc5d5a5128"
+  integrity sha512-f3UO3jNN1pYg5zxqXC81Bvv8hx5ACcYc0387382ZI7M5ono1heIwHYLrKsz85myguWdeVKPRZGmDdynWUBjK2g==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@mui/types" "^9.0.0"
+    "@types/prop-types" "^15.7.15"
+    clsx "^2.1.1"
+    prop-types "^15.8.1"
+    react-is "^19.2.4"
 
 "@mui/x-charts-vendor@8.19.0":
   version "8.19.0"
@@ -1570,6 +1641,11 @@ csstype@^3.0.2, csstype@^3.1.3:
   version "3.1.3"
   resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.1.3.tgz#d80ff294d114fb0e6ac500fbf85b60137d7eff81"
   integrity sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==
+
+csstype@^3.2.3:
+  version "3.2.3"
+  resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.2.3.tgz#ec48c0f3e993e50648c86da559e2610995cf989a"
+  integrity sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==
 
 "d3-array@1 - 2":
   version "2.12.1"
@@ -3162,6 +3238,11 @@ react-is@^19.1.1, react-is@^19.2.0:
   version "19.2.0"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-19.2.0.tgz#ddc3b4a4e0f3336c3847f18b806506388d7b9973"
   integrity sha512-x3Ax3kNSMIIkyVYhWPyO09bu0uttcAIoecO/um/rKGQ4EltYWVYtyiGkS/3xMynrbVQdS69Jhlv8FXUEZehlzA==
+
+react-is@^19.2.4:
+  version "19.2.6"
+  resolved "https://registry.yarnpkg.com/react-is/-/react-is-19.2.6.tgz#aeee6159b159eb7f520d672cffcc69e7052d288f"
+  integrity sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==
 
 react-redux@^9.2.0:
   version "9.2.0"
