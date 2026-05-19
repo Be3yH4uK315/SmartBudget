@@ -3,7 +3,7 @@ import { pushApi } from '@shared/api/push'
 import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
 import { getUnreadNotificationsCount } from '@shared/store/user'
 
-const POLLING_INTERVAL = 60_000
+const POLLING_INTERVAL = 15_000
 
 export function NotificationsProvider({ children }: PropsWithChildren) {
   const dispatch = useAppDispatch()
