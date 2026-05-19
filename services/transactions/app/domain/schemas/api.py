@@ -122,6 +122,7 @@ class DeleteTransactionResponse(CamelModel):
 class ImportTransactionItemRequest(CamelModel):
     """Элемент запроса mock-импорта транзакции."""
 
+    transaction_id: UUID | None = Field(None, description="ID транзакции")
     user_id: UUID = Field(..., description="ID пользователя")
     account_id: UUID | None = Field(None, description="ID счета")
     date: datetime = Field(..., description="Время операции")

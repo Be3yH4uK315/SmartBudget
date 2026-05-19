@@ -1,8 +1,11 @@
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
+
+from pydantic import ValidationError
 
 from app.core import exceptions
 from app.core.config import settings
@@ -28,6 +31,7 @@ from smartbudget_shared.events import (
 logger = logging.getLogger(__name__)
 
 EMPTY_UUID = UUID("00000000-0000-0000-0000-000000000000")
+DEMO_IMPORT_FILE = Path(__file__).resolve().parents[1] / "data" / "demo_transactions.json"
 
 
 def _utc_now() -> datetime:
@@ -215,13 +219,12 @@ class TransactionService:
             transaction_id=transaction.transaction_id,
         )
 
-    async def import_mock_transactions(
+    async def import_demo_transactions(
         self,
-        request: api_schemas.ImportMockTransactionsRequest,
-        request_user_id: UUID | None = None,
+        request_user_id: UUID,
     ) -> api_schemas.ImportMockTransactionsResponse:
-        """Импортирует mock-транзакции."""
-        raw_items = request.root
+        """Импортирует подготовленные demo-транзакции из JSON-файла."""
+        raw_items = self._load_demo_import_items().root
         items = raw_items if isinstance(raw_items, list) else [raw_items]
 
         prepared_transactions = self._prepare_import_transactions(
@@ -247,6 +250,22 @@ class TransactionService:
                 imported_count += 1
 
         return api_schemas.ImportMockTransactionsResponse(imported_count=imported_count)
+
+    @staticmethod
+    def _load_demo_import_items() -> api_schemas.ImportMockTransactionsRequest:
+        """Загружает и валидирует подготовленный файл demo-транзакций."""
+        try:
+            return api_schemas.ImportMockTransactionsRequest.model_validate_json(
+                DEMO_IMPORT_FILE.read_bytes(),
+            )
+        except OSError as exc:
+            raise exceptions.InvalidTransactionDataError(
+                f"Demo import file is not available: {DEMO_IMPORT_FILE}",
+            ) from exc
+        except ValidationError as exc:
+            raise exceptions.InvalidTransactionDataError(
+                "Demo import file contains invalid transactions",
+            ) from exc
 
     async def patch_category(
         self,
@@ -683,7 +702,7 @@ class TransactionService:
 
         return models.Transaction(
             user_id=user_id,
-            transaction_id=uuid4(),
+            transaction_id=item.transaction_id or uuid4(),
             account_id=item.account_id,
             category_id=category_id,
             date=_ensure_aware(item.date),

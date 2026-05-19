@@ -88,15 +88,14 @@ async def create_manual_transaction(
     "/import",
     response_model=schemas.ImportMockTransactionsResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Импортировать mock-транзакции",
+    summary="Импортировать demo-транзакции",
 )
-async def import_mock_transactions(
-    request: schemas.ImportMockTransactionsRequest = Body(...),
-    user_id: UUID | None = Depends(dependencies.get_optional_current_user_id),
+async def import_demo_transactions(
+    user_id: UUID = Depends(dependencies.get_current_user_id),
     service: TransactionService = Depends(dependencies.get_transaction_service),
 ):
-    """Импортирует одну или несколько mock-транзакций."""
-    return await service.import_mock_transactions(request, user_id)
+    """Импортирует подготовленные demo-транзакции из JSON-файла."""
+    return await service.import_demo_transactions(user_id)
 
 
 @router.patch(
