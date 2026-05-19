@@ -45,6 +45,7 @@ export const notificationsDict: LocaleDictionary = {
         Transactions: 'Операции',
         Budget: 'Бюджет и лимиты',
         Security: 'Безопасность',
+        Limit: 'Лимиты по категориям',
       },
 
       Limit: {

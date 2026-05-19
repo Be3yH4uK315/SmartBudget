@@ -289,7 +289,7 @@ class NotificationsMock {
     // Фильтрация по сервисам
     if (filters.services.length > 0) {
       filtered = filtered.filter((notification) =>
-        filters.services.includes(notification.service as Exclude<NotificationService, 'Limit'>),
+        filters.services.includes(notification.service as NotificationService),
       )
     }
 
