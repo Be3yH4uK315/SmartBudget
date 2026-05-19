@@ -5,6 +5,7 @@ class BudgetMock {
     await new Promise((r) => setTimeout(r, 800))
 
     return {
+      budgetId: 'ddd',
       totalLimitAmount: 14000,
       totalIncomeAmount: 0,
       totalSpentAmount: 2200,

@@ -1,4 +1,5 @@
 export type BudgetPayload = {
+  budgetId: string | null
   categories: Category[]
 
   totalLimitAmount: number

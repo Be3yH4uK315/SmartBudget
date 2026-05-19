@@ -14,6 +14,13 @@ export const budgetDict: LocaleDictionary = {
       cannotFindData: 'К сожалению, у нас что-то сломалось :(',
       tryAgain: 'Попробуйте обновить страницу или загляните позже - мы обязательно все починим',
 
+      NoBudgetBlock: {
+        create: 'Создать бюджет',
+        title: 'Упс! Кажется бюджет еще не создан',
+        subtitle:
+          'Если вы уверены, что создавали бюджет – обновите страницу, иначе – нажмите кнопку ниже',
+      },
+
       CategoryInfoBlock: {
         category: 'Лимиты не установлены',
         category_one: '{{count}} категория',
@@ -78,6 +85,13 @@ export const budgetDict: LocaleDictionary = {
 
       cannotFindData: 'Unfortunately, something went wrong :(',
       tryAgain: 'Try refreshing the page or check back later – we’ll fix it!',
+
+      NoBudgetBlock: {
+        create: 'Create budget',
+        title: 'Oops! It seems you have no budget',
+        subtitle:
+          'If you are sure that you created a budget, refresh the page. Otherwise, click the button below',
+      },
 
       CategoryInfoBlock: {
         category: 'No limits set',

@@ -1,10 +1,16 @@
 import { useEffect } from 'react'
-import { CategoriesBlock, InfoBlock, OverflowCategoriesBlock } from '@features/budget/components'
+import {
+  CategoriesBlock,
+  InfoBlock,
+  NoBudgetBlock,
+  OverflowCategoriesBlock,
+} from '@features/budget/components'
 import { useBudgetData, useBudgetPieData } from '@features/budget/hooks'
 import {
   clearBudgetState,
   getBudgetData,
   selectBudgetCategories,
+  selectBudgetId,
   selectBudgetTotalIncome,
   selectBudgetTotalLimit,
   selectIsAutoRenew,
@@ -37,6 +43,7 @@ export default withAuth(function BudgetScreen() {
   const isAutoRenew = useAppSelector(selectIsAutoRenew)
   const isLoading = useAppSelector(selectIsBudgetLoading)
   const totalIncome = useAppSelector(selectBudgetTotalIncome)
+  const budgetId = useAppSelector(selectBudgetId)
 
   const { limited, unlimited, limitedSum, preOverflow, overflow } = useBudgetData({
     categories,
@@ -77,6 +84,9 @@ export default withAuth(function BudgetScreen() {
 
   const settingsButtonTitle = translate('settingsButtonTitle')
   const settingsButtonSubtitle = translate('settingsButtonSubtitle')
+
+  console.log(budgetId)
+  if (budgetId === null) return <NoBudgetBlock />
 
   return (
     <ScreenContent isLoading={isLoading} ContentSkeleton={BudgetScreenSkeleton}>
