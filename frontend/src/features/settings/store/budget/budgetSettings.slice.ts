@@ -16,9 +16,6 @@ export const budgetSettingsSlice = createSlice<
     clearBudgetSettingsState() {
       getBudgetSettingsInitialState()
     },
-    setBudgetStatus(state, { payload }) {
-      state.status = payload
-    },
   },
 
   extraReducers: (builder) => {
@@ -54,4 +51,4 @@ declare module '@shared/store' {
 }
 
 budgetSettingsSlice.injectInto(rootReducer)
-export const { clearBudgetSettingsState, setBudgetStatus } = budgetSettingsSlice.actions
+export const { clearBudgetSettingsState } = budgetSettingsSlice.actions

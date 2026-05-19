@@ -6,12 +6,6 @@ export const canEditNextMonthBudget = () => {
   return dayjs().date() >= 2
 }
 
-export const getBudgetDateByStatus = (status: 'current' | 'next') => {
-  return status === 'current'
-    ? dayjs().format('YYYY-MM-DD')
-    : dayjs().endOf('month').add(1, 'day').format('YYYY-MM-DD')
-}
-
 export const mapBudgetSettingsToForm = (
   data: Omit<BudgetSettings, 'totalLimitAmount'> & { totalLimitAmount: number | null },
 ): FormValues => ({
