@@ -1,9 +1,9 @@
 {
-  "limit.preOverflow.title": "Category limit is almost reached",
-  "limit.preOverflow.message": "Expenses for category {category_id} reached {percent}% of the limit. Spent {spent_amount} of {limit_amount}.",
+  "Limit.preOverflow.title": "Category limit is almost reached",
+  "Limit.preOverflow.message": "Expenses for category {category_id} reached {percent}% of the limit. Spent {spent_amount} of {limit_amount}.",
 
-  "limit.overflow.title": "Category limit exceeded",
-  "limit.overflow.message": "Limit for category {category_id} exceeded. Spent {spent_amount} of {limit_amount}.",
+  "Limit.overflow.title": "Category limit exceeded",
+  "Limit.overflow.message": "Limit for category {category_id} exceeded. Spent {spent_amount} of {limit_amount}.",
 
   "Budget.checkResults.title": "Budget check completed",
   "Budget.checkResults.message": "Budget check completed. Total budget exceeded: {total_exceeded_count}, category limits exceeded: {category_exceeded_count}.",

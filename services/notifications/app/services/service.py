@@ -616,7 +616,7 @@ class NotificationService:
             transactions=NotificationServiceType.TRANSACTIONS.value not in disabled,
             budget=api_schemas.BudgetNotificationSettingsResponse(
                 total_limit=NotificationServiceType.BUDGET.value not in disabled,
-                categories_limit=NotificationServiceType.CATEGORY_LIMITS.value not in disabled,
+                categories_limit=NotificationServiceType.LIMIT.value not in disabled,
             ),
         )
 
@@ -637,7 +637,7 @@ class NotificationService:
             disabled_services.append(NotificationServiceType.BUDGET.value)
 
         if not request.budget.categories_limit:
-            disabled_services.append(NotificationServiceType.CATEGORY_LIMITS.value)
+            disabled_services.append(NotificationServiceType.LIMIT.value)
 
         return {
             "push_enabled": request.push_status,

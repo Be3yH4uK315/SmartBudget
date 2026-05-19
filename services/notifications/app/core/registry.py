@@ -48,7 +48,7 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
 
     # Лимиты категорий
     "budget.category.threshold_reached": EventRouteConfig(
-        service=NotificationServiceType.CATEGORY_LIMITS,
+        service=NotificationServiceType.LIMIT,
         notification_type=NotificationType.ALERT,
         title_key="Limit.preOverflow.title",
         message_key="Limit.preOverflow.message",
@@ -63,7 +63,7 @@ EVENT_REGISTRY: dict[str, EventRouteConfig] = {
         ),
     ),
     "budget.category.exceeded": EventRouteConfig(
-        service=NotificationServiceType.CATEGORY_LIMITS,
+        service=NotificationServiceType.LIMIT,
         notification_type=NotificationType.WARNING,
         title_key="Limit.overflow.title",
         message_key="Limit.overflow.message",

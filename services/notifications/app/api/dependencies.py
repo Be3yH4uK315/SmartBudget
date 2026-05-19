@@ -12,6 +12,7 @@ from app.infrastructure.db.uow import UnitOfWork
 from app.services.service import NotificationService
 
 FILTERABLE_NOTIFICATION_SERVICES = {
+    NotificationServiceType.LIMIT,
     NotificationServiceType.BUDGET,
     NotificationServiceType.GOALS,
     NotificationServiceType.TRANSACTIONS,
@@ -87,7 +88,7 @@ class NotificationFilters:
         self,
         services: str | None = Query(
             None,
-            description="Сервисы через запятую: Budget,Goals,Transactions,Security",
+            description="Сервисы через запятую: Limit,Budget,Goals,Transactions,Security",
         ),
         types: str | None = Query(
             None,
