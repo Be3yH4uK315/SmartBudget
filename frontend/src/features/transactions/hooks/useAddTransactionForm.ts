@@ -88,7 +88,9 @@ export function useAddTransactionForm() {
       Number(values.amount) < 1 ||
       values.transactionType === undefined ||
       values.status === undefined ||
-      values.merchant === ''
+      values.merchant === '' ||
+      values.date === undefined ||
+      values.date === ''
     )
       return false
 
