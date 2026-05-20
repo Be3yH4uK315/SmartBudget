@@ -49,10 +49,10 @@ class GoalRepository:
         return result.scalar_one_or_none()
 
     async def get_main_goals(self, user_id: UUID) -> list[models.Goal]:
-        """Получает до 5 основных целей с наименьшим остатком."""
+        """Получает активные цели или fallback из неархивных целей."""
         remaining_amount = models.Goal.target_amount - models.Goal.current_amount
 
-        query = (
+        active_query = (
             select(models.Goal)
             .where(
                 models.Goal.user_id == user_id,
@@ -63,7 +63,22 @@ class GoalRepository:
             .limit(5)
         )
 
-        result = await self.db.execute(query)
+        result = await self.db.execute(active_query)
+        active_goals = list(result.scalars().all())
+        if active_goals:
+            return active_goals
+
+        fallback_query = (
+            select(models.Goal)
+            .where(
+                models.Goal.user_id == user_id,
+                models.Goal.is_archived.is_(False),
+            )
+            .order_by(models.Goal.updated_at.desc(), models.Goal.goal_id.asc())
+            .limit(5)
+        )
+
+        result = await self.db.execute(fallback_query)
         return list(result.scalars().all())
 
     async def search_goals(
