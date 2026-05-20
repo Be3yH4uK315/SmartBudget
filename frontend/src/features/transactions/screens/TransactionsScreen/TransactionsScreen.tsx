@@ -31,6 +31,12 @@ export default function TransactionsScreen() {
 
   const { appliedFiltersRef, isDirty, ...props } = useTransactionsFilters()
 
+  const handleImport = async () => {
+    await dispatch(importTransaction())
+      .unwrap()
+      .then(() => props.applyFilters(appliedFiltersRef.current))
+  }
+
   useEffect(() => {
     return () => {
       dispatch(clearTransactionsState())
@@ -61,7 +67,7 @@ export default function TransactionsScreen() {
             <Button
               variant="yellow"
               disabled={isImportLoading}
-              onClick={() => dispatch(importTransaction())}
+              onClick={handleImport}
               sx={{ flex: 1 }}
             >
               {translate('importTransactions')}
