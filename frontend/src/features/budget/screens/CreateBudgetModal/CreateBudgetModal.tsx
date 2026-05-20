@@ -16,12 +16,13 @@ export const CreateBudgetModal = ({ onClose }: Props) => {
 
   const props = useBudgetForm()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const payload = mapFormToBudgetPayload(props.values)
-    dispatch(createBudget({ payload: payload }))
-    onClose()
+    await dispatch(createBudget({ payload: payload }))
+      .unwrap()
+      .then(() => onClose())
   }
 
   return (
