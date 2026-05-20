@@ -3,6 +3,7 @@ import logging
 import ssl
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from email.utils import formataddr
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -126,7 +127,12 @@ async def send_email_task(
     )
 
     message = EmailMessage()
-    message["From"] = settings.SMTP.SMTP_FROM_EMAIL
+    message["From"] = formataddr(
+        (
+            settings.SMTP.SMTP_FROM_NAME or "SmartBudget",
+            settings.SMTP.SMTP_FROM_EMAIL,
+        ),
+    )
     message["To"] = to
     message["Subject"] = subject
     message.set_content(email_templates.to_plain_text(body))
