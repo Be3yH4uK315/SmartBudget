@@ -83,7 +83,7 @@ export const PublicPage = () => {
                 color: '#fff',
                 px: 5,
                 py: 1.5,
-                '&:hover': { bgcolor: 'gray.dark', opacity: 0.85 },
+                '&:hover': { bgcolor: 'gray.dark', color: '#fff', opacity: 0.85 },
               }}
             >
               {translate('heroCta')}
@@ -106,7 +106,18 @@ export const PublicPage = () => {
         </Grid>
       </Container>
 
-      <Box sx={{ bgcolor: 'surface.light', py: { xs: 6, md: 10 } }}>
+      <Box
+        sx={{
+          background: (theme) =>
+            `linear-gradient(
+                180deg,
+                ${theme.palette.surface.main} 0%,
+                ${theme.palette.surface.light} 100%,
+                transparent 100%
+              )`,
+          py: { xs: 6, md: 10 },
+        }}
+      >
         <Container maxWidth="sm">
           <Typography variant="h3" textAlign="center" sx={{ mb: 5 }}>
             {translate('howItWorks')}
@@ -116,7 +127,7 @@ export const PublicPage = () => {
         </Container>
       </Box>
 
-      <Box sx={{ bgcolor: 'surface.main', py: { xs: 6, md: 10 } }}>
+      <Box sx={{ bgcolor: 'surface.light', py: { xs: 6, md: 10 } }}>
         <Container maxWidth="sm">
           <Stack alignItems="center" textAlign="center" spacing={3}>
             <Typography variant="h4">{translate('ctaTitle')}</Typography>
