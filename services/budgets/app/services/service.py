@@ -147,8 +147,8 @@ def _request_total_limit_amount(
 
 
 def _budget_transaction_type(
-    category_id: int | None,
     transaction_type: TransactionType | str,
+    is_goal_transaction: bool = False,
 ) -> TransactionType:
     """Возвращает тип транзакции с точки зрения бюджета."""
     resolved_type = (
@@ -157,7 +157,7 @@ def _budget_transaction_type(
         else TransactionType(transaction_type)
     )
 
-    if category_id != settings.APP.GOAL_CATEGORY_ID:
+    if not is_goal_transaction:
         return resolved_type
 
     if resolved_type == TransactionType.INCOME:
@@ -536,8 +536,11 @@ class BudgetService:
         async with self.uow:
             for item in request.transactions:
                 category_id = item.category_id
+                is_goal_transaction = False
+
                 if category_id is None and item.account_id is not None:
                     category_id = settings.APP.GOAL_CATEGORY_ID
+                    is_goal_transaction = True
 
                 if category_id is None:
                     skipped_count += 1
@@ -568,8 +571,8 @@ class BudgetService:
                     continue
 
                 budget_transaction_type = _budget_transaction_type(
-                    category_id,
                     item.transaction_type,
+                    is_goal_transaction=is_goal_transaction,
                 )
 
                 self._apply_new_transaction_to_budget(
@@ -620,8 +623,8 @@ class BudgetService:
                 return
 
             budget_transaction_type = _budget_transaction_type(
-                message.category_id,
                 message.transaction_type,
+                is_goal_transaction=message.goal_id is not None,
             )
 
             self._apply_new_transaction_to_budget(
@@ -695,8 +698,8 @@ class BudgetService:
                     return
 
             budget_transaction_type = _budget_transaction_type(
-                resolved_category_id,
                 message.transaction_type,
+                is_goal_transaction=getattr(message, "goal_id", None) is not None,
             )
 
             self._apply_updated_transaction_to_budget(
@@ -1014,8 +1017,9 @@ class BudgetService:
         else:
             old_category_id = getattr(message, "old_category_id", None)
             old_transaction_type = _budget_transaction_type(
-                old_category_id,
                 message.transaction_type,
+                is_goal_transaction=getattr(message, "goal_id", None) is not None
+                and old_category_id == settings.APP.GOAL_CATEGORY_ID,
             )
             self.uow.budgets.adjust_category_spent(
                 old_budget,
