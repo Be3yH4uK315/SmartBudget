@@ -11,5 +11,3 @@ export const selectBudgetSettings = sliceStateSelector((state) => state.budgetSe
 export const selectIsBudgetSettingsLoading = sliceStateSelector((state) => state.isLoading)
 
 export const selectIsBudgetSettingsUpdating = sliceStateSelector((state) => state.isUpdating)
-
-export const selectBudgetSettingsStatus = sliceStateSelector((state) => state.status)

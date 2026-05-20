@@ -7,7 +7,6 @@ export function getBudgetSettingsInitialState(): BudgetSettingsSliceState {
       isAutoRenew: false,
       categories: [],
     },
-    status: 'current',
 
     isLoading: true,
     isUpdating: false,

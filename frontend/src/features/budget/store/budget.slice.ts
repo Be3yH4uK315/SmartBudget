@@ -2,7 +2,7 @@ import { BudgetSliceReducers, BudgetSliceState } from '@features/budget/types'
 import { createSlice, WithSlice } from '@reduxjs/toolkit'
 import { rootReducer } from '@shared/store'
 import { getBudgetInitialState } from './budget.state'
-import { getBudgetData } from './budget.thunks'
+import { createBudget, getBudgetData } from './budget.thunks'
 
 export const budgetSlice = createSlice<BudgetSliceState, BudgetSliceReducers, 'budget', any>({
   name: 'budget',
@@ -16,8 +16,9 @@ export const budgetSlice = createSlice<BudgetSliceState, BudgetSliceReducers, 'b
   extraReducers: (builder) => {
     builder
       .addCase(getBudgetData.fulfilled, (state, { payload }) => {
-        const { totalLimitAmount, totalIncomeAmount, isAutoRenew, categories } = payload
+        const { budgetId, totalLimitAmount, totalIncomeAmount, isAutoRenew, categories } = payload
 
+        state.budgetId = budgetId
         state.totalLimitAmount = totalLimitAmount
         state.isAutoRenew = isAutoRenew
         state.totalIncomeAmount = totalIncomeAmount
@@ -30,6 +31,25 @@ export const budgetSlice = createSlice<BudgetSliceState, BudgetSliceReducers, 'b
       })
 
       .addCase(getBudgetData.pending, (state) => {
+        state.isLoading = true
+      })
+
+      .addCase(createBudget.fulfilled, (state, { payload }) => {
+        const { budgetId, totalLimitAmount, totalIncomeAmount, isAutoRenew, categories } = payload
+
+        state.budgetId = budgetId
+        state.totalLimitAmount = totalLimitAmount
+        state.isAutoRenew = isAutoRenew
+        state.totalIncomeAmount = totalIncomeAmount
+        state.categories = categories
+        state.isLoading = false
+      })
+
+      .addCase(createBudget.rejected, (state) => {
+        state.isLoading = false
+      })
+
+      .addCase(createBudget.pending, (state) => {
         state.isLoading = true
       })
   },

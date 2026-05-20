@@ -12,3 +12,5 @@ export const selectBudgetTotalLimit = sliceStateSelector((state) => state.totalL
 export const selectBudgetTotalIncome = sliceStateSelector((state) => state.totalIncomeAmount)
 
 export const selectIsBudgetLoading = sliceStateSelector((state) => state.isLoading)
+
+export const selectBudgetId = sliceStateSelector((state) => state.budgetId)

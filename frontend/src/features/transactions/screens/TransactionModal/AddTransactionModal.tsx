@@ -172,7 +172,13 @@ export const AddTransactionModal = ({ onClose }: Props) => {
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DatePicker
-                label={translate('date')}
+                label={
+                  <Stack direction={'row'}>
+                    {translate('date')}
+
+                    <Typography color="red">*</Typography>
+                  </Stack>
+                }
                 value={values.date ? dayjs(values.date) : null}
                 onChange={handleDateChange}
                 format="DD.MM.YYYY"

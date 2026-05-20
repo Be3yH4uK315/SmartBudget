@@ -11,10 +11,10 @@ class BudgetApi {
     return response.data
   }
 
-  async createBudget(payload: BudgetSettings): Promise<void> {
+  async createBudget(payload: BudgetSettings): Promise<BudgetPayload> {
     const url = `${this.baseUrl}`
 
-    const response = await api.post<void>(url, payload)
+    const response = await api.post<BudgetPayload>(url, payload)
     return response.data
   }
 }

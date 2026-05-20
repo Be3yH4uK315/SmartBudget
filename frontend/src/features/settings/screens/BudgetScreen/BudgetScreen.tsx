@@ -3,19 +3,18 @@ import {
   clearBudgetSettingsState,
   getBudgetSettings,
   selectBudgetSettings,
-  selectBudgetSettingsStatus,
   selectIsBudgetSettingsLoading,
   selectIsBudgetSettingsUpdating,
   setBudgetSettings,
 } from '@features/settings/store/budget'
-import { getBudgetDateByStatus, mapBudgetSettingsToForm } from '@features/settings/utils'
+import { mapBudgetSettingsToForm } from '@features/settings/utils'
 import { Button, CircularProgress, Stack } from '@mui/material'
 import { BudgetForm, ScreenContent } from '@shared/components'
 import { useBudgetForm, useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { mapFormToBudgetPayload } from '@shared/utils'
+import dayjs from 'dayjs'
 import { BudgetScreenSkeleton } from './BudgetScreenSkeleton'
-import { MonthBlock } from './MonthInfo'
 
 export default function BudgetScreen() {
   const dispatch = useAppDispatch()
@@ -24,19 +23,16 @@ export default function BudgetScreen() {
   const isUpdating = useAppSelector(selectIsBudgetSettingsUpdating)
   const isLoading = useAppSelector(selectIsBudgetSettingsLoading)
   const settings = useAppSelector(selectBudgetSettings)
-  const status = useAppSelector(selectBudgetSettingsStatus)
 
   const props = useBudgetForm()
 
   useEffect(() => {
-    const date = getBudgetDateByStatus(status)
-
-    dispatch(getBudgetSettings(date))
+    dispatch(getBudgetSettings(dayjs().format('YYYY-MM-DD')))
 
     return () => {
       dispatch(clearBudgetSettingsState())
     }
-  }, [status, dispatch])
+  }, [dispatch])
 
   useEffect(() => {
     if (settings) {
@@ -57,9 +53,7 @@ export default function BudgetScreen() {
       {isLoading ? (
         <BudgetScreenSkeleton />
       ) : (
-        <Stack spacing={2} maxWidth={'800px'}>
-          <MonthBlock status={status} />
-
+        <Stack maxWidth={'800px'}>
           <form onSubmit={handleSubmit}>
             <Stack spacing={2} maxWidth="800px">
               <BudgetForm {...props} />

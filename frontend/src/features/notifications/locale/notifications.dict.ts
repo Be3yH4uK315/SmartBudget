@@ -7,6 +7,7 @@ export const notificationsDict: LocaleDictionary = {
       date: '{{date}} в {{time}}',
       unread: 'Новое уведомление',
       markAllAsRead: 'Прочитать все',
+      clear: 'Сбросить фильтры',
 
       NoNotifications: {
         Empty: {

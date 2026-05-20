@@ -8,6 +8,7 @@ import {
   budgetFormDict,
   categoriesDict,
   monthDict,
+  publicPageDict,
   sharedDict,
   toastsDict,
 } from '@shared/locale/dicts'
@@ -23,6 +24,7 @@ export const appLocaleDict = mergeLocaleDicts(
   goalsDict,
   monthDict,
   notificationsDict,
+  publicPageDict,
   toastsDict,
   transactionsDict,
   settingsDict,
