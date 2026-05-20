@@ -132,6 +132,20 @@ def _threshold_crossed(
     return before < boundary <= after
 
 
+def _overflow_crossed(
+    limit_amount: Decimal,
+    before: Decimal,
+    after: Decimal,
+) -> bool:
+    """Проверяет пересечение 100% лимита."""
+    return _threshold_crossed(
+        limit_amount,
+        before,
+        after,
+        BUDGET_OVERFLOW_RATIO,
+    )
+
+
 def _request_limit_amount(
     request: api_schemas.CategoryLimitRequest | api_schemas.PatchCategoryLimitRequest,
 ) -> Decimal:
@@ -1093,6 +1107,19 @@ class BudgetService:
         total_after: Decimal,
     ) -> None:
         """Добавляет события по общему лимиту бюджета."""
+        if _overflow_crossed(
+            budget.total_limit_amount,
+            total_before,
+            total_after,
+        ):
+            self._queue_total_budget_event(
+                user_id=user_id,
+                budget=budget,
+                event_type=BudgetEventType.BUDGET_TOTAL_EXCEEDED,
+                threshold_percent=100,
+            )
+            return
+
         if _threshold_crossed(
             budget.total_limit_amount,
             total_before,
@@ -1106,19 +1133,6 @@ class BudgetService:
                 threshold_percent=80,
             )
 
-        if _threshold_crossed(
-            budget.total_limit_amount,
-            total_before,
-            total_after,
-            BUDGET_OVERFLOW_RATIO,
-        ):
-            self._queue_total_budget_event(
-                user_id=user_id,
-                budget=budget,
-                event_type=BudgetEventType.BUDGET_TOTAL_EXCEEDED,
-                threshold_percent=100,
-            )
-
     def _queue_category_threshold_events(
         self,
         user_id: UUID,
@@ -1128,6 +1142,20 @@ class BudgetService:
     ) -> None:
         """Добавляет события по лимиту категории."""
         category_after = _category_expense(category)
+
+        if _overflow_crossed(
+            category.limit_amount,
+            category_before,
+            category_after,
+        ):
+            self._queue_category_budget_event(
+                user_id=user_id,
+                budget=budget,
+                category=category,
+                event_type=BudgetEventType.BUDGET_CATEGORY_EXCEEDED,
+                threshold_percent=100,
+            )
+            return
 
         if _threshold_crossed(
             category.limit_amount,
@@ -1141,20 +1169,6 @@ class BudgetService:
                 category=category,
                 event_type=BudgetEventType.BUDGET_CATEGORY_THRESHOLD_REACHED,
                 threshold_percent=80,
-            )
-
-        if _threshold_crossed(
-            category.limit_amount,
-            category_before,
-            category_after,
-            BUDGET_OVERFLOW_RATIO,
-        ):
-            self._queue_category_budget_event(
-                user_id=user_id,
-                budget=budget,
-                category=category,
-                event_type=BudgetEventType.BUDGET_CATEGORY_EXCEEDED,
-                threshold_percent=100,
             )
 
     def _queue_total_budget_event(
