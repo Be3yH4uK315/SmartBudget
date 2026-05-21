@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 from pydantic import ValidationError
 
@@ -88,6 +88,17 @@ def _goal_transaction_description(
         return "Пополнение цели"
 
     return "Списание с цели"
+
+
+def _import_transaction_id(
+    item: api_schemas.ImportTransactionItemRequest,
+    user_id: UUID,
+) -> UUID:
+    """Возвращает стабильный ID импортируемой транзакции в рамках пользователя."""
+    if item.transaction_id:
+        return uuid5(user_id, str(item.transaction_id))
+
+    return uuid4()
 
 
 def _model_to_api(transaction: models.Transaction) -> api_schemas.TransactionResponse:
@@ -702,7 +713,7 @@ class TransactionService:
 
         return models.Transaction(
             user_id=user_id,
-            transaction_id=item.transaction_id or uuid4(),
+            transaction_id=_import_transaction_id(item, user_id),
             account_id=item.account_id,
             category_id=category_id,
             date=_ensure_aware(item.date),
