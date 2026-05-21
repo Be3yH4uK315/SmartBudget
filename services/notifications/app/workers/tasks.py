@@ -118,25 +118,25 @@ def get_translation(ctx: dict[str, Any], language: str, key: str) -> str:
     return locale_dict.get(key, key)
 
 
-def _prepare_email_props(
+def _prepare_delivery_props(
     language: str,
     message_key: str,
     props: dict[str, Any],
 ) -> dict[str, Any]:
-    """Подготавливает props для email без изменения in-app/push payload."""
-    email_props = dict(props)
+    """Подготавливает props для внешних доставок без изменения in-app payload."""
+    delivery_props = dict(props)
     if not message_key.startswith("Limit."):
-        return email_props
+        return delivery_props
 
-    category_id = _to_int(email_props.get("category_id"))
+    category_id = _to_int(delivery_props.get("category_id"))
     if category_id is None:
-        return email_props
+        return delivery_props
 
     category_name = _category_name(language, category_id)
     if category_name:
-        email_props["category_id"] = category_name
+        delivery_props["category_id"] = category_name
 
-    return email_props
+    return delivery_props
 
 
 def _category_name(language: str, category_id: int) -> str | None:
@@ -166,7 +166,7 @@ async def send_email_task(
     props: dict[str, Any],
 ) -> None:
     """Фоновая задача отправки email-уведомления."""
-    email_props = _prepare_email_props(
+    email_props = _prepare_delivery_props(
         language=language,
         message_key=message_key,
         props=props or {},
@@ -222,7 +222,12 @@ async def send_push_task(
     props: dict[str, Any],
 ) -> None:
     """Фоновая задача отправки browser push-уведомления."""
-    safe_props = SafeDict(**(props or {}))
+    push_props = _prepare_delivery_props(
+        language=language,
+        message_key=message_key,
+        props=props or {},
+    )
+    safe_props = SafeDict(**push_props)
 
     title = _render_translation(
         ctx=ctx,
@@ -237,7 +242,7 @@ async def send_push_task(
         safe_props=safe_props,
     )
     data = {
-        **(props or {}),
+        **push_props,
         "url": get_push_url(message_key, props or {}),
     }
 
