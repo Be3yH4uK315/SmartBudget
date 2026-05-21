@@ -317,12 +317,16 @@ class ClassificationService:
         )
 
         if result_model.category_id == UNCATEGORIZED_CATEGORY_ID and source_event:
+            uncategorized_count = await self.uow.results.count_by_user_and_category(
+                user_id=result_model.user_id,
+                category_id=UNCATEGORIZED_CATEGORY_ID,
+            )
             self.uow.outbox.add_event(
                 settings.KAFKA.KAFKA_TOPIC_TRANSACTION_EVENTS,
                 _transaction_unclassified_found_event(
                     user_id=result_model.user_id,
                     amount=source_event.amount,
-                    count=1,
+                    count=uncategorized_count,
                 ),
                 "transaction.unclassified.found",
             )

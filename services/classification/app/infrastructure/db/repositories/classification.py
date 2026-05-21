@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.infrastructure.db.models import (
@@ -94,6 +94,21 @@ class ClassificationResultRepository(BaseRepository):
         )
 
         return set(result.scalars().all())
+
+    async def count_by_user_and_category(
+        self,
+        user_id: UUID,
+        category_id: int,
+    ) -> int:
+        """Считает результаты классификации пользователя по категории."""
+        result = await self.db.scalar(
+            select(func.count()).where(
+                ClassificationResult.user_id == user_id,
+                ClassificationResult.category_id == category_id,
+            ),
+        )
+
+        return result or 0
 
 
 class FeedbackRepository(BaseRepository):
