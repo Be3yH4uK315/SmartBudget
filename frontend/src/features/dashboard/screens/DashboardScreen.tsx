@@ -19,7 +19,7 @@ import {
 import { Stack } from '@mui/material'
 import { IconButtonsBlock, ScreenContent, TransactionsPieBlock, withAuth } from '@shared/components'
 import { ROUTES } from '@shared/constants'
-import { useTransactionFilters, useTranslate } from '@shared/hooks'
+import { useLocalization, useTransactionFilters, useTranslate } from '@shared/hooks'
 import { selectUser, useAppDispatch, useAppSelector } from '@shared/store'
 import { IconButtonItem } from '@shared/types'
 import { CenterLabel } from '@shared/types/components'
@@ -37,6 +37,7 @@ export default withAuth(function DashboardScreen() {
   const budgetLimit = useAppSelector(selectBudgetLimit)
   const isBudgetLoading = useAppSelector(selectIsDashboardBudgetLoading)
   const isGoalsLoading = useAppSelector(selectIsDashboardGoalsLoading)
+  const { language } = useLocalization()
 
   const ButtonsBlock = useMemo<IconButtonItem[]>(
     () => [
@@ -65,7 +66,8 @@ export default withAuth(function DashboardScreen() {
         path: ROUTES.PAGES.SETTINGS.SECURITY,
       },
     ],
-    [translate],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [translate, language],
   )
 
   const { activeType, toggleFilter, normalizedData, total } = useTransactionFilters(
