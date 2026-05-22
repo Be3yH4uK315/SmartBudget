@@ -34,7 +34,10 @@ export default function TransactionsScreen() {
   const handleImport = async () => {
     await dispatch(importTransaction())
       .unwrap()
-      .then(() => props.applyFilters(appliedFiltersRef.current))
+      .then(() => {
+        dispatch(clearTransactionsState())
+        props.applyFilters(appliedFiltersRef.current)
+      })
   }
 
   useEffect(() => {
@@ -58,7 +61,19 @@ export default function TransactionsScreen() {
           <Stack direction={'row'} spacing={2} sx={{ alignItems: 'stretch' }}>
             <Button
               variant="yellow"
-              onClick={() => dispatch(openModal({ id: MODAL_IDS.TRANSACTION_ADD_MODAL }))}
+              onClick={() =>
+                dispatch(
+                  openModal({
+                    id: MODAL_IDS.TRANSACTION_ADD_MODAL,
+                    props: {
+                      onSuccess: () => {
+                        dispatch(clearTransactionsState())
+                        props.applyFilters(appliedFiltersRef.current)
+                      },
+                    },
+                  }),
+                )
+              }
               sx={{ flex: 1 }}
             >
               {translate('createTransaction')}

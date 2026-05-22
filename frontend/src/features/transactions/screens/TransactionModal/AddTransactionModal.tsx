@@ -29,9 +29,10 @@ import dayjs from 'dayjs'
 
 type Props = {
   onClose: () => void
+  onSuccess?: () => void
 }
 
-export const AddTransactionModal = ({ onClose }: Props) => {
+export const AddTransactionModal = ({ onClose, onSuccess }: Props) => {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions.Modal.AddTransaction')
 
@@ -56,7 +57,7 @@ export const AddTransactionModal = ({ onClose }: Props) => {
 
     const payload = setPayload()
 
-    await dispatch(addTransaction(payload)).unwrap().finally(onClose)
+    await dispatch(addTransaction(payload)).unwrap().then(onSuccess).finally(onClose)
   }
 
   useEffect(() => {
