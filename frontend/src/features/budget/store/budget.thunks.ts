@@ -25,10 +25,12 @@ export const createBudget = createAsyncThunk<
   { rejectValue: 'cannotCreateBudget' }
 >('createBudget', async ({ payload }, { rejectWithValue }) => {
   try {
-    const response = await budgetApi.createBudget(payload)
+    await budgetApi.createBudget(payload)
+
+    const realData = await budgetApi.getBudgetData()
 
     showToast({ messageKey: 'budgetCreated', type: 'success' })
-    return response
+    return realData
   } catch (e: any) {
     showToast({ messageKey: 'cannotCreateBudget', type: 'error' })
 
