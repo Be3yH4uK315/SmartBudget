@@ -191,7 +191,7 @@ class Goal(Base):
         recommendation = monthly_quota - net_change_this_month
 
         if recommendation > 0:
-            return recommendation.quantize(Decimal("0.01"))
+            return min(recommendation, self.remaining_amount).quantize(Decimal("0.01"))
 
         return self._calculate_remaining_period_recommendation(
             today=today,
