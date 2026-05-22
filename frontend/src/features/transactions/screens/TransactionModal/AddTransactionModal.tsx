@@ -196,7 +196,6 @@ export const AddTransactionModal = ({ onClose, onSuccess }: Props) => {
                     },
                   },
                 }}
-                disablePast
               />
             </LocalizationProvider>
 
