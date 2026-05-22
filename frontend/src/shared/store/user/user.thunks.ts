@@ -27,8 +27,6 @@ export const getUnreadNotificationsCount = createAsyncThunk<
 
     return response
   } catch (e: any) {
-    showToast({ messageKey: 'cannotGetUnreadCount', type: 'error' })
-
     return rejectWithValue('cannotGetUnreadCount')
   }
 })
