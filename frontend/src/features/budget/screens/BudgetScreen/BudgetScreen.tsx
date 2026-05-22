@@ -82,87 +82,88 @@ export default withAuth(function BudgetScreen() {
 
   const handleRedirect = () => navigate(ROUTES.PAGES.SETTINGS.BUDGET)
 
-  const settingsButtonTitle = translate('settingsButtonTitle')
-  const settingsButtonSubtitle = translate('settingsButtonSubtitle')
-
-  console.log(budgetId)
-  if (budgetId === null) return <NoBudgetBlock />
-
   return (
     <ScreenContent isLoading={isLoading} ContentSkeleton={BudgetScreenSkeleton}>
       <ScreenBackgroundBlock />
-      <Stack spacing={2} sx={{ zIndex: 20, pt: 4 }}>
-        <Typography variant="h3" pl={2} color="#333333">
-          {translate('title')}
-        </Typography>
 
-        <Stack direction={{ md: 'row' }} spacing={{ xs: 2, md: 2 }} width={'100%'}>
-          <Stack spacing={2} width={{ xs: '100%', md: '50%' }}>
-            <StyledPaper>
-              <Typography variant="h4">
-                {translate('CategoryInfoBlock.category', { count: limited.length })}
-              </Typography>
+      {budgetId === null && <NoBudgetBlock />}
 
-              <Typography fontWeight={600}>{translate('CategoryInfoBlock.title')}</Typography>
+      {budgetId !== null && (
+        <Stack spacing={2} sx={{ zIndex: 20, pt: 4 }}>
+          <Typography variant="h3" pl={2} color="#333333">
+            {translate('title')}
+          </Typography>
 
-              <Typography variant="caption">{translate('CategoryInfoBlock.subtitle')}</Typography>
-            </StyledPaper>
+          <Stack direction={{ md: 'row' }} spacing={{ xs: 2, md: 2 }} width={'100%'}>
+            <Stack spacing={2} width={{ xs: '100%', md: '50%' }}>
+              <StyledPaper>
+                <Typography variant="h4">
+                  {translate('CategoryInfoBlock.category', { count: limited.length })}
+                </Typography>
 
-            {overflow.length > 0 && (
-              <OverflowCategoriesBlock variant="overflow" categories={overflow} />
-            )}
+                <Typography fontWeight={600}>{translate('CategoryInfoBlock.title')}</Typography>
 
-            {preOverflow.length > 0 && (
-              <OverflowCategoriesBlock variant="preOverflow" categories={preOverflow} />
-            )}
-          </Stack>
+                <Typography variant="caption">{translate('CategoryInfoBlock.subtitle')}</Typography>
+              </StyledPaper>
 
-          <Stack spacing={2} width={'100%'}>
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={{ xs: 2, md: 2 }}
-              width={'100%'}
-            >
-              <Stack spacing={2}>
-                <InfoBlock
-                  title={translate('IsAutoRenew.title')}
-                  subtitle={
-                    isAutoRenew ? translate('IsAutoRenew.on') : translate('IsAutoRenew.off')
-                  }
-                />
+              {overflow.length > 0 && (
+                <OverflowCategoriesBlock variant="overflow" categories={overflow} />
+              )}
 
-                <InfoBlock title={translate('income')} subtitle={formatCurrency(totalIncome)} />
+              {preOverflow.length > 0 && (
+                <OverflowCategoriesBlock variant="preOverflow" categories={preOverflow} />
+              )}
+            </Stack>
 
-                <IconButton
-                  onClick={handleRedirect}
-                  title={settingsButtonTitle}
-                  subtitle={settingsButtonSubtitle}
-                  paperSx={{ flex: '1 0 0%' }}
+            <Stack spacing={2} width={'100%'}>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={{ xs: 2, md: 2 }}
+                width={'100%'}
+              >
+                <Stack spacing={2}>
+                  <InfoBlock
+                    title={translate('IsAutoRenew.title')}
+                    subtitle={
+                      isAutoRenew ? translate('IsAutoRenew.on') : translate('IsAutoRenew.off')
+                    }
+                  />
+
+                  <InfoBlock title={translate('income')} subtitle={formatCurrency(totalIncome)} />
+
+                  <IconButton
+                    onClick={handleRedirect}
+                    title={translate('settingsButtonTitle')}
+                    subtitle={translate('settingsButtonSubtitle')}
+                    paperSx={{ flex: '1 0 0%' }}
+                  />
+                </Stack>
+
+                <PlannedBudgetBlock
+                  totalLimit={totalLimit}
+                  rawPlanedData={rawPlanedData}
+                  planedData={planedData}
+                  planedCenterLabel={planedCenterLabel}
                 />
               </Stack>
 
-              <PlannedBudgetBlock
-                totalLimit={totalLimit}
-                rawPlanedData={rawPlanedData}
-                planedData={planedData}
-                planedCenterLabel={planedCenterLabel}
+              <TransactionsPieBlock
+                activeType={activeType}
+                toggleFilter={toggleFilter}
+                title={translate('transactionsBlockTitle')}
+                pieData={factData}
+                centerLabel={factCenterLabel}
               />
+
+              {limited.length !== 0 && <CategoriesBlock categories={limited} />}
+
+              {unlimited.length !== 0 && (
+                <CategoriesBlock categories={unlimited} isLimited={false} />
+              )}
             </Stack>
-
-            <TransactionsPieBlock
-              activeType={activeType}
-              toggleFilter={toggleFilter}
-              title={translate('transactionsBlockTitle')}
-              pieData={factData}
-              centerLabel={factCenterLabel}
-            />
-
-            {limited.length !== 0 && <CategoriesBlock categories={limited} />}
-
-            {unlimited.length !== 0 && <CategoriesBlock categories={unlimited} isLimited={false} />}
           </Stack>
         </Stack>
-      </Stack>
+      )}
     </ScreenContent>
   )
 })

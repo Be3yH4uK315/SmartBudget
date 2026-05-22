@@ -1,5 +1,5 @@
 import { Button, Stack, Typography } from '@mui/material'
-import { ScreenBackgroundBlock, ScreenContent, StyledPaper } from '@shared/components'
+import { StyledPaper } from '@shared/components'
 import { MODAL_IDS } from '@shared/constants/modals'
 import { useTranslate } from '@shared/hooks'
 import { dispatch } from '@shared/store'
@@ -13,20 +13,16 @@ export const NoBudgetBlock = () => {
   }
 
   return (
-    <ScreenContent>
-      <ScreenBackgroundBlock />
+    <StyledPaper paperSx={{ zIndex: 20, mt: 10, textAlign: 'center' }}>
+      <Stack spacing={4}>
+        <Stack spacing={2}>
+          <Typography variant="h3">{translate('title')}</Typography>
 
-      <StyledPaper paperSx={{ zIndex: 20, mt: 10, textAlign: 'center' }}>
-        <Stack spacing={4}>
-          <Stack spacing={2}>
-            <Typography variant="h3">{translate('title')}</Typography>
-
-            <Typography>{translate('subtitle')}</Typography>
-          </Stack>
-
-          <Button onClick={handleClick}>{translate('create')}</Button>
+          <Typography>{translate('subtitle')}</Typography>
         </Stack>
-      </StyledPaper>
-    </ScreenContent>
+
+        <Button onClick={handleClick}>{translate('create')}</Button>
+      </Stack>
+    </StyledPaper>
   )
 }
