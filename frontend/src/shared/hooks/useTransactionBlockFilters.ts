@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTheme } from '@mui/material'
-import { useTranslate } from '@shared/hooks'
+import { useLocalization, useTranslate } from '@shared/hooks'
 import { FilterType, PieDataItem, TransactionBase } from '@shared/types/components'
 
 export function useTransactionFilters<T>(
@@ -11,6 +11,7 @@ export function useTransactionFilters<T>(
   const translateCategory = useTranslate('Categories')
   const translateMonth = useTranslate('MonthTransactionBlockLabel')
   const theme = useTheme()
+  const { language } = useLocalization()
 
   const [activeType, setActiveType] = useState<FilterType>(initType)
 
@@ -79,7 +80,8 @@ export function useTransactionFilters<T>(
     }, init)
 
     return { normalizedData: acc.normalizedData, total: acc.total }
-  }, [data, activeType, colors, translateCategory, translateMonth, mapper])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, activeType, colors, translateCategory, translateMonth, mapper, language])
 
   return { activeType, toggleFilter, normalizedData, total }
 }

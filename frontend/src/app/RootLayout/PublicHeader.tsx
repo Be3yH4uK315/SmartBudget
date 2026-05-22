@@ -1,12 +1,15 @@
 import { AppBar, Box, Button, Container, Typography } from '@mui/material'
 import { ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
+import { selectUser, useAppSelector } from '@shared/store'
 import { Link as RouterLink } from 'react-router'
 import { LanguageMenu } from './LanguageMenu'
 import { ThemeButton } from './ThemeButton'
 
 export const PublicHeader = () => {
   const translate = useTranslate('PublicPage')
+
+  const isAuth = useAppSelector(selectUser).isAuth
 
   return (
     <AppBar position="static" color="transparent" sx={{ bgcolor: 'surface.light' }}>
@@ -22,7 +25,7 @@ export const PublicHeader = () => {
 
         <Button
           component={RouterLink}
-          to={ROUTES.PAGES.LOGIN}
+          to={isAuth ? ROUTES.PAGES.DASHBOARD : ROUTES.PAGES.LOGIN}
           variant="yellow"
           size="small"
           sx={{ ml: 1, typography: 'caption', height: 'max-content', textAlign: 'center' }}
