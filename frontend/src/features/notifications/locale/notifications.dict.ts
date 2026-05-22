@@ -179,6 +179,34 @@ export const notificationsDict: LocaleDictionary = {
       unread: 'New notification',
       markAllAsRead: 'Mark all as read',
 
+      Filters: {
+        selected: 'Selected: {{value}}',
+        clear: 'Clear filters',
+        placeholder: {
+          types: 'Type',
+          services: 'Service',
+          statuses: 'Status',
+        },
+
+        Statuses: {
+          read: 'Read',
+          unread: 'Unread',
+          empty: 'Not set',
+        },
+
+        info: 'Informational',
+        success: 'Successful',
+        alert: 'Alert',
+        warning: 'Critical',
+        system: 'System',
+
+        Goals: 'Goals',
+        Transactions: 'Transactions',
+        Budget: 'Budget & Limits',
+        Security: 'Security',
+        Limit: 'Category Limits',
+      },
+
       Limit: {
         preOverflow: {
           title: '80% of category limit reached',
