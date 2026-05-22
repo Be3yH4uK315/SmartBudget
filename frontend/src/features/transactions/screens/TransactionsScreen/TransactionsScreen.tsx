@@ -3,6 +3,7 @@ import { transactionsApi } from '@features/transactions/api'
 import { useTransactionsFilters } from '@features/transactions/hooks'
 import {
   clearTransactionsState,
+  getTransactions,
   importTransaction,
   selectIsImportLoading,
   selectIsTransactionsLoading,
@@ -36,7 +37,7 @@ export default function TransactionsScreen() {
       .unwrap()
       .then(() => {
         dispatch(clearTransactionsState())
-        props.applyFilters(appliedFiltersRef.current)
+        dispatch(getTransactions(appliedFiltersRef.current))
       })
   }
 
@@ -68,7 +69,7 @@ export default function TransactionsScreen() {
                     props: {
                       onSuccess: () => {
                         dispatch(clearTransactionsState())
-                        props.applyFilters(appliedFiltersRef.current)
+                        dispatch(getTransactions(appliedFiltersRef.current))
                       },
                     },
                   }),

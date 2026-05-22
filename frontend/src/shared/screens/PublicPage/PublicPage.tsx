@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import {
   AccountBalanceWalletRounded,
   AutoAwesomeRounded,
@@ -8,7 +7,7 @@ import {
 import { Box, Button, Container, Grid, Stack, Typography } from '@mui/material'
 import { ROUTES } from '@shared/constants'
 import { useTranslate } from '@shared/hooks'
-import { getUserInfo, selectUser, useAppDispatch, useAppSelector } from '@shared/store'
+import { selectUser, useAppSelector } from '@shared/store'
 import { FeatureCard as FeatureCardType } from '@shared/types/components'
 import { Link as RouterLink } from 'react-router'
 import { FeatureCard } from './FeatureCard'
@@ -16,10 +15,7 @@ import { StepBlock } from './StepBlock'
 
 export const PublicPage = () => {
   const isAuth = useAppSelector(selectUser).isAuth
-  const dispatch = useAppDispatch()
   const translate = useTranslate('PublicPage')
-
-  const route = isAuth ? ROUTES.PAGES.DASHBOARD : ROUTES.PAGES.LOGIN
 
   const features: FeatureCardType[] = [
     {
@@ -43,10 +39,6 @@ export const PublicPage = () => {
       subtitle: 'Feature.Four.subtitle',
     },
   ]
-
-  useEffect(() => {
-    dispatch(getUserInfo())
-  }, [])
 
   return (
     <Box sx={{ width: '100%', overflowX: 'hidden' }}>
@@ -81,7 +73,7 @@ export const PublicPage = () => {
 
             <Button
               component={RouterLink}
-              to={route}
+              to={isAuth ? ROUTES.PAGES.DASHBOARD : ROUTES.PAGES.LOGIN}
               sx={{
                 bgcolor: 'gray.dark',
                 color: '#fff',
@@ -136,7 +128,12 @@ export const PublicPage = () => {
           <Stack alignItems="center" textAlign="center" spacing={3}>
             <Typography variant="h4">{translate('ctaTitle')}</Typography>
 
-            <Button component={RouterLink} to={route} variant="yellow" sx={{ px: 5, py: 1.5 }}>
+            <Button
+              component={RouterLink}
+              to={isAuth ? ROUTES.PAGES.DASHBOARD : ROUTES.PAGES.LOGIN}
+              variant="yellow"
+              sx={{ px: 5, py: 1.5 }}
+            >
               {translate('ctaButton')}
             </Button>
           </Stack>
