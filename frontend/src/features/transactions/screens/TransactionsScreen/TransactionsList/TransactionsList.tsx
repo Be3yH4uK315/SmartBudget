@@ -34,7 +34,7 @@ export const TransactionsList = ({ isLast, isLoading, transactions, appliedFilte
     if (date.isSame(dayjs(), 'day')) return translate('today')
     if (date.isSame(dayjs().subtract(1, 'day'), 'day')) return translate('yesterday')
 
-    return date.format('D MMMM')
+    return date.format(date.isSame(dayjs(), 'year') ? 'D MMMM' : 'D MMMM YYYY')
   }
 
   return (
