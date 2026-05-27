@@ -6,13 +6,13 @@ import {
   selectNotificationsSettingsIsLoading,
 } from '@features/settings/store/notifications'
 import { Stack } from '@mui/material'
-import { ScreenContent } from '@shared/components'
+import { ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { NotificationsScreenSkeleton } from './NotificationsScreenSkeleton'
 import { ServiceBlock } from './ServiceBlock'
 
-export default function NotificationsScreen() {
+export default withAuth(function NotificationsScreen() {
   const translate = useTranslate('Settings.Notifications')
   const dispatch = useAppDispatch()
 
@@ -69,4 +69,4 @@ export default function NotificationsScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

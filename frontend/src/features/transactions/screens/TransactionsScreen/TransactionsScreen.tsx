@@ -21,7 +21,7 @@ import { TransactionsFiltersBlock } from './TransactionsFilters'
 import { TransactionLine, TransactionsList } from './TransactionsList'
 import { TransactionsScreenSkeleton } from './TransactionsScreenSkeleton'
 
-export default function TransactionsScreen() {
+export default withAuth(function TransactionsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Transactions')
 
@@ -117,4 +117,4 @@ export default function TransactionsScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})
