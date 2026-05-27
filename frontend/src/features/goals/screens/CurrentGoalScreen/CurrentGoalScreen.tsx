@@ -18,6 +18,7 @@ import {
   ScreenBackgroundBlock,
   ScreenContent,
   TransactionsPieBlock,
+  withAuth,
 } from '@shared/components'
 import { MODAL_IDS, ROUTES } from '@shared/constants'
 import { useTransactionFilters, useTranslate } from '@shared/hooks'
@@ -31,7 +32,7 @@ import { CurrentGoalScreenSkeleton } from './CurrentGoalScreenSkeleton'
 import { GoalInfoBlock } from './GoalInfo'
 import { ProgressBlock } from './ProgressBlock'
 
-export default function GoalScreen() {
+export default withAuth(function GoalScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('CurrentGoal')
   const navigate = useNavigate()
@@ -167,4 +168,4 @@ export default function GoalScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

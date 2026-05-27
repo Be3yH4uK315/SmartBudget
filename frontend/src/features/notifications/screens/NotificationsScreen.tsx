@@ -8,12 +8,12 @@ import {
   selectUnreadCount,
 } from '@features/notifications/store'
 import { Button, Stack } from '@mui/material'
-import { EmptyList, ScreenContent } from '@shared/components'
+import { EmptyList, ScreenContent, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { NotificationsScreenSkeleton } from './NotificationsScreenSkeleton'
 
-export default function NotificationsScreen() {
+export default withAuth(function NotificationsScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Notifications')
 
@@ -81,4 +81,4 @@ export default function NotificationsScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

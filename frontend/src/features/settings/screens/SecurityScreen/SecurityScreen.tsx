@@ -9,7 +9,7 @@ import {
   selectSessions,
 } from '@features/settings/store/security'
 import { Button, Stack, Typography } from '@mui/material'
-import { ScreenContent, StyledPaper } from '@shared/components'
+import { ScreenContent, StyledPaper, withAuth } from '@shared/components'
 import { useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { ChangePasswordBlock } from './ChangePasswordBlock'
@@ -17,7 +17,7 @@ import { RefreshTokenDurationBlock } from './RefreshTokenDurationBlock'
 import { SecurityScreenSkeleton } from './SecurityScreenSkeleton'
 import { SessionItem } from './SessionItem'
 
-export default function SecurityScreen() {
+export default withAuth(function SecurityScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Settings.Security')
 
@@ -83,4 +83,4 @@ export default function SecurityScreen() {
       </Stack>
     </ScreenContent>
   )
-}
+})

@@ -9,14 +9,14 @@ import {
 } from '@features/settings/store/budget'
 import { mapBudgetSettingsToForm } from '@features/settings/utils'
 import { Button, CircularProgress, Stack } from '@mui/material'
-import { BudgetForm, ScreenContent } from '@shared/components'
+import { BudgetForm, ScreenContent, withAuth } from '@shared/components'
 import { useBudgetForm, useTranslate } from '@shared/hooks'
 import { useAppDispatch, useAppSelector } from '@shared/store'
 import { mapFormToBudgetPayload } from '@shared/utils'
 import dayjs from 'dayjs'
 import { BudgetScreenSkeleton } from './BudgetScreenSkeleton'
 
-export default function BudgetScreen() {
+export default withAuth(function BudgetScreen() {
   const dispatch = useAppDispatch()
   const translate = useTranslate('Settings.Budget')
 
@@ -73,4 +73,4 @@ export default function BudgetScreen() {
       )}
     </ScreenContent>
   )
-}
+})
